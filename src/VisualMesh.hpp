@@ -52,7 +52,7 @@ public:
      * @param shape             the shape we are generating a visual mesh for
      * @param min_height        the minimum height that our camera will be at
      * @param max_height        the maximum height our camera will be at
-     * @param height_resolution the number of look up tables to generated (height gradiations)
+     * @param height_resolution the number of look up tables to generated (height gradations)
      * @param min_angular_res   the smallest angular size to generate for
      */
     template <typename Shape>
@@ -139,11 +139,12 @@ public:
                     Node n;
 
                     // Calculate our unit vector with origin facing forward
-                    n.ray[0] = std::sin(theta) * std::cos(M_PI - phi);
-                    n.ray[1] = std::sin(theta) * std::sin(M_PI - phi);
-                    n.ray[2] = std::cos(theta);
+                    n.ray[0] = std::sin(M_PI - phi) * std::cos(theta);
+                    n.ray[1] = std::sin(M_PI - phi) * std::sin(theta);
+                    n.ray[2] = std::cos(M_PI - phi);
+                    n.ray[3] = 0;
 
-                    // Get the indicies for our left/right neighbours relative to this row
+                    // Get the indices for our left/right neighbours relative to this row
                     const int l = i == 0 ? steps - 1 : i - 1;
                     const int r = i == steps - 1 ? 0 : i + 1;
 
@@ -161,12 +162,12 @@ public:
             // Now we upwards and downwards to fill in the missing links
             for (size_t r = 0; r < rows.size(); ++r) {
 
-                // Alias for convinience
+                // Alias for convenience
                 const auto& prev    = rows[r - 1];
                 const auto& current = rows[r];
                 const auto& next    = rows[r + 1];
 
-                // Work out how big our rows are if they are within valid indicies
+                // Work out how big our rows are if they are within valid indices
                 int prev_size    = r > 0 ? prev.second - prev.first : 0;
                 int current_size = current.second - current.first;
                 int next_size    = r < rows.size() - 1 ? next.second - next.first : 0;
@@ -232,8 +233,8 @@ public:
                         size_t index = i - current.first + (current_size / 2);
 
                         // Link to them
-                        node.neighbours[0] = current.first + (index % current_size);
-                        node.neighbours[1] = current.first + ((index + 1) % current_size);
+                        node.neighbours[4] = current.first + (index % current_size);
+                        node.neighbours[5] = current.first + ((index + 1) % current_size);
                     }
                 }
             }
@@ -247,9 +248,7 @@ public:
 
     const std::vector<Node>& data(const Scalar& height) const {
 
-        // Work out our best fit for the height and return it
-        uint index = uint(((height - min_height) / (max_height - min_height)) * (height_resolution - 1));
-        return luts[index < 0 ? 0 : index >= height_resolution ? height_resolution - 1 : index];
+        return luts.lower_bound(height)->second;
     }
 
 private:
@@ -262,7 +261,7 @@ private:
     Scalar min_height;
     // The maximum height the luts are generated for
     Scalar max_height;
-    // The number gradiations in height
+    // The number gradations in height
     size_t height_resolution;
 };
 

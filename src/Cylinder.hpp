@@ -32,12 +32,15 @@ struct Cylinder {
      * @param plane_height the height of the cylinder above the observation plane
      * @param cylinder_height the height of the cylinder
      * @param intersections the number of intersections to ensure with a spherical section of the cylinder
+     * @param max_distance  the maximum distance we want to look for this object
      */
     Cylinder(const Scalar& plane_height,
              const Scalar& cylinder_height,
              const Scalar& radius,
-             const size_t& intersections)
-        : upper(plane_height + cylinder_height, radius, intersections), lower(plane_height, radius, intersections) {}
+             const size_t& intersections,
+             const Scalar& max_distance)
+        : upper(plane_height + cylinder_height, radius, intersections, max_distance)
+        , lower(plane_height, radius, intersections, max_distance) {}
 
     /**
      * @brief Given a value for phi and a camera height, return the value to the next phi in the sequence.

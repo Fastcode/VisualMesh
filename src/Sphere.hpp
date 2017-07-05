@@ -31,9 +31,10 @@ struct Sphere {
      * @param height the height of the object above the observation plane
      * @param radius the radius of the sphere
      * @param intersections the number of intersections to ensure with this object
+     * @param max_distance  the maximum distance we want to look for this object
      */
-    Sphere(const Scalar& height, const Scalar& radius, const size_t& intersections)
-        : h(height), r(radius), i(intersections) {}
+    Sphere(const Scalar& height, const Scalar& radius, const size_t& intersections, const Scalar& max_distance)
+        : h(height), r(radius), i(intersections), d(max_distance) {}
 
     /**
      * @brief Given a value for phi and a camera height, return the value to the next phi in the sequence.
@@ -47,6 +48,11 @@ struct Sphere {
 
         // Our effective height above the plane
         Scalar eh = c - h;
+
+        // If we are beyond our max distance return nan
+        if (std::abs(eh) * tan(phi_n) > d) {
+            return std::numeric_limits<Scalar>::quiet_NaN();
+        }
 
         // Our effective radius for the number of intersections
         Scalar er = effective_radius(std::abs(eh));
@@ -78,6 +84,11 @@ struct Sphere {
         // Our effective height above the observation plane
         Scalar eh = c - h;
 
+        // If we are beyond our max distance return nan
+        if (std::abs(eh) * tan(phi) > d) {
+            return std::numeric_limits<Scalar>::quiet_NaN();
+        }
+
         // Valid below the horizon
         if (eh > 0 && phi < M_PI_2) {
             return 2 * asin(r / (eh * tan(phi) + r)) / i;
@@ -98,6 +109,8 @@ struct Sphere {
     Scalar r;
     // The number of intersections the mesh should have with this sphere
     size_t i;
+    /// The maximum distance we want to see this object
+    Scalar d;
 
 private:
     /**
@@ -122,6 +135,11 @@ private:
      * @return the radius of a sphere that will intersect an appropriate number of times
      */
     Scalar effective_radius(const Scalar& eh, const Scalar& tolerance = 1e-5) const {
+
+        // If 1 short circuit
+        if (i == 1) {
+            return r;
+        }
 
         // The angle of a single intersection used as our target total phi
         Scalar p0 = phi0(0, r, eh);
