@@ -50,7 +50,7 @@ struct Cylinder {
      *
      * @return the next phi in the sequence (phi_n+1)
      */
-    Scalar phi(const Scalar& phi_n, const Scalar& c) {
+    Scalar phi(const Scalar& phi_n, const Scalar& c) const {
         // Get values from both the upper and lower sphere
         Scalar u = upper.phi(phi_n, c);
         Scalar l = lower.phi(phi_n, c);
@@ -74,7 +74,7 @@ struct Cylinder {
      *
      * @return the angular width of the object around a phi circle
      */
-    Scalar theta(const Scalar& phi, const Scalar& c) {
+    Scalar theta(const Scalar& phi, const Scalar& c) const {
         // Get values from the upper and lower sphere
         Scalar u = upper.theta(phi, c);
         Scalar l = lower.theta(phi, c);

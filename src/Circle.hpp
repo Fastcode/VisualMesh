@@ -44,13 +44,13 @@ struct Circle {
      *
      * @return the next phi in the sequence (phi_n+1)
      */
-    Scalar phi(const Scalar& phi_n, const Scalar& c) {
+    Scalar phi(const Scalar& phi_n, const Scalar& c) const {
 
         // Our effective height above the plane
         Scalar eh = c - h;
 
         // If we are beyond our max distance return nan
-        if (std::abs(eh) * tan(phi) > d) {
+        if (std::abs(eh) * tan(phi_n > M_PI_2 ? M_PI - phi_n : phi_n) > d) {
             return std::numeric_limits<Scalar>::quiet_NaN();
         }
 
@@ -76,13 +76,13 @@ struct Circle {
      *
      * @return the angular width of the object around a phi circle
      */
-    Scalar theta(const Scalar& phi, const Scalar& c) {
+    Scalar theta(const Scalar& phi, const Scalar& c) const {
 
         // Our effective height above the observation plane
         Scalar eh = c - h;
 
         // If we are beyond our max distance return nan
-        if (std::abs(eh) * tan(phi) > d) {
+        if (std::abs(eh) * tan(phi > M_PI_2 ? M_PI - phi : phi) > d) {
             return std::numeric_limits<Scalar>::quiet_NaN();
         }
 

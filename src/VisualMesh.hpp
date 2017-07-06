@@ -37,7 +37,7 @@ public:
     struct alignas(16) Node {
         /// The unit vector in the direction for this node
         Scalar ray[4];
-        /// Relative indicies to the linked hexagon nodes in the LUT ordered TL, TR, L, R, BL, BR,
+        /// Relative indices to the linked hexagon nodes in the LUT ordered TL, TR, L, R, BL, BR,
         int neighbours[6];
     };
 
@@ -88,12 +88,14 @@ public:
                 phi = std::max(phi + min_angular_res, shape.phi(phi, h));
             }
 
-
             // Loop from directly up down to the horizon (if phi is nan it will stop)
-            for (Scalar phi = shape.phi(M_PI, h) / 2.0; phi > M_PI_2;) {
+            for (Scalar phi = (M_PI + shape.phi(M_PI, h)) / 2.0; phi > M_PI_2;) {
 
                 // Calculate our theta
                 Scalar theta = std::max(shape.theta(phi, h), min_angular_res);
+
+                std::cout << "Phi:   " << phi << std::endl;
+                std::cout << "Theta: " << theta << std::endl;
 
                 if (!isnan(theta)) {
                     // Push back the phi, and the number of whole shapes we can fit
@@ -172,70 +174,61 @@ public:
                 int current_size = current.second - current.first;
                 int next_size    = r < rows.size() - 1 ? next.second - next.first : 0;
 
-
                 // Go through all the nodes on our current row
                 for (size_t i = current.first; i < current.second; ++i) {
 
                     // Grab our current node
                     auto& node = lut[i];
 
-
-                    // Find where we are in our row
+                    // Find where we are in our row as a value between 0 and 1
                     Scalar pos = Scalar(i - current.first) / Scalar(current_size);
 
-                    // Link to our previous row if something is available
-                    if (r > 0) {
+                    /**
+                     * This function links to the previous and next rows
+                     *
+                     * @param start         the start of the row to link to
+                     * @param size          the size of the row we are linking to
+                     * @param invalid_row   the row that is invalid (first for prev, last for next)
+                     * @param offset        the offset for our neighbour (0 for TL,TR 4 for BL BR)
+                     */
+                    auto link = [&](const int& start, const int& size, const size_t& invalid_row, const size_t offset) {
 
-                        // Work out if we are closer to the left or right and make an offset var for it
-                        // Note this bool is used like a bool and int. It is 0 when we should access TR first
-                        // and 1 when we should access TL first
-                        bool left = pos > 0.5;
+                        if (r != invalid_row) {
+                            // Work out if we are closer to the left or right and make an offset var for it
+                            // Note this bool is used like a bool and int. It is 0 when we should access TR first
+                            // and 1 when we should access TL first. This is to avoid accessing values which wrap around
+                            // and instead access a non wrap element and use its neighbours to work out ours
+                            bool left = pos > 0.5;
 
-                        // Get our closest neighbour on the previous row and use it to work out where the other one is
-                        // This will be the Right element when < 0.5 and Left when > 0.5
-                        size_t o1 = prev.first + std::floor(pos * prev_size + !left);  // Use `left` to add one to one
-                        size_t o2 = o1 + lut[o1].neighbours[2 + left];                 // But not the other
+                            // Get our closest neighbour on the previous row and use it to work out where the other one
+                            // is This will be the Right element when < 0.5 and Left when > 0.5
+                            size_t o1 = start + std::floor(pos * size + !left);  // Use `left` to add one to one
+                            size_t o2 = o1 + lut[o1].neighbours[2 + left];       // But not the other
 
-                        // Now use these to set our TL and TR neighbours
-                        node.neighbours[0] = (left ? o1 : o2) - i;
-                        node.neighbours[1] = (left ? o2 : o1) - i;
-                    }
-                    // If we don't have a previous row, we are at the end, so instead link to our own row
-                    else {
-                        // Work out which two points are on the opposite side to us
-                        size_t index = i - current.first + (current_size / 2);
+                            // Now use these to set our TL and TR neighbours
+                            node.neighbours[offset]     = (left ? o1 : o2) - i;
+                            node.neighbours[offset + 1] = (left ? o2 : o1) - i;
+                        }
+                        // If we don't have a row to link to, we are at the end, so instead link to our own row
+                        // However if we only do this if we only do this if we are ending on our side of the horizon
+                        else if ((node.ray[2] < 0 && invalid_row == 0) || (node.ray[2] > 0 && invalid_row != 0)) {
+                            // Work out which two points are on the opposite side to us
+                            size_t index = i - current.first + (current_size / 2);
 
-                        // Link to them
-                        node.neighbours[0] = current.first + (index % current_size);
-                        node.neighbours[1] = current.first + ((index + 1) % current_size);
-                    }
+                            // Link to them
+                            node.neighbours[offset]     = current.first + (index % current_size) - i;
+                            node.neighbours[offset + 1] = current.first + ((index + 1) % current_size) - i;
+                        }
+                        // If we can't link, just link to our left and right
+                        else {
+                            node.neighbours[offset]     = node.neighbours[2];
+                            node.neighbours[offset + 1] = node.neighbours[3];
+                        }
+                    };
 
-                    // Link to our next row if something is available
-                    if (r < rows.size() - 1) {
-
-                        // Work out if we are closer to the left or right and make an offset var for it
-                        // Note this bool is used like a bool and int. It is 0 when we should access TR first
-                        // and 1 when we should access TL first
-                        bool left = pos > 0.5;
-
-                        // Get our closest neighbour on the previous row and use it to work out where the other one is
-                        // This will be the Right element when < 0.5 and Left when > 0.5
-                        size_t o1 = next.first + std::floor(pos * next_size + !left);  // Use `left` to add one to one
-                        size_t o2 = o1 + lut[o1].neighbours[2 + left];                 // But not the other
-
-                        // Now use these to set our TL and TR neighbours
-                        node.neighbours[4] = (left ? o1 : o2) - i;
-                        node.neighbours[5] = (left ? o2 : o1) - i;
-                    }
-                    // If we don't have a previous row, we are at the end, so instead link to our own row
-                    else {
-                        // Work out which two points are on the opposite side to us
-                        size_t index = i - current.first + (current_size / 2);
-
-                        // Link to them
-                        node.neighbours[4] = current.first + (index % current_size);
-                        node.neighbours[5] = current.first + ((index + 1) % current_size);
-                    }
+                    // Perform both links
+                    link(prev.first, prev_size, 0, 0);
+                    link(next.first, next_size, rows.size() - 1, 4);
                 }
             }
 

@@ -1,23 +1,31 @@
 #include <iostream>
 
+#include "Circle.hpp"
+#include "Cylinder.hpp"
 #include "Sphere.hpp"
 #include "VisualMesh.hpp"
 
 int main() {
 
-    mesh::Sphere<float> s(0, 0.075, 1, 5);
+    mesh::Cylinder<float> cylinder(0, 2.0, 0.075, 1, 10);
+    mesh::Sphere<float> sphere(2, 0.075, 1, 10);
+    mesh::Circle<float> circle(0, 0.075, 1, 10);
 
-    mesh::VisualMesh<> mesh(s, 0.4, 1.0, 10, M_PI / 1024.0);
+    mesh::VisualMesh<> mesh(cylinder, 1.0, 1.1, 1, M_PI / 1024.0);
 
     // Print the mesh
     const auto& lut = mesh.data(0.5);
 
     std::cout << "[ ";
-    for (int i = 0; i < lut.size(); ++i) {
+    for (size_t i = 0; i < lut.size(); ++i) {
 
         const auto& node = lut[i];
 
-        for (const auto& n : lut[i].neighbours) {
+        // for (const auto& n : lut[i].neighbours) {
+        for (int j = 0; j < 6; ++j) {
+
+            const auto& n = lut[i].neighbours[j];
+
             const auto& neighbour = lut[i + n];
             std::cout << "(" << node.ray[0] << ", " << node.ray[1] << ", " << node.ray[2] << ", " << neighbour.ray[0]
                       << ", " << neighbour.ray[1] << ", " << neighbour.ray[2] << "), ";

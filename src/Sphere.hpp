@@ -50,7 +50,7 @@ struct Sphere {
         Scalar eh = c - h;
 
         // If we are beyond our max distance return nan
-        if (std::abs(eh) * tan(phi_n) > d) {
+        if (std::abs(eh) * tan(phi_n > M_PI_2 ? M_PI - phi_n : phi_n) > d) {
             return std::numeric_limits<Scalar>::quiet_NaN();
         }
 
@@ -85,7 +85,7 @@ struct Sphere {
         Scalar eh = c - h;
 
         // If we are beyond our max distance return nan
-        if (std::abs(eh) * tan(phi) > d) {
+        if (std::abs(eh) * tan(phi > M_PI_2 ? M_PI - phi : phi) > d) {
             return std::numeric_limits<Scalar>::quiet_NaN();
         }
 
