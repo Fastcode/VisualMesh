@@ -34,11 +34,31 @@ namespace mesh {
 template <typename Scalar = float>
 class VisualMesh {
 public:
-    struct alignas(16) Node {
+    struct Node {
         /// The unit vector in the direction for this node
         Scalar ray[4];
         /// Relative indices to the linked hexagon nodes in the LUT ordered TL, TR, L, R, BL, BR,
         int neighbours[6];
+    };
+
+    struct Row {
+        Row(const Scalar& phi, const size_t& begin, const size_t& end) : phi(phi), begin(begin), end(end) {}
+
+        /// The phi value this row represents
+        Scalar phi;
+        /// The index of the beginning of this row in the node table
+        size_t begin;
+        /// The index of one past the end of this row in the node table
+        size_t end;
+    };
+
+    struct Mesh {
+        Mesh(std::vector<Node>&& nodes, std::vector<Row>&& rows) : nodes(nodes), rows(rows) {}
+
+        /// The lookup table for this mesh
+        std::vector<Node> nodes;
+        /// A set of individual rows for phi values. `begin` and `end` refer to the table
+        std::vector<Row> rows;
     };
 
     /**
@@ -121,7 +141,7 @@ public:
             lut.reserve(lut_size);
 
             // The start and end of each row in the final lut
-            std::vector<std::pair<size_t, size_t>> rows;
+            std::vector<Row> rows;
             rows.reserve(phis.size());
 
             // Loop through our LUT and calculate our left and right neighbours
@@ -133,7 +153,7 @@ public:
                 Scalar dtheta     = (2.0 * M_PI) / steps;
 
                 // We will use the start position of each row later for linking the graph
-                rows.emplace_back(lut.size(), lut.size() + steps);
+                rows.emplace_back(phi, lut.size(), lut.size() + steps);
 
                 // Generate for each of the theta values from 0 to 2 pi
                 Scalar theta = 0;
@@ -170,18 +190,18 @@ public:
                 const auto& next    = rows[r + 1];
 
                 // Work out how big our rows are if they are within valid indices
-                int prev_size    = r > 0 ? prev.second - prev.first : 0;
-                int current_size = current.second - current.first;
-                int next_size    = r < rows.size() - 1 ? next.second - next.first : 0;
+                int prev_size    = r > 0 ? prev.end - prev.begin : 0;
+                int current_size = current.end - current.begin;
+                int next_size    = r < rows.size() - 1 ? next.end - next.begin : 0;
 
                 // Go through all the nodes on our current row
-                for (size_t i = current.first; i < current.second; ++i) {
+                for (size_t i = current.begin; i < current.end; ++i) {
 
                     // Grab our current node
                     auto& node = lut[i];
 
                     // Find where we are in our row as a value between 0 and 1
-                    Scalar pos = Scalar(i - current.first) / Scalar(current_size);
+                    Scalar pos = Scalar(i - current.begin) / Scalar(current_size);
 
                     /**
                      * This function links to the previous and next rows
@@ -213,11 +233,11 @@ public:
                         // However if we only do this if we only do this if we are ending on our side of the horizon
                         else if ((node.ray[2] < 0 && invalid_row == 0) || (node.ray[2] > 0 && invalid_row != 0)) {
                             // Work out which two points are on the opposite side to us
-                            size_t index = i - current.first + (current_size / 2);
+                            size_t index = i - current.begin + (current_size / 2);
 
                             // Link to them
-                            node.neighbours[offset]     = current.first + (index % current_size) - i;
-                            node.neighbours[offset + 1] = current.first + ((index + 1) % current_size) - i;
+                            node.neighbours[offset]     = current.begin + (index % current_size) - i;
+                            node.neighbours[offset + 1] = current.begin + ((index + 1) % current_size) - i;
                         }
                         // If we can't link, just link to our left and right
                         else {
@@ -227,26 +247,26 @@ public:
                     };
 
                     // Perform both links
-                    link(prev.first, prev_size, 0, 0);
-                    link(next.first, next_size, rows.size() - 1, 4);
+                    link(prev.begin, prev_size, 0, 0);
+                    link(next.begin, next_size, rows.size() - 1, 4);
                 }
             }
 
-            // Insert our constructed lut into the lookup
-            luts.insert(std::make_pair(h, std::move(lut)));
+            // Insert our constructed mesh into the lookup
+            luts.insert(std::make_pair(h, Mesh(std::move(lut), std::move(rows))));
         }
     }
 
     // std::vector<std::pair<iterator, iterator>> lookup() const {}
 
-    const std::vector<Node>& data(const Scalar& height) const {
+    const Mesh& data(const Scalar& height) const {
 
         return luts.lower_bound(height)->second;
     }
 
 private:
     /// A map from heights to visual mesh tables
-    std::map<Scalar, std::vector<Node>> luts;
+    std::map<Scalar, Mesh> luts;
 
     /// The smallest angular width the LUT should be generated for
     Scalar min_angular_res;

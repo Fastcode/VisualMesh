@@ -17,16 +17,16 @@ int main() {
     const auto& lut = mesh.data(0.5);
 
     std::cout << "[ ";
-    for (size_t i = 0; i < lut.size(); ++i) {
+    for (size_t i = 0; i < lut.nodes.size(); ++i) {
 
-        const auto& node = lut[i];
+        const auto& node = lut.nodes[i];
 
         // for (const auto& n : lut[i].neighbours) {
         for (int j = 0; j < 6; ++j) {
 
-            const auto& n = lut[i].neighbours[j];
+            const auto& n = lut.nodes[i].neighbours[j];
 
-            const auto& neighbour = lut[i + n];
+            const auto& neighbour = lut.nodes[i + n];
             std::cout << "(" << node.ray[0] << ", " << node.ray[1] << ", " << node.ray[2] << ", " << neighbour.ray[0]
                       << ", " << neighbour.ray[1] << ", " << neighbour.ray[2] << "), ";
         }
