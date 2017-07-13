@@ -50,6 +50,17 @@ public:
         size_t begin;
         /// The index of one past the end of this row in the node table
         size_t end;
+
+        /**
+         * @brief Compare based on phi
+         *
+         * @param other other item to compare to
+         *
+         * @return if our phi is less than other phi
+         */
+        bool operator<(const Row& other) const {
+            return phi < other.phi;
+        }
     };
 
     struct Mesh {
@@ -83,11 +94,11 @@ public:
                         const Scalar& min_angular_res)
         : min_height(min_height)
         , max_height(max_height)
-        , height_resolution(height_resolution)
-        , min_angular_res(min_angular_res) {
+        , min_angular_res(min_angular_res)
+        , height_resolution(height_resolution) {
 
+        // Loop through to make a mesh for each of our height possibilities
         for (Scalar h = min_height; h < max_height; h += (max_height - min_height) / height_resolution) {
-
 
             // This is a list of phi values along with the delta theta values associated with them
             std::vector<std::pair<Scalar, size_t>> phis;
@@ -113,9 +124,6 @@ public:
 
                 // Calculate our theta
                 Scalar theta = std::max(shape.theta(phi, h), min_angular_res);
-
-                std::cout << "Phi:   " << phi << std::endl;
-                std::cout << "Theta: " << theta << std::endl;
 
                 if (!isnan(theta)) {
                     // Push back the phi, and the number of whole shapes we can fit
@@ -257,11 +265,44 @@ public:
         }
     }
 
-    // std::vector<std::pair<iterator, iterator>> lookup() const {}
-
-    const Mesh& data(const Scalar& height) const {
-
+    const Mesh& height(const Scalar& height) const {
         return luts.lower_bound(height)->second;
+    }
+
+    template <typename Func>
+    std::vector<std::pair<size_t, size_t>> lookup(const Scalar& height, Func&& theta_func) const {
+
+        const auto& mesh = luts.lower_bound(height)->second;
+        std::vector<std::pair<size_t, size_t>> indicies;
+
+        // Loop through each phi row
+        for (auto& row : mesh.rows) {
+
+            auto row_size = row.end - row.begin;
+
+            // Get the theta values that are valid for this phi
+            auto theta_ranges = theta_func(row.phi);
+
+            // Work out what this range means in terms of theta
+            for (auto& range : theta_ranges) {
+
+                // Convert our theta values into local indices
+                size_t begin = std::ceil(row_size * range.first / (2.0 * M_PI));
+                size_t end   = std::ceil(row_size * range.second / (2.0 * M_PI));
+
+                // If we define a nice enclosed range range add it
+                if (end >= begin) {
+                    indicies.emplace_back(row.begin + begin, row.begin + end);
+                }
+                // Our phi values wrap around so we need two ranges
+                else {
+                    indicies.emplace_back(row.begin, row.begin + end);
+                    indicies.emplace_back(row.begin + begin, row.end);
+                }
+            }
+        }
+
+        return indicies;
     }
 
 private:
