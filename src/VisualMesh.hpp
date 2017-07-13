@@ -34,6 +34,20 @@ namespace mesh {
 template <typename Scalar = float>
 class VisualMesh {
 public:
+    struct Lens {
+        enum Type { EQUIRECTANGULAR, RADIAL };
+        struct Radial {};
+        struct Equirectangular {
+            std::array<Scalar, 2> fov;
+        };
+
+        Type type;
+        union {
+            Radial radial;
+            Equirectangular equirectangular;
+        };
+    };
+
     struct Node {
         /// The unit vector in the direction for this node
         Scalar ray[4];
@@ -68,7 +82,7 @@ public:
 
         /// The lookup table for this mesh
         std::vector<Node> nodes;
-        /// A set of individual rows for phi values. `begin` and `end` refer to the table
+        /// A set of individual rows for phi values. `begin` and `end` refer to the table with end being 1 past the end
         std::vector<Row> rows;
     };
 
@@ -270,7 +284,7 @@ public:
     }
 
     template <typename Func>
-    std::vector<std::pair<size_t, size_t>> lookup(const Scalar& height, Func&& theta_func) const {
+    std::vector<std::pair<size_t, size_t>> lookup(const Scalar& height, Func&& theta_limits) const {
 
         const auto& mesh = luts.lower_bound(height)->second;
         std::vector<std::pair<size_t, size_t>> indicies;
@@ -281,7 +295,7 @@ public:
             auto row_size = row.end - row.begin;
 
             // Get the theta values that are valid for this phi
-            auto theta_ranges = theta_func(row.phi);
+            auto theta_ranges = theta_limits(row.phi);
 
             // Work out what this range means in terms of theta
             for (auto& range : theta_ranges) {
@@ -305,7 +319,178 @@ public:
         return indicies;
     }
 
+    std::vector<std::pair<size_t, size_t>> lookup(const std::array<std::array<Scalar, 4>, 4>& Hoc, const Lens& lens) {
+
+        switch (lens.type) {
+            case Lens::EQUIRECTANGULAR: {
+
+                // Extract our rotation
+                std::array<std::array<Scalar, 3>, 3> Roc = {{
+                    {{Hoc[0][0], Hoc[0][1], Hoc[0][2]}},  //
+                    {{Hoc[1][0], Hoc[1][1], Hoc[1][2]}},  //
+                    {{Hoc[2][0], Hoc[2][1], Hoc[2][2]}}   //
+                }};
+
+                // Extract our z height
+                const Scalar& height = Hoc[3][2];
+
+                // Work out how much additional y and z we get from our field of view if we have a focal length of 1
+                Scalar y_extent = std::tan(lens.equirectangular.fov[0] * 0.5);
+                Scalar z_extent = std::tan(lens.equirectangular.fov[1] * 0.5);
+                Scalar length   = 1.0 / std::sqrt(y_extent * y_extent + z_extent * z_extent + 1);
+
+                // Prenormalise these values
+                y_extent = y_extent * length;
+                z_extent = z_extent * length;
+
+                /* The names of the corners are as follows
+                    ^    T       U
+                    |        C
+                    z    V       W
+                    <- y
+                 */
+
+                // Make corners in cam space as unit vectors
+                std::array<std::array<Scalar, 3>, 4> rNCc = {{
+                    {{length, y_extent, z_extent}},   // rTCc
+                    {{length, -y_extent, z_extent}},  // rUCc
+                    {{length, y_extent, -z_extent}},  // rVCc
+                    {{length, -y_extent, -z_extent}}  // rWCc
+                }};
+
+                // Rotate these into world space
+                rNCc = {{
+                    {{dot(rNCc[0], Roc[0]), dot(rNCc[0], Roc[1]), dot(rNCc[0], Roc[2])}},  // rTCc
+                    {{dot(rNCc[1], Roc[0]), dot(rNCc[1], Roc[1]), dot(rNCc[1], Roc[2])}},  // rUCc
+                    {{dot(rNCc[2], Roc[0]), dot(rNCc[2], Roc[1]), dot(rNCc[2], Roc[2])}},  // rVCc
+                    {{dot(rNCc[3], Roc[0]), dot(rNCc[3], Roc[1]), dot(rNCc[3], Roc[2])}},  // rWCc
+                }};
+
+                // Create our corner basis transforms
+                std::array<std::array<std::array<Scalar, 3>, 3>, 4> Rcn = {{
+                    {{rNCc[0], {0, 0, 0}, cross(rNCc[0], rNCc[1])}},  // Rct
+                    {{rNCc[1], {0, 0, 0}, cross(rNCc[1], rNCc[2])}},  // Rcu
+                    {{rNCc[2], {0, 0, 0}, cross(rNCc[2], rNCc[3])}},  // Rcv
+                    {{rNCc[3], {0, 0, 0}, cross(rNCc[3], rNCc[0])}}   // Rcw
+                }};
+
+                // Normalise our 3rd axis and do our final cross products to get the last axis
+                for (int i = 0; i < 4; ++i) {
+                    Rcn[i][2] = normalise(Rcn[i][2]);
+                    Rcn[i][1] = cross(Rcn[i][2], Rcn[i][0]);
+                }
+
+                // Calculate our edge of screen arcs, we can use dot and acos since it's less than 180 degrees
+                std::array<Scalar, 4> arc_ends = {{std::acos(dot(rNCc[0], rNCc[1])),
+                                                   std::acos(dot(rNCc[1], rNCc[2])),
+                                                   std::acos(dot(rNCc[2], rNCc[3])),
+                                                   std::acos(dot(rNCc[3], rNCc[0]))}};
+
+                // Calculate our theta limits
+                auto theta_limits = [&](const Scalar& phi) {
+
+                    // This holds our list of intersections
+                    std::vector<Scalar> limits;
+
+                    // We use these values quite a bit
+                    Scalar sin_phi = std::sin(phi);
+                    Scalar cos_phi = std::cos(phi);
+
+                    // Loop through each of our screen edge spaces
+                    for (int i = 0; i < 4; ++i) {
+
+                        // Get the normal to the screen edge plane
+                        const auto& norm = Rcn[i][2];
+
+                        // Solve the intersections to this plane by the phi value
+                        auto solutions = a_cos_theta_plus_b_sin_theta_equals_c(
+                            norm[0] * sin_phi, norm[1] * sin_phi, norm[2] * cos_phi);
+
+                        // We only care about the case where we found 2 solutions
+                        if (!isnan(solutions.first) && solutions.first != solutions.second) {
+
+                            for (auto& v : {solutions.first, solutions.second}) {
+
+                                // Work out our angular solutions to the problem
+                                Scalar cos_v = std::cos(v);
+                                Scalar sin_v = std::sin(v);
+
+                                // Make this into a unit vector, rotate it into the edge plane space
+                                // And calculate our angle
+                                std::array<Scalar, 3> p = {{cos_v * sin_phi, sin_v * sin_phi, -cos_phi}};
+                                Scalar angle            = atan2(dot(Rcn[i][1], p), dot(Rcn[i][0], p));
+
+                                if (0 < angle && angle < arc_ends[i]) {
+                                    limits.emplace_back(angle);
+                                }
+                            }
+                        }
+                    }
+
+                    // Sort them
+                    std::sort(limits.begin(), limits.end());
+
+                    // Now make pairs
+                    std::vector<std::pair<Scalar, Scalar>> output;
+                    for (size_t i = 0; i < limits.size(); i += 2) {
+                        output.emplace_back(limits[i], limits[i + 1]);
+                    }
+                };
+
+                return {};
+            }
+
+            case Lens::RADIAL: {
+
+                // TODO work out the phi value of the camera vector
+
+                // TODO add/subtract the phi value from the FOV
+
+                // TODO normalise
+
+                throw std::runtime_error("Not implemented");
+            }
+            default: { throw std::runtime_error("Unknown lens type"); }
+        }
+    }
+
 private:
+    Scalar dot(const std::array<Scalar, 3>& a, const std::array<Scalar, 3>& b) {
+        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    }
+
+    std::array<Scalar, 3> cross(const std::array<Scalar, 3>& a, const std::array<Scalar, 3>& b) {
+        return {{
+            a[1] * b[2] - a[2] * b[1],  // x
+            a[2] * b[0] - a[0] * b[2],  // y
+            a[0] * b[1] - a[1] * b[0]   // z
+        }};
+    }
+
+    std::array<Scalar, 3> normalise(const std::array<Scalar, 3>& a) {
+        Scalar length = std::sqrt(a[0] * a[0] + a[1] * a[1] + a[2] + a[2]);
+        return {{a[0] * length, a[1] * length, a[2] * length}};
+    }
+
+    std::pair<Scalar, Scalar> a_cos_theta_plus_b_sin_theta_equals_c(float a, float b, float c) {
+
+        float r = std::sqrt(a * a + b * b);
+
+        if (std::abs(c) <= r) {
+            float alpha = std::atan2(b, a);
+            float beta  = std::acos(c / r);
+            if (beta == 0) {
+                return {alpha + beta, alpha + beta};
+            }
+            else {
+                return {alpha + beta, alpha - beta};
+            }
+        }
+        else {
+            return {std::numeric_limits<Scalar>::quiet_NaN(), std::numeric_limits<Scalar>::quiet_NaN()};
+        }
+    }
+
     /// A map from heights to visual mesh tables
     std::map<Scalar, Mesh> luts;
 

@@ -1,3 +1,4 @@
+#include <array>
 #include <iostream>
 
 #include "Circle.hpp"
@@ -11,21 +12,35 @@ int main() {
     mesh::Sphere<float> sphere(0, 0.075, 1, 10);
     mesh::Circle<float> circle(0, 0.075, 1, 10);
 
-    mesh::VisualMesh<> mesh(sphere, 1.0, 1.1, 1, M_PI / 1024.0);
+    mesh::VisualMesh<> mesh(cylinder, 1.0, 1.1, 1, M_PI / 1024.0);
 
+    //
+    std::array<std::array<float, 4>, 4> Hoc = {{
+        {{1, 0, 0, 0}},  //
+        {{0, 1, 0, 0}},  //
+        {{0, 0, 1, 0}},  //
+        {{0, 0, 0, 1}}   //
+    }};
+
+    mesh::VisualMesh<float>::Lens lens;
+
+    lens.equirectangular.fov = {1.0472, 0.785398};
 
     // Print the mesh
     const auto& lut    = mesh.height(0.5);
-    const auto& ranges = mesh.lookup(0.5, [](const float& phi) {
+    const auto& ranges = mesh.lookup(Hoc, lens);
 
-        std::vector<std::pair<float, float>> ret;
+    // const auto& ranges = mesh.lookup(0.5, [](const float& phi) {
 
-        if (phi > M_PI_4 && phi < M_PI_2) {
-            ret.emplace_back(3 * M_PI_2, M_PI_2);
-        }
+    //     std::vector<std::pair<float, float>> ret;
 
-        return ret;
-    });
+    //     // if (phi > M_PI_4 && phi < M_PI_2) {
+    //     //     ret.emplace_back(3 * M_PI_2, M_PI_2);
+    //     // }
+    //     ret.emplace_back(0, M_PI_2);
+
+    //     return ret;
+    // });
 
     std::cout << "[ ";
     for (auto& range : ranges) {
