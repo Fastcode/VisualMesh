@@ -8,7 +8,7 @@
 
 int main() {
 
-    mesh::Cylinder<float> cylinder(0, 2.0, 0.075, 1, 10);
+    mesh::Cylinder<float> cylinder(0, 2.0, 0.075, 1, 20);
     mesh::Sphere<float> sphere(0, 0.075, 1, 10);
     mesh::Circle<float> circle(0, 0.075, 1, 10);
 
@@ -18,13 +18,14 @@ int main() {
     std::array<std::array<float, 4>, 4> Hoc = {{
         {{1, 0, 0, 0}},  //
         {{0, 1, 0, 0}},  //
-        {{0, 0, 1, 0}},  //
+        {{0, 0, 1, 1}},  //
         {{0, 0, 0, 1}}   //
     }};
 
     mesh::VisualMesh<float>::Lens lens;
 
-    lens.equirectangular.fov = {1.0472, 0.785398};
+    lens.type                = mesh::VisualMesh<float>::Lens::EQUIRECTANGULAR;
+    lens.equirectangular.fov = {{1.0472, 0.785398}};
 
     // Print the mesh
     const auto& lut    = mesh.height(0.5);

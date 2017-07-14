@@ -106,9 +106,9 @@ public:
                         const Scalar& max_height,
                         const size_t& height_resolution,
                         const Scalar& min_angular_res)
-        : min_height(min_height)
+        : min_angular_res(min_angular_res)
+        , min_height(min_height)
         , max_height(max_height)
-        , min_angular_res(min_angular_res)
         , height_resolution(height_resolution) {
 
         // Loop through to make a mesh for each of our height possibilities
@@ -269,8 +269,8 @@ public:
                     };
 
                     // Perform both links
-                    link(prev.begin, prev_size, 0, 0);
-                    link(next.begin, next_size, rows.size() - 1, 4);
+                    if (r > 0) link(prev.begin, prev_size, 0, 0);
+                    if (r < rows.size() - 1) link(next.begin, next_size, rows.size() - 1, 4);
                 }
             }
 
@@ -319,31 +319,32 @@ public:
         return indicies;
     }
 
-    std::vector<std::pair<size_t, size_t>> lookup(const std::array<std::array<Scalar, 4>, 4>& Hoc, const Lens& lens) {
+    std::vector<std::pair<size_t, size_t>> lookup(const std::array<std::array<Scalar, 4>, 4>& Hco, const Lens& lens) {
 
         switch (lens.type) {
             case Lens::EQUIRECTANGULAR: {
 
-                // Extract our rotation
-                std::array<std::array<Scalar, 3>, 3> Roc = {{
-                    {{Hoc[0][0], Hoc[0][1], Hoc[0][2]}},  //
-                    {{Hoc[1][0], Hoc[1][1], Hoc[1][2]}},  //
-                    {{Hoc[2][0], Hoc[2][1], Hoc[2][2]}}   //
+                // Extract our rotation matrix
+                const std::array<std::array<Scalar, 3>, 3> Rco = {{
+                    {{Hco[0][0], Hco[0][1], Hco[0][2]}},  //
+                    {{Hco[1][0], Hco[1][1], Hco[1][2]}},  //
+                    {{Hco[2][0], Hco[2][1], Hco[2][2]}}   //
                 }};
 
                 // Extract our z height
-                const Scalar& height = Hoc[3][2];
+                const std::array<Scalar, 3> rOCc = {{Hco[0][3], Hco[1][3], Hco[2][3]}};
 
                 // Work out how much additional y and z we get from our field of view if we have a focal length of 1
                 Scalar y_extent = std::tan(lens.equirectangular.fov[0] * 0.5);
                 Scalar z_extent = std::tan(lens.equirectangular.fov[1] * 0.5);
-                Scalar length   = 1.0 / std::sqrt(y_extent * y_extent + z_extent * z_extent + 1);
 
-                // Prenormalise these values
-                y_extent = y_extent * length;
-                z_extent = z_extent * length;
+                // Prenormalise these values as they will all be the same length
+                Scalar length = 1.0 / std::sqrt(y_extent * y_extent + z_extent * z_extent + 1);
+                y_extent      = y_extent * length;
+                z_extent      = z_extent * length;
 
-                /* The names of the corners are as follows
+                /* The names of the corners are as follows.
+                   When stored as a group we use the identifier N
                     ^    T       U
                     |        C
                     z    V       W
@@ -358,20 +359,21 @@ public:
                     {{length, -y_extent, -z_extent}}  // rWCc
                 }};
 
-                // Rotate these into world space
-                rNCc = {{
-                    {{dot(rNCc[0], Roc[0]), dot(rNCc[0], Roc[1]), dot(rNCc[0], Roc[2])}},  // rTCc
-                    {{dot(rNCc[1], Roc[0]), dot(rNCc[1], Roc[1]), dot(rNCc[1], Roc[2])}},  // rUCc
-                    {{dot(rNCc[2], Roc[0]), dot(rNCc[2], Roc[1]), dot(rNCc[2], Roc[2])}},  // rVCc
-                    {{dot(rNCc[3], Roc[0]), dot(rNCc[3], Roc[1]), dot(rNCc[3], Roc[2])}},  // rWCc
+                // Rotate these into world space by multiplying by the rotation matrix
+                // Because of the way we are dot producting here, we are transposing Rco
+                std::array<std::array<Scalar, 3>, 4> rNCo = {{
+                    {{dot(rNCc[0], Rco[0]), dot(rNCc[0], Rco[1]), dot(rNCc[0], Rco[2])}},  // rTCo
+                    {{dot(rNCc[1], Rco[0]), dot(rNCc[1], Rco[1]), dot(rNCc[1], Rco[2])}},  // rUCo
+                    {{dot(rNCc[2], Rco[0]), dot(rNCc[2], Rco[1]), dot(rNCc[2], Rco[2])}},  // rVCo
+                    {{dot(rNCc[3], Rco[0]), dot(rNCc[3], Rco[1]), dot(rNCc[3], Rco[2])}},  // rWCo
                 }};
 
                 // Create our corner basis transforms
                 std::array<std::array<std::array<Scalar, 3>, 3>, 4> Rcn = {{
-                    {{rNCc[0], {0, 0, 0}, cross(rNCc[0], rNCc[1])}},  // Rct
-                    {{rNCc[1], {0, 0, 0}, cross(rNCc[1], rNCc[2])}},  // Rcu
-                    {{rNCc[2], {0, 0, 0}, cross(rNCc[2], rNCc[3])}},  // Rcv
-                    {{rNCc[3], {0, 0, 0}, cross(rNCc[3], rNCc[0])}}   // Rcw
+                    {{rNCo[0], {{0, 0, 0}}, cross(rNCo[0], rNCo[1])}},  // Rct
+                    {{rNCo[1], {{0, 0, 0}}, cross(rNCo[1], rNCo[2])}},  // Rcu
+                    {{rNCo[2], {{0, 0, 0}}, cross(rNCo[2], rNCo[3])}},  // Rcv
+                    {{rNCo[3], {{0, 0, 0}}, cross(rNCo[3], rNCo[0])}}   // Rcw
                 }};
 
                 // Normalise our 3rd axis and do our final cross products to get the last axis
@@ -381,10 +383,10 @@ public:
                 }
 
                 // Calculate our edge of screen arcs, we can use dot and acos since it's less than 180 degrees
-                std::array<Scalar, 4> arc_ends = {{std::acos(dot(rNCc[0], rNCc[1])),
-                                                   std::acos(dot(rNCc[1], rNCc[2])),
-                                                   std::acos(dot(rNCc[2], rNCc[3])),
-                                                   std::acos(dot(rNCc[3], rNCc[0]))}};
+                std::array<Scalar, 4> arc_ends = {{std::acos(dot(rNCo[0], rNCo[1])),
+                                                   std::acos(dot(rNCo[1], rNCo[2])),
+                                                   std::acos(dot(rNCo[2], rNCo[3])),
+                                                   std::acos(dot(rNCo[3], rNCo[0]))}};
 
                 // Calculate our theta limits
                 auto theta_limits = [&](const Scalar& phi) {
@@ -432,12 +434,13 @@ public:
 
                     // Now make pairs
                     std::vector<std::pair<Scalar, Scalar>> output;
-                    for (size_t i = 0; i < limits.size(); i += 2) {
+                    for (size_t i = 0; (i + 1) < limits.size(); i += 2) {
                         output.emplace_back(limits[i], limits[i + 1]);
                     }
+                    return output;
                 };
 
-                return {};
+                return lookup(rOCc[2], theta_limits);
             }
 
             case Lens::RADIAL: {
