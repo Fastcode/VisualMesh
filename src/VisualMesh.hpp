@@ -25,6 +25,51 @@
 
 namespace mesh {
 
+template <typename T>
+struct Printer;
+
+// Print a matrix
+template <typename Scalar, std::size_t n, std::size_t m>
+struct Printer<std::array<std::array<Scalar, n>, m>> {
+    static inline void print(std::ostream& out, const std::array<std::array<Scalar, n>, m>& s) {
+        for (std::size_t j = 0; j < m; ++j) {
+            out << "[";
+            for (std::size_t i = 0; i < n - 1; ++i) {
+                out << s[j][i] << ", ";
+            }
+            if (n > 0) {
+                out << s[j][n - 1];
+            }
+            out << "]";
+
+            if (j < m - 1) {
+                out << std::endl;
+            }
+        }
+    }
+};
+
+// Print a vector
+template <typename Scalar, std::size_t n>
+struct Printer<std::array<Scalar, n>> {
+    static inline void print(std::ostream& out, const std::array<Scalar, n>& s) {
+        out << "[";
+        for (std::size_t i = 0; i < n - 1; ++i) {
+            out << s[i] << ", ";
+        }
+        if (n > 0) {
+            out << s[n - 1];
+        }
+        out << "]";
+    }
+};
+
+template <typename T, std::size_t n>
+std::ostream& operator<<(std::ostream& out, const std::array<T, n>& s) {
+    Printer<std::array<T, n>>::print(out, s);
+    return out;
+}
+
 /**
  * @brief Constructs and holds a visual mesh
  * @details [long description]
@@ -331,12 +376,19 @@ public:
                     {{Hco[2][0], Hco[2][1], Hco[2][2]}}   //
                 }};
 
+                // Solution to finding the edges is an intersection between a line and a cone
+                // https://www.geometrictools.com/Documentation/IntersectionLineCone.pdf
+
                 // Extract our z height
+                // TODO this is wrong, fix it when it matters
                 const std::array<Scalar, 3> rOCc = {{Hco[0][3], Hco[1][3], Hco[2][3]}};
 
                 // Work out how much additional y and z we get from our field of view if we have a focal length of 1
                 Scalar y_extent = std::tan(lens.equirectangular.fov[0] * 0.5);
                 Scalar z_extent = std::tan(lens.equirectangular.fov[1] * 0.5);
+
+                std::cout << "Y extent: " << y_extent << std::endl;
+                std::cout << "Z extent: " << z_extent << std::endl;
 
                 // Prenormalise these values as they will all be the same length
                 Scalar length = 1.0 / std::sqrt(y_extent * y_extent + z_extent * z_extent + 1);
@@ -347,87 +399,131 @@ public:
                    When stored as a group we use the identifier N
                     ^    T       U
                     |        C
-                    z    V       W
+                    z    W       V
                     <- y
                  */
 
                 // Make corners in cam space as unit vectors
-                std::array<std::array<Scalar, 3>, 4> rNCc = {{
-                    {{length, y_extent, z_extent}},   // rTCc
-                    {{length, -y_extent, z_extent}},  // rUCc
-                    {{length, y_extent, -z_extent}},  // rVCc
-                    {{length, -y_extent, -z_extent}}  // rWCc
+                const std::array<std::array<Scalar, 3>, 4> rNCc = {{
+                    {{length, +y_extent, +z_extent}},  // rTCc
+                    {{length, -y_extent, +z_extent}},  // rUCc
+                    {{length, -y_extent, -z_extent}},  // rVCc
+                    {{length, +y_extent, -z_extent}}   // rWCc
                 }};
 
                 // Rotate these into world space by multiplying by the rotation matrix
-                // Because of the way we are dot producting here, we are transposing Rco
-                std::array<std::array<Scalar, 3>, 4> rNCo = {{
+                // Because of the way we are performing our dot product here (row->row), we are transposing Rco
+                const std::array<std::array<Scalar, 3>, 4> rNCo = {{
                     {{dot(rNCc[0], Rco[0]), dot(rNCc[0], Rco[1]), dot(rNCc[0], Rco[2])}},  // rTCo
                     {{dot(rNCc[1], Rco[0]), dot(rNCc[1], Rco[1]), dot(rNCc[1], Rco[2])}},  // rUCo
                     {{dot(rNCc[2], Rco[0]), dot(rNCc[2], Rco[1]), dot(rNCc[2], Rco[2])}},  // rVCo
                     {{dot(rNCc[3], Rco[0]), dot(rNCc[3], Rco[1]), dot(rNCc[3], Rco[2])}},  // rWCo
                 }};
 
-                // Create our corner basis transforms
-                std::array<std::array<std::array<Scalar, 3>, 3>, 4> Rcn = {{
-                    {{rNCo[0], {{0, 0, 0}}, cross(rNCo[0], rNCo[1])}},  // Rct
-                    {{rNCo[1], {{0, 0, 0}}, cross(rNCo[1], rNCo[2])}},  // Rcu
-                    {{rNCo[2], {{0, 0, 0}}, cross(rNCo[2], rNCo[3])}},  // Rcv
-                    {{rNCo[3], {{0, 0, 0}}, cross(rNCo[3], rNCo[0])}}   // Rcw
+                // Make our corner to next corner vectors
+                // In cam space these are 0,1,0 style vectors so we just get a col of the other matrix
+                // But since we are multiplying by the transpose we get a row of the matrix
+                const std::array<std::array<Scalar, 3>, 4> rMNo = {{
+                    {{-Rco[1][0], -Rco[1][1], -Rco[1][2]}},  // normalise(rUTc(0, -1,  0)) -> normalise(rUTo)
+                    {{-Rco[2][0], -Rco[2][1], -Rco[2][2]}},  // normalise(rVUc(0,  0, -1)) -> normalise(rVUo)
+                    {{+Rco[1][0], +Rco[1][1], +Rco[1][2]}},  // normalise(rWVc(0,  1,  0)) -> normalise(rWVo)
+                    {{+Rco[2][0], +Rco[2][1], +Rco[2][2]}}   // normalise(rTWc(0,  0,  1)) -> normalise(rTWo)
                 }};
 
-                // Normalise our 3rd axis and do our final cross products to get the last axis
-                for (int i = 0; i < 4; ++i) {
-                    Rcn[i][2] = normalise(Rcn[i][2]);
-                    Rcn[i][1] = cross(Rcn[i][2], Rcn[i][0]);
-                }
+                // Later we need dot(rNCo, rMNo) so calculate now.
+                // Also the values are identical for each side so only calculate half
+                // TODO this line can be greatly optimised using the extends/length/knowledge that it's 0,1,0 and 0,0,1
+                const std::array<Scalar, 2> rNCo_dot_rMNo = {dot(rNCo[0], rMNo[0]), dot(rNCo[1], rMNo[1])};
 
-                // Calculate our edge of screen arcs, we can use dot and acos since it's less than 180 degrees
-                std::array<Scalar, 4> arc_ends = {{std::acos(dot(rNCo[0], rNCo[1])),
-                                                   std::acos(dot(rNCo[1], rNCo[2])),
-                                                   std::acos(dot(rNCo[2], rNCo[3])),
-                                                   std::acos(dot(rNCo[3], rNCo[0]))}};
 
                 // Calculate our theta limits
                 auto theta_limits = [&](const Scalar& phi) {
 
-                    // This holds our list of intersections
+                    // Store any limits we find
                     std::vector<Scalar> limits;
 
-                    // We use these values quite a bit
-                    Scalar sin_phi = std::sin(phi);
-                    Scalar cos_phi = std::cos(phi);
+                    // Should we intersect with an upper or lower cone
+                    // If upper, the axis for the cone is +z, lower is -z
+                    const bool upper = phi > M_PI_2;
 
-                    // Loop through each of our screen edge spaces
+                    // No need for an upper/lower check here as cos^2(pi-x) == cos^2(x)
+                    const Scalar cos_phi  = std::cos(phi);
+                    const Scalar cos_phi2 = cos_phi * cos_phi;
+
                     for (int i = 0; i < 4; ++i) {
+                        // We make a line origin + ray to define a parametric line
+                        const auto& line_origin    = rNCo[i];
+                        const auto& line_direction = rMNo[i];
 
-                        // Get the normal to the screen edge plane
-                        const auto& norm = Rcn[i][2];
+                        // If we are using the upper cone then the cone axis is z = 1 and if the lower cone z = -1
+                        // Therefore these dot products are the same as selecting either +- the z component of the
+                        // vectors
+                        Scalar DdU   = upper ? line_direction[2] : -line_direction[2];
+                        Scalar DdPmV = upper ? line_origin[2] : -line_origin[2];
 
-                        // Solve the intersections to this plane by the phi value
-                        auto solutions = a_cos_theta_plus_b_sin_theta_equals_c(
-                            norm[0] * sin_phi, norm[1] * sin_phi, norm[2] * cos_phi);
+                        // rNCo_dot_rMNo[i % 2];  // Each side is the same for this
+                        Scalar UdPmV = dot(line_origin, line_direction);
 
-                        // We only care about the case where we found 2 solutions
-                        if (!isnan(solutions.first) && solutions.first != solutions.second) {
+                        Scalar c2 = DdU * DdU - cos_phi2;
+                        Scalar c1 = DdU * DdPmV - cos_phi2 * UdPmV;
+                        Scalar c0 = DdPmV * DdPmV - cos_phi2;
 
-                            for (auto& v : {solutions.first, solutions.second}) {
+                        if (c2 != 0) {
+                            Scalar discriminant = c1 * c1 - c0 * c2;
 
-                                // Work out our angular solutions to the problem
-                                Scalar cos_v = std::cos(v);
-                                Scalar sin_v = std::sin(v);
+                            if (discriminant > 0) {
+                                // We have two intersections with either the upper or lower code
+                                Scalar root   = std::sqrt(discriminant);
+                                Scalar inv_c2 = 1.0 / c2;
 
-                                // Make this into a unit vector, rotate it into the edge plane space
-                                // And calculate our angle
-                                std::array<Scalar, 3> p = {{cos_v * sin_phi, sin_v * sin_phi, -cos_phi}};
-                                Scalar angle            = atan2(dot(Rcn[i][1], p), dot(Rcn[i][0], p));
+                                // Get our two solutions for t
+                                for (const Scalar t : {(-c1 - root) * inv_c2, (-c1 + root) * inv_c2}) {
 
-                                if (0 < angle && angle < arc_ends[i]) {
-                                    limits.emplace_back(angle);
+                                    bool validp = t >= 0;
+                                    bool validm = t <= (i % 2 == 0 ? y_extent : z_extent);
+                                    bool valids = DdU * t + DdPmV >= 0;
+
+                                    if (validp && validm && valids) {
+                                        // This T is totally a valid value for our range! work out it's theta!
+                                        std::cout << i << " " << t << ", ";
+                                    }
+                                    else if (validp && validm && !valids) {
+                                        std::cout << i << " 🍿, ";
+                                    }
+                                    else if (validp && !validm && valids) {
+                                        std::cout << i << " 💣, ";
+                                    }
+                                    else if (validp && !validm && !valids) {
+                                        std::cout << i << " ⛄, ";
+                                    }
+                                    else if (!validp && validm && valids) {
+                                        std::cout << i << " 🚰, ";
+                                    }
+                                    else if (!validp && validm && !valids) {
+                                        std::cout << i << " 💔, ";
+                                    }
+                                    else if (!validp && !validm && valids) {
+                                        std::cout << i << " 🔎, ";
+                                    }
+                                    else if (!validp && !validm && !valids) {
+                                        std::cout << i << " 🍰, ";
+                                    }
+                                    else {
+                                        std::cout << i << " 🥚, ";
+                                    }
                                 }
                             }
+                            else {
+                                std::cout << i << " 🍪, ";
+                            }
+                        }
+                        else {
+                            std::cout << i << " 😈, ";
                         }
                     }
+
+                    std::cout << std::endl;
+                    std::cout << std::endl;
 
                     // Sort them
                     std::sort(limits.begin(), limits.end());
@@ -444,6 +540,23 @@ public:
             }
 
             case Lens::RADIAL: {
+
+
+                // Solution for intersections on the edge is the intersection between a unit sphere, a plane, and a cone
+                // The cone is the cone made by the phi angle, and the plane intersects with the unit sphere to form
+                // The circle that defines the edge of the field of view of the camera.
+                //
+                // Unit sphere
+                // x^2 + y^2 + x^2 = 1
+                //
+                // Cone
+                // z^2 = (x^2+y^2)/c^2
+                // c = phi > pi/2 ? tan(phi) : tan(pi - phi)
+                //
+                // Plane
+                // N = the unit vector in the direction of the camera
+                // r_0 = N * cos(fov/2)
+                // N . (r - r_0) = 0
 
                 // TODO work out the phi value of the camera vector
 

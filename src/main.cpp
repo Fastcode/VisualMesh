@@ -14,12 +14,14 @@ int main() {
 
     mesh::VisualMesh<> mesh(cylinder, 1.0, 1.1, 1, M_PI / 1024.0);
 
-    //
-    std::array<std::array<float, 4>, 4> Hoc = {{
-        {{1, 0, 0, 0}},  //
-        {{0, 1, 0, 0}},  //
-        {{0, 0, 1, 1}},  //
-        {{0, 0, 0, 1}}   //
+    float theta = 0;
+
+    // Stored in row major order
+    std::array<std::array<float, 4>, 4> Hco = {{
+        {{std::cos(theta), -std::sin(theta), 0, 0}},  //
+        {{std::sin(theta), std::cos(theta), 0, 0}},   //
+        {{0, 0, 1, 1}},                               //
+        {{0, 0, 0, 1}}                                //
     }};
 
     mesh::VisualMesh<float>::Lens lens;
@@ -27,22 +29,12 @@ int main() {
     lens.type                = mesh::VisualMesh<float>::Lens::EQUIRECTANGULAR;
     lens.equirectangular.fov = {{1.0472, 0.785398}};
 
-    // Print the mesh
-    const auto& lut    = mesh.height(0.5);
-    const auto& ranges = mesh.lookup(Hoc, lens);
+    // Perform our lookup
+    const auto& lut    = mesh.height(1.0);
+    const auto& ranges = mesh.lookup(Hco, lens);
 
-    // const auto& ranges = mesh.lookup(0.5, [](const float& phi) {
 
-    //     std::vector<std::pair<float, float>> ret;
-
-    //     // if (phi > M_PI_4 && phi < M_PI_2) {
-    //     //     ret.emplace_back(3 * M_PI_2, M_PI_2);
-    //     // }
-    //     ret.emplace_back(0, M_PI_2);
-
-    //     return ret;
-    // });
-
+    // Print out the mesh in a format for python
     std::cout << "[ ";
     for (auto& range : ranges) {
         for (size_t i = range.first; i < range.second; ++i) {
@@ -61,12 +53,4 @@ int main() {
         }
     }
     std::cout << "] " << std::endl;
-
-    // Print all the unit vectors
-    // std::cout << "[ ";
-    // for (const auto& n : mesh.data(0.5)) {
-
-    //     std::cout << "(" << n.ray[0] << ", " << n.ray[1] << ", " << n.ray[2] << "), ";
-    // }
-    // std::cout << "] " << std::endl;
 }
