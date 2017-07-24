@@ -56,13 +56,13 @@ struct Cylinder {
         Scalar l = lower.phi(phi_n, c);
 
         // If one is nan return the other one
-        if (isnan(u)) {
+        if (std::isnan(u)) {
             // If both are nan this will return nan here
             return l;
         }
         else {
             // If l is nan return u, otherwise return the smallest change
-            return isnan(l) ? u : std::abs(u - phi_n) < std::abs(l - phi_n) ? u : l;
+            return std::isnan(l) ? u : std::abs(u - phi_n) < std::abs(l - phi_n) ? u : l;
         }
     }
 
@@ -80,13 +80,13 @@ struct Cylinder {
         Scalar l = lower.theta(phi, c);
 
         // If one is nan return the other one
-        if (isnan(u)) {
+        if (std::isnan(u)) {
             // If both are nan this will return nan here
             return l;
         }
         else {
             // If l is nan return u, otherwise return the smallest change
-            return isnan(l) ? u : u < l ? u : l;
+            return std::isnan(l) ? u : u < l ? u : l;
         }
     }
 

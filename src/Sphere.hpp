@@ -19,6 +19,7 @@
 #define MESH_SPHERE_HPP
 
 #include <cmath>
+#include <limits>
 
 namespace mesh {
 

@@ -18,6 +18,7 @@
 #ifndef VISUALMESH_HPP
 #define VISUALMESH_HPP
 
+#include <algorithm>
 #include <cmath>
 #include <map>
 #include <numeric>
@@ -169,7 +170,7 @@ public:
                 // Calculate our theta
                 Scalar theta = std::max(shape.theta(phi, h), min_angular_res);
 
-                if (!isnan(theta)) {
+                if (!std::isnan(theta)) {
                     // Push back the phi, and the number of whole shapes we can fit
                     phis.emplace_back(phi, size_t(std::ceil(2.0 * M_PI / theta)));
                 }
@@ -184,7 +185,7 @@ public:
                 // Calculate our theta
                 Scalar theta = std::max(shape.theta(phi, h), min_angular_res);
 
-                if (!isnan(theta)) {
+                if (!std::isnan(theta)) {
                     // Push back the phi, and the number of whole shapes we can fit
                     phis.emplace_back(phi, size_t(std::ceil(2.0 * M_PI / theta)));
                 }

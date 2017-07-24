@@ -19,6 +19,7 @@
 #define MESH_CIRCLE_HPP
 
 #include <cmath>
+#include <limits>
 
 namespace mesh {
 
