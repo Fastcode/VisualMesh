@@ -388,9 +388,6 @@ public:
                 Scalar y_extent = std::tan(lens.equirectangular.fov[0] * 0.5);
                 Scalar z_extent = std::tan(lens.equirectangular.fov[1] * 0.5);
 
-                std::cout << "Y extent: " << y_extent << std::endl;
-                std::cout << "Z extent: " << z_extent << std::endl;
-
                 // Prenormalise these values as they will all be the same length
                 Scalar length = 1.0 / std::sqrt(y_extent * y_extent + z_extent * z_extent + 1);
                 y_extent      = y_extent * length;
@@ -480,53 +477,22 @@ public:
                                 // Get our two solutions for t
                                 for (const Scalar t : {(-c1 - root) * inv_c2, (-c1 + root) * inv_c2}) {
 
-                                    bool validp = t >= 0;
-                                    bool validm = t <= (i % 2 == 0 ? y_extent : z_extent);
-                                    bool valids = DdU * t + DdPmV >= 0;
+                                    if (t >= 0  // Check we are beyond the start corner
+                                        && t <= 2.0 * (i % 2 == 0 ? y_extent : z_extent)  // Check we are before the end
+                                        && DdU * t + DdPmV >= 0) {  // Check we are on the right half of the cone
 
-                                    if (validp && validm && valids) {
-                                        // This T is totally a valid value for our range! work out it's theta!
-                                        std::cout << i << " " << t << ", ";
-                                    }
-                                    else if (validp && validm && !valids) {
-                                        std::cout << i << " 🍿, ";
-                                    }
-                                    else if (validp && !validm && valids) {
-                                        std::cout << i << " 💣, ";
-                                    }
-                                    else if (validp && !validm && !valids) {
-                                        std::cout << i << " ⛄, ";
-                                    }
-                                    else if (!validp && validm && valids) {
-                                        std::cout << i << " 🚰, ";
-                                    }
-                                    else if (!validp && validm && !valids) {
-                                        std::cout << i << " 💔, ";
-                                    }
-                                    else if (!validp && !validm && valids) {
-                                        std::cout << i << " 🔎, ";
-                                    }
-                                    else if (!validp && !validm && !valids) {
-                                        std::cout << i << " 🍰, ";
-                                    }
-                                    else {
-                                        std::cout << i << " 🥚, ";
+                                        Scalar x     = line_origin[0] + line_direction[0] * t;
+                                        Scalar y     = line_origin[1] + line_direction[1] * t;
+                                        Scalar theta = std::atan2(y, x);
+                                        limits.emplace_back(theta < 0 ? theta + 2.0 * M_PI : theta);
                                     }
                                 }
                             }
-                            else {
-                                std::cout << i << " 🍪, ";
-                            }
-                        }
-                        else {
-                            std::cout << i << " 😈, ";
                         }
                     }
 
-                    std::cout << std::endl;
-                    std::cout << std::endl;
-
                     // Sort them
+                    // TODO this is a problem as the values can wrap around from -pi to pi
                     std::sort(limits.begin(), limits.end());
 
                     // Now make pairs
