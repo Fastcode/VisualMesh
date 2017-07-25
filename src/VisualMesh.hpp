@@ -489,7 +489,10 @@ public:
                                 }
                             }
                             else {
-                                // TODO we need to work out if
+                                // TODO we need to work out if we totally enclose the shape
+                                // TODO we can test this by dotting the cone vector with our camera vector
+                                // TODO then comparing that dot product with the dot product of the middle of the screen
+                                // edges
                             }
                         }
                     }
