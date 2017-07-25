@@ -459,12 +459,12 @@ public:
                         Scalar DdU   = upper ? line_direction[2] : -line_direction[2];
                         Scalar DdPmV = upper ? line_origin[2] : -line_origin[2];
 
-                        // rNCo_dot_rMNo[i % 2];  // Each side is the same for this
-                        Scalar UdPmV = dot(line_origin, line_direction);
-
-                        Scalar c2 = DdU * DdU - cos_phi2;
-                        Scalar c1 = DdU * DdPmV - cos_phi2 * UdPmV;
-                        Scalar c0 = DdPmV * DdPmV - cos_phi2;
+                        // rNCo_dot_rMNo[i % 2];  // TODO Each side is the same for this
+                        Scalar UdPmV   = dot(line_origin, line_direction);
+                        Scalar max_len = i % 2 == 0 ? y_extent : z_extent;
+                        Scalar c2      = DdU * DdU - cos_phi2;
+                        Scalar c1      = DdU * DdPmV - cos_phi2 * UdPmV;
+                        Scalar c0      = DdPmV * DdPmV - cos_phi2;
 
                         if (c2 != 0) {
                             Scalar discriminant = c1 * c1 - c0 * c2;
@@ -477,16 +477,19 @@ public:
                                 // Get our two solutions for t
                                 for (const Scalar t : {(-c1 - root) * inv_c2, (-c1 + root) * inv_c2}) {
 
-                                    if (t >= 0  // Check we are beyond the start corner
-                                        && t <= 2.0 * (i % 2 == 0 ? y_extent : z_extent)  // Check we are before the end
+                                    if (t >= 0                      // Check we are beyond the start corner
+                                        && t <= 2.0 * max_len       // Check we are before the end corner
                                         && DdU * t + DdPmV >= 0) {  // Check we are on the right half of the cone
 
                                         Scalar x     = line_origin[0] + line_direction[0] * t;
                                         Scalar y     = line_origin[1] + line_direction[1] * t;
                                         Scalar theta = std::atan2(y, x);
-                                        limits.emplace_back(theta < 0 ? theta + 2.0 * M_PI : theta);
+                                        limits.emplace_back(theta);
                                     }
                                 }
+                            }
+                            else {
+                                // TODO we need to work out if
                             }
                         }
                     }
