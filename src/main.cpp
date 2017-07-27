@@ -14,14 +14,21 @@ int main() {
 
     mesh::VisualMesh<> mesh(cylinder, 1.0, 1.1, 1, M_PI / 1024.0);
 
-    float theta = 0;
-
+    float a = 0;       // Rotation around z
+    float b = M_PI_2;  // Rotation around y
+    float c = 0;       // Rotation around x
     // Stored in row major order
     std::array<std::array<float, 4>, 4> Hco = {{
-        {{std::cos(theta), -std::sin(theta), 0, 0}},  //
-        {{std::sin(theta), std::cos(theta), 0, 0}},   //
-        {{0, 0, 1, 1}},                               //
-        {{0, 0, 0, 1}}                                //
+        {{std::cos(a) * std::cos(b),
+          std::cos(a) * std::sin(b) * std::sin(c) - std::sin(a) * std::cos(c),
+          std::cos(a) * std::sin(b) * std::cos(c) + std::sin(a) * std::sin(c),
+          0}},  //
+        {{std::sin(a) * std::cos(b),
+          std::sin(a) * std::sin(b) * std::sin(c) + std::cos(a) * std::cos(c),
+          std::sin(a) * std::sin(b) * std::cos(c) - std::cos(a) * std::sin(c),
+          0}},                                                                      //
+        {{-std::sin(a), std::cos(b) * std::sin(c), std::cos(b) * std::cos(c), 1}},  //
+        {{0, 0, 0, 1}}                                                              //
     }};
 
     mesh::VisualMesh<float>::Lens lens;

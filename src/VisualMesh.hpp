@@ -394,7 +394,7 @@ public:
                 z_extent      = z_extent * length;
 
                 /* The names of the corners are as follows.
-                   When stored as a group we use the identifier N
+                   When stored as a group we use the identifier N to M
                     ^    T       U
                     |        C
                     z    W       V
@@ -444,9 +444,14 @@ public:
                     // If upper, the axis for the cone is +z, lower is -z
                     const bool upper = phi > M_PI_2;
 
+                    // Calculate our cones gradient
+                    const Scalar cone_gradient = tan(phi);
+
                     // No need for an upper/lower check here as cos^2(pi-x) == cos^2(x)
                     const Scalar cos_phi  = std::cos(phi);
                     const Scalar cos_phi2 = cos_phi * cos_phi;
+
+                    int no_intersection_count = 0;
 
                     for (int i = 0; i < 4; ++i) {
                         // We make a line origin + ray to define a parametric line
@@ -489,20 +494,47 @@ public:
                                 }
                             }
                             else {
-                                // TODO we need to work out if we totally enclose the shape
-                                // TODO we can test this by dotting the cone vector with our camera vector
-                                // TODO then comparing that dot product with the dot product of the middle of the screen
-                                // edges
+                                // We have another line that does not intersect
+                                ++no_intersection_count;
                             }
                         }
                     }
+                    // If no lines intersect, this might be a totally internal cone
+                    if (no_intersection_count == 4) {
 
-                    // Sort them
-                    // TODO this is a problem as the values can wrap around from -pi to pi
+                        Scalar max_dot = std::numeric_limits<Scalar>::lowest();
+
+                        // Dot the midpoint with the cone axis
+                        for (int i = 0; i < 4; ++i) {
+                            const auto& a = rNCo[i];
+                            const auto& b = rNCo[(i + 1) % 4];
+
+                            // normalise(a + b) dot <0,0,(upper ? 1 : -1)>
+                            Scalar d = normalise(add(a, b))[2] * (upper ? 1 : -1);
+
+                            // New largest dot product
+                            max_dot = d > max_dot ? d : max_dot;
+                        }
+
+                        // If this dot product is greater then we must encompass the entire cone
+                        if (max_dot > cone_gradient) {
+                            limits.emplace_back(-M_PI);
+                            limits.emplace_back(M_PI);
+                        }
+                    }
+
+                    // Sort the limits
                     std::sort(limits.begin(), limits.end());
 
-                    // Now make pairs
                     std::vector<std::pair<Scalar, Scalar>> output;
+                    if (!limits.empty()) {
+                        // Test if the point between limits[0] and limits[1] is inside the cone or not
+                        Scalar test_theta = (limits[1] - limits[0]) * 0.5 + limits[0];
+
+                        // Make the unit vector to test
+                    }
+
+                    // Now make pairs
                     for (size_t i = 0; (i + 1) < limits.size(); i += 2) {
                         output.emplace_back(limits[i], limits[i + 1]);
                     }
@@ -544,11 +576,15 @@ public:
     }
 
 private:
-    Scalar dot(const std::array<Scalar, 3>& a, const std::array<Scalar, 3>& b) {
+    inline std::array<Scalar, 3> add(const std::array<Scalar, 3>& a, const std::array<Scalar, 3>& b) {
+        return {{a[0] + b[0], a[1] + b[1], a[2] + b[2]}};
+    }
+
+    inline Scalar dot(const std::array<Scalar, 3>& a, const std::array<Scalar, 3>& b) {
         return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     }
 
-    std::array<Scalar, 3> cross(const std::array<Scalar, 3>& a, const std::array<Scalar, 3>& b) {
+    inline std::array<Scalar, 3> cross(const std::array<Scalar, 3>& a, const std::array<Scalar, 3>& b) {
         return {{
             a[1] * b[2] - a[2] * b[1],  // x
             a[2] * b[0] - a[0] * b[2],  // y
@@ -556,28 +592,9 @@ private:
         }};
     }
 
-    std::array<Scalar, 3> normalise(const std::array<Scalar, 3>& a) {
+    inline std::array<Scalar, 3> normalise(const std::array<Scalar, 3>& a) {
         Scalar length = std::sqrt(a[0] * a[0] + a[1] * a[1] + a[2] + a[2]);
         return {{a[0] * length, a[1] * length, a[2] * length}};
-    }
-
-    std::pair<Scalar, Scalar> a_cos_theta_plus_b_sin_theta_equals_c(float a, float b, float c) {
-
-        float r = std::sqrt(a * a + b * b);
-
-        if (std::abs(c) <= r) {
-            float alpha = std::atan2(b, a);
-            float beta  = std::acos(c / r);
-            if (beta == 0) {
-                return {alpha + beta, alpha + beta};
-            }
-            else {
-                return {alpha + beta, alpha - beta};
-            }
-        }
-        else {
-            return {std::numeric_limits<Scalar>::quiet_NaN(), std::numeric_limits<Scalar>::quiet_NaN()};
-        }
     }
 
     /// A map from heights to visual mesh tables
