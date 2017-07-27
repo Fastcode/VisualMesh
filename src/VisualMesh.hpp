@@ -451,8 +451,6 @@ public:
                     const Scalar cos_phi  = std::cos(phi);
                     const Scalar cos_phi2 = cos_phi * cos_phi;
 
-                    int no_intersection_count = 0;
-
                     for (int i = 0; i < 4; ++i) {
                         // We make a line origin + ray to define a parametric line
                         const auto& line_origin    = rNCo[i];
@@ -493,14 +491,11 @@ public:
                                     }
                                 }
                             }
-                            else {
-                                // We have another line that does not intersect
-                                ++no_intersection_count;
-                            }
                         }
                     }
-                    // If no lines intersect, this might be a totally internal cone
-                    if (no_intersection_count == 4) {
+
+                    // If no lines intersect, then we need to check if this is a totally internal cone
+                    if (limits.empty()) {
 
                         Scalar max_dot = std::numeric_limits<Scalar>::lowest();
 
@@ -518,27 +513,44 @@ public:
 
                         // If this dot product is greater then we must encompass the entire cone
                         if (max_dot > cone_gradient) {
-                            limits.emplace_back(-M_PI);
-                            limits.emplace_back(M_PI);
+                            // We are full range (0 -> 2pi)
+                            return std::vector<std::pair<Scalar, Scalar>>(1, std::make_pair(0, M_PI * 2.0));
+                        }
+                    }
+                    // Otherwise we should have an even number of intersections
+                    else if (limits.size() % 2 == 0) {
+                        // Sort the limits
+                        std::sort(limits.begin(), limits.end());
+
+                        // Get a test point half way between the first two points
+                        const Scalar test_theta = (limits[0] + limits[1]) * 0.5;
+                        const Scalar sin_phi    = std::sin(phi);
+                        const Scalar sin_theta  = std::sin(test_theta);
+                        const Scalar cos_theta  = std::cos(test_theta);
+
+                        // Make a unit vector from the phi and theta
+                        std::array<Scalar, 3> test_vec = {{-cos_theta * sin_phi, -sin_theta * sin_phi, -cos_phi}};
+
+                        // Now work out if our first theta is entering or leaving the frustum
+                        bool first_is_end = false;
+                        for (int i = 0; i < 4; ++i) {
+                            // If we get a positive dot product our first point is an end segment
+                            first_is_end |= 0 > dot(test_vec, cross(rMNo[i], rMNo[(i + 1) % 4]));
+                        }
+
+                        // If this is entering, point 0 is a start, and point 1 is an end
+                        std::vector<std::pair<Scalar, Scalar>> output;
+                        for (size_t i = first_is_end ? 1 : 0; i < limits.size() - 1; i += 2) {
+                            output.emplace_back(limits[i], limits[i + 1]);
+                        }
+                        if (first_is_end) {
+                            output.emplace_back(limits[limits.size() - 1], 0);
                         }
                     }
 
-                    // Sort the limits
-                    std::sort(limits.begin(), limits.end());
+                    // Default to returning an empty list
+                    return std::vector<std::pair<Scalar, Scalar>>();
 
-                    std::vector<std::pair<Scalar, Scalar>> output;
-                    if (!limits.empty()) {
-                        // Test if the point between limits[0] and limits[1] is inside the cone or not
-                        Scalar test_theta = (limits[1] - limits[0]) * 0.5 + limits[0];
-
-                        // Make the unit vector to test
-                    }
-
-                    // Now make pairs
-                    for (size_t i = 0; (i + 1) < limits.size(); i += 2) {
-                        output.emplace_back(limits[i], limits[i + 1]);
-                    }
-                    return output;
                 };
 
                 return lookup(rOCc[2], theta_limits);
@@ -608,7 +620,7 @@ private:
     Scalar max_height;
     // The number gradations in height
     size_t height_resolution;
-};
+};  // namespace mesh
 
 }  // namespace mesh
 
