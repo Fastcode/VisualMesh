@@ -496,25 +496,15 @@ public:
                     // If no lines intersect, then we need to check if this is a totally internal cone
                     if (limits.empty()) {
 
-                        Scalar max_dot = std::numeric_limits<Scalar>::lowest();
-
-                        // Dot the midpoint with the cone axis
-                        for (int i = 0; i < 4; ++i) {
-                            const auto& a = rNCo[i];
-                            const auto& b = rNCo[(i + 1) % 4];
-
-                            // normalise(a + b) dot <0,0,(upper ? 1 : -1)>
-                            Scalar d = normalise(add(a, b))[2] * (upper ? 1 : -1);
-
-                            // New largest dot product
-                            max_dot = d > max_dot ? d : max_dot;
-                        }
-
-                        // If this dot product is greater then we must encompass the entire cone
-                        if (max_dot > cone_gradient) {
-                            // We are full range (0 -> 2pi)
-                            return std::vector<std::pair<Scalar, Scalar>>(1, std::make_pair(0, M_PI * 2.0));
-                        }
+                        // If we have no intersections then we are totally internal or totally external
+                        // We can test any point on the edge of the screen to see if it's in so we choose the first
+                        // corner. If we dot this vector with the negative cone axis we will get the same value as
+                        // cos(phi). Then we just need to ensure that we are either above or below this depending on if
+                        // it is an upper or lower cone.
+                        // if ((upper && -rNCc[0][2] > cos_phi) || (!upper && -rNCc[0][2] < cos_phi)) {
+                        //     return std::vector<std::pair<Scalar, Scalar>>(
+                        //         1, std::make_pair(Scalar(0.0), Scalar(2.0) * M_PI));
+                        // }
                     }
                     // Otherwise we should have an even number of intersections
                     else if (limits.size() % 2 == 0) {
