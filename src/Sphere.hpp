@@ -135,7 +135,7 @@ private:
      *
      * @return the radius of a sphere that will intersect an appropriate number of times
      */
-    Scalar effective_radius(const Scalar& eh, const Scalar& tolerance = 1e-5) const {
+    Scalar effective_radius(const Scalar& eh) const {
 
         // If 1 short circuit
         if (i == 1) {
@@ -162,13 +162,19 @@ private:
         };
 
         // We know that s > r/i and s < r which give us bounds for the method
-        Scalar x1 = r;                                   // s < r
-        Scalar x2 = r / i;                               // s > r/i
-        Scalar x3 = 0;                                   // The value of our best guess
-        Scalar y  = std::numeric_limits<Scalar>::max();  // Our best guess error
+        Scalar x1      = r;                                         // s < r
+        Scalar x2      = r / i;                                     // s > r/i
+        Scalar x3      = std::numeric_limits<Scalar>::quiet_NaN();  // The value of our best guess
+        Scalar x3_prev = std::numeric_limits<Scalar>::quiet_NaN();  // Our previous best guess
+        Scalar y       = std::numeric_limits<Scalar>::max();        // Our best guess error
 
-        // Iterate until we reach tolerance
-        while (std::abs(y) > tolerance) {
+        // Iterate until we reach the accuracy floor normally comparing floats like this is dangerous. However in this
+        // situation we are relying on the determinism of floating point math, not the two values being equal. Since
+        // this function is convex and almost linear this will never iterate too many times to solve.
+        while (x3 != x3_prev) {
+
+            // Feed our previous value through
+            x3_prev = x3;
 
             // Perform our iteration
             Scalar y1 = f(x1);
@@ -182,8 +188,12 @@ private:
             if (y > 0) {
                 x1 = x3;
             }
-            else {
+            else if (y < 0) {
                 x2 = x3;
+            }
+            // If y == 0 we have found the perfect solution
+            else {
+                return x3;
             }
         }
 
