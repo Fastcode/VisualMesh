@@ -33,13 +33,13 @@ int main() {
 
     // Rotation matrix
     Hco[0][0] = ct * cp;
-    Hco[0][0] = ct * sp;
-    Hco[0][0] = -st;
-    Hco[1][1] = sl * st * cp - cl * sp;
+    Hco[0][1] = ct * sp;
+    Hco[0][2] = -st;
+    Hco[1][0] = sl * st * cp - cl * sp;
     Hco[1][1] = sl * st * sp + cl * cp;
-    Hco[1][1] = ct * sl;
-    Hco[2][2] = cl * st * cp + sl * sp;
-    Hco[2][2] = cl * st * sp - sl * cp;
+    Hco[1][2] = ct * sl;
+    Hco[2][0] = cl * st * cp + sl * sp;
+    Hco[2][1] = cl * st * sp - sl * cp;
     Hco[2][2] = ct * cl;
 
     // Lower row
