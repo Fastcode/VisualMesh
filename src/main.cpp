@@ -6,34 +6,57 @@
 #include "Sphere.hpp"
 #include "VisualMesh.hpp"
 
+using Scalar = float;
+
 int main() {
 
-    mesh::Cylinder<float> cylinder(0, 2.0, 0.075, 1, 20);
-    mesh::Sphere<float> sphere(0, 0.075, 1, 10);
-    mesh::Circle<float> circle(0, 0.075, 1, 10);
+    mesh::Cylinder<Scalar> cylinder(0, 2.0, 0.075, 10, 20);
+    mesh::Sphere<Scalar> sphere(0, 0.075, 1, 10);
+    mesh::Circle<Scalar> circle(0, 0.075, 1, 10);
 
-    mesh::VisualMesh<> mesh(cylinder, 1.0, 1.1, 1, M_PI / 1024.0);
+    mesh::VisualMesh<Scalar> mesh(cylinder, 1.0, 1.1, 1, M_PI / 1024.0);
 
-    float a = 0;       // Rotation around z
-    float b = M_PI_2;  // Rotation around y
-    float c = 0;       // Rotation around x
-    // Stored in row major order
-    std::array<std::array<float, 4>, 4> Hco = {{
-        {{std::cos(a) * std::cos(b),
-          std::cos(a) * std::sin(b) * std::sin(c) - std::sin(a) * std::cos(c),
-          std::cos(a) * std::sin(b) * std::cos(c) + std::sin(a) * std::sin(c),
-          0}},  //
-        {{std::sin(a) * std::cos(b),
-          std::sin(a) * std::sin(b) * std::sin(c) + std::cos(a) * std::cos(c),
-          std::sin(a) * std::sin(b) * std::cos(c) - std::cos(a) * std::sin(c),
-          0}},                                                                      //
-        {{-std::sin(a), std::cos(b) * std::sin(c), std::cos(b) * std::cos(c), 1}},  //
-        {{0, 0, 0, 1}}                                                              //
-    }};
+    // theta is pitch, lambda is roll, and phi is yaw
+    Scalar theta  = 0;
+    Scalar phi    = 0;
+    Scalar lambda = 0;
 
-    mesh::VisualMesh<float>::Lens lens;
+    Scalar ct = std::cos(theta);
+    Scalar st = std::sin(theta);
+    Scalar cp = std::cos(phi);
+    Scalar sp = std::sin(phi);
+    Scalar cl = std::cos(lambda);
+    Scalar sl = std::sin(lambda);
 
-    lens.type                = mesh::VisualMesh<float>::Lens::EQUIRECTANGULAR;
+
+    std::array<std::array<Scalar, 4>, 4> Hco;
+
+    // Rotation matrix
+    Hco[0][0] = ct * cp;
+    Hco[0][0] = ct * sp;
+    Hco[0][0] = -st;
+    Hco[1][1] = sl * st * cp - cl * sp;
+    Hco[1][1] = sl * st * sp + cl * cp;
+    Hco[1][1] = ct * sl;
+    Hco[2][2] = cl * st * cp + sl * sp;
+    Hco[2][2] = cl * st * sp - sl * cp;
+    Hco[2][2] = ct * cl;
+
+    // Lower row
+    Hco[3][0] = 0;
+    Hco[3][1] = 0;
+    Hco[3][2] = 0;
+    Hco[3][3] = 1;
+
+    // Translation
+    Hco[0][3] = 0;
+    Hco[1][3] = 0;
+    Hco[2][3] = 1;
+
+
+    mesh::VisualMesh<Scalar>::Lens lens;
+
+    lens.type                = mesh::VisualMesh<Scalar>::Lens::EQUIRECTANGULAR;
     lens.equirectangular.fov = {{1.0472, 0.785398}};
 
     // Perform our lookup

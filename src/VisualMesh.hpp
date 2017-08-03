@@ -378,6 +378,7 @@ public:
                 }};
 
                 // Solution to finding the edges is an intersection between a line and a cone
+                // Based on a simplified version of the math found at
                 // https://www.geometrictools.com/Documentation/IntersectionLineCone.pdf
 
                 // Extract our z height
@@ -393,8 +394,7 @@ public:
                 y_extent      = y_extent * length;
                 z_extent      = z_extent * length;
 
-                /* The names of the corners are as follows.
-                   When stored as a group we use the identifier N to M
+                /* The labels for each of the corners of the frustum is shown below.
                     ^    T       U
                     |        C
                     z    W       V
@@ -421,6 +421,7 @@ public:
                 // Make our corner to next corner vectors
                 // In cam space these are 0,1,0 style vectors so we just get a col of the other matrix
                 // But since we are multiplying by the transpose we get a row of the matrix
+                // When we are storing this matrix we represent each corner as N and the following clockwise corner as M
                 const std::array<std::array<Scalar, 3>, 4> rMNo = {{
                     {{-Rco[1][0], -Rco[1][1], -Rco[1][2]}},  // normalise(rUTc(0, -1,  0)) -> normalise(rUTo)
                     {{-Rco[2][0], -Rco[2][1], -Rco[2][2]}},  // normalise(rVUc(0,  0, -1)) -> normalise(rVUo)
@@ -442,10 +443,7 @@ public:
 
                     // Should we intersect with an upper or lower cone
                     // If upper, the axis for the cone is +z, lower is -z
-                    const bool upper = phi > M_PI_2;
-
-                    // Calculate our cones gradient
-                    const Scalar cone_gradient = tan(phi);
+                    const Scalar cone_z_axis = phi > M_PI_2 ? 1 : -1;
 
                     // No need for an upper/lower check here as cos^2(pi-x) == cos^2(x)
                     const Scalar cos_phi  = std::cos(phi);
@@ -459,8 +457,8 @@ public:
                         // If we are using the upper cone then the cone axis is z = 1 and if the lower cone z = -1
                         // Therefore these dot products are the same as selecting either +- the z component of the
                         // vectors
-                        Scalar DdU   = upper ? line_direction[2] : -line_direction[2];
-                        Scalar DdPmV = upper ? line_origin[2] : -line_origin[2];
+                        Scalar DdU   = cone_z_axis * line_direction[2];
+                        Scalar DdPmV = cone_z_axis * line_origin[2];
 
                         // rNCo_dot_rMNo[i % 2];  // TODO Each side is the same for this
                         Scalar UdPmV   = dot(line_origin, line_direction);
@@ -487,7 +485,8 @@ public:
                                         Scalar x     = line_origin[0] + line_direction[0] * t;
                                         Scalar y     = line_origin[1] + line_direction[1] * t;
                                         Scalar theta = std::atan2(y, x);
-                                        limits.emplace_back(theta);
+                                        // atan2 gives a result from -pi -> pi, we need 0 -> 2 pi
+                                        limits.emplace_back(theta > 0 ? theta : theta + M_PI * 2.0);
                                     }
                                 }
                             }
@@ -544,8 +543,14 @@ public:
                             output.emplace_back(limits[i], limits[i + 1]);
                         }
                         if (first_is_end) {
-                            output.emplace_back(limits[limits.size() - 1], 0);
+                            output.emplace_back(limits.back(), limits.front());
                         }
+                        return output;
+                    }
+                    // If we have an odd number of intersections something is wrong
+                    else {
+                        // std::cout << limits.size() << std::endl;
+                        // throw std::runtime_error("Odd number of intersections found with cone");
                     }
 
                     // Default to returning an empty list
