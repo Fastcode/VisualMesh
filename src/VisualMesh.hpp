@@ -492,13 +492,11 @@ public:
 
                         // If we have no intersections then we are totally internal or totally external
                         // We can test any point on the edge of the screen to see if it's in so we choose the first
-                        // corner. If we dot this vector with the negative cone axis we will get the same value as
-                        // cos(phi). Then we just need to ensure that we are either above or below this depending on if
-                        // it is an upper or lower cone.
-                        // if ((upper && -rNCc[0][2] > cos_phi) || (!upper && -rNCc[0][2] < cos_phi)) {
-                        //     return std::vector<std::pair<Scalar, Scalar>>(
-                        //         1, std::make_pair(Scalar(0.0), Scalar(2.0) * M_PI));
-                        // }
+                        // corner. If we dot this vector with the vector <0,0,-1> we will get a value that is comparable
+                        // to cos(phi). Then we just need to ensure that we are above or below the cones phi depending
+                        // on if this is an upper or lower cone.
+
+                        // TODO work out if the cone is internal
                     }
                     // Otherwise we should have an even number of intersections
                     else if (limits.size() % 2 == 0) {
@@ -515,6 +513,10 @@ public:
                         std::array<Scalar, 3> test_vec = {{-cos_theta * sin_phi, -sin_theta * sin_phi, -cos_phi}};
 
                         // Now work out if our first theta is entering or leaving the frustum
+                        // We do this by dotting our test vector with vectors that are normal to the
+                        // frustum planes. As we dot in a clockwise direction, all normals will face inward.
+                        // Then we can dot our test vector with these normals and see if our vector is in the same
+                        // direction with the normal. If any are opposed our test vector lies outside the frustum.
                         bool first_is_end = false;
                         for (int i = 0; i < 4; ++i) {
                             // If we get a positive dot product our first point is an end segment
