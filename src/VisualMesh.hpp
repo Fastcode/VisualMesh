@@ -429,12 +429,6 @@ public:
                     {{+Rco[2][0], +Rco[2][1], +Rco[2][2]}}   // normalise(rTWc(0,  0,  1)) -> normalise(rTWo)
                 }};
 
-                // Later we need dot(rNCo, rMNo) so calculate now.
-                // Also the values are identical for each side so only calculate half
-                // TODO this line can be greatly optimised using the extends/length/knowledge that it's 0,1,0 and 0,0,1
-                const std::array<Scalar, 2> rNCo_dot_rMNo = {dot(rNCo[0], rMNo[0]), dot(rNCo[1], rMNo[1])};
-
-
                 // Calculate our theta limits
                 auto theta_limits = [&](const Scalar& phi) {
 
@@ -461,11 +455,11 @@ public:
                         Scalar DdPmV = cone_z_axis * line_origin[2];
 
                         // rNCo_dot_rMNo[i % 2];  // TODO Each side is the same for this
-                        Scalar UdPmV   = dot(line_origin, line_direction);
-                        Scalar max_len = i % 2 == 0 ? y_extent : z_extent;
-                        Scalar c2      = DdU * DdU - cos_phi2;
-                        Scalar c1      = DdU * DdPmV - cos_phi2 * UdPmV;
-                        Scalar c0      = DdPmV * DdPmV - cos_phi2;
+                        Scalar UdPmV    = dot(line_origin, line_direction);
+                        Scalar side_len = 2.0 * (i % 2 == 0 ? y_extent : z_extent);
+                        Scalar c2       = DdU * DdU - cos_phi2;
+                        Scalar c1       = DdU * DdPmV - cos_phi2 * UdPmV;
+                        Scalar c0       = DdPmV * DdPmV - cos_phi2;
 
                         if (c2 != 0) {
                             Scalar discriminant = c1 * c1 - c0 * c2;
@@ -479,7 +473,7 @@ public:
                                 for (const Scalar t : {(-c1 - root) * inv_c2, (-c1 + root) * inv_c2}) {
 
                                     if (t >= 0                      // Check we are beyond the start corner
-                                        && t <= 2.0 * max_len       // Check we are before the end corner
+                                        && t <= side_len            // Check we are before the end corner
                                         && DdU * t + DdPmV >= 0) {  // Check we are on the right half of the cone
 
                                         Scalar x     = line_origin[0] + line_direction[0] * t;
@@ -524,7 +518,7 @@ public:
                         bool first_is_end = false;
                         for (int i = 0; i < 4; ++i) {
                             // If we get a positive dot product our first point is an end segment
-                            first_is_end |= 0 > dot(test_vec, cross(rMNo[i], rMNo[(i + 1) % 4]));
+                            first_is_end |= 0 > dot(test_vec, cross(rNCo[i], rNCo[(i + 1) % 4]));
                         }
 
                         // If this is entering, point 0 is a start, and point 1 is an end
@@ -539,8 +533,7 @@ public:
                     }
                     // If we have an odd number of intersections something is wrong
                     else {
-                        // std::cout << limits.size() << std::endl;
-                        // throw std::runtime_error("Odd number of intersections found with cone");
+                        throw std::runtime_error("Odd number of intersections found with cone");
                     }
 
                     // Default to returning an empty list
@@ -583,10 +576,6 @@ public:
     }
 
 private:
-    inline std::array<Scalar, 3> add(const std::array<Scalar, 3>& a, const std::array<Scalar, 3>& b) {
-        return {{a[0] + b[0], a[1] + b[1], a[2] + b[2]}};
-    }
-
     inline Scalar dot(const std::array<Scalar, 3>& a, const std::array<Scalar, 3>& b) {
         return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     }
