@@ -10,7 +10,7 @@ using Scalar = float;
 
 int main() {
 
-    mesh::Cylinder<Scalar> cylinder(0, 2.0, 0.075, 10, 20);
+    mesh::Cylinder<Scalar> cylinder(0, 2.0, 0.075, 1, 20);
     mesh::Sphere<Scalar> sphere(0, 0.075, 1, 10);
     mesh::Circle<Scalar> circle(0, 0.075, 1, 10);
 
@@ -63,6 +63,7 @@ int main() {
     const auto& lut    = mesh.height(1.0);
     const auto& ranges = mesh.lookup(Hco, lens);
 
+    return 0;
 
     // Print out the mesh in a format for python
     std::cout << "[ ";
