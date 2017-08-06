@@ -82,7 +82,9 @@ class VisualMesh {
 public:
     struct Lens {
         enum Type { EQUIRECTANGULAR, RADIAL };
-        struct Radial {};
+        struct Radial {
+            Scalar fov;
+        };
         struct Equirectangular {
             std::array<Scalar, 2> fov;
         };
@@ -566,6 +568,19 @@ public:
                 // N = the unit vector in the direction of the camera
                 // r_0 = N * cos(fov/2)
                 // N . (r - r_0) = 0
+
+
+                // Scalar lambda = std::cos(lens.radial.fov);
+
+                // Scalar z = 1.0 / (std::sqrt(std::tan(phi) * std::tan(phi) + 1));
+
+                // Scalar a = (lambda - cam[2] *±z) / cam[0];
+                // Scalar b = 1 - z * z;
+
+                // Scalar y = ±std::sqrt(4.0 * (b - a * a)) / 2.0;
+
+                // Scalar x = ±std::sqrt(b - y * y);
+
 
                 // TODO work out the phi value of the camera vector
 
