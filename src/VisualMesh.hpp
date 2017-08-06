@@ -420,9 +420,15 @@ public:
                     {{dot(rNCc[3], Rco[0]), dot(rNCc[3], Rco[1]), dot(rNCc[3], Rco[2])}},  // rWCo
                 }};
 
-                for (const auto& v : rNCo) {
+                for (int i = 0; i < 4; ++i) {
 
-                    std::cout << "(0, 0, 0," << v[0] << ", " << v[1] << ", " << v[2] << "), ";
+                    std::cout << "(0, 0, 0," << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << "), ";
+
+                    for (const auto& q : rNCo) {
+                        std::cout << "(" << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << ", "
+                                  << rNCo[(i + 1) % 4][0] << ", " << rNCo[(i + 1) % 4][1] << ", "
+                                  << rNCo[(i + 1) % 4][2] << "), ";
+                    }
                 }
 
                 // Make our corner to next corner vectors
