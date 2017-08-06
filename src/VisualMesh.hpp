@@ -514,13 +514,15 @@ public:
 
                         // Now work out if our first theta is entering or leaving the frustum
                         // We do this by dotting our test vector with vectors that are normal to the
-                        // frustum planes. As we dot in a clockwise direction, all normals will face inward.
-                        // Then we can dot our test vector with these normals and see if our vector is in the same
-                        // direction with the normal. If any are opposed our test vector lies outside the frustum.
+                        // frustum planes. IMPORTANT while it looks like we are doing our cross products in a clockwise
+                        // direction here, note that the y axis is actually to the left in the diagram. This means that
+                        // we are actually doing our cross products in an anticlockwise direction. Therefore all of our
+                        // normal vectors will be facing outwards from the frustum. This means that if we get a vector
+                        // that has a positive dot product with one of these vectors then it lies outside the frustum.
                         bool first_is_end = false;
                         for (int i = 0; i < 4; ++i) {
                             // If we get a positive dot product our first point is an end segment
-                            first_is_end |= 0 > dot(test_vec, cross(rNCo[i], rNCo[(i + 1) % 4]));
+                            first_is_end |= 0 < dot(test_vec, cross(rNCo[i], rNCo[(i + 1) % 4]));
                         }
 
                         // If this is entering, point 0 is a start, and point 1 is an end
