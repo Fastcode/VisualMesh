@@ -420,6 +420,11 @@ public:
                     {{dot(rNCc[3], Rco[0]), dot(rNCc[3], Rco[1]), dot(rNCc[3], Rco[2])}},  // rWCo
                 }};
 
+                for (const auto& v : rNCo) {
+
+                    std::cout << "(0, 0, 0," << v[0] << ", " << v[1] << ", " << v[2] << "), ";
+                }
+
                 // Make our corner to next corner vectors
                 // In cam space these are 0,1,0 style vectors so we just get a col of the other matrix
                 // But since we are multiplying by the transpose we get a row of the matrix
@@ -539,7 +544,7 @@ public:
                     }
                     // If we have an odd number of intersections something is wrong
                     else {
-                        throw std::runtime_error("Odd number of intersections found with cone");
+                        // throw std::runtime_error("Odd number of intersections found with cone");
                     }
 
                     // Default to returning an empty list

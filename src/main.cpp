@@ -58,12 +58,13 @@ int main() {
     lens.type                = mesh::VisualMesh<Scalar>::Lens::EQUIRECTANGULAR;
     lens.equirectangular.fov = {{1.0472, 0.785398}};
 
+    std::cout << "[ ";
+
     // Perform our lookup
     const auto& lut    = mesh.height(1.0);
     const auto& ranges = mesh.lookup(Hco, lens);
 
     // Print out the mesh in a format for python
-    std::cout << "[ ";
     for (auto& range : ranges) {
         for (size_t i = range.first; i < range.second; ++i) {
 
