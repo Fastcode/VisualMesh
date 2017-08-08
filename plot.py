@@ -12,7 +12,7 @@ binary = sys.argv[1]
 
 for s in range(2):
     for i in range(100):
-        # try:
+        try:
             if s == 0:
                 pitch = (i / 100.0) * 2.0 * math.pi
                 yaw = 0.0
@@ -24,6 +24,7 @@ for s in range(2):
 
             # Run our mesh lookup for pitch/roll/yaw
             print('Pitch: {}, Yaw: {}, Roll: {}'.format(pitch, yaw, roll))
+            print(' '.join([binary, '{}'.format(pitch), '{}'.format(yaw), '{}'.format(roll)]))
             result = run([binary, '{}'.format(pitch), '{}'.format(yaw), '{}'.format(roll)], stdout=PIPE)
 
             # Fix our data and load it as json
@@ -48,5 +49,5 @@ for s in range(2):
             ax.set_zlabel('Z axis')
 
             plt.savefig('output/{:01d}-{:01d}.png'.format(s, i))
-        # except:
-            # print(data)
+        except:
+            print(data)
