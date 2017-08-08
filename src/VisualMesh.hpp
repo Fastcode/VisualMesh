@@ -167,14 +167,14 @@ public:
 
             // Loop from directly down up to the horizon (if phi is nan it will stop)
             // So we don't have a single point at the base, we move half a jump forward
-            for (Scalar phi = shape.phi(0, h) / 2.0; phi < M_PI_2;) {
+            for (Scalar phi = shape.phi(0, h) * Scalar(0.5); phi < M_PI_2;) {
 
                 // Calculate our theta
                 Scalar theta = std::max(shape.theta(phi, h), min_angular_res);
 
                 if (!std::isnan(theta)) {
                     // Push back the phi, and the number of whole shapes we can fit
-                    phis.emplace_back(phi, size_t(std::ceil(2.0 * M_PI / theta)));
+                    phis.emplace_back(phi, size_t(std::ceil(Scalar(2.0) * M_PI / theta)));
                 }
 
                 // Move to our next phi
@@ -182,14 +182,14 @@ public:
             }
 
             // Loop from directly up down to the horizon (if phi is nan it will stop)
-            for (Scalar phi = (M_PI + shape.phi(M_PI, h)) / 2.0; phi > M_PI_2;) {
+            for (Scalar phi = (M_PI + shape.phi(M_PI, h)) * Scalar(0.5); phi > M_PI_2;) {
 
                 // Calculate our theta
                 Scalar theta = std::max(shape.theta(phi, h), min_angular_res);
 
                 if (!std::isnan(theta)) {
                     // Push back the phi, and the number of whole shapes we can fit
-                    phis.emplace_back(phi, size_t(std::ceil(2.0 * M_PI / theta)));
+                    phis.emplace_back(phi, size_t(std::ceil(Scalar(2.0) * M_PI / theta)));
                 }
 
                 // Move to our next phi
@@ -220,7 +220,7 @@ public:
                 // Get our phi and delta theta values for a clean circle
                 const auto& phi   = v.first;
                 const auto& steps = v.second;
-                Scalar dtheta     = (2.0 * M_PI) / steps;
+                Scalar dtheta     = (Scalar(2.0) * M_PI) / steps;
 
                 // We will use the start position of each row later for linking the graph
                 rows.emplace_back(phi, lut.size(), lut.size() + steps);
@@ -288,7 +288,7 @@ public:
                             // Note this bool is used like a bool and int. It is 0 when we should access TR first
                             // and 1 when we should access TL first. This is to avoid accessing values which wrap around
                             // and instead access a non wrap element and use its neighbours to work out ours
-                            bool left = pos > 0.5;
+                            bool left = pos > Scalar(0.5);
 
                             // Get our closest neighbour on the previous row and use it to work out where the other one
                             // is This will be the Right element when < 0.5 and Left when > 0.5
@@ -349,8 +349,8 @@ public:
             for (auto& range : theta_ranges) {
 
                 // Convert our theta values into local indices
-                size_t begin = std::ceil(row_size * range.first / (2.0 * M_PI));
-                size_t end   = std::ceil(row_size * range.second / (2.0 * M_PI));
+                size_t begin = std::ceil(row_size * range.first * (Scalar(1.0) / (Scalar(2.0) * M_PI)));
+                size_t end   = std::ceil(row_size * range.second * (Scalar(1.0) / (Scalar(2.0) * M_PI)));
 
                 // If we define a nice enclosed range range add it
                 if (end >= begin) {
@@ -388,11 +388,11 @@ public:
                 const std::array<Scalar, 3> rOCc = {{Hco[0][3], Hco[1][3], Hco[2][3]}};
 
                 // Work out how much additional y and z we get from our field of view if we have a focal length of 1
-                Scalar y_extent = std::tan(lens.equirectangular.fov[0] * 0.5);
-                Scalar z_extent = std::tan(lens.equirectangular.fov[1] * 0.5);
+                Scalar y_extent = std::tan(lens.equirectangular.fov[0] * Scalar(0.5));
+                Scalar z_extent = std::tan(lens.equirectangular.fov[1] * Scalar(0.5));
 
                 // Prenormalise these values as they will all be the same length
-                Scalar length = 1.0 / std::sqrt(y_extent * y_extent + z_extent * z_extent + 1);
+                Scalar length = Scalar(1.0) / std::sqrt(y_extent * y_extent + z_extent * z_extent + 1);
                 y_extent      = y_extent * length;
                 z_extent      = z_extent * length;
 
@@ -420,8 +420,8 @@ public:
                     {{dot(rNCc[3], Rco[0]), dot(rNCc[3], Rco[1]), dot(rNCc[3], Rco[2])}},  // rWCo
                 }};
 
+                // TODO remove this when you're finished it
                 for (int i = 0; i < 4; ++i) {
-
                     std::cout << "[0, 0, 0," << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << "], ";
 
                     for (const auto& q : rNCo) {
@@ -469,7 +469,7 @@ public:
 
                         // rNCo_dot_rMNo[i % 2];  // TODO Each side is the same for this
                         Scalar UdPmV    = dot(line_origin, line_direction);
-                        Scalar side_len = 2.0 * (i % 2 == 0 ? y_extent : z_extent);
+                        Scalar side_len = Scalar(2.0) * (i % 2 == 0 ? y_extent : z_extent);
                         Scalar c2       = DdU * DdU - cos_phi2;
                         Scalar c1       = DdU * DdPmV - cos_phi2 * UdPmV;
                         Scalar c0       = DdPmV * DdPmV - cos_phi2;
@@ -480,7 +480,7 @@ public:
                             if (discriminant > 0) {
                                 // We have two intersections with either the upper or lower code
                                 Scalar root   = std::sqrt(discriminant);
-                                Scalar inv_c2 = 1.0 / c2;
+                                Scalar inv_c2 = Scalar(1.0) / c2;
 
                                 // Get our two solutions for t
                                 for (const Scalar t : {(-c1 - root) * inv_c2, (-c1 + root) * inv_c2}) {
@@ -493,7 +493,7 @@ public:
                                         Scalar y     = line_origin[1] + line_direction[1] * t;
                                         Scalar theta = std::atan2(y, x);
                                         // atan2 gives a result from -pi -> pi, we need 0 -> 2 pi
-                                        limits.emplace_back(theta > 0 ? theta : theta + M_PI * 2.0);
+                                        limits.emplace_back(theta > 0 ? theta : theta + M_PI * Scalar(2.0));
                                     }
                                 }
                             }
@@ -517,7 +517,7 @@ public:
                         std::sort(limits.begin(), limits.end());
 
                         // Get a test point half way between the first two points
-                        const Scalar test_theta = (limits[0] + limits[1]) * 0.5;
+                        const Scalar test_theta = (limits[0] + limits[1]) * Scalar(0.5);
                         const Scalar sin_phi    = std::sin(phi);
                         const Scalar sin_theta  = std::sin(test_theta);
                         const Scalar cos_theta  = std::cos(test_theta);
