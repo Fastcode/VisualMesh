@@ -8,7 +8,7 @@
 
 using Scalar = float;
 
-int main() {
+int main(int argc, char* argv[]) {
 
     mesh::Cylinder<Scalar> cylinder(0, 2.0, 0.075, 1, 20);
     mesh::Sphere<Scalar> sphere(0, 0.075, 1, 10);
@@ -16,9 +16,9 @@ int main() {
     mesh::VisualMesh<Scalar> mesh(cylinder, 1.0, 1.1, 1, M_PI / 1024.0);
 
     // theta is pitch, lambda is roll, and phi is yaw
-    Scalar theta  = 0;
-    Scalar phi    = 0;
-    Scalar lambda = 0;
+    Scalar theta  = std::atof(argv[1]);
+    Scalar phi    = std::atof(argv[2]);
+    Scalar lambda = std::atof(argv[3]);
 
     Scalar ct = std::cos(theta);
     Scalar st = std::sin(theta);
@@ -76,8 +76,8 @@ int main() {
                 const auto& n = lut.nodes[i].neighbours[j];
 
                 const auto& neighbour = lut.nodes[i + n];
-                std::cout << "(" << node.ray[0] << ", " << node.ray[1] << ", " << node.ray[2] << ", "
-                          << neighbour.ray[0] << ", " << neighbour.ray[1] << ", " << neighbour.ray[2] << "), ";
+                std::cout << "[" << node.ray[0] << ", " << node.ray[1] << ", " << node.ray[2] << ", "
+                          << neighbour.ray[0] << ", " << neighbour.ray[1] << ", " << neighbour.ray[2] << "], ";
             }
         }
     }

@@ -422,12 +422,12 @@ public:
 
                 for (int i = 0; i < 4; ++i) {
 
-                    std::cout << "(0, 0, 0," << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << "), ";
+                    std::cout << "[0, 0, 0," << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << "], ";
 
                     for (const auto& q : rNCo) {
-                        std::cout << "(" << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << ", "
+                        std::cout << "[" << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << ", "
                                   << rNCo[(i + 1) % 4][0] << ", " << rNCo[(i + 1) % 4][1] << ", "
-                                  << rNCo[(i + 1) % 4][2] << "), ";
+                                  << rNCo[(i + 1) % 4][2] << "], ";
                     }
                 }
 
