@@ -8,7 +8,7 @@
 
 using Scalar = float;
 
-int main(int argc, char* argv[]) {
+int main(int, char* argv[]) {
 
     mesh::Cylinder<Scalar> cylinder(0, 2.0, 0.075, 1, 20);
     mesh::Sphere<Scalar> sphere(0, 0.075, 1, 10);
@@ -77,9 +77,9 @@ int main(int argc, char* argv[]) {
             // for (const auto& n : lut[i].neighbours) {
             for (int j = 0; j < 6; ++j) {
 
-                const auto& n = lut.nodes[i].neighbours[j];
-
+                const auto& n         = lut.nodes.at(i).neighbours[j];
                 const auto& neighbour = lut.nodes[i + n];
+
                 std::cout << "[" << node.ray[0] << ", " << node.ray[1] << ", " << node.ray[2] << ", "
                           << neighbour.ray[0] << ", " << neighbour.ray[1] << ", " << neighbour.ray[2] << "], ";
             }

@@ -251,8 +251,44 @@ public:
                 }
             }
 
+
+            /**
+             * This function links to the previous and next rows
+             *
+             * @param i       the absolute index to the node we are linking
+             * @param pos     the position of this node in its row as a value between 0 and 1
+             * @param start   the start of the row to link to
+             * @param size    the size of the row we are linking to
+             * @param offset  the offset for our neighbour (0 for TL,TR 4 for BL BR)
+             */
+            auto link = [](std::vector<Node>& lut,
+                           const size_t& i,
+                           const Scalar& pos,
+                           const int& start,
+                           const int& size,
+                           const size_t offset) {
+
+                // Grab our current node
+                auto& node = lut[i];
+
+                // Work out if we are closer to the left or right and make an offset var for it
+                // Note this bool is used like a bool and int. It is 0 when we should access TR first
+                // and 1 when we should access TL first. This is to avoid accessing values which wrap around
+                // and instead access a non wrap element and use its neighbours to work out ours
+                bool left = pos > Scalar(0.5);
+
+                // Get our closest neighbour on the previous row and use it to work out where the other one
+                // is This will be the Right element when < 0.5 and Left when > 0.5
+                size_t o1 = start + std::floor(pos * size + !left);  // Use `left` to add one to one
+                size_t o2 = o1 + lut[o1].neighbours[2 + left];       // But not the other
+
+                // Now use these to set our TL and TR neighbours
+                node.neighbours[offset]     = (left ? o1 : o2) - i;
+                node.neighbours[offset + 1] = (left ? o2 : o1) - i;
+            };
+
             // Now we upwards and downwards to fill in the missing links
-            for (size_t r = 0; r < rows.size(); ++r) {
+            for (size_t r = 1; r < rows.size() - 1; ++r) {
 
                 // Alias for convenience
                 const auto& prev    = rows[r - 1];
@@ -260,65 +296,69 @@ public:
                 const auto& next    = rows[r + 1];
 
                 // Work out how big our rows are if they are within valid indices
-                int prev_size    = r > 0 ? prev.end - prev.begin : 0;
+                int prev_size    = prev.end - prev.begin;
                 int current_size = current.end - current.begin;
-                int next_size    = r < rows.size() - 1 ? next.end - next.begin : 0;
+                int next_size    = next.end - next.begin;
 
                 // Go through all the nodes on our current row
                 for (size_t i = current.begin; i < current.end; ++i) {
 
-                    // Grab our current node
-                    auto& node = lut[i];
-
                     // Find where we are in our row as a value between 0 and 1
                     Scalar pos = Scalar(i - current.begin) / Scalar(current_size);
 
-                    /**
-                     * This function links to the previous and next rows
-                     *
-                     * @param start         the start of the row to link to
-                     * @param size          the size of the row we are linking to
-                     * @param invalid_row   the row that is invalid (first for prev, last for next)
-                     * @param offset        the offset for our neighbour (0 for TL,TR 4 for BL BR)
-                     */
-                    auto link = [&](const int& start, const int& size, const size_t& invalid_row, const size_t offset) {
-
-                        if (r != invalid_row) {
-                            // Work out if we are closer to the left or right and make an offset var for it
-                            // Note this bool is used like a bool and int. It is 0 when we should access TR first
-                            // and 1 when we should access TL first. This is to avoid accessing values which wrap around
-                            // and instead access a non wrap element and use its neighbours to work out ours
-                            bool left = pos > Scalar(0.5);
-
-                            // Get our closest neighbour on the previous row and use it to work out where the other one
-                            // is This will be the Right element when < 0.5 and Left when > 0.5
-                            size_t o1 = start + std::floor(pos * size + !left);  // Use `left` to add one to one
-                            size_t o2 = o1 + lut[o1].neighbours[2 + left];       // But not the other
-
-                            // Now use these to set our TL and TR neighbours
-                            node.neighbours[offset]     = (left ? o1 : o2) - i;
-                            node.neighbours[offset + 1] = (left ? o2 : o1) - i;
-                        }
-                        // If we don't have a row to link to, we are at the end, so instead link to our own row
-                        // However if we only do this if we only do this if we are ending on our side of the horizon
-                        else if ((node.ray[2] < 0 && invalid_row == 0) || (node.ray[2] > 0 && invalid_row != 0)) {
-                            // Work out which two points are on the opposite side to us
-                            size_t index = i - current.begin + (current_size / 2);
-
-                            // Link to them
-                            node.neighbours[offset]     = current.begin + (index % current_size) - i;
-                            node.neighbours[offset + 1] = current.begin + ((index + 1) % current_size) - i;
-                        }
-                        // If we can't link, just link to our left and right
-                        else {
-                            node.neighbours[offset]     = node.neighbours[2];
-                            node.neighbours[offset + 1] = node.neighbours[3];
-                        }
-                    };
-
                     // Perform both links
-                    if (r > 0) link(prev.begin, prev_size, 0, 0);
-                    if (r < rows.size() - 1) link(next.begin, next_size, rows.size() - 1, 4);
+                    link(lut, i, pos, prev.begin, prev_size, 0);
+                    link(lut, i, pos, next.begin, next_size, 4);
+                }
+            }
+
+            // Now we have to deal with the very first, and very last rows as they can't be linked in the normal way
+            if (!rows.empty()) {
+
+                auto& front    = rows.front();
+                int front_size = front.end - front.begin;
+
+                auto& back    = rows.back();
+                int back_size = back.end - back.begin;
+
+                // Link the front to itself
+                for (size_t i = front.begin; i < front.end; ++i) {
+                    // Alias our node
+                    auto& node = lut[i];
+
+                    // Work out which two points are on the opposite side to us
+                    size_t index = i - front.begin + (front_size / 2);
+
+                    // Find where we are in our row as a value between 0 and 1
+                    Scalar pos = Scalar(i - front.begin) / Scalar(front_size);
+
+                    // Link to ourself
+                    node.neighbours[0] = front.begin + (index % front_size) - i;
+                    node.neighbours[1] = front.begin + ((index + 1) % front_size) - i;
+
+                    // Link to our next row normally
+                    auto& r2 = rows[1];
+                    link(lut, i, pos, r2.begin, r2.end - r2.begin, 4);
+                }
+
+                // Link the back to itself
+                for (size_t i = back.begin; i < back.end; ++i) {
+                    // Alias our node
+                    auto& node = lut[i];
+
+                    // Work out which two points are on the opposite side to us
+                    size_t index = i - back.begin + (back_size / 2);
+
+                    // Find where we are in our row as a value between 0 and 1
+                    Scalar pos = Scalar(i - back.begin) / Scalar(back_size);
+
+                    // Link to ourself on the other side
+                    node.neighbours[4] = back.begin + (index % back_size) - i;
+                    node.neighbours[5] = back.begin + ((index + 1) % back_size) - i;
+
+                    // Link to our previous row normally
+                    auto& r2 = rows[rows.size() - 2];
+                    link(lut, i, pos, r2.begin, r2.end - r2.begin, 0);
                 }
             }
 
@@ -351,6 +391,12 @@ public:
                 // Convert our theta values into local indices
                 size_t begin = std::ceil(row_size * range.first * (Scalar(1.0) / (Scalar(2.0) * M_PI)));
                 size_t end   = std::ceil(row_size * range.second * (Scalar(1.0) / (Scalar(2.0) * M_PI)));
+
+                // Floating point numbers are annoying... did you know pi * 1/pi is slightly larger than 1?
+                // It's also possible that our theta ranges cross the wrap around but the indices mean they don't
+                // This will cause segfaults unless we fix the wrap
+                begin = begin > row_size ? 0 : begin;
+                end   = end > row_size ? row_size : end;
 
                 // If we define a nice enclosed range range add it
                 if (end >= begin) {
@@ -562,8 +608,6 @@ public:
             }
 
             case Lens::RADIAL: {
-
-
                 // Solution for intersections on the edge is the intersection between a unit sphere, a plane, and a cone
                 // The cone is the cone made by the phi angle, and the plane intersects with the unit sphere to form
                 // The circle that defines the edge of the field of view of the camera.
@@ -588,7 +632,19 @@ public:
 
                 auto theta_limits = [&](const Scalar& phi) {
 
+                    // Check if we are intersecting with an upper or lower cone
+                    const bool upper = phi > M_PI_2;
+
+                    // First we should check if this phi is totally contained in our fov
+                    // Work out what our largest fully contained phi value is
+                    // We can work this out by subtracting our offset angle from our fov and checking if phi is smaller
+                    if ((upper && (lens.radial.fov * 0.5 - std::acos(cam[2])) > (M_PI - phi))
+                        || (!upper && (lens.radial.fov * 0.5 - std::acos(-cam[2])) > phi)) {
+                        return std::vector<std::pair<Scalar, Scalar>>(1, std::make_pair(0, M_PI * 2.0));
+                    }
+
                     Scalar tan_phi = std::tan(phi);
+                    Scalar cos_phi = std::cos(phi);
 
                     // The z component is ± this value
                     Scalar z = Scalar(1.0) / std::sqrt(tan_phi * tan_phi + Scalar(1.0));
@@ -596,10 +652,11 @@ public:
                     // Since we are squaring z, the ± will always be the same
                     Scalar a = Scalar(1.0) - z * z;
 
+                    // This constant however cares about ± z
                     Scalar b_0 = (cos_fov - cam[2] * +z) / cam[0];
                     Scalar b_1 = (cos_fov - cam[2] * -z) / cam[0];
 
-                    // The y component is ±
+                    // The y component is ± this square root
                     Scalar y_0 = std::sqrt(Scalar(4.0) * (a - b_0 * b_0)) * Scalar(0.5);
                     Scalar y_1 = std::sqrt(Scalar(4.0) * (a - b_1 * b_1)) * Scalar(0.5);
 
@@ -615,38 +672,42 @@ public:
                     // std::cerr << "x: " << x_0 << ", " << -x_0 << ", " << x_1 << ", " << -x_1 << std::endl;
                     // std::cerr << std::endl;
 
-                    if (!isnan(x_0) && !isnan(y_0))
-                        std::cout << "[0, 0, 0, " << x_0 << ", " << y_0 << ", " << z << "],";
-                    if (!isnan(x_0) && !isnan(y_0))
-                        std::cout << "[0, 0, 0, " << x_0 << ", " << y_0 << ", " << -z << "],";
-                    if (!isnan(x_0) && !isnan(y_0))
-                        std::cout << "[0, 0, 0, " << x_0 << ", " << -y_0 << ", " << z << "],";
-                    if (!isnan(x_0) && !isnan(y_0))
-                        std::cout << "[0, 0, 0, " << x_0 << ", " << -y_0 << ", " << -z << "],";
-                    if (!isnan(x_0) && !isnan(y_0))
-                        std::cout << "[0, 0, 0, " << -x_0 << ", " << y_0 << ", " << z << "],";
-                    if (!isnan(x_0) && !isnan(y_0))
-                        std::cout << "[0, 0, 0, " << -x_0 << ", " << y_0 << ", " << -z << "],";
-                    if (!isnan(x_0) && !isnan(y_0))
-                        std::cout << "[0, 0, 0, " << -x_0 << ", " << -y_0 << ", " << z << "],";
-                    if (!isnan(x_0) && !isnan(y_0))
-                        std::cout << "[0, 0, 0, " << -x_0 << ", " << -y_0 << ", " << -z << "],";
-                    if (!isnan(x_1) && !isnan(y_1))
-                        std::cout << "[0, 0, 0, " << x_1 << ", " << y_1 << ", " << z << "],";
-                    if (!isnan(x_1) && !isnan(y_1))
-                        std::cout << "[0, 0, 0, " << x_1 << ", " << y_1 << ", " << -z << "],";
-                    if (!isnan(x_1) && !isnan(y_1))
-                        std::cout << "[0, 0, 0, " << x_1 << ", " << -y_1 << ", " << z << "],";
-                    if (!isnan(x_1) && !isnan(y_1))
-                        std::cout << "[0, 0, 0, " << x_1 << ", " << -y_1 << ", " << -z << "],";
-                    if (!isnan(x_1) && !isnan(y_1))
-                        std::cout << "[0, 0, 0, " << -x_1 << ", " << y_1 << ", " << z << "],";
-                    if (!isnan(x_1) && !isnan(y_1))
-                        std::cout << "[0, 0, 0, " << -x_1 << ", " << y_1 << ", " << -z << "],";
-                    if (!isnan(x_1) && !isnan(y_1))
-                        std::cout << "[0, 0, 0, " << -x_1 << ", " << -y_1 << ", " << z << "],";
-                    if (!isnan(x_1) && !isnan(y_1))
-                        std::cout << "[0, 0, 0, " << -x_1 << ", " << -y_1 << ", " << -z << "],";
+
+                    // Now we will have 16 solutions.
+                    // They come from the following:
+                    //      2x from the sides (the 2 we are about)
+                    //      2x mirrored around ± cam axis
+                    //      2x mirrored around ± cone axis
+                    //      2x ???
+                    std::array<std::array<Scalar, 3>, 16> sols = {{{{+x_0, +y_0, +z}},
+                                                                   {{+x_0, +y_0, -z}},
+                                                                   {{+x_0, -y_0, +z}},
+                                                                   {{+x_0, -y_0, -z}},
+                                                                   {{-x_0, +y_0, +z}},
+                                                                   {{-x_0, +y_0, -z}},
+                                                                   {{-x_0, -y_0, +z}},
+                                                                   {{-x_0, -y_0, -z}},
+                                                                   {{+x_1, +y_1, +z}},
+                                                                   {{+x_1, +y_1, -z}},
+                                                                   {{+x_1, -y_1, +z}},
+                                                                   {{+x_1, -y_1, -z}},
+                                                                   {{-x_1, +y_1, +z}},
+                                                                   {{-x_1, +y_1, -z}},
+                                                                   {{-x_1, -y_1, +z}},
+                                                                   {{-x_1, -y_1, -z}}}};
+
+                    for (const auto& s : sols) {
+                        // Check that this solution is in the right place around our camera vector
+                        // Dot product of cam vector with solution must be cos_fov
+                        // Dot product of -z axis with solution must be cos_phi
+                        // Since they are floating point values that will always be around 1, we can use epsilon here
+                        // for comparison
+                        if (std::abs(cam[0] * s[0] + cam[1] * s[1] + cam[2] * s[2] - cos_fov)
+                                < std::numeric_limits<Scalar>::epsilon()
+                            && std::abs(-s[2] - cos_phi) < std::numeric_limits<Scalar>::epsilon()) {
+                            std::cout << "[0, 0, 0, " << s[0] << ", " << s[1] << ", " << s[2] << "],";
+                        }
+                    }
 
                     return std::vector<std::pair<Scalar, Scalar>>();
                 };
@@ -686,7 +747,7 @@ private:
     Scalar max_height;
     // The number gradations in height
     size_t height_resolution;
-};  // namespace mesh
+};
 
 }  // namespace mesh
 
