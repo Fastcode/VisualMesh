@@ -580,26 +580,78 @@ public:
                 // r_0 = N * cos(fov/2)
                 // N . (r - r_0) = 0
 
+                // The gradient of our field of view cone
+                Scalar cos_fov            = std::cos(lens.radial.fov * Scalar(0.5));
+                std::array<Scalar, 3> cam = {{Hco[0][0], Hco[0][1], Hco[0][2]}};
+                std::cerr << "Cam: " << cam << std::endl << std::endl;
+                std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << "],";
 
-                // Scalar lambda = std::cos(lens.radial.fov);
+                auto theta_limits = [&](const Scalar& phi) {
 
-                // Scalar z = 1.0 / (std::sqrt(std::tan(phi) * std::tan(phi) + 1));
+                    Scalar tan_phi = std::tan(phi);
 
-                // Scalar a = (lambda - cam[2] *±z) / cam[0];
-                // Scalar b = 1 - z * z;
+                    // The z component is ± this value
+                    Scalar z = Scalar(1.0) / std::sqrt(tan_phi * tan_phi + Scalar(1.0));
 
-                // Scalar y = ±std::sqrt(4.0 * (b - a * a)) / 2.0;
+                    // Since we are squaring z, the ± will always be the same
+                    Scalar a = Scalar(1.0) - z * z;
 
-                // Scalar x = ±std::sqrt(b - y * y);
+                    Scalar b_0 = (cos_fov - cam[2] * +z) / cam[0];
+                    Scalar b_1 = (cos_fov - cam[2] * -z) / cam[0];
 
+                    // The y component is ±
+                    Scalar y_0 = std::sqrt(Scalar(4.0) * (a - b_0 * b_0)) * Scalar(0.5);
+                    Scalar y_1 = std::sqrt(Scalar(4.0) * (a - b_1 * b_1)) * Scalar(0.5);
 
-                // TODO work out the phi value of the camera vector
+                    // Squaring y means the ± will always be the same
+                    Scalar x_0 = std::sqrt(a - y_0 * y_0);
+                    Scalar x_1 = std::sqrt(a - y_1 * y_1);
 
-                // TODO add/subtract the phi value from the FOV
+                    // std::cerr << "f: " << cos_fov << std::endl;
+                    // std::cerr << "a: " << a << std::endl;
+                    // std::cerr << "b: " << b_0 << ", " << b_1 << std::endl;
+                    // std::cerr << "z: " << z << std::endl;
+                    // std::cerr << "y: " << y_0 << ", " << -y_0 << ", " << y_1 << ", " << -y_1 << std::endl;
+                    // std::cerr << "x: " << x_0 << ", " << -x_0 << ", " << x_1 << ", " << -x_1 << std::endl;
+                    // std::cerr << std::endl;
 
-                // TODO normalise
+                    if (!isnan(x_0) && !isnan(y_0))
+                        std::cout << "[0, 0, 0, " << x_0 << ", " << y_0 << ", " << z << "],";
+                    if (!isnan(x_0) && !isnan(y_0))
+                        std::cout << "[0, 0, 0, " << x_0 << ", " << y_0 << ", " << -z << "],";
+                    if (!isnan(x_0) && !isnan(y_0))
+                        std::cout << "[0, 0, 0, " << x_0 << ", " << -y_0 << ", " << z << "],";
+                    if (!isnan(x_0) && !isnan(y_0))
+                        std::cout << "[0, 0, 0, " << x_0 << ", " << -y_0 << ", " << -z << "],";
+                    if (!isnan(x_0) && !isnan(y_0))
+                        std::cout << "[0, 0, 0, " << -x_0 << ", " << y_0 << ", " << z << "],";
+                    if (!isnan(x_0) && !isnan(y_0))
+                        std::cout << "[0, 0, 0, " << -x_0 << ", " << y_0 << ", " << -z << "],";
+                    if (!isnan(x_0) && !isnan(y_0))
+                        std::cout << "[0, 0, 0, " << -x_0 << ", " << -y_0 << ", " << z << "],";
+                    if (!isnan(x_0) && !isnan(y_0))
+                        std::cout << "[0, 0, 0, " << -x_0 << ", " << -y_0 << ", " << -z << "],";
+                    if (!isnan(x_1) && !isnan(y_1))
+                        std::cout << "[0, 0, 0, " << x_1 << ", " << y_1 << ", " << z << "],";
+                    if (!isnan(x_1) && !isnan(y_1))
+                        std::cout << "[0, 0, 0, " << x_1 << ", " << y_1 << ", " << -z << "],";
+                    if (!isnan(x_1) && !isnan(y_1))
+                        std::cout << "[0, 0, 0, " << x_1 << ", " << -y_1 << ", " << z << "],";
+                    if (!isnan(x_1) && !isnan(y_1))
+                        std::cout << "[0, 0, 0, " << x_1 << ", " << -y_1 << ", " << -z << "],";
+                    if (!isnan(x_1) && !isnan(y_1))
+                        std::cout << "[0, 0, 0, " << -x_1 << ", " << y_1 << ", " << z << "],";
+                    if (!isnan(x_1) && !isnan(y_1))
+                        std::cout << "[0, 0, 0, " << -x_1 << ", " << y_1 << ", " << -z << "],";
+                    if (!isnan(x_1) && !isnan(y_1))
+                        std::cout << "[0, 0, 0, " << -x_1 << ", " << -y_1 << ", " << z << "],";
+                    if (!isnan(x_1) && !isnan(y_1))
+                        std::cout << "[0, 0, 0, " << -x_1 << ", " << -y_1 << ", " << -z << "],";
 
-                throw std::runtime_error("Not implemented");
+                    return std::vector<std::pair<Scalar, Scalar>>();
+                };
+
+                return lookup(0.5, theta_limits);
             }
             default: { throw std::runtime_error("Unknown lens type"); }
         }
