@@ -80,13 +80,20 @@ std::ostream& operator<<(std::ostream& out, const std::array<T, n>& s) {
 template <typename Scalar = float>
 class VisualMesh {
 public:
+    // Typedef some value types we commonly use
+    using vec2 = std::array<Scalar, 2>;
+    using vec3 = std::array<Scalar, 3>;
+    using vec4 = std::array<Scalar, 4>;
+    using mat3 = std::array<vec3, 3>;
+    using mat4 = std::array<vec4, 4>;
+
     struct Lens {
         enum Type { EQUIRECTANGULAR, RADIAL };
         struct Radial {
             Scalar fov;
         };
         struct Equirectangular {
-            std::array<Scalar, 2> fov;
+            vec2 fov;
         };
 
         Type type;
@@ -98,7 +105,7 @@ public:
 
     struct Node {
         /// The unit vector in the direction for this node
-        Scalar ray[4];
+        vec4 ray;
         /// Relative indices to the linked hexagon nodes in the LUT ordered TL, TR, L, R, BL, BR,
         int neighbours[6];
     };
@@ -413,25 +420,30 @@ public:
         return indicies;
     }
 
-    std::vector<std::pair<size_t, size_t>> lookup(const std::array<std::array<Scalar, 4>, 4>& Hco, const Lens& lens) {
+    std::vector<std::pair<size_t, size_t>> lookup(const mat4& Hco, const Lens& lens) {
 
         switch (lens.type) {
             case Lens::EQUIRECTANGULAR: {
 
                 // Extract our rotation matrix
-                const std::array<std::array<Scalar, 3>, 3> Rco = {{
+                const mat3 Rco = {{
                     {{Hco[0][0], Hco[0][1], Hco[0][2]}},  //
                     {{Hco[1][0], Hco[1][1], Hco[1][2]}},  //
                     {{Hco[2][0], Hco[2][1], Hco[2][2]}}   //
                 }};
 
+                // Extract our z height
+                // TODO this is wrong, fix it when it matters
+                const vec3 rOCc = {{Hco[0][3], Hco[1][3], Hco[2][3]}};
+
+                // Print our camera vector
+                const std::array<Scalar, 3> cam = {{Hco[0][0], Hco[0][1], Hco[0][2]}};
+                std::cerr << "Cam: " << cam << std::endl << std::endl;
+                std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << "],";
+
                 // Solution to finding the edges is an intersection between a line and a cone
                 // Based on a simplified version of the math found at
                 // https://www.geometrictools.com/Documentation/IntersectionLineCone.pdf
-
-                // Extract our z height
-                // TODO this is wrong, fix it when it matters
-                const std::array<Scalar, 3> rOCc = {{Hco[0][3], Hco[1][3], Hco[2][3]}};
 
                 // Work out how much additional y and z we get from our field of view if we have a focal length of 1
                 Scalar y_extent = std::tan(lens.equirectangular.fov[0] * Scalar(0.5));
@@ -450,7 +462,7 @@ public:
                  */
 
                 // Make corners in cam space as unit vectors
-                const std::array<std::array<Scalar, 3>, 4> rNCc = {{
+                const std::array<vec3, 4> rNCc = {{
                     {{length, +y_extent, +z_extent}},  // rTCc
                     {{length, -y_extent, +z_extent}},  // rUCc
                     {{length, -y_extent, -z_extent}},  // rVCc
@@ -459,7 +471,7 @@ public:
 
                 // Rotate these into world space by multiplying by the rotation matrix
                 // Because of the way we are performing our dot product here (row->row), we are transposing Rco
-                const std::array<std::array<Scalar, 3>, 4> rNCo = {{
+                const std::array<vec3, 4> rNCo = {{
                     {{dot(rNCc[0], Rco[0]), dot(rNCc[0], Rco[1]), dot(rNCc[0], Rco[2])}},  // rTCo
                     {{dot(rNCc[1], Rco[0]), dot(rNCc[1], Rco[1]), dot(rNCc[1], Rco[2])}},  // rUCo
                     {{dot(rNCc[2], Rco[0]), dot(rNCc[2], Rco[1]), dot(rNCc[2], Rco[2])}},  // rVCo
@@ -481,7 +493,7 @@ public:
                 // In cam space these are 0,1,0 style vectors so we just get a col of the other matrix
                 // But since we are multiplying by the transpose we get a row of the matrix
                 // When we are storing this matrix we represent each corner as N and the following clockwise corner as M
-                const std::array<std::array<Scalar, 3>, 4> rMNo = {{
+                const std::array<vec3, 4> rMNo = {{
                     {{-Rco[1][0], -Rco[1][1], -Rco[1][2]}},  // normalise(rUTc(0, -1,  0)) -> normalise(rUTo)
                     {{-Rco[2][0], -Rco[2][1], -Rco[2][2]}},  // normalise(rVUc(0,  0, -1)) -> normalise(rVUo)
                     {{+Rco[1][0], +Rco[1][1], +Rco[1][2]}},  // normalise(rWVc(0,  1,  0)) -> normalise(rWVo)
@@ -524,7 +536,7 @@ public:
                             Scalar discriminant = c1 * c1 - c0 * c2;
 
                             if (discriminant > 0) {
-                                // We have two intersections with either the upper or lower code
+                                // We have two intersections with either the upper or lower cone
                                 Scalar root   = std::sqrt(discriminant);
                                 Scalar inv_c2 = Scalar(1.0) / c2;
 
@@ -622,10 +634,13 @@ public:
                 // N = the unit vector in the direction of the camera
                 // r_0 = N * cos(fov/2)
                 // N . (r - r_0) = 0
+                //
+                // To simplify things however, we remove the y component and assume the camera vector is only ever
+                // on the x/z plane. We calculate the offset to make this happen and re apply it at the end
 
                 // The gradient of our field of view cone
-                const Scalar cos_half_fov       = std::cos(lens.radial.fov * Scalar(0.5));
-                const std::array<Scalar, 3> cam = {{Hco[0][0], Hco[0][1], Hco[0][2]}};
+                const Scalar cos_half_fov = std::cos(lens.radial.fov * Scalar(0.5));
+                const vec3 cam            = {{Hco[0][0], Hco[0][1], Hco[0][2]}};
                 std::cerr << "Cam: " << cam << std::endl << std::endl;
                 std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << "],";
 
@@ -698,11 +713,11 @@ public:
     }
 
 private:
-    inline Scalar dot(const std::array<Scalar, 3>& a, const std::array<Scalar, 3>& b) {
+    inline Scalar dot(const vec3& a, const vec3& b) {
         return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     }
 
-    inline std::array<Scalar, 3> cross(const std::array<Scalar, 3>& a, const std::array<Scalar, 3>& b) {
+    inline vec3 cross(const vec3& a, const vec3& b) {
         return {{
             a[1] * b[2] - a[2] * b[1],  // x
             a[2] * b[0] - a[0] * b[2],  // y
@@ -710,7 +725,7 @@ private:
         }};
     }
 
-    inline std::array<Scalar, 3> normalise(const std::array<Scalar, 3>& a) {
+    inline vec3 normalise(const vec3& a) {
         Scalar length = std::sqrt(a[0] * a[0] + a[1] * a[1] + a[2] + a[2]);
         return {{a[0] * length, a[1] * length, a[2] * length}};
     }

@@ -59,8 +59,8 @@ int main(int, char* argv[]) {
     lens.equirectangular.fov = {{1.0472, 0.785398}};
 
 
-    lens.type       = mesh::VisualMesh<Scalar>::Lens::RADIAL;
-    lens.radial.fov = 1.0472;
+    // lens.type       = mesh::VisualMesh<Scalar>::Lens::RADIAL;
+    // lens.radial.fov = 1.0472;
 
     std::cout << "[ ";
 

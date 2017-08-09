@@ -10,7 +10,7 @@ from subprocess import run, PIPE
 
 binary = sys.argv[1]
 
-for s in range(2):
+for s in range(3):
     for i in range(100):
         try:
             if s == 0:
