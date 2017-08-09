@@ -23,7 +23,8 @@ for s in range(2):
                 roll = 0.0
 
             # Run our mesh lookup for pitch/roll/yaw
-            print('Pitch: {}, Yaw: {}, Roll: {}'.format(pitch, yaw, roll))
+            print('Pitch: {} , Yaw: {}, Roll: {}'.format(pitch, yaw, roll))
+            print('output/{:02d}-{:02d}.png'.format(s, i))
             print(' '.join([binary, '{}'.format(pitch), '{}'.format(yaw), '{}'.format(roll)]))
             result = run([binary, '{}'.format(pitch), '{}'.format(yaw), '{}'.format(roll)], stdout=PIPE)
 

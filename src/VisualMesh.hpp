@@ -624,15 +624,16 @@ public:
                 // N . (r - r_0) = 0
 
                 // The gradient of our field of view cone
-                const Scalar cos_fov            = std::cos(lens.radial.fov * Scalar(0.5));
+                const Scalar cos_half_fov       = std::cos(lens.radial.fov * Scalar(0.5));
                 const std::array<Scalar, 3> cam = {{Hco[0][0], Hco[0][1], Hco[0][2]}};
                 std::cerr << "Cam: " << cam << std::endl << std::endl;
                 std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << "],";
 
-                auto theta_limits = [&](const Scalar& phi) {
+                auto theta_limits = [&](const Scalar& phi) -> std::array<std::pair<Scalar, Scalar>, 1> {
 
                     // Check if we are intersecting with an upper or lower cone
                     const bool upper = phi > M_PI_2;
+
                     // The cameras inclination from straight down (same reference frame as phi)
                     const Scalar cam_inc  = std::acos(-cam[2]);
                     const Scalar half_fov = lens.radial.fov * 0.5;
@@ -641,12 +642,12 @@ public:
                     // Work out what our largest fully contained phi value is
                     // We can work this out by subtracting our offset angle from our fov and checking if phi is smaller
                     if ((upper && half_fov - (M_PI - cam_inc) > M_PI - phi) || (!upper && half_fov - cam_inc > phi)) {
-                        return std::vector<std::pair<Scalar, Scalar>>(1, std::make_pair(0, M_PI * 2.0));
+                        return {{std::make_pair(0, M_PI * 2.0)}};
                     }
                     // Also if we can tell that the phi is totally outside we can bail out early
                     // To check this we check phi is greater than our inclination plus our fov
                     if ((upper && half_fov + (M_PI - cam_inc) < M_PI - phi) || (!upper && half_fov + cam_inc < phi)) {
-                        return std::vector<std::pair<Scalar, Scalar>>();
+                        return {{std::make_pair(0, 0)}};
                     }
 
                     // The solution only works for camera vectors that lie in the x/z plane
@@ -661,72 +662,32 @@ public:
                     // Since y will be 0, and z doesn't change we only need this one
                     const Scalar r_x = cam[0] * cos_offset + cam[1] * sin_offset;
 
-                    const Scalar tan_phi = std::tan(phi);
-                    const Scalar cos_phi = std::cos(phi);
+                    // The z component of our solution
+                    const Scalar z = -std::cos(phi);
 
-                    // The z component is ± this value
-                    const Scalar z = Scalar(1.0) / std::sqrt(tan_phi * tan_phi + Scalar(1.0));
-
-                    // Since we are squaring z, the ± will always be the same
-                    const Scalar a = Scalar(1.0) - z * z;
-
-                    // This constant however cares about ± z
-                    const Scalar b_0 = (cos_fov - cam[2] * -z) / r_x;
-                    const Scalar b_1 = (cos_fov - cam[2] * +z) / r_x;
+                    // Calculate intermediate products
+                    const Scalar a = Scalar(1.0) - z * z;  // aka sin^2(phi)
+                    const Scalar x = (cos_half_fov - cam[2] * z) / r_x;
 
                     // The y component is ± this square root
-                    const Scalar y_0 = std::sqrt(Scalar(4.0) * (a - b_0 * b_0)) * Scalar(0.5);
-                    const Scalar y_1 = std::sqrt(Scalar(4.0) * (a - b_1 * b_1)) * Scalar(0.5);
+                    const Scalar y_disc = a - x * x;
 
-                    // Squaring y means the ± will always be the same
-                    const Scalar x_0 = std::sqrt(a - y_0 * y_0);
-                    const Scalar x_1 = std::sqrt(a - y_1 * y_1);
-
-                    // Now we will have 16 solutions.
-                    // They come from the following:
-                    //      2x from the sides (the 2 we are about)
-                    //      2x mirrored around ± cam axis
-                    //      2x mirrored around ± cone axis
-                    //      2x mirrored around ???
-                    std::array<std::array<Scalar, 3>, 16> sols = {{{{+x_0, +y_0, +z}},
-                                                                   {{+x_0, +y_0, -z}},
-                                                                   {{+x_0, -y_0, +z}},
-                                                                   {{+x_0, -y_0, -z}},
-                                                                   {{-x_0, +y_0, +z}},
-                                                                   {{-x_0, +y_0, -z}},
-                                                                   {{-x_0, -y_0, +z}},
-                                                                   {{-x_0, -y_0, -z}},
-                                                                   {{+x_1, +y_1, +z}},
-                                                                   {{+x_1, +y_1, -z}},
-                                                                   {{+x_1, -y_1, +z}},
-                                                                   {{+x_1, -y_1, -z}},
-                                                                   {{-x_1, +y_1, +z}},
-                                                                   {{-x_1, +y_1, -z}},
-                                                                   {{-x_1, -y_1, +z}},
-                                                                   {{-x_1, -y_1, -z}}}};
-
-                    for (const auto& s : sols) {
-                        // Check that this solution is in the right place around our camera vector
-                        // Dot product of cam vector with solution must be cos_fov (y == 0 so we skip that)
-                        // Dot product of -z axis with solution must be cos_phi
-                        // Since they are floating point values that will always be around 1, we can use epsilon here
-                        // for comparison
-                        if (std::abs(r_x * s[0] + cam[2] * s[2] - cos_fov) < std::numeric_limits<Scalar>::epsilon()
-                            && std::abs(-s[2] - cos_phi) < std::numeric_limits<Scalar>::epsilon()) {
-                            // if (!isnan(s[0]) && !isnan(s[1]) && !isnan(s[2])) {
-
-                            // Now that we have our solution, we need to rotate it back into the correct space
-                            std::array<Scalar, 3> r_s = {{
-                                s[0] * cos_offset - s[1] * sin_offset,  //
-                                s[0] * sin_offset + s[1] * cos_offset,  //
-                                s[2]                                    //
-                            }};
-
-                            std::cout << "[0, 0, 0, " << r_s[0] << ", " << r_s[1] << ", " << r_s[2] << "],";
-                        }
+                    if (y_disc < 0) {
+                        return {{std::make_pair(0, 0)}};
                     }
 
-                    return std::vector<std::pair<Scalar, Scalar>>();
+                    const Scalar y  = std::sqrt(y_disc);
+                    const Scalar t1 = offset + std::atan2(-y, x);
+                    const Scalar t2 = offset + std::atan2(y, x);
+
+                    //  Print our two solutions
+                    std::cout << "[0, 0, 0, " << (x * cos_offset - y * sin_offset) << ", "
+                              << (x * sin_offset + y * cos_offset) << ", " << z << "],";
+                    std::cout << "[0, 0, 0, " << (x * cos_offset + y * sin_offset) << ", "
+                              << (x * sin_offset - y * cos_offset) << ", " << z << "],";
+
+                    return {
+                        {std::make_pair(t1 > 0 ? t1 : t1 + M_PI * Scalar(2.0), t2 > 0 ? t2 : t2 + M_PI * Scalar(2.0))}};
                 };
 
                 // TODO work out the height of the camera properly
