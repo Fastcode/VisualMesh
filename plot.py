@@ -48,6 +48,6 @@ for s in range(2):
             ax.set_ylabel('Y axis')
             ax.set_zlabel('Z axis')
 
-            plt.savefig('output/{:01d}-{:01d}.png'.format(s, i))
+            plt.savefig('output/{:02d}-{:02d}.png'.format(s, i))
         except:
             print(data)

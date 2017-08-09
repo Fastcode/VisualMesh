@@ -601,7 +601,6 @@ public:
 
                     // Default to returning an empty list
                     return std::vector<std::pair<Scalar, Scalar>>();
-
                 };
 
                 return lookup(rOCc[2], theta_limits);
@@ -613,11 +612,11 @@ public:
                 // The circle that defines the edge of the field of view of the camera.
                 //
                 // Unit sphere
-                // x^2 + y^2 + x^2 = 1
+                // x^2 + y^2 + z^2 = 1
                 //
-                // Cone
+                // Cone (don't need to check side for phi since it's squared)
                 // z^2 = (x^2+y^2)/c^2
-                // c = phi > pi/2 ? tan(phi) : tan(pi - phi)
+                // c = tan(phi)
                 //
                 // Plane
                 // N = the unit vector in the direction of the camera
@@ -625,8 +624,8 @@ public:
                 // N . (r - r_0) = 0
 
                 // The gradient of our field of view cone
-                Scalar cos_fov            = std::cos(lens.radial.fov * Scalar(0.5));
-                std::array<Scalar, 3> cam = {{Hco[0][0], Hco[0][1], Hco[0][2]}};
+                const Scalar cos_fov            = std::cos(lens.radial.fov * Scalar(0.5));
+                const std::array<Scalar, 3> cam = {{Hco[0][0], Hco[0][1], Hco[0][2]}};
                 std::cerr << "Cam: " << cam << std::endl << std::endl;
                 std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << "],";
 
@@ -634,51 +633,61 @@ public:
 
                     // Check if we are intersecting with an upper or lower cone
                     const bool upper = phi > M_PI_2;
+                    // The cameras inclination from straight down (same reference frame as phi)
+                    const Scalar cam_inc  = std::acos(-cam[2]);
+                    const Scalar half_fov = lens.radial.fov * 0.5;
 
                     // First we should check if this phi is totally contained in our fov
                     // Work out what our largest fully contained phi value is
                     // We can work this out by subtracting our offset angle from our fov and checking if phi is smaller
-                    if ((upper && (lens.radial.fov * 0.5 - std::acos(cam[2])) > (M_PI - phi))
-                        || (!upper && (lens.radial.fov * 0.5 - std::acos(-cam[2])) > phi)) {
+                    if ((upper && half_fov - (M_PI - cam_inc) > M_PI - phi) || (!upper && half_fov - cam_inc > phi)) {
                         return std::vector<std::pair<Scalar, Scalar>>(1, std::make_pair(0, M_PI * 2.0));
                     }
+                    // Also if we can tell that the phi is totally outside we can bail out early
+                    // To check this we check phi is greater than our inclination plus our fov
+                    if ((upper && half_fov + (M_PI - cam_inc) < M_PI - phi) || (!upper && half_fov + cam_inc < phi)) {
+                        return std::vector<std::pair<Scalar, Scalar>>();
+                    }
 
-                    Scalar tan_phi = std::tan(phi);
-                    Scalar cos_phi = std::cos(phi);
+                    // The solution only works for camera vectors that lie in the x/z plane
+                    // So we have to rotate our vector into that space, solve it and then rotate them back
+                    // Normally this would be somewhat unsafe as cam[1] and cam[0] could be both 0
+                    // However, that case is resolved by the checks above that confirm we intersect
+                    const Scalar offset     = std::atan2(cam[1], cam[0]);
+                    const Scalar sin_offset = std::sin(offset);
+                    const Scalar cos_offset = std::cos(offset);
+
+                    // Now we must rotate our cam vector before doing the solution
+                    // Since y will be 0, and z doesn't change we only need this one
+                    const Scalar r_x = cam[0] * cos_offset + cam[1] * sin_offset;
+
+                    const Scalar tan_phi = std::tan(phi);
+                    const Scalar cos_phi = std::cos(phi);
 
                     // The z component is ± this value
-                    Scalar z = Scalar(1.0) / std::sqrt(tan_phi * tan_phi + Scalar(1.0));
+                    const Scalar z = Scalar(1.0) / std::sqrt(tan_phi * tan_phi + Scalar(1.0));
 
                     // Since we are squaring z, the ± will always be the same
-                    Scalar a = Scalar(1.0) - z * z;
+                    const Scalar a = Scalar(1.0) - z * z;
 
                     // This constant however cares about ± z
-                    Scalar b_0 = (cos_fov - cam[2] * +z) / cam[0];
-                    Scalar b_1 = (cos_fov - cam[2] * -z) / cam[0];
+                    const Scalar b_0 = (cos_fov - cam[2] * -z) / r_x;
+                    const Scalar b_1 = (cos_fov - cam[2] * +z) / r_x;
 
                     // The y component is ± this square root
-                    Scalar y_0 = std::sqrt(Scalar(4.0) * (a - b_0 * b_0)) * Scalar(0.5);
-                    Scalar y_1 = std::sqrt(Scalar(4.0) * (a - b_1 * b_1)) * Scalar(0.5);
+                    const Scalar y_0 = std::sqrt(Scalar(4.0) * (a - b_0 * b_0)) * Scalar(0.5);
+                    const Scalar y_1 = std::sqrt(Scalar(4.0) * (a - b_1 * b_1)) * Scalar(0.5);
 
                     // Squaring y means the ± will always be the same
-                    Scalar x_0 = std::sqrt(a - y_0 * y_0);
-                    Scalar x_1 = std::sqrt(a - y_1 * y_1);
-
-                    // std::cerr << "f: " << cos_fov << std::endl;
-                    // std::cerr << "a: " << a << std::endl;
-                    // std::cerr << "b: " << b_0 << ", " << b_1 << std::endl;
-                    // std::cerr << "z: " << z << std::endl;
-                    // std::cerr << "y: " << y_0 << ", " << -y_0 << ", " << y_1 << ", " << -y_1 << std::endl;
-                    // std::cerr << "x: " << x_0 << ", " << -x_0 << ", " << x_1 << ", " << -x_1 << std::endl;
-                    // std::cerr << std::endl;
-
+                    const Scalar x_0 = std::sqrt(a - y_0 * y_0);
+                    const Scalar x_1 = std::sqrt(a - y_1 * y_1);
 
                     // Now we will have 16 solutions.
                     // They come from the following:
                     //      2x from the sides (the 2 we are about)
                     //      2x mirrored around ± cam axis
                     //      2x mirrored around ± cone axis
-                    //      2x ???
+                    //      2x mirrored around ???
                     std::array<std::array<Scalar, 3>, 16> sols = {{{{+x_0, +y_0, +z}},
                                                                    {{+x_0, +y_0, -z}},
                                                                    {{+x_0, -y_0, +z}},
@@ -698,20 +707,29 @@ public:
 
                     for (const auto& s : sols) {
                         // Check that this solution is in the right place around our camera vector
-                        // Dot product of cam vector with solution must be cos_fov
+                        // Dot product of cam vector with solution must be cos_fov (y == 0 so we skip that)
                         // Dot product of -z axis with solution must be cos_phi
                         // Since they are floating point values that will always be around 1, we can use epsilon here
                         // for comparison
-                        if (std::abs(cam[0] * s[0] + cam[1] * s[1] + cam[2] * s[2] - cos_fov)
-                                < std::numeric_limits<Scalar>::epsilon()
+                        if (std::abs(r_x * s[0] + cam[2] * s[2] - cos_fov) < std::numeric_limits<Scalar>::epsilon()
                             && std::abs(-s[2] - cos_phi) < std::numeric_limits<Scalar>::epsilon()) {
-                            std::cout << "[0, 0, 0, " << s[0] << ", " << s[1] << ", " << s[2] << "],";
+                            // if (!isnan(s[0]) && !isnan(s[1]) && !isnan(s[2])) {
+
+                            // Now that we have our solution, we need to rotate it back into the correct space
+                            std::array<Scalar, 3> r_s = {{
+                                s[0] * cos_offset - s[1] * sin_offset,  //
+                                s[0] * sin_offset + s[1] * cos_offset,  //
+                                s[2]                                    //
+                            }};
+
+                            std::cout << "[0, 0, 0, " << r_s[0] << ", " << r_s[1] << ", " << r_s[2] << "],";
                         }
                     }
 
                     return std::vector<std::pair<Scalar, Scalar>>();
                 };
 
+                // TODO work out the height of the camera properly
                 return lookup(0.5, theta_limits);
             }
             default: { throw std::runtime_error("Unknown lens type"); }
