@@ -1,6 +1,7 @@
 #include <array>
 #include <iostream>
 
+#include "ArrayPrint.hpp"
 #include "Circle.hpp"
 #include "Cylinder.hpp"
 #include "Sphere.hpp"
