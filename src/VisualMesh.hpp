@@ -338,7 +338,7 @@ public:
     std::vector<std::pair<size_t, size_t>> lookup(const Scalar& height, Func&& theta_limits) const {
 
         const auto& mesh = luts.lower_bound(height)->second;
-        std::vector<std::pair<size_t, size_t>> indicies;
+        std::vector<std::pair<size_t, size_t>> indices;
 
         // Loop through each phi row
         for (auto& row : mesh.rows) {
@@ -363,17 +363,17 @@ public:
 
                 // If we define a nice enclosed range range add it
                 if (end >= begin) {
-                    indicies.emplace_back(row.begin + begin, row.begin + end);
+                    indices.emplace_back(row.begin + begin, row.begin + end);
                 }
                 // Our phi values wrap around so we need two ranges
                 else {
-                    indicies.emplace_back(row.begin, row.begin + end);
-                    indicies.emplace_back(row.begin + begin, row.end);
+                    indices.emplace_back(row.begin, row.begin + end);
+                    indices.emplace_back(row.begin + begin, row.end);
                 }
             }
         }
 
-        return indicies;
+        return indices;
     }
 
     std::vector<std::pair<size_t, size_t>> lookup(const mat4& Hco, const Lens& lens) {
@@ -459,6 +459,13 @@ public:
                 // Calculate our theta limits
                 auto theta_limits = [&](const Scalar& phi) {
 
+                    // Before we start, we can check if this phi is totally within our FOV
+                    // If so we don't need to do any solving and can just return the entire range
+
+                    // TODO check if phi is totally contained
+                    // TODO check if phi is totally excluded
+
+
                     // Store any limits we find
                     std::vector<Scalar> limits;
 
@@ -503,68 +510,64 @@ public:
                                         && t <= side_len            // Check we are before the end corner
                                         && DdU * t + DdPmV >= 0) {  // Check we are on the right half of the cone
 
-                                        Scalar x     = line_origin[0] + line_direction[0] * t;
-                                        Scalar y     = line_origin[1] + line_direction[1] * t;
+                                        Scalar x = line_origin[0] + line_direction[0] * t;
+                                        Scalar y = line_origin[1] + line_direction[1] * t;
+                                        Scalar z = line_origin[2] + line_direction[2] * t;
+                                        std::cout << "[0, 0, 0, " << x << ", " << y << ", " << z << "],";
                                         Scalar theta = std::atan2(y, x);
                                         // atan2 gives a result from -pi -> pi, we need 0 -> 2 pi
-                                        limits.emplace_back(theta > 0 ? theta : theta + M_PI * Scalar(2.0));
+                                        // TODO re-enable this to make the mesh work
+                                        // limits.emplace_back(theta > 0 ? theta : theta + M_PI * Scalar(2.0));
                                     }
                                 }
                             }
                         }
                     }
 
-                    // If no lines intersect, then we need to check if this is a totally internal cone
-                    if (limits.empty()) {
+                    // If we have intersections
+                    if (!limits.empty()) {
+                        // If we have an even number of intersections
+                        if (limits.size() % 2 == 0) {
+                            // Sort the limits
+                            std::sort(limits.begin(), limits.end());
 
-                        // If we have no intersections then we are totally internal or totally external
-                        // We can test any point on the edge of the screen to see if it's in so we choose the first
-                        // corner. If we dot this vector with the vector <0,0,-1> we will get a value that is comparable
-                        // to cos(phi). Then we just need to ensure that we are above or below the cones phi depending
-                        // on if this is an upper or lower cone.
+                            // Get a test point half way between the first two points
+                            const Scalar test_theta = (limits[0] + limits[1]) * Scalar(0.5);
+                            const Scalar sin_phi    = std::sin(phi);
+                            const Scalar sin_theta  = std::sin(test_theta);
+                            const Scalar cos_theta  = std::cos(test_theta);
 
-                        // TODO work out if the cone is internal
-                    }
-                    // Otherwise we should have an even number of intersections
-                    else if (limits.size() % 2 == 0) {
-                        // Sort the limits
-                        std::sort(limits.begin(), limits.end());
+                            // Make a unit vector from the phi and theta
+                            vec3 test_vec = {{-cos_theta * sin_phi, -sin_theta * sin_phi, -cos_phi}};
 
-                        // Get a test point half way between the first two points
-                        const Scalar test_theta = (limits[0] + limits[1]) * Scalar(0.5);
-                        const Scalar sin_phi    = std::sin(phi);
-                        const Scalar sin_theta  = std::sin(test_theta);
-                        const Scalar cos_theta  = std::cos(test_theta);
+                            // Now work out if our first theta is entering or leaving the frustum
+                            // We do this by dotting our test vector with vectors that are normal to the
+                            // frustum planes. IMPORTANT while it looks like we are doing our cross products in a
+                            // clockwise direction here, note that the y axis is actually to the left in the diagram.
+                            // This means that we are actually doing our cross products in an anticlockwise direction.
+                            // Therefore all of our normal vectors will be facing outwards from the frustum. This means
+                            // that if we get a vector that has a positive dot product with one of these vectors then it
+                            // lies outside the frustum.
+                            bool first_is_end = false;
+                            for (int i = 0; i < 4; ++i) {
+                                // If we get a positive dot product our first point is an end segment
+                                first_is_end |= 0 < dot(test_vec, cross(rNCo[i], rNCo[(i + 1) % 4]));
+                            }
 
-                        // Make a unit vector from the phi and theta
-                        std::array<Scalar, 3> test_vec = {{-cos_theta * sin_phi, -sin_theta * sin_phi, -cos_phi}};
-
-                        // Now work out if our first theta is entering or leaving the frustum
-                        // We do this by dotting our test vector with vectors that are normal to the
-                        // frustum planes. IMPORTANT while it looks like we are doing our cross products in a clockwise
-                        // direction here, note that the y axis is actually to the left in the diagram. This means that
-                        // we are actually doing our cross products in an anticlockwise direction. Therefore all of our
-                        // normal vectors will be facing outwards from the frustum. This means that if we get a vector
-                        // that has a positive dot product with one of these vectors then it lies outside the frustum.
-                        bool first_is_end = false;
-                        for (int i = 0; i < 4; ++i) {
-                            // If we get a positive dot product our first point is an end segment
-                            first_is_end |= 0 < dot(test_vec, cross(rNCo[i], rNCo[(i + 1) % 4]));
+                            // If this is entering, point 0 is a start, and point 1 is an end
+                            std::vector<std::pair<Scalar, Scalar>> output;
+                            for (size_t i = first_is_end ? 1 : 0; i < limits.size() - 1; i += 2) {
+                                output.emplace_back(limits[i], limits[i + 1]);
+                            }
+                            if (first_is_end) {
+                                output.emplace_back(limits.back(), limits.front());
+                            }
+                            return output;
                         }
-
-                        // If this is entering, point 0 is a start, and point 1 is an end
-                        std::vector<std::pair<Scalar, Scalar>> output;
-                        for (size_t i = first_is_end ? 1 : 0; i < limits.size() - 1; i += 2) {
-                            output.emplace_back(limits[i], limits[i + 1]);
+                        // If we have an odd number of intersections something is wrong
+                        else {
+                            // throw std::runtime_error("Odd number of intersections found with cone");
                         }
-                        if (first_is_end) {
-                            output.emplace_back(limits.back(), limits.front());
-                        }
-                        return output;
-                    }
-                    // If we have an odd number of intersections something is wrong
-                    else {
-                        // throw std::runtime_error("Odd number of intersections found with cone");
                     }
 
                     // Default to returning an empty list
