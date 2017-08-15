@@ -601,7 +601,7 @@ public:
 
                 // The gradient of our field of view cone
                 const Scalar cos_half_fov = std::cos(lens.radial.fov * Scalar(0.5));
-                const vec3 cam            = {{Hco[0][0], Hco[0][1], Hco[0][2]}};
+                const vec3 cam            = {{Hco[0][0], Hco[1][0], Hco[2][0]}};
                 std::cerr << "Cam: " << cam << std::endl << std::endl;
                 std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << "],";
 
