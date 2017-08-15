@@ -21,6 +21,10 @@ for s in range(3):
                 pitch = 0.0
                 yaw = (i / 100.0) * 2.0 * math.pi
                 roll = 0.0
+            elif s == 2:
+                pitch = 0.0
+                yaw = 0.0
+                roll = (i / 100.0) * 2.0 * math.pi
 
             # Run our mesh lookup for pitch/roll/yaw
             print('Pitch: {} , Yaw: {}, Roll: {}'.format(pitch, yaw, roll))

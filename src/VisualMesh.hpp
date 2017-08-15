@@ -378,6 +378,9 @@ public:
 
     std::vector<std::pair<size_t, size_t>> lookup(const mat4& Hco, const Lens& lens) {
 
+        // We multiply a lot of things by 2
+        constexpr const Scalar x2 = Scalar(2.0);
+
         switch (lens.type) {
             case Lens::EQUIRECTANGULAR: {
 
@@ -393,7 +396,7 @@ public:
                 const vec3 rOCc = {{Hco[0][3], Hco[1][3], Hco[2][3]}};
 
                 // Print our camera vector
-                const std::array<Scalar, 3> cam = {{Hco[0][0], Hco[0][1], Hco[0][2]}};
+                const std::array<Scalar, 3> cam = {{Hco[0][0], Hco[1][0], Hco[2][0]}};
                 std::cerr << "Cam: " << cam << std::endl << std::endl;
                 std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << "],";
 
@@ -406,7 +409,7 @@ public:
                 Scalar z_extent = std::tan(lens.equirectangular.fov[1] * Scalar(0.5));
 
                 // Prenormalise these values as they will all be the same length
-                Scalar length = Scalar(1.0) / std::sqrt(y_extent * y_extent + z_extent * z_extent + 1);
+                Scalar length = Scalar(1.0) / std::sqrt(y_extent * y_extent + z_extent * z_extent + Scalar(1.0));
                 y_extent      = y_extent * length;
                 z_extent      = z_extent * length;
 
@@ -434,27 +437,25 @@ public:
                     {{dot(rNCc[3], Rco[0]), dot(rNCc[3], Rco[1]), dot(rNCc[3], Rco[2])}},  // rWCo
                 }};
 
-                // TODO remove this when you're finished it
-                for (int i = 0; i < 4; ++i) {
-                    std::cout << "[0, 0, 0," << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << "], ";
-
-                    for (const auto& q : rNCo) {
-                        std::cout << "[" << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << ", "
-                                  << rNCo[(i + 1) % 4][0] << ", " << rNCo[(i + 1) % 4][1] << ", "
-                                  << rNCo[(i + 1) % 4][2] << "], ";
-                    }
-                }
-
                 // Make our corner to next corner vectors
                 // In cam space these are 0,1,0 style vectors so we just get a col of the other matrix
                 // But since we are multiplying by the transpose we get a row of the matrix
                 // When we are storing this matrix we represent each corner as N and the following clockwise corner as M
+                // Then it is multiplied by the extent to make a vector of the length of the edge of the frustum
                 const std::array<vec3, 4> rMNo = {{
-                    {{-Rco[1][0], -Rco[1][1], -Rco[1][2]}},  // normalise(rUTc(0, -1,  0)) -> normalise(rUTo)
-                    {{-Rco[2][0], -Rco[2][1], -Rco[2][2]}},  // normalise(rVUc(0,  0, -1)) -> normalise(rVUo)
-                    {{+Rco[1][0], +Rco[1][1], +Rco[1][2]}},  // normalise(rWVc(0,  1,  0)) -> normalise(rWVo)
-                    {{+Rco[2][0], +Rco[2][1], +Rco[2][2]}}   // normalise(rTWc(0,  0,  1)) -> normalise(rTWo)
+                    {{-Rco[0][1] * x2 * y_extent, -Rco[1][1] * x2 * y_extent, -Rco[2][1] * x2 * y_extent}},  //
+                    {{-Rco[0][2] * x2 * z_extent, -Rco[1][2] * x2 * z_extent, -Rco[2][2] * x2 * z_extent}},  //
+                    {{+Rco[0][1] * x2 * y_extent, +Rco[1][1] * x2 * y_extent, +Rco[2][1] * x2 * y_extent}},  //
+                    {{+Rco[0][2] * x2 * z_extent, +Rco[1][2] * x2 * z_extent, +Rco[2][2] * x2 * z_extent}}   //
                 }};
+
+                // TODO remove this when you're finished it
+                for (int i = 0; i < 4; ++i) {
+                    std::cout << "[0, 0, 0," << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << "], ";
+                    std::cout << "[" << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << ", "
+                              << (rMNo[i][0] + rNCo[i][0]) << ", " << (rMNo[i][1] + rNCo[i][1]) << ", "
+                              << (rMNo[i][2] + rNCo[i][2]) << "], ";
+                }
 
                 // Calculate our theta limits
                 auto theta_limits = [&](const Scalar& phi) {
@@ -465,59 +466,60 @@ public:
                     // TODO check if phi is totally contained
                     // TODO check if phi is totally excluded
 
+                    // Cone gradient squared
+                    const Scalar cos_phi = std::cos(phi);
+                    const Scalar tan_phi = std::tan(phi);
+                    const Scalar c2      = tan_phi * tan_phi;
 
                     // Store any limits we find
                     std::vector<Scalar> limits;
 
-                    // Should we intersect with an upper or lower cone
-                    // If upper, the axis for the cone is +z, lower is -z
-                    const Scalar cone_z_axis = phi > M_PI_2 ? 1 : -1;
-
-                    // No need for an upper/lower check here as cos^2(pi-x) == cos^2(x)
-                    const Scalar cos_phi  = std::cos(phi);
-                    const Scalar cos_phi2 = cos_phi * cos_phi;
-
                     for (int i = 0; i < 4; ++i) {
                         // We make a line origin + ray to define a parametric line
-                        const auto& line_origin    = rNCo[i];
-                        const auto& line_direction = rMNo[i];
+                        // Note that both of these vectors are always unit length
+                        const auto& o = rNCo[i];  // Line origin
+                        const auto& d = rMNo[i];  // Line direction
 
-                        // If we are using the upper cone then the cone axis is z = 1 and if the lower cone z = -1
-                        // Therefore these dot products are the same as selecting either +- the z component of the
-                        // vectors
-                        Scalar DdU   = cone_z_axis * line_direction[2];
-                        Scalar DdPmV = cone_z_axis * line_origin[2];
+                        // Calculate our discriminant. While we could optimise this math a little, it's better to rely
+                        // on the compiler doing common sub expression elimination.
+                        const Scalar disc = c2 * d[0] * d[0] * o[2] * o[2]         // c^2 dx^2 oz^2
+                                            - x2 * c2 * d[0] * d[2] * o[0] * o[2]  // 2 c^2 dx dz ox oz
+                                            + c2 * d[1] * d[1] * o[2] * o[2]       // c^2 dy^2 oz^2
+                                            - x2 * c2 * d[1] * d[2] * o[1] * o[2]  // 2 c^2 dy dz oy oz
+                                            + c2 * d[2] * d[2] * o[0] * o[0]       // c^2 d_z^2 o_y^2
+                                            - d[0] * d[0] * o[1] * o[1]            // dx^2 oy^2
+                                            + x2 * d[0] * d[1] * o[0] * o[1]       // 2 dx dy ox oy
+                                            - d[1] * d[1] * o[0] * o[0];           // dy^2 ox^2
 
-                        // rNCo_dot_rMNo[i % 2];  // TODO Each side is the same for this
-                        Scalar UdPmV    = dot(line_origin, line_direction);
-                        Scalar side_len = Scalar(2.0) * (i % 2 == 0 ? y_extent : z_extent);
-                        Scalar c2       = DdU * DdU - cos_phi2;
-                        Scalar c1       = DdU * DdPmV - cos_phi2 * UdPmV;
-                        Scalar c0       = DdPmV * DdPmV - cos_phi2;
+                        const Scalar denom = d[0] * d[0] + d[1] * d[1] - d[2] * d[2] * c2;
+                        const Scalar num   = c2 * d[2] * o[2] - d[1] * o[1] - d[0] * o[0];
 
-                        if (c2 != 0) {
-                            Scalar discriminant = c1 * c1 - c0 * c2;
 
-                            if (discriminant > 0) {
-                                // We have two intersections with either the upper or lower cone
-                                Scalar root   = std::sqrt(discriminant);
-                                Scalar inv_c2 = Scalar(1.0) / c2;
+                        if (denom != Scalar(0) && disc > Scalar(0)) {
 
-                                // Get our two solutions for t
-                                for (const Scalar t : {(-c1 - root) * inv_c2, (-c1 + root) * inv_c2}) {
+                            // We have two intersections with either the upper or lower cone
+                            Scalar root = std::sqrt(disc);
 
-                                    if (t >= 0                      // Check we are beyond the start corner
-                                        && t <= side_len            // Check we are before the end corner
-                                        && DdU * t + DdPmV >= 0) {  // Check we are on the right half of the cone
+                            // Get our two solutions for t
+                            for (const Scalar t : {(num + root) / denom, (num - root) / denom}) {
 
-                                        Scalar x = line_origin[0] + line_direction[0] * t;
-                                        Scalar y = line_origin[1] + line_direction[1] * t;
-                                        Scalar z = line_origin[2] + line_direction[2] * t;
+                                // Check we are within the valid range for our segment.
+                                // Since we set the length of the direction vector to the length of the side we can
+                                // check it's less than one
+                                if (t >= Scalar(0.0) && t <= Scalar(1.0)) {
+
+                                    // We check z first to make sure it's on the correct side
+                                    Scalar z = o[2] + d[2] * t;
+
+                                    // If we are both above, or both below the horizon
+                                    if ((z > 0) == (phi > M_PI_2)) {
+
+                                        Scalar x = o[0] + d[0] * t;
+                                        Scalar y = o[1] + d[1] * t;
                                         std::cout << "[0, 0, 0, " << x << ", " << y << ", " << z << "],";
                                         Scalar theta = std::atan2(y, x);
                                         // atan2 gives a result from -pi -> pi, we need 0 -> 2 pi
-                                        // TODO re-enable this to make the mesh work
-                                        // limits.emplace_back(theta > 0 ? theta : theta + M_PI * Scalar(2.0));
+                                        limits.emplace_back(theta > 0 ? theta : theta + M_PI * Scalar(2.0));
                                     }
                                 }
                             }
