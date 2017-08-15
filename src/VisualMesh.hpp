@@ -486,7 +486,8 @@ public:
                                             - x2 * c2 * d[0] * d[2] * o[0] * o[2]  // 2 c^2 dx dz ox oz
                                             + c2 * d[1] * d[1] * o[2] * o[2]       // c^2 dy^2 oz^2
                                             - x2 * c2 * d[1] * d[2] * o[1] * o[2]  // 2 c^2 dy dz oy oz
-                                            + c2 * d[2] * d[2] * o[0] * o[0]       // c^2 d_z^2 o_y^2
+                                            + c2 * d[2] * d[2] * o[0] * o[0]       // c^2 d_z^2 o_x^2
+                                            + c2 * d[2] * d[2] * o[1] * o[1]       // c^2 d_z^2 o_y^2
                                             - d[0] * d[0] * o[1] * o[1]            // dx^2 oy^2
                                             + x2 * d[0] * d[1] * o[0] * o[1]       // 2 dx dy ox oy
                                             - d[1] * d[1] * o[0] * o[0];           // dy^2 ox^2
@@ -494,8 +495,7 @@ public:
                         const Scalar denom = d[0] * d[0] + d[1] * d[1] - d[2] * d[2] * c2;
                         const Scalar num   = c2 * d[2] * o[2] - d[1] * o[1] - d[0] * o[0];
 
-
-                        if (denom != Scalar(0) && disc > Scalar(0)) {
+                        if (denom != Scalar(0.0) && disc > Scalar(0.0)) {
 
                             // We have two intersections with either the upper or lower cone
                             Scalar root = std::sqrt(disc);
@@ -568,7 +568,7 @@ public:
                         }
                         // If we have an odd number of intersections something is wrong
                         else {
-                            // throw std::runtime_error("Odd number of intersections found with cone");
+                            throw std::runtime_error("Odd number of intersections found with cone");
                         }
                     }
 
