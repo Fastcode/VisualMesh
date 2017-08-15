@@ -44,7 +44,7 @@ IF(CMAKE_CXX_COMPILER_ID MATCHES GNU)
         SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
     ENDIF()
 
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread -ftemplate-backtrace-limit=0 -Wall -Wpedantic -Weffc++")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread -ftemplate-backtrace-limit=0 -Wall -Wpedantic")
 
 # Clang Compiler
 ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES Clang)
