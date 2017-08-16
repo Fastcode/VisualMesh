@@ -181,9 +181,9 @@ public:
             for (const auto& v : phis) {
 
                 // Get our phi and delta theta values for a clean circle
-                const auto& phi   = v.first;
-                const auto& steps = v.second;
-                Scalar dtheta     = (Scalar(2.0) * M_PI) / steps;
+                const auto& phi     = v.first;
+                const auto& steps   = v.second;
+                const Scalar dtheta = (Scalar(2.0) * M_PI) / steps;
 
                 // We will use the start position of each row later for linking the graph
                 rows.emplace_back(phi, lut.size(), lut.size() + steps);
@@ -238,12 +238,12 @@ public:
                 // Note this bool is used like a bool and int. It is 0 when we should access TR first
                 // and 1 when we should access TL first. This is to avoid accessing values which wrap around
                 // and instead access a non wrap element and use its neighbours to work out ours
-                bool left = pos > Scalar(0.5);
+                const bool left = pos > Scalar(0.5);
 
                 // Get our closest neighbour on the previous row and use it to work out where the other one
                 // is This will be the Right element when < 0.5 and Left when > 0.5
-                size_t o1 = start + std::floor(pos * size + !left);  // Use `left` to add one to one
-                size_t o2 = o1 + lut[o1].neighbours[2 + left];       // But not the other
+                const size_t o1 = start + std::floor(pos * size + !left);  // Use `left` to add one to one
+                const size_t o2 = o1 + lut[o1].neighbours[2 + left];       // But not the other
 
                 // Now use these to set our TL and TR neighbours
                 node.neighbours[offset]     = (left ? o1 : o2) - i;
@@ -259,15 +259,15 @@ public:
                 const auto& next    = rows[r + 1];
 
                 // Work out how big our rows are if they are within valid indices
-                int prev_size    = prev.end - prev.begin;
-                int current_size = current.end - current.begin;
-                int next_size    = next.end - next.begin;
+                const int prev_size    = prev.end - prev.begin;
+                const int current_size = current.end - current.begin;
+                const int next_size    = next.end - next.begin;
 
                 // Go through all the nodes on our current row
                 for (size_t i = current.begin; i < current.end; ++i) {
 
                     // Find where we are in our row as a value between 0 and 1
-                    Scalar pos = Scalar(i - current.begin) / Scalar(current_size);
+                    const Scalar pos = Scalar(i - current.begin) / Scalar(current_size);
 
                     // Perform both links
                     link(lut, i, pos, prev.begin, prev_size, 0);
@@ -278,11 +278,11 @@ public:
             // Now we have to deal with the very first, and very last rows as they can't be linked in the normal way
             if (!rows.empty()) {
 
-                auto& front    = rows.front();
-                int front_size = front.end - front.begin;
+                const auto& front    = rows.front();
+                const int front_size = front.end - front.begin;
 
-                auto& back    = rows.back();
-                int back_size = back.end - back.begin;
+                const auto& back    = rows.back();
+                const int back_size = back.end - back.begin;
 
                 // Link the front to itself
                 for (size_t i = front.begin; i < front.end; ++i) {
@@ -290,17 +290,17 @@ public:
                     auto& node = lut[i];
 
                     // Work out which two points are on the opposite side to us
-                    size_t index = i - front.begin + (front_size / 2);
+                    const size_t index = i - front.begin + (front_size / 2);
 
                     // Find where we are in our row as a value between 0 and 1
-                    Scalar pos = Scalar(i - front.begin) / Scalar(front_size);
+                    const Scalar pos = Scalar(i - front.begin) / Scalar(front_size);
 
                     // Link to ourself
                     node.neighbours[0] = front.begin + (index % front_size) - i;
                     node.neighbours[1] = front.begin + ((index + 1) % front_size) - i;
 
                     // Link to our next row normally
-                    auto& r2 = rows[1];
+                    const auto& r2 = rows[1];
                     link(lut, i, pos, r2.begin, r2.end - r2.begin, 4);
                 }
 
@@ -310,17 +310,17 @@ public:
                     auto& node = lut[i];
 
                     // Work out which two points are on the opposite side to us
-                    size_t index = i - back.begin + (back_size / 2);
+                    const size_t index = i - back.begin + (back_size / 2);
 
                     // Find where we are in our row as a value between 0 and 1
-                    Scalar pos = Scalar(i - back.begin) / Scalar(back_size);
+                    const Scalar pos = Scalar(i - back.begin) / Scalar(back_size);
 
                     // Link to ourself on the other side
                     node.neighbours[4] = back.begin + (index % back_size) - i;
                     node.neighbours[5] = back.begin + ((index + 1) % back_size) - i;
 
                     // Link to our previous row normally
-                    auto& r2 = rows[rows.size() - 2];
+                    const auto& r2 = rows[rows.size() - 2];
                     link(lut, i, pos, r2.begin, r2.end - r2.begin, 0);
                 }
             }
@@ -343,10 +343,10 @@ public:
         // Loop through each phi row
         for (auto& row : mesh.rows) {
 
-            auto row_size = row.end - row.begin;
+            const auto row_size = row.end - row.begin;
 
             // Get the theta values that are valid for this phi
-            auto theta_ranges = theta_limits(row.phi);
+            const auto theta_ranges = theta_limits(row.phi);
 
             // Work out what this range means in terms of theta
             for (auto& range : theta_ranges) {
@@ -376,7 +376,7 @@ public:
         return indices;
     }
 
-    std::vector<std::pair<size_t, size_t>> lookup(const mat4& Hco, const Lens& lens) {
+    std::vector<std::pair<size_t, size_t>> lookup(const mat4& Hoc, const Lens& lens) {
 
         // We multiply a lot of things by 2
         constexpr const Scalar x2 = Scalar(2.0);
@@ -385,18 +385,17 @@ public:
             case Lens::EQUIRECTANGULAR: {
 
                 // Extract our rotation matrix
-                const mat3 Rco = {{
-                    {{Hco[0][0], Hco[0][1], Hco[0][2]}},  //
-                    {{Hco[1][0], Hco[1][1], Hco[1][2]}},  //
-                    {{Hco[2][0], Hco[2][1], Hco[2][2]}}   //
+                const mat3 Roc = {{
+                    {{Hoc[0][0], Hoc[0][1], Hoc[0][2]}},  //
+                    {{Hoc[1][0], Hoc[1][1], Hoc[1][2]}},  //
+                    {{Hoc[2][0], Hoc[2][1], Hoc[2][2]}}   //
                 }};
 
-                // Extract our z height
-                // TODO this is wrong, fix it when it matters
-                const vec3 rOCc = {{Hco[0][3], Hco[1][3], Hco[2][3]}};
+                // The height of our camera above the observation plane
+                const Scalar& height = Hoc[2][3];
 
                 // Print our camera vector
-                const std::array<Scalar, 3> cam = {{Hco[0][0], Hco[1][0], Hco[2][0]}};
+                const std::array<Scalar, 3> cam = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
                 std::cerr << "Cam: " << cam << std::endl << std::endl;
                 std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << ", 0, 0, 0],";
 
@@ -419,12 +418,11 @@ public:
                 }};
 
                 // Rotate these into world space by multiplying by the rotation matrix
-                // Because of the way we are performing our dot product here (row->row), we are transposing Rco
                 const std::array<vec3, 4> rNCo = {{
-                    {{dot(rNCc[0], Rco[0]), dot(rNCc[0], Rco[1]), dot(rNCc[0], Rco[2])}},  // rTCo
-                    {{dot(rNCc[1], Rco[0]), dot(rNCc[1], Rco[1]), dot(rNCc[1], Rco[2])}},  // rUCo
-                    {{dot(rNCc[2], Rco[0]), dot(rNCc[2], Rco[1]), dot(rNCc[2], Rco[2])}},  // rVCo
-                    {{dot(rNCc[3], Rco[0]), dot(rNCc[3], Rco[1]), dot(rNCc[3], Rco[2])}},  // rWCo
+                    {{dot(rNCc[0], Roc[0]), dot(rNCc[0], Roc[1]), dot(rNCc[0], Roc[2])}},  // rTCo
+                    {{dot(rNCc[1], Roc[0]), dot(rNCc[1], Roc[1]), dot(rNCc[1], Roc[2])}},  // rUCo
+                    {{dot(rNCc[2], Roc[0]), dot(rNCc[2], Roc[1]), dot(rNCc[2], Roc[2])}},  // rVCo
+                    {{dot(rNCc[3], Roc[0]), dot(rNCc[3], Roc[1]), dot(rNCc[3], Roc[2])}},  // rWCo
                 }};
 
                 // Make our corner to next corner vectors
@@ -433,10 +431,10 @@ public:
                 // When we are storing this matrix we represent each corner as N and the following clockwise corner as M
                 // Then it is multiplied by the extent to make a vector of the length of the edge of the frustum
                 const std::array<vec3, 4> rMNo = {{
-                    {{-Rco[0][1] * x2 * y_extent, -Rco[1][1] * x2 * y_extent, -Rco[2][1] * x2 * y_extent}},  // rUTo
-                    {{-Rco[0][2] * x2 * z_extent, -Rco[1][2] * x2 * z_extent, -Rco[2][2] * x2 * z_extent}},  // rVUo
-                    {{+Rco[0][1] * x2 * y_extent, +Rco[1][1] * x2 * y_extent, +Rco[2][1] * x2 * y_extent}},  // rWVo
-                    {{+Rco[0][2] * x2 * z_extent, +Rco[1][2] * x2 * z_extent, +Rco[2][2] * x2 * z_extent}}   // rTWo
+                    {{-Roc[0][1] * x2 * y_extent, -Roc[1][1] * x2 * y_extent, -Roc[2][1] * x2 * y_extent}},  // rUTo
+                    {{-Roc[0][2] * x2 * z_extent, -Roc[1][2] * x2 * z_extent, -Roc[2][2] * x2 * z_extent}},  // rVUo
+                    {{+Roc[0][1] * x2 * y_extent, +Roc[1][1] * x2 * y_extent, +Roc[2][1] * x2 * y_extent}},  // rWVo
+                    {{+Roc[0][2] * x2 * z_extent, +Roc[1][2] * x2 * z_extent, +Roc[2][2] * x2 * z_extent}}   // rTWo
                 }};
 
                 // Make our normals to the frustum edges
@@ -530,7 +528,8 @@ public:
                         const Scalar denom = c2 * eq_parts[i][4] + eq_parts[i][5];
 
                         // We need to count how many complex solutions we get, if all 4 are we totally enclose phi
-                        if (disc < Scalar(0.0)) {
+                        // We also don't care about the case with one solution (touching an edge)
+                        if (disc <= Scalar(0.0)) {
                             ++complex_sols;
                         }
                         else if (denom != Scalar(0.0)) {
@@ -547,17 +546,19 @@ public:
                                 if (t >= Scalar(0.0) && t <= Scalar(1.0)) {
 
                                     // We check z first to make sure it's on the correct side
-                                    Scalar z = o[2] + d[2] * t;
+                                    const Scalar z = o[2] + d[2] * t;
 
                                     // If we are both above, or both below the horizon
                                     if ((z > 0) == (phi > M_PI_2)) {
 
-                                        Scalar x = o[0] + d[0] * t;
-                                        Scalar y = o[1] + d[1] * t;
-                                        std::cout << "[0, 0, 0, " << x << ", " << y << ", " << z << ", 255, 0, 0],";
-                                        Scalar theta = std::atan2(y, x);
+                                        const Scalar x     = o[0] + d[0] * t;
+                                        const Scalar y     = o[1] + d[1] * t;
+                                        const Scalar theta = std::atan2(y, x);
                                         // atan2 gives a result from -pi -> pi, we need 0 -> 2 pi
                                         limits.emplace_back(theta > 0 ? theta : theta + M_PI * Scalar(2.0));
+
+                                        // TODO delete when done
+                                        std::cout << "[0, 0, 0, " << x << ", " << y << ", " << z << ", 255, 0, 0],";
                                     }
                                 }
                             }
@@ -566,14 +567,14 @@ public:
 
                     // If all solutions are complex we totally enclose the phi however we still need to check the cone
                     // is on the correct side
-                    if (complex_sols == 4 && ((cos_phi > 0) == (-cam[2] > 0))) {
+                    if (complex_sols == 4 && ((cos_phi > 0) == (cam[2] < 0))) {
 
                         // Make a test unit vector that is on the cone, theta=0 is easiest
                         const vec3 test_vec = {{sin_phi, Scalar(0.0), -cos_phi}};
 
                         bool external = false;
                         for (int i = 0; !external && i < 4; ++i) {
-                            // If we get a negative dot product our first point is an end segment
+                            // If we get a negative dot product our point is external
                             external = Scalar(0.0) > dot(test_vec, edges[i]);
                         }
                         if (!external) {
@@ -622,7 +623,7 @@ public:
                     return std::vector<std::pair<Scalar, Scalar>>();
                 };
 
-                return lookup(rOCc[2], theta_limits);
+                return lookup(height, theta_limits);
             }
 
             case Lens::RADIAL: {
@@ -647,7 +648,12 @@ public:
 
                 // The gradient of our field of view cone
                 const Scalar cos_half_fov = std::cos(lens.radial.fov * Scalar(0.5));
-                const vec3 cam            = {{Hco[0][0], Hco[1][0], Hco[2][0]}};
+                const vec3 cam            = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
+
+                // The height of our camera above the observation plane
+                const Scalar& height = Hoc[2][3];
+
+                // TODO remove when done
                 std::cerr << "Cam: " << cam << std::endl << std::endl;
                 std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << ", 255, 0, 0],";
 
@@ -664,12 +670,12 @@ public:
                     // Work out what our largest fully contained phi value is
                     // We can work this out by subtracting our offset angle from our fov and checking if phi is smaller
                     if ((upper && half_fov - (M_PI - cam_inc) > M_PI - phi) || (!upper && half_fov - cam_inc > phi)) {
-                        return {{std::make_pair(0, M_PI * 2.0)}};
+                        return {{std::make_pair(Scalar(0.0), Scalar(2.0) * M_PI)}};
                     }
                     // Also if we can tell that the phi is totally outside we can bail out early
                     // To check this we check phi is greater than our inclination plus our fov
                     if ((upper && half_fov + (M_PI - cam_inc) < M_PI - phi) || (!upper && half_fov + cam_inc < phi)) {
-                        return {{std::make_pair(0, 0)}};
+                        return {{std::make_pair(Scalar(0.0), Scalar(0.0))}};
                     }
 
                     // The solution only works for camera vectors that lie in the x/z plane
@@ -695,7 +701,7 @@ public:
                     const Scalar y_disc = a - x * x;
 
                     if (y_disc < 0) {
-                        return {{std::make_pair(0, 0)}};
+                        return {{std::make_pair(Scalar(0.0), Scalar(0.0))}};
                     }
 
                     const Scalar y  = std::sqrt(y_disc);
@@ -708,12 +714,12 @@ public:
                     std::cout << "[0, 0, 0, " << (x * cos_offset + y * sin_offset) << ", "
                               << (x * sin_offset - y * cos_offset) << ", " << z << ", 255, 0, 0],";
 
-                    return {
-                        {std::make_pair(t1 > 0 ? t1 : t1 + M_PI * Scalar(2.0), t2 > 0 ? t2 : t2 + M_PI * Scalar(2.0))}};
+                    return {{std::make_pair(t1 > Scalar(0.0) ? t1 : t1 + Scalar(2.0) * M_PI,
+                                            t2 > Scalar(0.0) ? t2 : t2 + Scalar(2.0) * M_PI)}};
                 };
 
                 // TODO work out the height of the camera properly
-                return lookup(0.5, theta_limits);
+                return lookup(height, theta_limits);
             }
             default: { throw std::runtime_error("Unknown lens type"); }
         }
