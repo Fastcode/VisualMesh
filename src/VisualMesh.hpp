@@ -25,6 +25,17 @@
 #include <numeric>
 #include <vector>
 
+#define CL_HPP_MINIMUM_OPENCL_VERSION 120
+#define CL_HPP_TARGET_OPENCL_VERSION 120
+// #define CL_HPP_ENABLE_EXCEPTIONS
+#include "cl/cl2.hpp"
+
+// Include our generated OpenCL headers
+#include "cl/lens.cl.h"
+#include "cl/node.cl.h"
+#include "cl/project_equirectangular.cl.h"
+#include "cl/project_radial.cl.h"
+
 namespace mesh {
 
 /**
@@ -43,28 +54,34 @@ public:
     using mat3 = std::array<vec3, 3>;
     using mat4 = std::array<vec4, 4>;
 
+// These types are shared with OpenCL so they need to be pragma packed for memory alignment
+#pragma pack(push, 1)
     struct Lens {
         enum Type { EQUIRECTANGULAR, RADIAL };
         struct Radial {
             Scalar fov;
+            Scalar pixels_per_radian;
         };
         struct Equirectangular {
             vec2 fov;
+            Scalar focal_length_pixels;
         };
 
-        Type type;
+        enum Type type;
+        std::array<int, 2> dimensions;
         union {
-            Radial radial;
-            Equirectangular equirectangular;
+            struct Radial radial;
+            struct Equirectangular equirectangular;
         };
     };
 
     struct Node {
         /// The unit vector in the direction for this node
-        vec4 ray;
+        vec3 ray;
         /// Relative indices to the linked hexagon nodes in the LUT ordered TL, TR, L, R, BL, BR,
         int neighbours[6];
     };
+#pragma pack(pop)
 
     struct Row {
         Row(const Scalar& phi, const size_t& begin, const size_t& end) : phi(phi), begin(begin), end(end) {}
@@ -89,12 +106,15 @@ public:
     };
 
     struct Mesh {
-        Mesh(std::vector<Node>&& nodes, std::vector<Row>&& rows) : nodes(nodes), rows(rows) {}
+        Mesh(std::vector<Node>&& nodes, std::vector<Row>&& rows, cl::Buffer&& cl) : nodes(nodes), rows(rows), cl(cl) {}
 
         /// The lookup table for this mesh
         std::vector<Node> nodes;
         /// A set of individual rows for phi values. `begin` and `end` refer to the table with end being 1 past the end
         std::vector<Row> rows;
+
+        /// The on device buffer of the mesh nodes
+        cl::Buffer cl;
     };
 
     /**
@@ -121,6 +141,9 @@ public:
         , min_height(min_height)
         , max_height(max_height)
         , height_resolution(height_resolution) {
+
+        // Setup OpenCL
+        setup_opencl();
 
         // Loop through to make a mesh for each of our height possibilities
         for (Scalar h = min_height; h < max_height; h += (max_height - min_height) / height_resolution) {
@@ -181,9 +204,11 @@ public:
             for (const auto& v : phis) {
 
                 // Get our phi and delta theta values for a clean circle
-                const auto& phi     = v.first;
-                const auto& steps   = v.second;
-                const Scalar dtheta = (Scalar(2.0) * M_PI) / steps;
+                const auto& phi      = v.first;
+                const Scalar sin_phi = std::sin(phi);
+                const Scalar cos_phi = std::cos(phi);
+                const auto& steps    = v.second;
+                const Scalar dtheta  = (Scalar(2.0) * M_PI) / steps;
 
                 // We will use the start position of each row later for linking the graph
                 rows.emplace_back(phi, lut.size(), lut.size() + steps);
@@ -194,10 +219,11 @@ public:
                     Node n;
 
                     // Calculate our unit vector with origin facing forward
-                    n.ray[0] = std::sin(M_PI - phi) * std::cos(theta);
-                    n.ray[1] = std::sin(M_PI - phi) * std::sin(theta);
-                    n.ray[2] = std::cos(M_PI - phi);
-                    n.ray[3] = 0;
+                    n.ray = {{
+                        std::cos(theta) * sin_phi,  //
+                        std::sin(theta) * sin_phi,  //
+                        -cos_phi,                   //
+                    }};
 
                     // Get the indices for our left/right neighbours relative to this row
                     const int l = i == 0 ? steps - 1 : i - 1;
@@ -325,8 +351,12 @@ public:
                 }
             }
 
+            // Upload our lut to the OpenCL device
+            cl::Buffer b(context, CL_MEM_READ_ONLY, lut.size() * sizeof(Node), nullptr, nullptr);
+            mem_queue.enqueueWriteBuffer(b, true, 0, lut.size() * sizeof(Node), lut.data());
+
             // Insert our constructed mesh into the lookup
-            luts.insert(std::make_pair(h, Mesh(std::move(lut), std::move(rows))));
+            luts.insert(std::make_pair(h, Mesh(std::move(lut), std::move(rows), std::move(b))));
         }
     }
 
@@ -335,7 +365,8 @@ public:
     }
 
     template <typename Func>
-    std::vector<std::pair<size_t, size_t>> lookup(const Scalar& height, Func&& theta_limits) const {
+    std::pair<const Mesh&, std::vector<std::pair<size_t, size_t>>> lookup(const Scalar& height,
+                                                                          Func&& theta_limits) const {
 
         const auto& mesh = luts.lower_bound(height)->second;
         std::vector<std::pair<size_t, size_t>> indices;
@@ -361,22 +392,25 @@ public:
                 begin = begin > row_size ? 0 : begin;
                 end   = end > row_size ? row_size : end;
 
-                // If we define a nice enclosed range range add it
-                if (end >= begin) {
-                    indices.emplace_back(row.begin + begin, row.begin + end);
-                }
-                // Our phi values wrap around so we need two ranges
-                else {
-                    indices.emplace_back(row.begin, row.begin + end);
-                    indices.emplace_back(row.begin + begin, row.end);
+                // If we define an empty range don't bother doing any more
+                if (begin != end) {
+                    // If we define a nice enclosed range range add it
+                    if (begin < end) {
+                        indices.emplace_back(row.begin + begin, row.begin + end);
+                    }
+                    // Our phi values wrap around so we need two ranges
+                    else {
+                        indices.emplace_back(row.begin, row.begin + end);
+                        indices.emplace_back(row.begin + begin, row.end);
+                    }
                 }
             }
         }
 
-        return indices;
+        return {mesh, indices};
     }
 
-    std::vector<std::pair<size_t, size_t>> lookup(const mat4& Hoc, const Lens& lens) {
+    std::pair<const Mesh&, std::vector<std::pair<size_t, size_t>>> lookup(const mat4& Hoc, const Lens& lens) {
 
         // We multiply a lot of things by 2
         constexpr const Scalar x2 = Scalar(2.0);
@@ -696,6 +730,90 @@ public:
         }
     }
 
+    void classify(const mat4& Hoc, const Lens& lens) {
+
+        // Build Rco by transposing the rotation of Hoc and upload it to the device
+        const mat3 Rco = {{
+            {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}},  //
+            {{Hoc[0][1], Hoc[1][1], Hoc[2][1]}},  //
+            {{Hoc[0][2], Hoc[1][2], Hoc[2][2]}}   //
+        }};
+        cl::Event Rco_event;
+        cl::Buffer Rco_buffer(context, 0, sizeof(Rco), nullptr, nullptr);
+        mem_queue.enqueueWriteBuffer(Rco_buffer, false, 0, sizeof(Rco), Rco.data(), nullptr, &Rco_event);
+
+        // Perform our lookup to get our relevant range
+        auto ranges      = lookup(Hoc, lens);
+        auto& lut_buffer = ranges.first.cl;
+
+        // Build up our list of indices for OpenCL
+        std::vector<cl_int> indices;
+
+        // First count the size of the buffer we will need to allocate and create it
+        int points = 0;
+        for (auto& range : ranges.second) {
+            points += range.second - range.first;
+        }
+        indices.resize(points);
+
+        // Now use iota to fill in the numbers
+        auto it = indices.begin();
+        for (auto& range : ranges.second) {
+            auto n = std::next(it, range.second - range.first);
+            std::iota(it, n, range.first);
+            it = n;
+        }
+
+        // Create buffers for indices map
+        cl::Buffer indices_map(context, 0, sizeof(cl_int) * points, nullptr, nullptr);
+        cl::Buffer pixel_coordinates(context, 0, sizeof(cl_int2) * points, nullptr, nullptr);
+
+        // Upload our indices map
+        cl::Event indices_event;
+        mem_queue.enqueueWriteBuffer(
+            indices_map, false, 0, points * sizeof(cl_int), indices.data(), nullptr, &indices_event);
+
+        // When everything is uploaded, we can run our projection kernel to get the pixel coordinates
+        cl::Event projected;
+        switch (lens.type) {
+            case Lens::EQUIRECTANGULAR: {
+                projected = project_equirectangular(
+                    cl::EnqueueArgs(
+                        exec_queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
+                    lut_buffer,
+                    indices_map,
+                    Rco_buffer,
+                    lens,
+                    pixel_coordinates);
+
+            } break;
+            case Lens::RADIAL: {
+                projected = project_radial(
+                    cl::EnqueueArgs(
+                        exec_queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
+                    lut_buffer,
+                    indices_map,
+                    Rco_buffer,
+                    lens,
+                    pixel_coordinates);
+
+            } break;
+        }
+
+        std::vector<std::array<cl_int, 2>> px(points);
+        std::vector<cl::Event> ev({projected});
+        mem_queue.enqueueReadBuffer(pixel_coordinates, true, 0, points * sizeof(std::array<cl_int, 2>), px.data(), &ev);
+
+        for (const auto& p : px) {
+            std::cout << p << std::endl;
+        }
+
+
+        // Now actually allocate that buffer and upload it to OpenCL
+
+        // Run our OpenCL kernel to work out valid pixel coordinates
+    }
+
 private:
     inline Scalar dot(const vec3& a, const vec3& b) {
         return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -713,6 +831,93 @@ private:
         Scalar length = std::sqrt(a[0] * a[0] + a[1] * a[1] + a[2] + a[2]);
         return {{a[0] * length, a[1] * length, a[2] * length}};
     }
+
+    std::string get_scalar_defines(float) {
+        return "#define Scalar float\n#define Scalar2 float2\n#define Scalar3 float3\n#define Scalar4 float4\n";
+    }
+
+    std::string get_scalar_defines(double) {
+        return "#define Scalar double\n#define Scalar2 double2\n#define Scalar3 double3\n#define Scalar4 double4\n";
+    }
+
+    void setup_opencl() {
+        // Get all available platforms (drivers)
+        std::vector<cl::Platform> all_platforms;
+        cl::Platform::get(&all_platforms);
+        if (all_platforms.empty()) {
+            throw std::runtime_error("No OpenCL platforms found. Check OpenCL Installation");
+        }
+
+        // Chose our default platform
+        cl::Platform default_platform = all_platforms.front();
+        std::cerr << "Using OpenCL platform: " << default_platform.getInfo<CL_PLATFORM_NAME>() << " "
+                  << default_platform.getInfo<CL_PLATFORM_VERSION>() << std::endl;
+
+        // Get the default device of the default platform
+        std::vector<cl::Device> all_devices;
+        default_platform.getDevices(CL_DEVICE_TYPE_CPU, &all_devices);
+        if (all_devices.empty()) {
+            throw std::runtime_error("No devices found. Check OpenCL installation!");
+        }
+
+        // Choose our default device
+        cl::Device default_device = all_devices.front();
+        std::cerr << "Using OpenCL device: " << default_device.getInfo<CL_DEVICE_NAME>() << std::endl;
+
+        // Make a context for this device
+        context = cl::Context({default_device});
+
+        // Create two queues, one for memory transfers and one for execution
+        exec_queue = cl::CommandQueue(context, default_device);
+        mem_queue  = cl::CommandQueue(context, default_device);
+
+        // Get our program source code
+        cl::Program::Sources sources;
+
+
+        // First we define our templated types
+        sources.emplace_back(get_scalar_defines(Scalar(0.0)));
+
+        // These two must be first since they are used later
+        sources.emplace_back(LENS_CL);
+        sources.emplace_back(NODE_CL);
+        sources.emplace_back(PROJECT_RADIAL_CL);
+        sources.emplace_back(PROJECT_EQUIRECTANGULAR_CL);
+
+        // Build the program
+        cl::Program program(context, sources);
+        if (program.build({default_device}) != CL_SUCCESS) {
+            std::cerr << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(default_device) << std::endl;
+            exit(1);
+        }
+
+        // Build functors for our projection kernels
+        using ProjectionFunctor = cl::KernelFunctor<const cl::Buffer&,  // The Node* LUT buffer
+                                                    const cl::Buffer&,  // The int* index map
+                                                    const cl::Buffer&,  // The Rco matrix
+                                                    const Lens&,        // The lens parameters
+                                                    cl::Buffer&>;       // The output int2 buffer
+        project_equirectangular = ProjectionFunctor(program, "project_equirectangular");
+        project_radial          = ProjectionFunctor(program, "project_radial");
+    }
+
+    // Our OpenCL context
+    cl::Context context;
+
+    // OpenCL queue for executing kernels
+    cl::CommandQueue exec_queue;
+    // OpenCL queue for uploading data to the device
+    cl::CommandQueue mem_queue;
+
+    // OpenCL kernel functions
+    using ProjectionFunctor = std::function<cl::Event(const cl::EnqueueArgs&,  // The number of workers to spawn etc
+                                                      const cl::Buffer&,       // The Node* LUT buffer
+                                                      const cl::Buffer&,       // The int* index map
+                                                      const cl::Buffer&,       // The Rco matrix
+                                                      const Lens&,             // The lens parameters
+                                                      cl::Buffer&)>;           // The output int2 buffer
+    ProjectionFunctor project_equirectangular;
+    ProjectionFunctor project_radial;
 
     /// A map from heights to visual mesh tables
     std::map<Scalar, Mesh> luts;

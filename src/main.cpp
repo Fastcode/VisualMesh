@@ -83,25 +83,26 @@ int main() {
 
     Timer t;
     mesh::VisualMesh<Scalar> mesh(cylinder, 1.0, 1.1, 1, M_PI / 1024.0);
-    t.measure("Generated the LUT");
+    t.measure("Generated visual mesh");
 
     mesh::VisualMesh<Scalar>::Lens lens;
-    lens.type                = mesh::VisualMesh<Scalar>::Lens::EQUIRECTANGULAR;
-    lens.equirectangular.fov = {{1.0472, 0.785398}};
+    lens.type                                = mesh::VisualMesh<Scalar>::Lens::EQUIRECTANGULAR;
+    lens.dimensions                          = {{1280, 1024}};
+    lens.equirectangular.fov                 = {{1.0472, 0.785398}};
+    lens.equirectangular.focal_length_pixels = (lens.dimensions[0] * 0.5) / std::tan(lens.equirectangular.fov[0] * 0.5);
 
     // lens.type       = mesh::VisualMesh<Scalar>::Lens::RADIAL;
     // lens.radial.fov = 1.0472;
 
     // Perform our lookup
     // const auto& lut = mesh.height(1.0);
-    for (int i = 0; i < 10000; ++i) {
+    for (int i = 0; i < 1; ++i) {
         auto Hoc = generateHoc((Scalar(rand()) / Scalar(RAND_MAX)) * (M_PI * 2.0),
                                (Scalar(rand()) / Scalar(RAND_MAX)) * (M_PI * 2.0),
                                (Scalar(rand()) / Scalar(RAND_MAX)) * (M_PI * 2.0),
                                0.5);
         t.measure("Generated Hoc");
-
-        const auto& ranges = mesh.lookup(Hoc, lens);
-        t.measure("Performed a lookup");
+        mesh.classify(Hoc, lens);
+        t.measure("Classified");
     }
 }

@@ -26,5 +26,38 @@ SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 # Setup our compiler settings
 INCLUDE(CompilerSetup)
 
-# Add the subdirectories
-ADD_SUBDIRECTORY(src)
+FIND_PACKAGE(OpenCL REQUIRED)
+FIND_PACKAGE(PythonInterp 3 REQUIRED)
+
+# Find our files
+FILE(GLOB src
+    "src/**.cpp"
+    "src/**.hpp")
+
+FILE(GLOB cls
+     "src/cl/**.cl")
+
+# Convert our opencl files into header files with their contents
+FOREACH(cl ${cls})
+
+    FILE(RELATIVE_PATH cl_path ${CMAKE_CURRENT_SOURCE_DIR} ${cl})
+
+    ADD_CUSTOM_COMMAND(
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.h"
+        COMMAND ${PYTHON_EXECUTABLE}
+        ARGS "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py"
+             "${cl}"
+             "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.h"
+        DEPENDS "${cl}"
+                "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py"
+        COMMENT "Wrapping OpenCL file ${cl_path} in a header"
+    )
+    LIST(APPEND src "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.h")
+ENDFOREACH(cl ${cls})
+
+INCLUDE_DIRECTORIES(${OpenCL_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES("${CMAKE_CURRENT_BINARY_DIR}/src")
+
+ADD_EXECUTABLE(visualmesh ${src})
+
+TARGET_LINK_LIBRARIES(visualmesh ${OpenCL_LIBRARIES})
