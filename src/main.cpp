@@ -77,7 +77,7 @@ std::array<std::array<Scalar, 4>, 4> generateHoc(const Scalar& theta,
 
 int main() {
 
-    mesh::Cylinder<Scalar> cylinder(0, 2.0, 0.075, 1, 20);
+    mesh::Cylinder<Scalar> cylinder(0, 2.0, 0.075, 8, 20);
     mesh::Sphere<Scalar> sphere(0, 0.075, 1, 10);
     mesh::Circle<Scalar> circle(0, 0.075, 1, 10);
 
@@ -94,15 +94,19 @@ int main() {
     // lens.type       = mesh::VisualMesh<Scalar>::Lens::RADIAL;
     // lens.radial.fov = 1.0472;
 
-    // Perform our lookup
-    // const auto& lut = mesh.height(1.0);
-    for (int i = 0; i < 1; ++i) {
+    for (int i = 0; i < 10000; ++i) {
         auto Hoc = generateHoc((Scalar(rand()) / Scalar(RAND_MAX)) * (M_PI * 2.0),
                                (Scalar(rand()) / Scalar(RAND_MAX)) * (M_PI * 2.0),
                                (Scalar(rand()) / Scalar(RAND_MAX)) * (M_PI * 2.0),
                                0.5);
         t.measure("Generated Hoc");
-        mesh.classify(Hoc, lens);
+        try {
+            mesh.classify(nullptr, 0, mesh::VisualMesh<Scalar>::FOURCC::YUYV, Hoc, lens);
+        }
+        catch (const std::exception& ex) {
+            std::cout << ex.what() << std::endl;
+        }
+
         t.measure("Classified");
     }
 }

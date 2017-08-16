@@ -35,6 +35,7 @@
 #include "cl/node.cl.h"
 #include "cl/project_equirectangular.cl.h"
 #include "cl/project_radial.cl.h"
+#include "cl/read_image_to_network.cl.h"
 
 namespace mesh {
 
@@ -115,6 +116,31 @@ public:
 
         /// The on device buffer of the mesh nodes
         cl::Buffer cl;
+    };
+
+    enum FOURCC : cl_int {
+        GREY    = 0x59455247,
+        Y12     = 0x20323159,
+        Y16     = 0x20363159,
+        GRBG    = 0x47425247,
+        RGGB    = 0x42474752,
+        GBRG    = 0x47524247,
+        BGGR    = 0x52474742,
+        GR12    = 0x32315247,
+        RG12    = 0x32314752,
+        GB12    = 0x32314247,
+        BG12    = 0x32314742,
+        GR16    = 0x36315247,
+        RG16    = 0x36314752,
+        GB16    = 0x36314247,
+        BG16    = 0x36314742,
+        Y411    = 0x31313459,
+        UYVY    = 0x59565955,
+        YUYV    = 0x56595559,
+        YM24    = 0x34324d59,
+        RGB3    = 0x33424752,
+        JPEG    = 0x4745504a,
+        UNKNOWN = 0
     };
 
     /**
@@ -731,7 +757,16 @@ public:
         }
     }
 
-    void classify(const mat4& Hoc, const Lens& lens) {
+    void classify(const void* image_data,
+                  const size_t& image_size,
+                  const FOURCC& image_format,
+                  const mat4& Hoc,
+                  const Lens& lens) {
+
+        // First start uploading our image data
+        cl::Event image_buffer_event;
+        cl::Buffer image_buffer(context, CL_MEM_READ_ONLY, image_size, nullptr, nullptr);
+        mem_queue.enqueueWriteBuffer(image_buffer, false, 0, image_size, image_data, nullptr, &image_buffer_event);
 
         // Build Rco by transposing the rotation of Hoc and upload it to the device
         const mat4 Rco = {{
@@ -803,18 +838,31 @@ public:
             } break;
         }
 
+        // Create our network buffer for holding the intermediate stages of the neural network
+        cl::Buffer network_buffer(context, CL_MEM_READ_WRITE, sizeof(cl_float3) * points, nullptr, nullptr);
+
+        // Read our image pixels into the first layer of the network
+        read_image_to_network(cl::EnqueueArgs(exec_queue, projected, cl::NDRange(points)),
+                              image_buffer,
+                              image_format,
+                              pixel_coordinates,
+                              network_buffer);
+
+        cl::Buffer link_buffer(context, CL_MEM_READ_WRITE, sizeof(int) * 6 * points, nullptr, nullptr);
+
+
+        // TODO now you have the screen coordinates for the mesh
+        // TODO now you need to perform your neural network layer steps
+        // TODO decide on the size of the layers you will need
+
+        // Input layer is 3 * 7 = 21 // TODO you could also add in the phi/theta/something to make it 24 input
+        // Hidden layer 1 is ???
+        // Multiple hidden layers?
+        // Output layer is 3
+
         std::vector<std::array<cl_int, 2>> px(points);
         std::vector<cl::Event> ev({projected});
         mem_queue.enqueueReadBuffer(pixel_coordinates, true, 0, points * sizeof(std::array<cl_int, 2>), px.data(), &ev);
-
-        for (const auto& p : px) {
-            std::cout << p << std::endl;
-        }
-
-
-        // Now actually allocate that buffer and upload it to OpenCL
-
-        // Run our OpenCL kernel to work out valid pixel coordinates
     }
 
 private:
@@ -877,7 +925,6 @@ private:
         // Get our program source code
         cl::Program::Sources sources;
 
-
         // First we define our templated types
         sources.emplace_back(get_scalar_defines(Scalar(0.0)));
 
@@ -886,6 +933,7 @@ private:
         sources.emplace_back(NODE_CL);
         sources.emplace_back(PROJECT_RADIAL_CL);
         sources.emplace_back(PROJECT_EQUIRECTANGULAR_CL);
+        sources.emplace_back(READ_IMAGE_TO_NETWORK_CL);
 
         // Build the program
         cl::Program program(context, sources);
@@ -902,6 +950,13 @@ private:
                                                     cl::Buffer&>;       // The output int2 buffer
         project_equirectangular = ProjectionFunctor(program, "project_equirectangular");
         project_radial          = ProjectionFunctor(program, "project_radial");
+
+        // Build functors for reading images into the neural network layer
+        using ImageReadFunctor = cl::KernelFunctor<const cl::Buffer&,  // The image bufferr
+                                                   const FOURCC&,      // The binary format the image is in
+                                                   const cl::Buffer&,  // The pixel coordinates to lookup
+                                                   cl::Buffer&>;  // The neural network layer information to output to
+        read_image_to_network  = ImageReadFunctor(program, "read_image_to_network");
     }
 
     // Our OpenCL context
@@ -921,6 +976,12 @@ private:
                                                       cl::Buffer&)>;           // The output int2 buffer
     ProjectionFunctor project_equirectangular;
     ProjectionFunctor project_radial;
+    std::function<cl::Event(const cl::EnqueueArgs&,  // The number of workers to spawn etc
+                            const cl::Buffer&,       // The image buffer
+                            const FOURCC&,           // The binary format the image is in
+                            const cl::Buffer&,       // The pixel coordinates to lookup
+                            cl::Buffer&)>            // The neural network layer information to output to
+        read_image_to_network;
 
     /// A map from heights to visual mesh tables
     std::map<Scalar, Mesh> luts;
