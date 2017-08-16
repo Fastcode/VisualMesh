@@ -40,12 +40,14 @@ for s in range(3):
             print('\tFound {} points'.format(len(data)))
 
             # Fix our data
-            data = np.array([[d[0], d[1], d[2], d[3] - d[0], d[4] - d[1], d[5] - d[2]] for d in data])
+            data = np.array([[d[0], d[1], d[2], d[3] - d[0], d[4] - d[1], d[5] - d[2], d[6], d[7], d[8]] for d in data])
 
-            X, Y, Z, U, V, W = zip(*data)
+            X, Y, Z, U, V, W , R, G, B = zip(*data)
+            C = np.array(list(zip(R, G, B)))/255.0
+
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
-            ax.quiver(X, Y, Z, U, V, W, arrow_length_ratio=0, linewidth=0.5)
+            ax.quiver(X, Y, Z, U, V, W, color=C, arrow_length_ratio=0, linewidth=0.5)
             ax.set_xlim([-1, 1])
             ax.set_ylim([-1, 1])
             ax.set_zlim([-1, 1])

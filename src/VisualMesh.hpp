@@ -398,7 +398,7 @@ public:
                 // Print our camera vector
                 const std::array<Scalar, 3> cam = {{Hco[0][0], Hco[1][0], Hco[2][0]}};
                 std::cerr << "Cam: " << cam << std::endl << std::endl;
-                std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << "],";
+                std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << ", 0, 0, 0],";
 
                 // Solution to finding the edges is an intersection between a line and a cone
                 // Based on a simplified version of the math found at
@@ -438,10 +438,10 @@ public:
                 // When we are storing this matrix we represent each corner as N and the following clockwise corner as M
                 // Then it is multiplied by the extent to make a vector of the length of the edge of the frustum
                 const std::array<vec3, 4> rMNo = {{
-                    {{-Rco[0][1] * x2 * y_extent, -Rco[1][1] * x2 * y_extent, -Rco[2][1] * x2 * y_extent}},  //
-                    {{-Rco[0][2] * x2 * z_extent, -Rco[1][2] * x2 * z_extent, -Rco[2][2] * x2 * z_extent}},  //
-                    {{+Rco[0][1] * x2 * y_extent, +Rco[1][1] * x2 * y_extent, +Rco[2][1] * x2 * y_extent}},  //
-                    {{+Rco[0][2] * x2 * z_extent, +Rco[1][2] * x2 * z_extent, +Rco[2][2] * x2 * z_extent}}   //
+                    {{-Rco[0][1] * x2 * y_extent, -Rco[1][1] * x2 * y_extent, -Rco[2][1] * x2 * y_extent}},  // rUTo
+                    {{-Rco[0][2] * x2 * z_extent, -Rco[1][2] * x2 * z_extent, -Rco[2][2] * x2 * z_extent}},  // rVUo
+                    {{+Rco[0][1] * x2 * y_extent, +Rco[1][1] * x2 * y_extent, +Rco[2][1] * x2 * y_extent}},  // rWVo
+                    {{+Rco[0][2] * x2 * z_extent, +Rco[1][2] * x2 * z_extent, +Rco[2][2] * x2 * z_extent}}   // rTWo
                 }};
 
                 // Make our normals to the frustum edges
@@ -491,11 +491,15 @@ public:
 
                 // TODO remove this when you're finished it
                 for (int i = 0; i < 4; ++i) {
-                    std::cout << "[0, 0, 0," << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << "], ";
-                    std::cout << "[0, 0, 0," << edges[i][0] << ", " << edges[i][1] << ", " << edges[i][2] << "], ";
+                    std::cout << "[0, 0, 0," << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2]
+                              << ", 255, 0, 0], ";
+
+                    std::cout << "[0, 0, 0, " << edges[i][0] << ", " << edges[i][1] << ", " << edges[i][2]
+                              << ", 255, 0, 0], ";
+
                     std::cout << "[" << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << ", "
                               << (rMNo[i][0] + rNCo[i][0]) << ", " << (rMNo[i][1] + rNCo[i][1]) << ", "
-                              << (rMNo[i][2] + rNCo[i][2]) << "], ";
+                              << (rMNo[i][2] + rNCo[i][2]) << ", 255, 0, 0], ";
                 }
 
                 // Calculate our theta limits
@@ -552,7 +556,7 @@ public:
 
                                         Scalar x = o[0] + d[0] * t;
                                         Scalar y = o[1] + d[1] * t;
-                                        std::cout << "[0, 0, 0, " << x << ", " << y << ", " << z << "],";
+                                        std::cout << "[0, 0, 0, " << x << ", " << y << ", " << z << ", 255, 0, 0],";
                                         Scalar theta = std::atan2(y, x);
                                         // atan2 gives a result from -pi -> pi, we need 0 -> 2 pi
                                         limits.emplace_back(theta > 0 ? theta : theta + M_PI * Scalar(2.0));
@@ -583,18 +587,10 @@ public:
                             // Make a unit vector from the phi and theta
                             vec3 test_vec = {{-cos_theta * sin_phi, -sin_theta * sin_phi, -cos_phi}};
 
-                            // Now work out if our first theta is entering or leaving the frustum
-                            // We do this by dotting our test vector with vectors that are normal to the
-                            // frustum planes. IMPORTANT while it looks like we are doing our cross products in a
-                            // clockwise direction here, note that the y axis is actually to the left in the diagram.
-                            // This means that we are actually doing our cross products in an anticlockwise direction.
-                            // Therefore all of our normal vectors will be facing outwards from the frustum. This means
-                            // that if we get a vector that has a positive dot product with one of these vectors then it
-                            // lies outside the frustum.
                             bool first_is_end = false;
                             for (int i = 0; i < 4; ++i) {
                                 // If we get a negative dot product our first point is an end segment
-                                first_is_end |= 0 > dot(test_vec, edges[i]);
+                                first_is_end |= Scalar(0.0) > dot(test_vec, edges[i]);
                             }
 
                             // If this is entering, point 0 is a start, and point 1 is an end
@@ -644,7 +640,7 @@ public:
                 const Scalar cos_half_fov = std::cos(lens.radial.fov * Scalar(0.5));
                 const vec3 cam            = {{Hco[0][0], Hco[1][0], Hco[2][0]}};
                 std::cerr << "Cam: " << cam << std::endl << std::endl;
-                std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << "],";
+                std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << ", 255, 0, 0],";
 
                 auto theta_limits = [&](const Scalar& phi) -> std::array<std::pair<Scalar, Scalar>, 1> {
 
@@ -699,9 +695,9 @@ public:
 
                     //  Print our two solutions
                     std::cout << "[0, 0, 0, " << (x * cos_offset - y * sin_offset) << ", "
-                              << (x * sin_offset + y * cos_offset) << ", " << z << "],";
+                              << (x * sin_offset + y * cos_offset) << ", " << z << ", 255, 0, 0],";
                     std::cout << "[0, 0, 0, " << (x * cos_offset + y * sin_offset) << ", "
-                              << (x * sin_offset - y * cos_offset) << ", " << z << "],";
+                              << (x * sin_offset - y * cos_offset) << ", " << z << ", 255, 0, 0],";
 
                     return {
                         {std::make_pair(t1 > 0 ? t1 : t1 + M_PI * Scalar(2.0), t2 > 0 ? t2 : t2 + M_PI * Scalar(2.0))}};

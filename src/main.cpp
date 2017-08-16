@@ -82,7 +82,8 @@ int main(int, char* argv[]) {
                 const auto& neighbour = lut.nodes[i + n];
 
                 std::cout << "[" << node.ray[0] << ", " << node.ray[1] << ", " << node.ray[2] << ", "
-                          << neighbour.ray[0] << ", " << neighbour.ray[1] << ", " << neighbour.ray[2] << "], ";
+                          << neighbour.ray[0] << ", " << neighbour.ray[1] << ", " << neighbour.ray[2]
+                          << ", 0, 0, 255], ";
             }
         }
     }
