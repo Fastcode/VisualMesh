@@ -396,8 +396,6 @@ public:
 
                 // Print our camera vector
                 const std::array<Scalar, 3> cam = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
-                std::cerr << "Cam: " << cam << std::endl << std::endl;
-                std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << ", 0, 0, 0],";
 
                 // Work out how much additional y and z we get from our field of view if we have a focal length of 1
                 const Scalar y_extent = std::tan(lens.equirectangular.fov[0] * Scalar(0.5));
@@ -481,20 +479,6 @@ public:
                     eq_parts[i][5] = d[0] * d[0] + d[1] * d[1];  // dx^2 + dy^2
                 }
 
-
-                // TODO remove this when you're finished it
-                for (int i = 0; i < 4; ++i) {
-                    std::cout << "[0, 0, 0," << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2]
-                              << ", 255, 0, 0], ";
-
-                    std::cout << "[0, 0, 0, " << edges[i][0] << ", " << edges[i][1] << ", " << edges[i][2]
-                              << ", 255, 0, 0], ";
-
-                    std::cout << "[" << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << ", "
-                              << (rMNo[i][0] + rNCo[i][0]) << ", " << (rMNo[i][1] + rNCo[i][1]) << ", "
-                              << (rMNo[i][2] + rNCo[i][2]) << ", 255, 0, 0], ";
-                }
-
                 // Calculate our theta limits
                 auto theta_limits = [&](const Scalar& phi) {
 
@@ -556,9 +540,6 @@ public:
                                         const Scalar theta = std::atan2(y, x);
                                         // atan2 gives a result from -pi -> pi, we need 0 -> 2 pi
                                         limits.emplace_back(theta > 0 ? theta : theta + M_PI * Scalar(2.0));
-
-                                        // TODO delete when done
-                                        std::cout << "[0, 0, 0, " << x << ", " << y << ", " << z << ", 255, 0, 0],";
                                     }
                                 }
                             }
@@ -653,10 +634,6 @@ public:
                 // The height of our camera above the observation plane
                 const Scalar& height = Hoc[2][3];
 
-                // TODO remove when done
-                std::cerr << "Cam: " << cam << std::endl << std::endl;
-                std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << ", 255, 0, 0],";
-
                 auto theta_limits = [&](const Scalar& phi) -> std::array<std::pair<Scalar, Scalar>, 1> {
 
                     // Check if we are intersecting with an upper or lower cone
@@ -708,17 +685,11 @@ public:
                     const Scalar t1 = offset + std::atan2(-y, x);
                     const Scalar t2 = offset + std::atan2(y, x);
 
-                    //  Print our two solutions
-                    std::cout << "[0, 0, 0, " << (x * cos_offset - y * sin_offset) << ", "
-                              << (x * sin_offset + y * cos_offset) << ", " << z << ", 255, 0, 0],";
-                    std::cout << "[0, 0, 0, " << (x * cos_offset + y * sin_offset) << ", "
-                              << (x * sin_offset - y * cos_offset) << ", " << z << ", 255, 0, 0],";
-
                     return {{std::make_pair(t1 > Scalar(0.0) ? t1 : t1 + Scalar(2.0) * M_PI,
                                             t2 > Scalar(0.0) ? t2 : t2 + Scalar(2.0) * M_PI)}};
                 };
 
-                // TODO work out the height of the camera properly
+                // Lookup the mesh
                 return lookup(height, theta_limits);
             }
             default: { throw std::runtime_error("Unknown lens type"); }
