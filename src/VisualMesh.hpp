@@ -739,7 +739,7 @@ public:
             {{Hoc[0][2], Hoc[1][2], Hoc[2][2]}}   //
         }};
         cl::Event Rco_event;
-        cl::Buffer Rco_buffer(context, 0, sizeof(Rco), nullptr, nullptr);
+        cl::Buffer Rco_buffer(context, CL_MEM_READ_ONLY, sizeof(Rco), nullptr, nullptr);
         mem_queue.enqueueWriteBuffer(Rco_buffer, false, 0, sizeof(Rco), Rco.data(), nullptr, &Rco_event);
 
         // Perform our lookup to get our relevant range
@@ -765,7 +765,7 @@ public:
         }
 
         // Create buffers for indices map
-        cl::Buffer indices_map(context, 0, sizeof(cl_int) * points, nullptr, nullptr);
+        cl::Buffer indices_map(context, CL_MEM_READ_ONLY, sizeof(cl_int) * points, nullptr, nullptr);
         cl::Buffer pixel_coordinates(context, 0, sizeof(cl_int2) * points, nullptr, nullptr);
 
         // Upload our indices map
