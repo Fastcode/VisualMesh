@@ -585,7 +585,7 @@ public:
                             const Scalar cos_theta  = std::cos(test_theta);
 
                             // Make a unit vector from the phi and theta
-                            vec3 test_vec = {{-cos_theta * sin_phi, -sin_theta * sin_phi, -cos_phi}};
+                            vec3 test_vec = {{cos_theta * sin_phi, sin_theta * sin_phi, -cos_phi}};
 
                             bool first_is_end = false;
                             for (int i = 0; i < 4; ++i) {
