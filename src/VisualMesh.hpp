@@ -444,6 +444,14 @@ public:
                     {{+Rco[0][2] * x2 * z_extent, +Rco[1][2] * x2 * z_extent, +Rco[2][2] * x2 * z_extent}}   //
                 }};
 
+                // Make our normals to the frustum edges
+                const std::array<vec3, 4> edges = {{
+                    cross(rNCo[0], rNCo[1]),  // Top edge
+                    cross(rNCo[1], rNCo[2]),  // Left edge
+                    cross(rNCo[2], rNCo[3]),  // Base edge
+                    cross(rNCo[3], rNCo[0]),  // Right edge
+                }};
+
                 // These calculations are intermediates for the solution to the cone/line equation. Since these parts
                 // are the same for all phi values, we can pre-calculate them here to save effort later
                 std::array<std::array<Scalar, 6>, 4> eq_parts;
@@ -484,6 +492,7 @@ public:
                 // TODO remove this when you're finished it
                 for (int i = 0; i < 4; ++i) {
                     std::cout << "[0, 0, 0," << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << "], ";
+                    std::cout << "[0, 0, 0," << edges[i][0] << ", " << edges[i][1] << ", " << edges[i][2] << "], ";
                     std::cout << "[" << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << ", "
                               << (rMNo[i][0] + rNCo[i][0]) << ", " << (rMNo[i][1] + rNCo[i][1]) << ", "
                               << (rMNo[i][2] + rNCo[i][2]) << "], ";
@@ -584,8 +593,8 @@ public:
                             // lies outside the frustum.
                             bool first_is_end = false;
                             for (int i = 0; i < 4; ++i) {
-                                // If we get a positive dot product our first point is an end segment
-                                first_is_end |= 0 < dot(test_vec, cross(rNCo[i], rNCo[(i + 1) % 4]));
+                                // If we get a negative dot product our first point is an end segment
+                                first_is_end |= 0 > dot(test_vec, edges[i]);
                             }
 
                             // If this is entering, point 0 is a start, and point 1 is an end
