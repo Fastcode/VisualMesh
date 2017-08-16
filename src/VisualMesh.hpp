@@ -405,13 +405,8 @@ public:
                 // https://www.geometrictools.com/Documentation/IntersectionLineCone.pdf
 
                 // Work out how much additional y and z we get from our field of view if we have a focal length of 1
-                Scalar y_extent = std::tan(lens.equirectangular.fov[0] * Scalar(0.5));
-                Scalar z_extent = std::tan(lens.equirectangular.fov[1] * Scalar(0.5));
-
-                // Prenormalise these values as they will all be the same length
-                Scalar length = Scalar(1.0) / std::sqrt(y_extent * y_extent + z_extent * z_extent + Scalar(1.0));
-                y_extent      = y_extent * length;
-                z_extent      = z_extent * length;
+                const Scalar y_extent = std::tan(lens.equirectangular.fov[0] * Scalar(0.5));
+                const Scalar z_extent = std::tan(lens.equirectangular.fov[1] * Scalar(0.5));
 
                 /* The labels for each of the corners of the frustum is shown below.
                     ^    T       U
@@ -420,12 +415,12 @@ public:
                     <- y
                  */
 
-                // Make corners in cam space as unit vectors
+                // Make vectors to the corners in cam space
                 const std::array<vec3, 4> rNCc = {{
-                    {{length, +y_extent, +z_extent}},  // rTCc
-                    {{length, -y_extent, +z_extent}},  // rUCc
-                    {{length, -y_extent, -z_extent}},  // rVCc
-                    {{length, +y_extent, -z_extent}}   // rWCc
+                    {{Scalar(1.0), +y_extent, +z_extent}},  // rTCc
+                    {{Scalar(1.0), -y_extent, +z_extent}},  // rUCc
+                    {{Scalar(1.0), -y_extent, -z_extent}},  // rVCc
+                    {{Scalar(1.0), +y_extent, -z_extent}}   // rWCc
                 }};
 
                 // Rotate these into world space by multiplying by the rotation matrix
@@ -449,6 +444,43 @@ public:
                     {{+Rco[0][2] * x2 * z_extent, +Rco[1][2] * x2 * z_extent, +Rco[2][2] * x2 * z_extent}}   //
                 }};
 
+                // These calculations are intermediates for the solution to the cone/line equation. Since these parts
+                // are the same for all phi values, we can pre-calculate them here to save effort later
+                std::array<std::array<Scalar, 6>, 4> eq_parts;
+                for (int i = 0; i < 4; ++i) {
+                    const auto& o = rNCo[i];  // Line origin
+                    const auto& d = rMNo[i];  // Line direction
+
+                    // Later we will use these constants like so
+                    // (p[0] + c2 * p[1] ± sqrt(c2 * p[2] + p[3]))/(p[4] + c2 * p[5]);
+
+                    // c2 dependant part of numerator
+                    eq_parts[i][0] = d[2] * o[2];  // -dz oz
+
+                    // Non c2 dependant part of numerator
+                    eq_parts[i][1] = -d[1] * o[1] - d[0] * o[0];  // -dy oy - dx ox
+
+                    // c2 dependant part of discriminant
+                    eq_parts[i][2] = d[0] * d[0] * o[2] * o[2]         // dx^2 oz^2
+                                     - x2 * d[0] * d[2] * o[0] * o[2]  // 2 dx dz ox oz
+                                     + d[1] * d[1] * o[2] * o[2]       // dy^2 oz^2
+                                     - x2 * d[1] * d[2] * o[1] * o[2]  // 2 dy dz oy oz
+                                     + d[2] * d[2] * o[0] * o[0]       // d_z^2 o_x^2
+                                     + d[2] * d[2] * o[1] * o[1];      // d_z^2 o_y^2
+
+                    // non c2 dependant part of discriminant
+                    eq_parts[i][3] = -d[0] * d[0] * o[1] * o[1]        // dx^2 oy^2
+                                     + x2 * d[0] * d[1] * o[0] * o[1]  // 2 dx dy ox oy
+                                     - d[1] * d[1] * o[0] * o[0];      // dy^2 ox^2
+
+                    // c2 dependant part of denominator
+                    eq_parts[i][4] = -d[2] * d[2];  // -(dz^2)
+
+                    // non c2 dependant part of denominator
+                    eq_parts[i][5] = d[0] * d[0] + d[1] * d[1];  // dx^2 + dy^2
+                }
+
+
                 // TODO remove this when you're finished it
                 for (int i = 0; i < 4; ++i) {
                     std::cout << "[0, 0, 0," << rNCo[i][0] << ", " << rNCo[i][1] << ", " << rNCo[i][2] << "], ";
@@ -460,12 +492,6 @@ public:
                 // Calculate our theta limits
                 auto theta_limits = [&](const Scalar& phi) {
 
-                    // Before we start, we can check if this phi is totally within our FOV
-                    // If so we don't need to do any solving and can just return the entire range
-
-                    // TODO check if phi is totally contained
-                    // TODO check if phi is totally excluded
-
                     // Cone gradient squared
                     const Scalar cos_phi = std::cos(phi);
                     const Scalar tan_phi = std::tan(phi);
@@ -474,28 +500,29 @@ public:
                     // Store any limits we find
                     std::vector<Scalar> limits;
 
+                    // Count how many complex solutions we get
+                    int complex_sols = 0;
+
                     for (int i = 0; i < 4; ++i) {
                         // We make a line origin + ray to define a parametric line
                         // Note that both of these vectors are always unit length
                         const auto& o = rNCo[i];  // Line origin
                         const auto& d = rMNo[i];  // Line direction
 
-                        // Calculate our discriminant. While we could optimise this math a little, it's better to rely
-                        // on the compiler doing common sub expression elimination.
-                        const Scalar disc = c2 * d[0] * d[0] * o[2] * o[2]         // c^2 dx^2 oz^2
-                                            - x2 * c2 * d[0] * d[2] * o[0] * o[2]  // 2 c^2 dx dz ox oz
-                                            + c2 * d[1] * d[1] * o[2] * o[2]       // c^2 dy^2 oz^2
-                                            - x2 * c2 * d[1] * d[2] * o[1] * o[2]  // 2 c^2 dy dz oy oz
-                                            + c2 * d[2] * d[2] * o[0] * o[0]       // c^2 d_z^2 o_x^2
-                                            + c2 * d[2] * d[2] * o[1] * o[1]       // c^2 d_z^2 o_y^2
-                                            - d[0] * d[0] * o[1] * o[1]            // dx^2 oy^2
-                                            + x2 * d[0] * d[1] * o[0] * o[1]       // 2 dx dy ox oy
-                                            - d[1] * d[1] * o[0] * o[0];           // dy^2 ox^2
+                        // Calculate the first half of our numerator
+                        const Scalar num = c2 * eq_parts[i][0] + eq_parts[i][1];
 
-                        const Scalar denom = d[0] * d[0] + d[1] * d[1] - d[2] * d[2] * c2;
-                        const Scalar num   = c2 * d[2] * o[2] - d[1] * o[1] - d[0] * o[0];
+                        // Calculate our discriminant.
+                        const Scalar disc = c2 * eq_parts[i][2] + eq_parts[i][3];
 
-                        if (denom != Scalar(0.0) && disc > Scalar(0.0)) {
+                        // Calculate our denominator
+                        const Scalar denom = c2 * eq_parts[i][4] + eq_parts[i][5];
+
+                        // We need to count how many complex solutions we get, if all 4 are we totally enclose phi
+                        if (disc < Scalar(0.0)) {
+                            ++complex_sols;
+                        }
+                        else if (denom != Scalar(0.0)) {
 
                             // We have two intersections with either the upper or lower cone
                             Scalar root = std::sqrt(disc);
@@ -526,8 +553,13 @@ public:
                         }
                     }
 
+                    // If all solutions are complex we totally enclose the phi however we still need to check the cone
+                    // is on the correct side
+                    if (complex_sols == 4 && ((cos_phi > 0) == (-cam[2] > 0))) {
+                        return std::vector<std::pair<Scalar, Scalar>>(1, std::make_pair(0, Scalar(2.0) * M_PI));
+                    }
                     // If we have intersections
-                    if (!limits.empty()) {
+                    else if (!limits.empty()) {
                         // If we have an even number of intersections
                         if (limits.size() % 2 == 0) {
                             // Sort the limits
