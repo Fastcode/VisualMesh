@@ -1,6 +1,6 @@
 kernel void project_equirectangular(global const struct Node* lut,
                                     global const int* indices,
-                                    global const Scalar3* Rco,
+                                    global const Scalar4* Rco,  // This is only Scalar4 for alignment concerns
                                     const struct Lens lens,
                                     global int2* out) {
 

@@ -1,6 +1,6 @@
 kernel void project_radial(global struct Node* lut,
                            global int* indices,
-                           global Scalar3* Rco,
+                           global Scalar4* Rco,
                            const struct Lens lens,
                            global int2* out) {
 

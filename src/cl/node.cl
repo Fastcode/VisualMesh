@@ -3,7 +3,7 @@
 
 struct Node {
     /// The unit vector in the direction for this node
-    Scalar3 ray;
+    Scalar4 ray;
     /// Relative indices to the linked hexagon nodes in the LUT ordered TL, TR, L, R, BL, BR,
     int neighbours[6];
 };

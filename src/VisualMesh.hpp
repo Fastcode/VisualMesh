@@ -77,7 +77,7 @@ public:
 
     struct Node {
         /// The unit vector in the direction for this node
-        vec3 ray;
+        vec4 ray;
         /// Relative indices to the linked hexagon nodes in the LUT ordered TL, TR, L, R, BL, BR,
         int neighbours[6];
     };
@@ -223,6 +223,7 @@ public:
                         std::cos(theta) * sin_phi,  //
                         std::sin(theta) * sin_phi,  //
                         -cos_phi,                   //
+                        Scalar(0.0)                 //
                     }};
 
                     // Get the indices for our left/right neighbours relative to this row
@@ -733,11 +734,13 @@ public:
     void classify(const mat4& Hoc, const Lens& lens) {
 
         // Build Rco by transposing the rotation of Hoc and upload it to the device
-        const mat3 Rco = {{
-            {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}},  //
-            {{Hoc[0][1], Hoc[1][1], Hoc[2][1]}},  //
-            {{Hoc[0][2], Hoc[1][2], Hoc[2][2]}}   //
+        const mat4 Rco = {{
+            {{Hoc[0][0], Hoc[1][0], Hoc[2][0], Scalar(0.0)}},       //
+            {{Hoc[0][1], Hoc[1][1], Hoc[2][1], Scalar(0.0)}},       //
+            {{Hoc[0][2], Hoc[1][2], Hoc[2][2], Scalar(0.0)}},       //
+            {{Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0)}}  //
         }};
+
         cl::Event Rco_event;
         cl::Buffer Rco_buffer(context, CL_MEM_READ_ONLY, sizeof(Rco), nullptr, nullptr);
         mem_queue.enqueueWriteBuffer(Rco_buffer, false, 0, sizeof(Rco), Rco.data(), nullptr, &Rco_event);
