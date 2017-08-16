@@ -400,10 +400,6 @@ public:
                 std::cerr << "Cam: " << cam << std::endl << std::endl;
                 std::cout << "[0, 0, 0, " << cam[0] << ", " << cam[1] << ", " << cam[2] << ", 0, 0, 0],";
 
-                // Solution to finding the edges is an intersection between a line and a cone
-                // Based on a simplified version of the math found at
-                // https://www.geometrictools.com/Documentation/IntersectionLineCone.pdf
-
                 // Work out how much additional y and z we get from our field of view if we have a focal length of 1
                 const Scalar y_extent = std::tan(lens.equirectangular.fov[0] * Scalar(0.5));
                 const Scalar z_extent = std::tan(lens.equirectangular.fov[1] * Scalar(0.5));
@@ -414,7 +410,6 @@ public:
                     z    W       V
                     <- y
                  */
-
                 // Make vectors to the corners in cam space
                 const std::array<vec3, 4> rNCc = {{
                     {{Scalar(1.0), +y_extent, +z_extent}},  // rTCc
@@ -505,10 +500,13 @@ public:
                 // Calculate our theta limits
                 auto theta_limits = [&](const Scalar& phi) {
 
-                    // Cone gradient squared
+                    // Precalculate some trigonometric functions
+                    const Scalar sin_phi = std::sin(phi);
                     const Scalar cos_phi = std::cos(phi);
                     const Scalar tan_phi = std::tan(phi);
-                    const Scalar c2      = tan_phi * tan_phi;
+
+                    // Cone gradient squared
+                    const Scalar c2 = tan_phi * tan_phi;
 
                     // Store any limits we find
                     std::vector<Scalar> limits;
@@ -569,7 +567,19 @@ public:
                     // If all solutions are complex we totally enclose the phi however we still need to check the cone
                     // is on the correct side
                     if (complex_sols == 4 && ((cos_phi > 0) == (-cam[2] > 0))) {
-                        return std::vector<std::pair<Scalar, Scalar>>(1, std::make_pair(0, Scalar(2.0) * M_PI));
+
+                        // Make a test unit vector that is on the cone, theta=0 is easiest
+                        const vec3 test_vec = {{sin_phi, Scalar(0.0), -cos_phi}};
+
+                        bool external = false;
+                        for (int i = 0; !external && i < 4; ++i) {
+                            // If we get a negative dot product our first point is an end segment
+                            external = Scalar(0.0) > dot(test_vec, edges[i]);
+                        }
+                        if (!external) {
+                            return std::vector<std::pair<Scalar, Scalar>>(
+                                1, std::make_pair(Scalar(0.0), Scalar(2.0) * M_PI));
+                        }
                     }
                     // If we have intersections
                     else if (!limits.empty()) {
@@ -580,17 +590,16 @@ public:
 
                             // Get a test point half way between the first two points
                             const Scalar test_theta = (limits[0] + limits[1]) * Scalar(0.5);
-                            const Scalar sin_phi    = std::sin(phi);
                             const Scalar sin_theta  = std::sin(test_theta);
                             const Scalar cos_theta  = std::cos(test_theta);
 
                             // Make a unit vector from the phi and theta
-                            vec3 test_vec = {{cos_theta * sin_phi, sin_theta * sin_phi, -cos_phi}};
+                            const vec3 test_vec = {{cos_theta * sin_phi, sin_theta * sin_phi, -cos_phi}};
 
                             bool first_is_end = false;
-                            for (int i = 0; i < 4; ++i) {
+                            for (int i = 0; !first_is_end && i < 4; ++i) {
                                 // If we get a negative dot product our first point is an end segment
-                                first_is_end |= Scalar(0.0) > dot(test_vec, edges[i]);
+                                first_is_end = Scalar(0.0) > dot(test_vec, edges[i]);
                             }
 
                             // If this is entering, point 0 is a start, and point 1 is an end
