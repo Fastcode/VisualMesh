@@ -31,6 +31,7 @@
 #include "cl/cl2.hpp"
 
 // Include our generated OpenCL headers
+#include "cl/init_network_buffer.cl.h"
 #include "cl/lens.cl.h"
 #include "cl/node.cl.h"
 #include "cl/project_equirectangular.cl.h"
@@ -80,7 +81,7 @@ public:
         /// The unit vector in the direction for this node
         vec4 ray;
         /// Relative indices to the linked hexagon nodes in the LUT ordered TL, TR, L, R, BL, BR,
-        int neighbours[6];
+        std::array<int, 6> neighbours;
     };
 #pragma pack(pop)
 
@@ -768,7 +769,10 @@ public:
         cl::Event image_buffer_event;
         cl::Buffer image_buffer(context, CL_MEM_READ_ONLY, image_size, nullptr, nullptr);
         mem_queue.enqueueWriteBuffer(image_buffer, false, 0, image_size, image_data, nullptr, &image_buffer_event);
+
+        image_buffer_event.wait();    // TIMER_LINE
         t.measure("\tUpload image");  // TIMER_LINE
+
         // Build Rco by transposing the rotation of Hoc and upload it to the device
         const mat4 Rco = {{
             {{Hoc[0][0], Hoc[1][0], Hoc[2][0], Scalar(0.0)}},       //
@@ -781,6 +785,7 @@ public:
         cl::Buffer Rco_buffer(context, CL_MEM_READ_ONLY, sizeof(Rco), nullptr, nullptr);
         mem_queue.enqueueWriteBuffer(Rco_buffer, false, 0, sizeof(Rco), Rco.data(), nullptr, &Rco_event);
 
+        Rco_event.wait();           // TIMER_LINE
         t.measure("\tUpload Rco");  // TIMER_LINE
         // Perform our lookup to get our relevant range
         auto ranges            = lookup(Hoc, lens);
@@ -804,6 +809,7 @@ public:
         }
 
         t.measure("\tBuild Range");  // TIMER_LINE
+
         // Create buffers for indices map
         cl::Buffer indices_map(context, CL_MEM_READ_ONLY, sizeof(cl_int) * points, nullptr, nullptr);
         cl::Buffer pixel_coordinates(context, 0, sizeof(cl_int2) * points, nullptr, nullptr);
@@ -813,7 +819,9 @@ public:
         mem_queue.enqueueWriteBuffer(
             indices_map, false, 0, points * sizeof(cl_int), indices.data(), nullptr, &indices_event);
 
+        indices_event.wait();         // TIMER_LINE
         t.measure("\tUpload Range");  // TIMER_LINE
+
         // When everything is uploaded, we can run our projection kernel to get the pixel coordinates
         cl::Event projected;
         switch (lens.type) {
@@ -840,72 +848,42 @@ public:
 
             } break;
         }
+        projected.wait();               // TIMER_LINE
         t.measure("\tProject points");  // TIMER_LINE
 
-        // Create our network buffer for holding the intermediate stages of the neural network
-        cl::Buffer network_buffer(context, CL_MEM_READ_WRITE, sizeof(cl_float3) * points, nullptr, nullptr);
+        // Create our two network buffer for holding the intermediate stages of the neural network (ping/pong buffers)
+        cl::Buffer network_buffer1(context, CL_MEM_READ_WRITE, sizeof(cl_float3) * nodes.size(), nullptr, nullptr);
+        cl::Buffer network_buffer2(context, CL_MEM_READ_WRITE, sizeof(cl_float3) * nodes.size(), nullptr, nullptr);
+
+        // Fill these buffers with 0s so the unused nodes will still work
+        cl::Event network1_fill = init_network_buffer(
+            cl::EnqueueArgs(exec_queue, indices_event, cl::NDRange(points)), lut_buffer, indices_map, network_buffer1);
+        cl::Event network2_fill = init_network_buffer(
+            cl::EnqueueArgs(exec_queue, indices_event, cl::NDRange(points)), lut_buffer, indices_map, network_buffer2);
+
+        // mem_queue.enqueueFillBuffer(
+        //     network_buffer1, float(0.0), 0, sizeof(cl_float3) * nodes.size(), nullptr, &network1_fill);
+        // mem_queue.enqueueFillBuffer(
+        //     network_buffer2, float(0.0), 0, sizeof(cl_float3) * nodes.size(), nullptr, &network2_fill);
+
+        network1_fill.wait();                 // TIMER_LINE
+        t.measure("\tFill Network1 buffer");  // TIMER_LINE
 
         // Read our image pixels into the first layer of the network
-        cl::Event image_read_event = read_image_to_network(cl::EnqueueArgs(exec_queue, projected, cl::NDRange(points)),
-                                                           image_buffer,
-                                                           image_format,
-                                                           pixel_coordinates,
-                                                           network_buffer);
+        cl::Event image_read_event = read_image_to_network(
+            cl::EnqueueArgs(exec_queue, std::vector<cl::Event>({network1_fill, projected}), cl::NDRange(points)),
+            indices_map,
+            image_buffer,
+            image_format,
+            pixel_coordinates,
+            network_buffer1);
 
 
+        image_read_event.wait();             // TIMER_LINE
         t.measure("\tSample Image Points");  // TIMER_LINE
 
         // While that image read etc is processing we can setup our local lookup buffer that will tell the network
         // where to look for neighbour values in the network_buffer
-        // Function to calculate the new index
-        auto calc_new_index = [](const std::vector<std::pair<size_t, size_t>>& ranges, const int& index) -> int {
-
-            int new_index = 0;
-            for (const auto& r : ranges) {
-                // If we already passed this index
-                if (int(r.first) > index) {
-                    return -1;
-                }
-                // If we haven't reached it yet advance
-                else if (int(r.second) < index) {
-                    new_index += r.second - r.first;
-                }
-                // Otherwise we are in range so work out how much extra
-                else {
-                    return new_index + (index - r.first);
-                }
-            }
-
-            // We ran past the end of our ranges without finding it
-            return -1;
-        };
-
-        std::cout << "\tLUT Size:   " << nodes.size() << std::endl;
-        std::cout << "\tSlice Size: " << points << std::endl;
-
-        // Calculate the new index for each neighbour or -1 if they do not exist
-        std::vector<std::array<int, 6>> local_link(points);
-        for (size_t i = 0; i < indices.size(); ++i) {
-            // Get our global index and the node it represents
-            auto& idx = indices[i];
-            auto& n   = nodes[idx];
-            auto& ll  = local_link[i];
-
-            // Go through our neighbours and work out their new position
-            for (int i = 0; i < 6; ++i) {
-                ll[i] = calc_new_index(ranges.second, idx + n.neighbours[i]);
-            }
-        }
-
-        t.measure("\tRelink list");  // TIMER_LINE
-
-        // Upload this list to the OpenCL device
-        cl::Event local_link_event;
-        cl::Buffer local_link_buffer(context, CL_MEM_READ_WRITE, sizeof(int) * 6 * points, nullptr, nullptr);
-        mem_queue.enqueueWriteBuffer(
-            local_link_buffer, false, 0, points * sizeof(cl_int) * 6, local_link.data(), nullptr, &local_link_event);
-
-        t.measure("\tUpload List");  // TIMER_LINE
 
         // Input layer is 3 * 7 = 21 // TODO you could also add in the phi/theta/something to make it 24 input
         // Hidden layer 1 is ???
@@ -988,6 +966,7 @@ private:
         sources.emplace_back(NODE_CL);
         sources.emplace_back(PROJECT_RADIAL_CL);
         sources.emplace_back(PROJECT_EQUIRECTANGULAR_CL);
+        sources.emplace_back(INIT_NETWORK_BUFFER_CL);
         sources.emplace_back(READ_IMAGE_TO_NETWORK_CL);
 
         // Build the program
@@ -1007,11 +986,18 @@ private:
         project_radial          = ProjectionFunctor(program, "project_radial");
 
         // Build functors for reading images into the neural network layer
-        using ImageReadFunctor = cl::KernelFunctor<const cl::Buffer&,  // The image bufferr
+        using ImageReadFunctor = cl::KernelFunctor<const cl::Buffer&,  // The int* index map
+                                                   const cl::Buffer&,  // The image buffer
                                                    const FOURCC&,      // The binary format the image is in
                                                    const cl::Buffer&,  // The pixel coordinates to lookup
                                                    cl::Buffer&>;  // The neural network layer information to output to
         read_image_to_network  = ImageReadFunctor(program, "read_image_to_network");
+
+        // Build functor for zeroing the memory for neural network layers
+        using InitNetworkFunctor = cl::KernelFunctor<const cl::Buffer&,  // The Node* LUT buffer
+                                                     const cl::Buffer&,  // The int* index map
+                                                     cl::Buffer&>;       // The output float3 buffer
+        init_network_buffer      = InitNetworkFunctor(program, "init_network_buffer");
     }
 
     // Our OpenCL context
@@ -1032,11 +1018,18 @@ private:
     ProjectionFunctor project_equirectangular;
     ProjectionFunctor project_radial;
     std::function<cl::Event(const cl::EnqueueArgs&,  // The number of workers to spawn etc
+                            const cl::Buffer&,       // The int* index map
                             const cl::Buffer&,       // The image buffer
                             const FOURCC&,           // The binary format the image is in
                             const cl::Buffer&,       // The pixel coordinates to lookup
                             cl::Buffer&)>            // The neural network layer information to output to
         read_image_to_network;
+    // OpenCL kernel functions
+    using InitNetworkFunctor = std::function<cl::Event(const cl::EnqueueArgs&,  // The number of workers to spawn etc
+                                                       const cl::Buffer&,       // The Node* LUT buffer
+                                                       const cl::Buffer&,       // The int* index map
+                                                       cl::Buffer&)>;           // The output float3 buffer
+    InitNetworkFunctor init_network_buffer;
 
     /// A map from heights to visual mesh tables
     std::map<Scalar, Mesh> luts;

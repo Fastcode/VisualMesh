@@ -32,13 +32,15 @@ Scalar3 read_image(global const char* image, const enum FOURCC format, const int
     }
 }
 
-kernel void read_image_to_network(global const char* image,
+kernel void read_image_to_network(global int* indices,
+                                  global const char* image,
                                   const enum FOURCC format,
                                   global int2* coordinates,
                                   global Scalar3* network) {
 
-    const int index = get_global_id(0);
+    const size_t id    = get_global_id(0);
+    const size_t index = indices[id];
 
     // Store our pixel value in the network
-    network[index] = read_image(image, format, coordinates[index]);
+    network[index] = read_image(image, format, coordinates[id]);
 }
