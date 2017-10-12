@@ -23,3 +23,4 @@ with open(input_path, 'r') as input_file:
 
         output = '#define {}_CL "{}"'.format(define, '\\n\\\n'.join(output))
         output_file.write(output)
+        output_file.write('\n')

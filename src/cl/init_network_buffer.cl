@@ -5,7 +5,7 @@ kernel void init_network_buffer(global const struct Node* lut, global const int*
     // Get our real index
     const int id = indices[index];
 
-    buffer[id] = float3(0, 0, 0);
+    buffer[id] = (float3)(0, 0, 0);
 
     // Get our LUT node
     const struct Node n = lut[id];

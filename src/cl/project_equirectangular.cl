@@ -24,5 +24,5 @@ kernel void project_equirectangular(global const struct Node* lut,
         (Scalar2)((Scalar)(lens.dimensions.x - 1) * 0.5, (Scalar)(lens.dimensions.y - 1) * 0.5) - screen;
 
     // Store our output coordinates
-    out[index] = (int2)(round(image[0]), round(image[1]));
+    out[index] = (int2)(round(image.x), round(image.y));
 }

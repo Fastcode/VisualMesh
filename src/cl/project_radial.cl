@@ -16,7 +16,7 @@ kernel void project_radial(global struct Node* lut,
     const Scalar3 ray = (Scalar3)(dot(Rco[0], n.ray), dot(Rco[1], n.ray), dot(Rco[2], n.ray));
 
     // Calculate some intermediates
-    const Scalar theta     = acos(n.ray[0]);
+    const Scalar theta     = acos(n.ray.x);
     const Scalar r         = theta * lens.radial.pixels_per_radian;
     const Scalar sin_theta = sin(theta);
 
@@ -31,5 +31,5 @@ kernel void project_radial(global struct Node* lut,
     // TODO apply this
 
     // Store our output coordinates
-    out[index] = (int2)(round(image[0]), round(image[1]));
+    out[index] = (int2)(round(image.x), round(image.y));
 }
