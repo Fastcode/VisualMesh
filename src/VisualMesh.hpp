@@ -53,8 +53,6 @@ public:
     using mat3 = std::array<vec3, 3>;
     using mat4 = std::array<vec4, 4>;
 
-// These types are shared with OpenCL so they need to be pragma packed for memory alignment
-#pragma pack(push, 1)
     struct Lens {
         enum Type { EQUIRECTANGULAR, RADIAL };
         struct Radial {
@@ -69,8 +67,8 @@ public:
         enum Type type;
         std::array<int, 2> dimensions;
         union {
-            struct Radial radial;
-            struct Equirectangular equirectangular;
+            Radial radial;
+            Equirectangular equirectangular;
         };
     };
 
@@ -80,7 +78,6 @@ public:
         /// Relative indices to the linked hexagon nodes in the LUT ordered TL, TR, L, R, BL, BR,
         std::array<int, 6> neighbours;
     };
-#pragma pack(pop)
 
     struct Row {
         Row(const Scalar& phi, const int& begin, const int& end) : phi(phi), begin(begin), end(end) {}
@@ -388,9 +385,7 @@ public:
             cl::Buffer cl_points_buffer(context, cl_points.begin(), cl_points.end(), true);
 
             // Insert our constructed mesh into the lookup
-            luts.insert(std::make_pair(
-                h,
-                Mesh(std::move(lut), std::move(rows), std::move(cl_points_buffer))));
+            luts.insert(std::make_pair(h, Mesh(std::move(lut), std::move(rows), std::move(cl_points_buffer))));
         }
     }
 
@@ -794,9 +789,9 @@ public:
         // Rco_event.wait();           // TIMER_LINE
         // t.measure("\tUpload Rco");  // TIMER_LINE
         // Perform our lookup to get our relevant range
-        auto ranges               = lookup(Hoc, lens);
-        const auto& cl_points     = ranges.first.cl_points;
-        const auto& nodes         = ranges.first.nodes;
+        auto ranges           = lookup(Hoc, lens);
+        const auto& cl_points = ranges.first.cl_points;
+        const auto& nodes     = ranges.first.nodes;
 
         // First count the size of the buffer we will need to allocate and create it
         int points = 0;
@@ -858,8 +853,6 @@ public:
         }
         // projected.wait();               // TIMER_LINE
         // t.measure("\tProject points");  // TIMER_LINE
-        
-        
     }
 
 private:
