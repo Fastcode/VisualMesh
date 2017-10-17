@@ -31,9 +31,6 @@
 #include "cl/cl2.hpp"
 
 // Include our generated OpenCL headers
-#include "cl/init_network_buffer.cl.h"
-#include "cl/lens.cl.h"
-#include "cl/node.cl.h"
 #include "cl/project_equirectangular.cl.h"
 #include "cl/project_radial.cl.h"
 #include "cl/read_image_to_network.cl.h"
@@ -86,14 +83,14 @@ public:
 #pragma pack(pop)
 
     struct Row {
-        Row(const Scalar& phi, const size_t& begin, const size_t& end) : phi(phi), begin(begin), end(end) {}
+        Row(const Scalar& phi, const int& begin, const int& end) : phi(phi), begin(begin), end(end) {}
 
         /// The phi value this row represents
         Scalar phi;
         /// The index of the beginning of this row in the node table
-        size_t begin;
+        int begin;
         /// The index of one past the end of this row in the node table
-        size_t end;
+        int end;
 
         /**
          * @brief Compare based on phi
@@ -108,15 +105,16 @@ public:
     };
 
     struct Mesh {
-        Mesh(std::vector<Node>&& nodes, std::vector<Row>&& rows, cl::Buffer&& cl) : nodes(nodes), rows(rows), cl(cl) {}
+        Mesh(std::vector<Node>&& nodes, std::vector<Row>&& rows, cl::Buffer&& cl_points)
+            : nodes(nodes), rows(rows), cl_points(cl_points) {}
 
         /// The lookup table for this mesh
         std::vector<Node> nodes;
         /// A set of individual rows for phi values. `begin` and `end` refer to the table with end being 1 past the end
         std::vector<Row> rows;
 
-        /// The on device buffer of the mesh nodes
-        cl::Buffer cl;
+        /// The on device buffer of the visual mesh unit vectors
+        cl::Buffer cl_points;
     };
 
     enum FOURCC : cl_int {
@@ -176,7 +174,7 @@ public:
         for (Scalar h = min_height; h < max_height; h += (max_height - min_height) / height_resolution) {
 
             // This is a list of phi values along with the delta theta values associated with them
-            std::vector<std::pair<Scalar, size_t>> phis;
+            std::vector<std::pair<Scalar, int>> phis;
 
             // Loop from directly down up to the horizon (if phi is nan it will stop)
             // So we don't have a single point at the base, we move half a jump forward
@@ -242,7 +240,7 @@ public:
 
                 // Generate for each of the theta values from 0 to 2 pi
                 Scalar theta = 0;
-                for (size_t i = 0; i < steps; ++i) {
+                for (int i = 0; i < steps; ++i) {
                     Node n;
 
                     // Calculate our unit vector with origin facing forward
@@ -279,7 +277,7 @@ public:
              * @param offset  the offset for our neighbour (0 for TL,TR 4 for BL BR)
              */
             auto link = [](std::vector<Node>& lut,
-                           const size_t& i,
+                           const int& i,
                            const Scalar& pos,
                            const int& start,
                            const int& size,
@@ -296,8 +294,8 @@ public:
 
                 // Get our closest neighbour on the previous row and use it to work out where the other one
                 // is This will be the Right element when < 0.5 and Left when > 0.5
-                const size_t o1 = start + std::floor(pos * size + !left);  // Use `left` to add one to one
-                const size_t o2 = o1 + lut[o1].neighbours[2 + left];       // But not the other
+                const int o1 = start + std::floor(pos * size + !left);  // Use `left` to add one to one
+                const int o2 = o1 + lut[o1].neighbours[2 + left];       // But not the other
 
                 // Now use these to set our TL and TR neighbours
                 node.neighbours[offset]     = (left ? o1 : o2) - i;
@@ -305,7 +303,7 @@ public:
             };
 
             // Now we upwards and downwards to fill in the missing links
-            for (size_t r = 1; r < rows.size() - 1; ++r) {
+            for (int r = 1; r < int(rows.size()) - 1; ++r) {
 
                 // Alias for convenience
                 const auto& prev    = rows[r - 1];
@@ -318,7 +316,7 @@ public:
                 const int next_size    = next.end - next.begin;
 
                 // Go through all the nodes on our current row
-                for (size_t i = current.begin; i < current.end; ++i) {
+                for (int i = current.begin; i < current.end; ++i) {
 
                     // Find where we are in our row as a value between 0 and 1
                     const Scalar pos = Scalar(i - current.begin) / Scalar(current_size);
@@ -339,7 +337,7 @@ public:
                 const int back_size = back.end - back.begin;
 
                 // Link the front to itself
-                for (size_t i = front.begin; i < front.end; ++i) {
+                for (int i = front.begin; i < front.end; ++i) {
                     // Alias our node
                     auto& node = lut[i];
 
@@ -359,7 +357,7 @@ public:
                 }
 
                 // Link the back to itself
-                for (size_t i = back.begin; i < back.end; ++i) {
+                for (int i = back.begin; i < back.end; ++i) {
                     // Alias our node
                     auto& node = lut[i];
 
@@ -379,12 +377,20 @@ public:
                 }
             }
 
-            // Upload our lut to the OpenCL device
-            cl::Buffer b(context, CL_MEM_READ_ONLY, lut.size() * sizeof(Node), nullptr, nullptr);
-            mem_queue.enqueueWriteBuffer(b, true, 0, lut.size() * sizeof(Node), lut.data());
+            // Flatten out our memory for opencl
+            std::vector<std::array<Scalar, 4>> cl_points;
+            cl_points.reserve(lut.size());
+            for (const auto& n : lut) {
+                cl_points.push_back(n.ray);
+            }
+
+            // Upload our unit vectors to the OpenCL device
+            cl::Buffer cl_points_buffer(context, cl_points.begin(), cl_points.end(), true);
 
             // Insert our constructed mesh into the lookup
-            luts.insert(std::make_pair(h, Mesh(std::move(lut), std::move(rows), std::move(b))));
+            luts.insert(std::make_pair(
+                h,
+                Mesh(std::move(lut), std::move(rows), std::move(cl_points_buffer))));
         }
     }
 
@@ -411,8 +417,8 @@ public:
             for (auto& range : theta_ranges) {
 
                 // Convert our theta values into local indices
-                size_t begin = std::ceil(row_size * range.first * (Scalar(1.0) / (Scalar(2.0) * M_PI)));
-                size_t end   = std::ceil(row_size * range.second * (Scalar(1.0) / (Scalar(2.0) * M_PI)));
+                int begin = std::ceil(row_size * range.first * (Scalar(1.0) / (Scalar(2.0) * M_PI)));
+                int end   = std::ceil(row_size * range.second * (Scalar(1.0) / (Scalar(2.0) * M_PI)));
 
                 // Floating point numbers are annoying... did you know pi * 1/pi is slightly larger than 1?
                 // It's also possible that our theta ranges cross the wrap around but the indices mean they don't
@@ -764,14 +770,14 @@ public:
                   const mat4& Hoc,
                   const Lens& lens) {
 
-        Timer t;  // TIMER_LINE
+        // Timer t;  // TIMER_LINE
         // First start uploading our image data
         cl::Event image_buffer_event;
         cl::Buffer image_buffer(context, CL_MEM_READ_ONLY, image_size, nullptr, nullptr);
         mem_queue.enqueueWriteBuffer(image_buffer, false, 0, image_size, image_data, nullptr, &image_buffer_event);
 
-        image_buffer_event.wait();    // TIMER_LINE
-        t.measure("\tUpload image");  // TIMER_LINE
+        // image_buffer_event.wait();    // TIMER_LINE
+        // t.measure("\tUpload image");  // TIMER_LINE
 
         // Build Rco by transposing the rotation of Hoc and upload it to the device
         const mat4 Rco = {{
@@ -785,12 +791,12 @@ public:
         cl::Buffer Rco_buffer(context, CL_MEM_READ_ONLY, sizeof(Rco), nullptr, nullptr);
         mem_queue.enqueueWriteBuffer(Rco_buffer, false, 0, sizeof(Rco), Rco.data(), nullptr, &Rco_event);
 
-        Rco_event.wait();           // TIMER_LINE
-        t.measure("\tUpload Rco");  // TIMER_LINE
+        // Rco_event.wait();           // TIMER_LINE
+        // t.measure("\tUpload Rco");  // TIMER_LINE
         // Perform our lookup to get our relevant range
-        auto ranges            = lookup(Hoc, lens);
-        const auto& lut_buffer = ranges.first.cl;
-        const auto& nodes      = ranges.first.nodes;
+        auto ranges               = lookup(Hoc, lens);
+        const auto& cl_points     = ranges.first.cl_points;
+        const auto& nodes         = ranges.first.nodes;
 
         // First count the size of the buffer we will need to allocate and create it
         int points = 0;
@@ -808,7 +814,7 @@ public:
             it = n;
         }
 
-        t.measure("\tBuild Range");  // TIMER_LINE
+        // t.measure("\tBuild Range");  // TIMER_LINE
 
         // Create buffers for indices map
         cl::Buffer indices_map(context, CL_MEM_READ_ONLY, sizeof(cl_int) * points, nullptr, nullptr);
@@ -819,8 +825,8 @@ public:
         mem_queue.enqueueWriteBuffer(
             indices_map, false, 0, points * sizeof(cl_int), indices.data(), nullptr, &indices_event);
 
-        indices_event.wait();         // TIMER_LINE
-        t.measure("\tUpload Range");  // TIMER_LINE
+        // indices_event.wait();         // TIMER_LINE
+        // t.measure("\tUpload Range");  // TIMER_LINE
 
         // When everything is uploaded, we can run our projection kernel to get the pixel coordinates
         cl::Event projected;
@@ -829,10 +835,11 @@ public:
                 projected = project_equirectangular(
                     cl::EnqueueArgs(
                         exec_queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
-                    lut_buffer,
+                    cl_points,
                     indices_map,
                     Rco_buffer,
-                    lens,
+                    lens.equirectangular.focal_length_pixels,
+                    lens.dimensions,
                     pixel_coordinates);
 
             } break;
@@ -840,62 +847,19 @@ public:
                 projected = project_radial(
                     cl::EnqueueArgs(
                         exec_queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
-                    lut_buffer,
+                    cl_points,
                     indices_map,
                     Rco_buffer,
-                    lens,
+                    lens.radial.pixels_per_radian,
+                    lens.dimensions,
                     pixel_coordinates);
 
             } break;
         }
-        projected.wait();               // TIMER_LINE
-        t.measure("\tProject points");  // TIMER_LINE
-
-        // Create our two network buffer for holding the intermediate stages of the neural network (ping/pong buffers)
-        cl::Buffer network_buffer1(context, CL_MEM_READ_WRITE, sizeof(cl_float3) * nodes.size(), nullptr, nullptr);
-        cl::Buffer network_buffer2(context, CL_MEM_READ_WRITE, sizeof(cl_float3) * nodes.size(), nullptr, nullptr);
-
-        // Fill these buffers with 0s so the unused nodes will still work
-        cl::Event network1_fill = init_network_buffer(
-            cl::EnqueueArgs(exec_queue, indices_event, cl::NDRange(points)), lut_buffer, indices_map, network_buffer1);
-        cl::Event network2_fill = init_network_buffer(
-            cl::EnqueueArgs(exec_queue, indices_event, cl::NDRange(points)), lut_buffer, indices_map, network_buffer2);
-
-        // mem_queue.enqueueFillBuffer(
-        //     network_buffer1, float(0.0), 0, sizeof(cl_float3) * nodes.size(), nullptr, &network1_fill);
-        // mem_queue.enqueueFillBuffer(
-        //     network_buffer2, float(0.0), 0, sizeof(cl_float3) * nodes.size(), nullptr, &network2_fill);
-
-        network1_fill.wait();                 // TIMER_LINE
-        t.measure("\tFill Network1 buffer");  // TIMER_LINE
-
-        // Read our image pixels into the first layer of the network
-        cl::Event image_read_event = read_image_to_network(
-            cl::EnqueueArgs(exec_queue, std::vector<cl::Event>({network1_fill, projected}), cl::NDRange(points)),
-            indices_map,
-            image_buffer,
-            image_format,
-            pixel_coordinates,
-            network_buffer1);
-
-
-        image_read_event.wait();             // TIMER_LINE
-        t.measure("\tSample Image Points");  // TIMER_LINE
-
-        // While that image read etc is processing we can setup our local lookup buffer that will tell the network
-        // where to look for neighbour values in the network_buffer
-
-        // Input layer is 3 * 7 = 21 // TODO you could also add in the phi/theta/something to make it 24 input
-        // Hidden layer 1 is ???
-        // Multiple hidden layers?
-        // Output layer is 3
-
-        std::vector<std::array<cl_int, 2>> px(points);
-        std::vector<cl::Event> ev({projected});
-        mem_queue.enqueueReadBuffer(pixel_coordinates, true, 0, points * sizeof(std::array<cl_int, 2>), px.data(), &ev);
-
-
-        t.measure("\tDownload points");  // TIMER_LINE
+        // projected.wait();               // TIMER_LINE
+        // t.measure("\tProject points");  // TIMER_LINE
+        
+        
     }
 
 private:
@@ -961,12 +925,9 @@ private:
         // First we define our templated types
         sources.emplace_back(get_scalar_defines(Scalar(0.0)));
 
-        // These two must be first since they are used later
-        sources.emplace_back(LENS_CL);
-        sources.emplace_back(NODE_CL);
+        // Add our sources
         sources.emplace_back(PROJECT_RADIAL_CL);
         sources.emplace_back(PROJECT_EQUIRECTANGULAR_CL);
-        sources.emplace_back(INIT_NETWORK_BUFFER_CL);
         sources.emplace_back(READ_IMAGE_TO_NETWORK_CL);
 
         // Build the program
@@ -976,28 +937,31 @@ private:
             exit(1);
         }
 
-        // Build functors for our projection kernels
-        using ProjectionFunctor = cl::KernelFunctor<const cl::Buffer&,  // The Node* LUT buffer
-                                                    const cl::Buffer&,  // The int* index map
-                                                    const cl::Buffer&,  // The Rco matrix
-                                                    const Lens&,        // The lens parameters
-                                                    cl::Buffer&>;       // The output int2 buffer
-        project_equirectangular = ProjectionFunctor(program, "project_equirectangular");
-        project_radial          = ProjectionFunctor(program, "project_radial");
+        // Radial projection function
+        project_radial = cl::KernelFunctor<const cl::Buffer&,          // The Scalar4* unit vectors
+                                           const cl::Buffer&,          // The int* index map
+                                           const cl::Buffer&,          // The Rco matrix
+                                           const Scalar&,              // The ratio of pixels per radian
+                                           const std::array<int, 2>&,  // The image dimensions
+                                           cl::Buffer&>                // The output int2 buffer
+            (program, "project_radial");
+
+        // Equirectangular projection function
+        project_radial = cl::KernelFunctor<const cl::Buffer&,          // The Scalar4* unit vectors
+                                           const cl::Buffer&,          // The int* index map
+                                           const cl::Buffer&,          // The Rco matrix
+                                           const Scalar&,              // The focal length in pixels
+                                           const std::array<int, 2>&,  // The image dimensions
+                                           cl::Buffer&>                // The output int2 buffer
+            (program, "project_equirectangular");
 
         // Build functors for reading images into the neural network layer
-        using ImageReadFunctor = cl::KernelFunctor<const cl::Buffer&,  // The int* index map
-                                                   const cl::Buffer&,  // The image buffer
-                                                   const FOURCC&,      // The binary format the image is in
-                                                   const cl::Buffer&,  // The pixel coordinates to lookup
-                                                   cl::Buffer&>;  // The neural network layer information to output to
-        read_image_to_network  = ImageReadFunctor(program, "read_image_to_network");
-
-        // Build functor for zeroing the memory for neural network layers
-        using InitNetworkFunctor = cl::KernelFunctor<const cl::Buffer&,  // The Node* LUT buffer
-                                                     const cl::Buffer&,  // The int* index map
-                                                     cl::Buffer&>;       // The output float3 buffer
-        init_network_buffer      = InitNetworkFunctor(program, "init_network_buffer");
+        read_image_to_network = cl::KernelFunctor<const cl::Buffer&,  // The int* index map
+                                                  const cl::Buffer&,  // The image buffer
+                                                  const FOURCC&,      // The binary format the image is in
+                                                  const cl::Buffer&,  // The pixel coordinates to lookup
+                                                  cl::Buffer&>  // The neural network layer information to output to
+            (program, "read_image_to_network");
     }
 
     // Our OpenCL context
@@ -1009,14 +973,24 @@ private:
     cl::CommandQueue mem_queue;
 
     // OpenCL kernel functions
-    using ProjectionFunctor = std::function<cl::Event(const cl::EnqueueArgs&,  // The number of workers to spawn etc
-                                                      const cl::Buffer&,       // The Node* LUT buffer
-                                                      const cl::Buffer&,       // The int* index map
-                                                      const cl::Buffer&,       // The Rco matrix
-                                                      const Lens&,             // The lens parameters
-                                                      cl::Buffer&)>;           // The output int2 buffer
-    ProjectionFunctor project_equirectangular;
-    ProjectionFunctor project_radial;
+    std::function<cl::Event(const cl::EnqueueArgs&,     // The number of workers to spawn etc
+                            const cl::Buffer&,          // The Scalar4* unit vectors
+                            const cl::Buffer&,          // The int* index map
+                            const cl::Buffer&,          // The Rco matrix
+                            const Scalar&,              // The ratio of pixels per radian
+                            const std::array<int, 2>&,  // The image dimensions
+                            cl::Buffer&)>               // The output int2 buffer
+        project_radial;
+
+    std::function<cl::Event(const cl::EnqueueArgs&,     // The number of workers to spawn etc
+                            const cl::Buffer&,          // The Scalar4* unit vectors
+                            const cl::Buffer&,          // The int* index map
+                            const cl::Buffer&,          // The Rco matrix
+                            const Scalar&,              // The focal length in pixels
+                            const std::array<int, 2>&,  // The image dimensions
+                            cl::Buffer&)>               // The output int2 buffer
+        project_equirectangular;
+
     std::function<cl::Event(const cl::EnqueueArgs&,  // The number of workers to spawn etc
                             const cl::Buffer&,       // The int* index map
                             const cl::Buffer&,       // The image buffer
@@ -1024,12 +998,6 @@ private:
                             const cl::Buffer&,       // The pixel coordinates to lookup
                             cl::Buffer&)>            // The neural network layer information to output to
         read_image_to_network;
-    // OpenCL kernel functions
-    using InitNetworkFunctor = std::function<cl::Event(const cl::EnqueueArgs&,  // The number of workers to spawn etc
-                                                       const cl::Buffer&,       // The Node* LUT buffer
-                                                       const cl::Buffer&,       // The int* index map
-                                                       cl::Buffer&)>;           // The output float3 buffer
-    InitNetworkFunctor init_network_buffer;
 
     /// A map from heights to visual mesh tables
     std::map<Scalar, Mesh> luts;

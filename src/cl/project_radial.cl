@@ -1,7 +1,8 @@
-kernel void project_radial(global struct Node* lut,
+kernel void project_radial(global Scalar4* points,
                            global int* indices,
                            global Scalar4* Rco,
-                           const struct Lens lens,
+                           const Scalar pixels_per_radian,
+                           const int2 dimensions,
                            global int2* out) {
 
     const int index = get_global_id(0);
@@ -10,22 +11,21 @@ kernel void project_radial(global struct Node* lut,
     const int id = indices[index];
 
     // Get our LUT node
-    const struct Node n = lut[id];
+    Scalar4 ray = points[id];
 
     // Rotate our ray by our matrix to put it into camera space
-    const Scalar3 ray = (Scalar3)(dot(Rco[0], n.ray), dot(Rco[1], n.ray), dot(Rco[2], n.ray));
+    ray = (Scalar4)(dot(Rco[0], ray), dot(Rco[1], ray), dot(Rco[2], ray), 0);
 
     // Calculate some intermediates
-    const Scalar theta     = acos(n.ray.x);
-    const Scalar r         = theta * lens.radial.pixels_per_radian;
+    const Scalar theta     = acos(ray.x);
+    const Scalar r         = theta * pixels_per_radian;
     const Scalar sin_theta = sin(theta);
 
     // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
     const Scalar2 screen = (Scalar2)(r * ray.y / sin_theta, r * ray.z / sin_theta);
 
     // Apply our offset to move into image space (0 at top left, x to the right, y down)
-    const Scalar2 image =
-        (Scalar2)((Scalar)(lens.dimensions.x - 1) * 0.5, (Scalar)(lens.dimensions.y - 1) * 0.5) - screen;
+    const Scalar2 image = (Scalar2)((Scalar)(dimensions.x - 1) * 0.5, (Scalar)(dimensions.y - 1) * 0.5) - screen;
 
     // Apply our lens centre offset
     // TODO apply this
