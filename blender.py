@@ -1,6 +1,7 @@
 #!/usr/local/bin/blender -P
 
 import bpy
+import bisect
 import math
 import os
 import random
@@ -59,6 +60,11 @@ def create_pbr_ball_material():
 
     output = nodes['Material Output']
 
+
+    roughness_value = nodes.new(type='ShaderNodeValue')
+    roughness_value.name = roughness_value.label = 'Roughness'
+    roughness_value.outputs[0].default_value = roughness
+
     # Textures
     color_tex = nodes.new(type='ShaderNodeTexImage')
     color_tex.name = color_tex.label = 'ColorTexture'
@@ -76,11 +82,9 @@ def create_pbr_ball_material():
     # Shaders
     glossy = nodes.new(type='ShaderNodeBsdfGlossy')
     glossy.inputs['Color'].default_value = (1.0, 1.0, 1.0, 1.0)
-    glossy.inputs['Roughness'].default_value = roughness
     glossy.name = glossy.label = 'Gloss'
 
     diffuse = nodes['Diffuse BSDF']
-    diffuse.inputs['Roughness'].default_value = roughness
     diffuse.name = diffuse.label = 'Diffuse'
 
     mix = nodes.new(type='ShaderNodeMixShader')
@@ -97,7 +101,6 @@ def create_pbr_ball_material():
     fresnel_geometry.name = fresnel_geometry.label = 'FresnelGeometry'
 
     fresnel_mix = nodes.new(type='ShaderNodeMixRGB')
-    fresnel_mix.inputs['Fac'].default_value = roughness
     fresnel_mix.name = fresnel_mix.label = 'FresnelMix'
 
     reflection_mix = nodes.new(type='ShaderNodeMixRGB')
@@ -109,6 +112,12 @@ def create_pbr_ball_material():
     node_tree.links.new(diffuse.outputs['BSDF'], mix.inputs[1])
     node_tree.links.new(glossy.outputs['BSDF'], mix.inputs[2])
     node_tree.links.new(mix.outputs['Shader'], output.inputs['Surface'])
+
+    # Link our roughness
+    node_tree.links.new(roughness_value.outputs[0], glossy.inputs['Roughness'])
+    node_tree.links.new(roughness_value.outputs[0], diffuse.inputs['Roughness'])
+    node_tree.links.new(roughness_value.outputs[0], fresnel_mix.inputs['Fac'])
+
 
     # Link our Fresnel group
     node_tree.links.new(fresnel_mix.outputs['Color'], fresnel.inputs['Normal'])
@@ -146,6 +155,53 @@ def load_ball(ball):
 
     return obj
 
+# Make a bunch of weighted rectangles to choose from
+def weighted_rectangles(rectangles, exclude):
+    subtangles = []
+
+    split_size = 0.05
+    total_weight = 0
+
+    # Split the rectanges into approx 10x10cm squares
+    for r in rectangles:
+
+        p1 = (r[0][0], r[1][0])
+        p2 = (r[0][1], r[1][1])
+
+        # Loop through 5cm jumps
+        x = p1[0]
+        while x < p2[0]:
+            y = p1[1]
+            while y < p2[1]:
+
+                cx = (x+split_size*0.5)
+                cy = (y+split_size*0.5)
+
+                excluded = False
+                # Work out if we are in an excluded zone
+                for e in exclude:
+                    if cx > e[0][0] and cx < e[0][1] and cy > e[1][0] and cy < e[1][1]:
+                        excluded = True
+
+                if not excluded:
+                    # Work out weights and add them
+                    weight = split_size * split_size / (cx**2 + cy**2)
+                    subtangles.append((total_weight + weight, (x, y), (x + split_size, y + split_size)))
+
+                    # Add to our total weight
+                    total_weight += weight
+
+                # Move y along
+                y += split_size
+
+            # Move x along
+            x += split_size
+
+
+
+    return list(sorted([(s[0] / total_weight, s[1], s[2]) for s in subtangles]))
+
+
 #####################################################################################################################
 #####################################################################################################################
 #                                                   CODE HERE                                                       #
@@ -165,7 +221,7 @@ bpy.ops.object.delete()
 bpy.context.scene.render.engine = 'CYCLES'
 scene = bpy.data.scenes['Scene']
 scene.cycles.device = 'CPU'
-scene.cycles.samples = 128
+scene.cycles.samples = 256
 
 # Enable the object pass index so we can make our masks
 scene.render.layers['RenderLayer'].use_pass_object_index = True
@@ -222,11 +278,14 @@ for f in os.listdir(os.path.join(script_dir, 'textures', 'field')):
         img = bpy.data.images.load(os.path.join(script_dir, 'textures', 'field', f))
         with open(os.path.join(script_dir, 'textures', 'field', '{}.json'.format(f[:-4])), 'r') as f:
             meta = json.loads(f.read())
+
+        # Build up our list of weighted rectangles
+        meta['ranges']['weighted_rectangles'] = weighted_rectangles(meta['ranges']['include'], meta['ranges']['exclude'])
+
         environments.append((img, meta))
 
 # Set some initial values for our environment
 environment = random.choice(environments)
-environment = environments[1]
 world_tex_node.image = environment[0]
 shadow_tex_node.image = environment[0]
 world_rotation[0] = math.radians(environment[1]['roll'])
@@ -274,9 +333,8 @@ if bpy.app.background:
         # Remove the old ball and add the new one
         bpy.data.objects.remove(ball)
         ball = load_ball(b)
-
-        run_data['background'] = f[0].name
-        run_data['ball']['file'] = b[0]
+        run_data['background'] = os.path.basename(f[0].name)
+        run_data['ball']['file'] = os.path.basename(b[0])
         run_data['ball']['radius'] = ball_radius
 
         # Randomize environment strength from 0.5 to 3
@@ -288,13 +346,20 @@ if bpy.app.background:
         run_data['ball']['orientation'] = ball_orientation
         ball.rotation_euler = ball_orientation
 
-        # Randomize ball position within the field bounds
-        rang = random.choice(f[1]['ranges'])
-        ball_loc = (random.uniform(rang[0][0], rang[0][1]), random.uniform(rang[1][0], rang[1][1]))
+        # Randomize ball position within the bounds, biasing to a point closer to the cameras
+        subtangles = f[1]['ranges']['weighted_rectangles']
+        rectangle = subtangles[bisect.bisect(subtangles, (random.uniform(0.0, 1.0), (), ()))]
+
+        ball_loc = (random.uniform(rectangle[1][0], rectangle[2][0]), random.uniform(rectangle[1][1], rectangle[2][1]))
         run_data['ball']['position'] = ball_loc
         ball.location = (ball_loc[0], ball_loc[1], ball_radius - height)
         ball.dimensions = (ball_radius * 2.0, ball_radius * 2.0, ball_radius * 2.0)
         shadowcatcher.location = (ball_loc[0], ball_loc[1], -height)
+
+        # Randomize ball roughness
+        roughness = random.uniform(0.05, 0.15)
+        bpy.data.materials['PBRBall'].node_tree.nodes['Roughness'].outputs[0].default_value = roughness
+        run_data['ball']['roughness'] = roughness
 
         # Fisheye camera
         if random.choice([True, False]):
@@ -320,10 +385,13 @@ if bpy.app.background:
 
 
         # Randomize camera rotation
-        camera_rotation = (random.uniform(math.pi / 4, math.pi / 2), random.uniform(-0.1, +0.1), 0)
+        camera_rotation = (random.uniform(math.pi / 4, math.pi / 2), random.uniform(-0.1, +0.1), random.uniform(-math.pi, +math.pi))
         camera.rotation_euler = camera_rotation
 
-        run_data['camera']['rotation'] = camera_rotation
+        # Get the true rotation after constraints are applied
+        scene.update()
+        true_rotation = camera.matrix_world.decompose()[1].to_euler()
+        run_data['camera']['rotation'] = (true_rotation[0], true_rotation[1], true_rotation[2])
 
         # Render the image
         bpy.context.scene.frame_set(fno)
@@ -334,3 +402,27 @@ if bpy.app.background:
             md.write(json.dumps(run_data, sort_keys=True, indent=4, separators=(',', ': ')))
 
         fno += 1
+
+# Otherwise make some quality of life improvements
+else:
+
+    # Don't show splash
+    bpy.context.user_preferences.view.show_splash = False
+
+    # Default to rendered view
+    for area in bpy.context.screen.areas: # iterate through areas in current screen
+        if area.type == 'VIEW_3D':
+            for space in area.spaces: # iterate through spaces in current VIEW_3D area
+                if space.type == 'VIEW_3D': # check if space is a 3D view
+                    space.viewport_shade = 'RENDERED' # set the viewport shading to rendered
+
+    for r in environment[1]['ranges']['include']:
+        minx, maxx = r[0]
+        miny, maxy = r[1]
+
+        bpy.ops.mesh.primitive_plane_add()
+        obj = bpy.context.selected_objects[0]
+
+        obj.dimensions = (maxx - minx, maxy - miny, 0)
+        obj.location = ((maxx + minx) / 2.0, (maxy + miny) / 2.0, -environment[1]['height'])
+
