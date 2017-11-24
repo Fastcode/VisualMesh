@@ -1,4 +1,4 @@
-kernel void project_equirectangular(global const struct Node* lut,
+kernel void project_equirectangular(global const Scalar4* points,
                                     global const int* indices,
                                     global const Scalar4* Rco,  // This is only Scalar4 for alignment concerns
                                     const Scalar focal_length_pixels,
@@ -11,10 +11,10 @@ kernel void project_equirectangular(global const struct Node* lut,
     const int id = indices[index];
 
     // Get our LUT node
-    const struct Node n = lut[id];
+    Scalar4 ray = points[id];
 
     // Rotate our ray by our matrix to put it in the camera space
-    const Scalar3 ray = (Scalar3)(dot(Rco[0], n.ray), dot(Rco[1], n.ray), dot(Rco[2], n.ray));
+    ray = (Scalar4)(dot(Rco[0], ray), dot(Rco[1], ray), dot(Rco[2], ray), 0);
 
     // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
     const Scalar2 screen = (Scalar2)(focal_length_pixels * ray.y / ray.x, focal_length_pixels * ray.z / ray.x);

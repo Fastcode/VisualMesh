@@ -31,9 +31,14 @@
 #include "cl/cl2.hpp"
 
 // Include our generated OpenCL headers
-#include "cl/project_equirectangular.cl.h"
-#include "cl/project_radial.cl.h"
-#include "cl/read_image_to_network.cl.h"
+#include "mesh/cl/project_equirectangular.cl.h"
+#include "mesh/cl/project_radial.cl.h"
+#include "mesh/cl/read_image_to_network.cl.h"
+
+// Debugging
+#include <nuclear>
+#include "mesh/Timer.hpp"
+#include "utility/nubugger/NUHelpers.h"
 
 namespace mesh {
 
@@ -381,6 +386,13 @@ public:
                 cl_points.push_back(n.ray);
             }
 
+            // Convert all the relative indices we calculated to absolute indices
+            for (int i = 0; i < lut.size(); ++i) {
+                for (auto& n : lut[i].neighbours) {
+                    n = i + n;
+                }
+            }
+
             // Upload our unit vectors to the OpenCL device
             cl::Buffer cl_points_buffer(context, cl_points.begin(), cl_points.end(), true);
 
@@ -390,14 +402,27 @@ public:
     }
 
     const Mesh& height(const Scalar& height) const {
-        return luts.lower_bound(height)->second;
+        // Find the bounding height values
+        auto range = luts.equal_range(height);
+
+        // If we reached the end of the list return the lower bound
+        if (range.second == luts.end()) {
+            return range.first->second;
+        }
+        // Otherwise see which is closer
+        else if (std::abs(range.first->first - height) < std::abs(range.second->first - height)) {
+            return range.first->second;
+        }
+        else {
+            return range.second->second;
+        }
     }
 
     template <typename Func>
     std::pair<const Mesh&, std::vector<std::pair<size_t, size_t>>> lookup(const Scalar& height,
                                                                           Func&& theta_limits) const {
 
-        const auto& mesh = luts.lower_bound(height)->second;
+        const auto& mesh = this->height(height);
         std::vector<std::pair<size_t, size_t>> indices;
 
         // Loop through each phi row
@@ -765,14 +790,14 @@ public:
                   const mat4& Hoc,
                   const Lens& lens) {
 
-        // Timer t;  // TIMER_LINE
+        Timer t;  // TIMER_LINE
         // First start uploading our image data
         cl::Event image_buffer_event;
         cl::Buffer image_buffer(context, CL_MEM_READ_ONLY, image_size, nullptr, nullptr);
         mem_queue.enqueueWriteBuffer(image_buffer, false, 0, image_size, image_data, nullptr, &image_buffer_event);
 
-        // image_buffer_event.wait();    // TIMER_LINE
-        // t.measure("\tUpload image");  // TIMER_LINE
+        image_buffer_event.wait();          // TIMER_LINE
+        t.measure("\tUpload image (mem)");  // TIMER_LINE
 
         // Build Rco by transposing the rotation of Hoc and upload it to the device
         const mat4 Rco = {{
@@ -786,10 +811,13 @@ public:
         cl::Buffer Rco_buffer(context, CL_MEM_READ_ONLY, sizeof(Rco), nullptr, nullptr);
         mem_queue.enqueueWriteBuffer(Rco_buffer, false, 0, sizeof(Rco), Rco.data(), nullptr, &Rco_event);
 
-        // Rco_event.wait();           // TIMER_LINE
-        // t.measure("\tUpload Rco");  // TIMER_LINE
+        Rco_event.wait();                 // TIMER_LINE
+        t.measure("\tUpload Rco (mem)");  // TIMER_LINE
         // Perform our lookup to get our relevant range
-        auto ranges           = lookup(Hoc, lens);
+        auto ranges = lookup(Hoc, lens);
+
+        t.measure("\tLookup Range (cpu)");  // TIMER_LINE
+
         const auto& cl_points = ranges.first.cl_points;
         const auto& nodes     = ranges.first.nodes;
 
@@ -801,7 +829,7 @@ public:
 
         // Build up our list of indices for OpenCL
         // Use iota to fill in the numbers
-        std::vector<cl_int> indices(points);
+        std::vector<int> indices(points);
         auto it = indices.begin();
         for (auto& range : ranges.second) {
             auto n = std::next(it, range.second - range.first);
@@ -809,7 +837,7 @@ public:
             it = n;
         }
 
-        // t.measure("\tBuild Range");  // TIMER_LINE
+        t.measure("\tBuild Range (cpu)");  // TIMER_LINE
 
         // Create buffers for indices map
         cl::Buffer indices_map(context, CL_MEM_READ_ONLY, sizeof(cl_int) * points, nullptr, nullptr);
@@ -820,8 +848,8 @@ public:
         mem_queue.enqueueWriteBuffer(
             indices_map, false, 0, points * sizeof(cl_int), indices.data(), nullptr, &indices_event);
 
-        // indices_event.wait();         // TIMER_LINE
-        // t.measure("\tUpload Range");  // TIMER_LINE
+        indices_event.wait();               // TIMER_LINE
+        t.measure("\tUpload Range (mem)");  // TIMER_LINE
 
         // When everything is uploaded, we can run our projection kernel to get the pixel coordinates
         cl::Event projected;
@@ -851,8 +879,80 @@ public:
 
             } break;
         }
-        // projected.wait();               // TIMER_LINE
-        // t.measure("\tProject points");  // TIMER_LINE
+        projected.wait();                     // TIMER_LINE
+        t.measure("\tProject points (gpu)");  // TIMER_LINE
+
+        // Build the reverse lookup map
+        std::vector<int> r_indices(nodes.size(), -1);
+        for (int i = 0; i < indices.size(); ++i) {
+            r_indices[indices[i]] = i;
+        }
+
+        std::vector<int> local_neighbourhood;
+        local_neighbourhood.reserve(points * 6);
+
+        for (const auto& i : indices) {
+            for (const auto& n : nodes[i].neighbours) {
+                local_neighbourhood.push_back(r_indices[n]);
+            }
+        }
+
+        t.measure("\tBuild Local Neighbourhood (cpu)");  // TIMER_LINE
+
+        cl::Event local_n_event;
+        cl::Buffer local_n_buffer(context, CL_MEM_READ_ONLY, points * sizeof(int) * 6, nullptr, nullptr);
+        mem_queue.enqueueWriteBuffer(
+            local_n_buffer, false, 0, points * sizeof(int) * 6, local_neighbourhood.data(), nullptr, &local_n_event);
+
+        local_n_event.wait();                             // TIMER_LINE
+        t.measure("\tUpload Local Neighbourhood (mem)");  // TIMER_LINE
+
+        // Draw the projection output
+        std::vector<std::array<int, 2>> project_output;
+        project_output.resize(points);
+
+        mem_queue.enqueueReadBuffer(
+            pixel_coordinates, true, 0, points * sizeof(std::array<int, 2>), project_output.data());
+
+        t.measure("\tRead Projected Points");  // TIMER_LINE
+
+        std::vector<std::tuple<Eigen::Vector2i, Eigen::Vector2i, Eigen::Vector4d>,
+                    Eigen::aligned_allocator<std::tuple<Eigen::Vector2i, Eigen::Vector2i, Eigen::Vector4d>>>
+            lines;
+
+        for (auto& p : project_output) {
+            lines.emplace_back(
+                Eigen::Vector2i(p[0], p[1]), Eigen::Vector2i(p[0] + 1, p[1] + 1), Eigen::Vector4d(1, 1, 0, 1));
+        }
+
+        for (int i = 0; i < project_output.size(); ++i) {
+            for (int j = 0; j < 6; ++j) {
+
+                int neighbour_index = i * 6 + j;
+
+                // Check if the connection is out of our screen
+                if (local_neighbourhood[neighbour_index] != -1) {
+                    lines.emplace_back(Eigen::Vector2i(project_output[i][0], project_output[i][1]),
+                                       Eigen::Vector2i(project_output[local_neighbourhood[neighbour_index]][0],
+                                                       project_output[local_neighbourhood[neighbour_index]][1]),
+                                       Eigen::Vector4d(1, 1, 1, 0.5));
+                }
+            }
+        }
+
+        NUClear::PowerPlant::powerplant->emit(utility::nubugger::drawVisionLines(std::move(lines)));
+
+        // Make a map where global index -> i
+
+        // Then you can use that map to lookup each neighbour and get the local index
+
+
+        // While we are projecting we can relink the neighbours to make a local neighbourhood lookup
+
+        // TODO change to using absolute neighbour indexing, reverse the mapping and use it for lookups
+
+        // TODO REMOVE ME
+        projected.wait();
     }
 
 private:
@@ -890,13 +990,13 @@ private:
         }
 
         // Chose our default platform
-        cl::Platform default_platform = all_platforms.front();
+        cl::Platform default_platform = all_platforms[1];
         std::cerr << "Using OpenCL platform: " << default_platform.getInfo<CL_PLATFORM_NAME>() << " "
                   << default_platform.getInfo<CL_PLATFORM_VERSION>() << std::endl;
 
         // Get the default device of the default platform
         std::vector<cl::Device> all_devices;
-        default_platform.getDevices(CL_DEVICE_TYPE_CPU, &all_devices);
+        default_platform.getDevices(CL_DEVICE_TYPE_GPU, &all_devices);
         if (all_devices.empty()) {
             throw std::runtime_error("No devices found. Check OpenCL installation!");
         }
@@ -940,12 +1040,12 @@ private:
             (program, "project_radial");
 
         // Equirectangular projection function
-        project_radial = cl::KernelFunctor<const cl::Buffer&,          // The Scalar4* unit vectors
-                                           const cl::Buffer&,          // The int* index map
-                                           const cl::Buffer&,          // The Rco matrix
-                                           const Scalar&,              // The focal length in pixels
-                                           const std::array<int, 2>&,  // The image dimensions
-                                           cl::Buffer&>                // The output int2 buffer
+        project_equirectangular = cl::KernelFunctor<const cl::Buffer&,          // The Scalar4* unit vectors
+                                                    const cl::Buffer&,          // The int* index map
+                                                    const cl::Buffer&,          // The Rco matrix
+                                                    const Scalar&,              // The focal length in pixels
+                                                    const std::array<int, 2>&,  // The image dimensions
+                                                    cl::Buffer&>                // The output int2 buffer
             (program, "project_equirectangular");
 
         // Build functors for reading images into the neural network layer

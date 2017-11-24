@@ -54,7 +54,7 @@ std::array<std::array<Scalar, 4>, 4> generateHoc(const Scalar& theta,
 
 int main() {
 
-    mesh::Cylinder<Scalar> cylinder(0, 2.0, 0.075, 8, 20);
+    mesh::Cylinder<Scalar> cylinder(0, 2.0, 0.075, 15, 20);
     mesh::Sphere<Scalar> sphere(0, 0.075, 1, 10);
     mesh::Circle<Scalar> circle(0, 0.075, 1, 10);
 

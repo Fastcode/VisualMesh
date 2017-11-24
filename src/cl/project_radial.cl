@@ -1,4 +1,4 @@
-kernel void project_radial(global Scalar4* points,
+kernel void project_radial(global const Scalar4* points,
                            global int* indices,
                            global Scalar4* Rco,
                            const Scalar pixels_per_radian,
