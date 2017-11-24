@@ -20,18 +20,24 @@ SET(VERSION_MAJOR 1)
 SET(VERSION_MINOR 0)
 SET(VERSION_PATCH 0)
 
+ADD_COMPILE_OPTIONS(
+                    -std=c++14
+                    -march=native
+                    -mtune=native
+)
+
 # We use additional modules that cmake needs to know about
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 # Setup our compiler settings
 INCLUDE(CompilerSetup)
 
+FIND_PACKAGE(OpenCV REQUIRED)
 FIND_PACKAGE(OpenCL REQUIRED)
 FIND_PACKAGE(PythonInterp 3 REQUIRED)
 
 # Find our files
-FILE(GLOB src
-    "src/**.cpp"
+FILE(GLOB hdr
     "src/**.hpp")
 
 FILE(GLOB cls
@@ -43,21 +49,24 @@ FOREACH(cl ${cls})
     FILE(RELATIVE_PATH cl_path ${CMAKE_CURRENT_SOURCE_DIR} ${cl})
 
     ADD_CUSTOM_COMMAND(
-        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.h"
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp"
         COMMAND ${PYTHON_EXECUTABLE}
         ARGS "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py"
              "${cl}"
-             "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.h"
+             "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp"
         DEPENDS "${cl}"
                 "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py"
         COMMENT "Wrapping OpenCL file ${cl_path} in a header"
     )
-    LIST(APPEND src "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.h")
+    LIST(APPEND hdr "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp")
 ENDFOREACH(cl ${cls})
 
 INCLUDE_DIRECTORIES(${OpenCL_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES("${CMAKE_CURRENT_BINARY_DIR}/src")
 
-ADD_EXECUTABLE(visualmesh ${src})
-
+ADD_EXECUTABLE(visualmesh "src/main.cpp" ${hdr})
 TARGET_LINK_LIBRARIES(visualmesh ${OpenCL_LIBRARIES})
+
+INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
+ADD_EXECUTABLE(generate_training "src/generate_training.cpp" ${hdr})
+TARGET_LINK_LIBRARIES(generate_training ${OpenCL_LIBRARIES} ${OpenCV_LIBS})

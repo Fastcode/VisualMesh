@@ -31,14 +31,12 @@
 #include "cl/cl2.hpp"
 
 // Include our generated OpenCL headers
-#include "mesh/cl/project_equirectangular.cl.h"
-#include "mesh/cl/project_radial.cl.h"
-#include "mesh/cl/read_image_to_network.cl.h"
+#include "cl/project_radial.cl.hpp"
+#include "cl/project_rectilinear.cl.hpp"
+#include "cl/read_image_to_network.cl.hpp"
 
 // Debugging
-#include <nuclear>
-#include "mesh/Timer.hpp"
-#include "utility/nubugger/NUHelpers.h"
+#include "Timer.hpp"
 
 namespace mesh {
 
@@ -59,12 +57,12 @@ public:
     using mat4 = std::array<vec4, 4>;
 
     struct Lens {
-        enum Type { EQUIRECTANGULAR, RADIAL };
+        enum Type { RECTILINEAR, RADIAL };
         struct Radial {
             Scalar fov;
             Scalar pixels_per_radian;
         };
-        struct Equirectangular {
+        struct Rectilinear {
             vec2 fov;
             Scalar focal_length_pixels;
         };
@@ -73,7 +71,7 @@ public:
         std::array<int, 2> dimensions;
         union {
             Radial radial;
-            Equirectangular equirectangular;
+            Rectilinear rectilinear;
         };
     };
 
@@ -387,7 +385,7 @@ public:
             }
 
             // Convert all the relative indices we calculated to absolute indices
-            for (int i = 0; i < lut.size(); ++i) {
+            for (uint i = 0; i < lut.size(); ++i) {
                 for (auto& n : lut[i].neighbours) {
                     n = i + n;
                 }
@@ -470,7 +468,7 @@ public:
         constexpr const Scalar x2 = Scalar(2.0);
 
         switch (lens.type) {
-            case Lens::EQUIRECTANGULAR: {
+            case Lens::RECTILINEAR: {
 
                 // Extract our rotation matrix
                 const mat3 Roc = {{
@@ -486,8 +484,8 @@ public:
                 const std::array<Scalar, 3> cam = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
 
                 // Work out how much additional y and z we get from our field of view if we have a focal length of 1
-                const Scalar y_extent = std::tan(lens.equirectangular.fov[0] * Scalar(0.5));
-                const Scalar z_extent = std::tan(lens.equirectangular.fov[1] * Scalar(0.5));
+                const Scalar y_extent = std::tan(lens.rectilinear.fov[0] * Scalar(0.5));
+                const Scalar z_extent = std::tan(lens.rectilinear.fov[1] * Scalar(0.5));
 
                 /* The labels for each of the corners of the frustum is shown below.
                     ^    T       U
@@ -854,14 +852,14 @@ public:
         // When everything is uploaded, we can run our projection kernel to get the pixel coordinates
         cl::Event projected;
         switch (lens.type) {
-            case Lens::EQUIRECTANGULAR: {
-                projected = project_equirectangular(
+            case Lens::RECTILINEAR: {
+                projected = project_rectilinear(
                     cl::EnqueueArgs(
                         exec_queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
                     cl_points,
                     indices_map,
                     Rco_buffer,
-                    lens.equirectangular.focal_length_pixels,
+                    lens.rectilinear.focal_length_pixels,
                     lens.dimensions,
                     pixel_coordinates);
 
@@ -884,7 +882,7 @@ public:
 
         // Build the reverse lookup map
         std::vector<int> r_indices(nodes.size(), -1);
-        for (int i = 0; i < indices.size(); ++i) {
+        for (uint i = 0; i < indices.size(); ++i) {
             r_indices[indices[i]] = i;
         }
 
@@ -916,42 +914,6 @@ public:
 
         t.measure("\tRead Projected Points");  // TIMER_LINE
 
-        std::vector<std::tuple<Eigen::Vector2i, Eigen::Vector2i, Eigen::Vector4d>,
-                    Eigen::aligned_allocator<std::tuple<Eigen::Vector2i, Eigen::Vector2i, Eigen::Vector4d>>>
-            lines;
-
-        for (auto& p : project_output) {
-            lines.emplace_back(
-                Eigen::Vector2i(p[0], p[1]), Eigen::Vector2i(p[0] + 1, p[1] + 1), Eigen::Vector4d(1, 1, 0, 1));
-        }
-
-        for (int i = 0; i < project_output.size(); ++i) {
-            for (int j = 0; j < 6; ++j) {
-
-                int neighbour_index = i * 6 + j;
-
-                // Check if the connection is out of our screen
-                if (local_neighbourhood[neighbour_index] != -1) {
-                    lines.emplace_back(Eigen::Vector2i(project_output[i][0], project_output[i][1]),
-                                       Eigen::Vector2i(project_output[local_neighbourhood[neighbour_index]][0],
-                                                       project_output[local_neighbourhood[neighbour_index]][1]),
-                                       Eigen::Vector4d(1, 1, 1, 0.5));
-                }
-            }
-        }
-
-        NUClear::PowerPlant::powerplant->emit(utility::nubugger::drawVisionLines(std::move(lines)));
-
-        // Make a map where global index -> i
-
-        // Then you can use that map to lookup each neighbour and get the local index
-
-
-        // While we are projecting we can relink the neighbours to make a local neighbourhood lookup
-
-        // TODO change to using absolute neighbour indexing, reverse the mapping and use it for lookups
-
-        // TODO REMOVE ME
         projected.wait();
     }
 
@@ -990,7 +952,7 @@ private:
         }
 
         // Chose our default platform
-        cl::Platform default_platform = all_platforms[1];
+        cl::Platform default_platform = all_platforms.front();
         std::cerr << "Using OpenCL platform: " << default_platform.getInfo<CL_PLATFORM_NAME>() << " "
                   << default_platform.getInfo<CL_PLATFORM_VERSION>() << std::endl;
 
@@ -1020,7 +982,7 @@ private:
 
         // Add our sources
         sources.emplace_back(PROJECT_RADIAL_CL);
-        sources.emplace_back(PROJECT_EQUIRECTANGULAR_CL);
+        sources.emplace_back(PROJECT_RECTILINEAR_CL);
         sources.emplace_back(READ_IMAGE_TO_NETWORK_CL);
 
         // Build the program
@@ -1039,14 +1001,14 @@ private:
                                            cl::Buffer&>                // The output int2 buffer
             (program, "project_radial");
 
-        // Equirectangular projection function
-        project_equirectangular = cl::KernelFunctor<const cl::Buffer&,          // The Scalar4* unit vectors
-                                                    const cl::Buffer&,          // The int* index map
-                                                    const cl::Buffer&,          // The Rco matrix
-                                                    const Scalar&,              // The focal length in pixels
-                                                    const std::array<int, 2>&,  // The image dimensions
-                                                    cl::Buffer&>                // The output int2 buffer
-            (program, "project_equirectangular");
+        // Rectilinear projection function
+        project_rectilinear = cl::KernelFunctor<const cl::Buffer&,          // The Scalar4* unit vectors
+                                                const cl::Buffer&,          // The int* index map
+                                                const cl::Buffer&,          // The Rco matrix
+                                                const Scalar&,              // The focal length in pixels
+                                                const std::array<int, 2>&,  // The image dimensions
+                                                cl::Buffer&>                // The output int2 buffer
+            (program, "project_rectilinear");
 
         // Build functors for reading images into the neural network layer
         read_image_to_network = cl::KernelFunctor<const cl::Buffer&,  // The int* index map
@@ -1082,7 +1044,7 @@ private:
                             const Scalar&,              // The focal length in pixels
                             const std::array<int, 2>&,  // The image dimensions
                             cl::Buffer&)>               // The output int2 buffer
-        project_equirectangular;
+        project_rectilinear;
 
     std::function<cl::Event(const cl::EnqueueArgs&,  // The number of workers to spawn etc
                             const cl::Buffer&,       // The int* index map

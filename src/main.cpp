@@ -63,10 +63,9 @@ int main() {
     t.measure("Generated visual mesh");
 
     mesh::VisualMesh<Scalar>::Lens lens;
-    lens.type                                = mesh::VisualMesh<Scalar>::Lens::EQUIRECTANGULAR;
-    lens.dimensions                          = {{1280, 1024}};
-    lens.equirectangular.fov                 = {{1.0472, 0.785398}};
-    lens.equirectangular.focal_length_pixels = (lens.dimensions[0] * 0.5) / std::tan(lens.equirectangular.fov[0] * 0.5);
+    lens.type            = mesh::VisualMesh<Scalar>::Lens::RECTILINEAR;
+    lens.dimensions      = {{1280, 1024}};
+    lens.rectilinear.fov = {{1.0472, 0.785398}};
 
     // lens.type       = mesh::VisualMesh<Scalar>::Lens::RADIAL;
     // lens.radial.fov = 1.0472;

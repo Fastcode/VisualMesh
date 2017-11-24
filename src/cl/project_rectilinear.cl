@@ -1,9 +1,9 @@
-kernel void project_equirectangular(global const Scalar4* points,
-                                    global const int* indices,
-                                    global const Scalar4* Rco,  // This is only Scalar4 for alignment concerns
-                                    const Scalar focal_length_pixels,
-                                    const int2 dimensions,
-                                    global int2* out) {
+kernel void project_rectilinear(global const Scalar4* points,
+                                global const int* indices,
+                                global const Scalar4* Rco,  // This is only Scalar4 for alignment concerns
+                                const Scalar focal_length_pixels,
+                                const int2 dimensions,
+                                global int2* out) {
 
     const int index = get_global_id(0);
 
