@@ -31,7 +31,8 @@
 #include "cl/cl2.hpp"
 
 // Include our generated OpenCL headers
-#include "cl/project_radial.cl.hpp"
+#include "cl/project_equidistant.cl.hpp"
+#include "cl/project_equisolid.cl.hpp"
 #include "cl/project_rectilinear.cl.hpp"
 #include "cl/read_image_to_network.cl.hpp"
 
@@ -57,22 +58,17 @@ public:
     using mat4 = std::array<vec4, 4>;
 
     struct Lens {
-        enum Type { RECTILINEAR, RADIAL };
-        struct Radial {
-            Scalar fov;
-            Scalar pixels_per_radian;
-        };
-        struct Rectilinear {
-            vec2 fov;
-            Scalar focal_length_pixels;
-        };
+        enum Projection { RECTILINEAR, EQUISOLID, EQUIDISTANT };
 
-        enum Type type;
+        Projection projection;
         std::array<int, 2> dimensions;
-        union {
-            Radial radial;
-            Rectilinear rectilinear;
-        };
+        Scalar fov;
+        Scalar focal_length;
+    };
+
+    struct ProjectedMesh {
+        std::vector<std::array<int, 2>> pixel_coordinates;
+        std::vector<std::array<int, 6>> neighbourhood;
     };
 
     struct Node {
@@ -138,6 +134,7 @@ public:
         YUYV    = 0x56595559,
         YM24    = 0x34324d59,
         RGB3    = 0x33424752,
+        RGBA    = 0x41424752,
         JPEG    = 0x4745504a,
         UNKNOWN = 0
     };
@@ -467,7 +464,8 @@ public:
         // We multiply a lot of things by 2
         constexpr const Scalar x2 = Scalar(2.0);
 
-        switch (lens.type) {
+        // Cut down how many points we send here by calculating how many will be on screen
+        switch (lens.projection) {
             case Lens::RECTILINEAR: {
 
                 // Extract our rotation matrix
@@ -484,8 +482,9 @@ public:
                 const std::array<Scalar, 3> cam = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
 
                 // Work out how much additional y and z we get from our field of view if we have a focal length of 1
-                const Scalar y_extent = std::tan(lens.rectilinear.fov[0] * Scalar(0.5));
-                const Scalar z_extent = std::tan(lens.rectilinear.fov[1] * Scalar(0.5));
+                const Scalar v_fov    = lens.fov * Scalar(lens.dimensions[1]) / Scalar(lens.dimensions[0]);
+                const Scalar y_extent = std::tan(lens.fov * Scalar(0.5));
+                const Scalar z_extent = std::tan(v_fov * Scalar(0.5));
 
                 /* The labels for each of the corners of the frustum is shown below.
                     ^    T       U
@@ -693,7 +692,10 @@ public:
                 return lookup(height, theta_limits);
             }
 
-            case Lens::RADIAL: {
+            // Both the radial lenses can be treated the same here
+            // This only works for full frame, otherwise there are extra points that are not removed
+            case Lens::EQUIDISTANT:
+            case Lens::EQUISOLID: {
                 // Solution for intersections on the edge is the intersection between a unit sphere, a plane, and a cone
                 // The cone is the cone made by the phi angle, and the plane intersects with the unit sphere to form
                 // The circle that defines the edge of the field of view of the camera.
@@ -714,7 +716,7 @@ public:
                 // on the x/z plane. We calculate the offset to make this happen and re apply it at the end
 
                 // The gradient of our field of view cone
-                const Scalar cos_half_fov = std::cos(lens.radial.fov * Scalar(0.5));
+                const Scalar cos_half_fov = std::cos(lens.fov * Scalar(0.5));
                 const vec3 cam            = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
 
                 // The height of our camera above the observation plane
@@ -727,7 +729,8 @@ public:
 
                     // The cameras inclination from straight down (same reference frame as phi)
                     const Scalar cam_inc  = std::acos(-cam[2]);
-                    const Scalar half_fov = lens.radial.fov * 0.5;
+                    const Scalar half_fov = lens.fov * 0.5;
+                    // TODO work out if you can move these out of the lambda?
 
                     // First we should check if this phi is totally contained in our fov
                     // Work out what our largest fully contained phi value is
@@ -782,20 +785,9 @@ public:
         }
     }
 
-    void classify(const void* image_data,
-                  const size_t& image_size,
-                  const FOURCC& image_format,
-                  const mat4& Hoc,
-                  const Lens& lens) {
+    ProjectedMesh project_mesh(const mat4& Hoc, const Lens& lens) {
 
         Timer t;  // TIMER_LINE
-        // First start uploading our image data
-        cl::Event image_buffer_event;
-        cl::Buffer image_buffer(context, CL_MEM_READ_ONLY, image_size, nullptr, nullptr);
-        mem_queue.enqueueWriteBuffer(image_buffer, false, 0, image_size, image_data, nullptr, &image_buffer_event);
-
-        image_buffer_event.wait();          // TIMER_LINE
-        t.measure("\tUpload image (mem)");  // TIMER_LINE
 
         // Build Rco by transposing the rotation of Hoc and upload it to the device
         const mat4 Rco = {{
@@ -811,18 +803,25 @@ public:
 
         Rco_event.wait();                 // TIMER_LINE
         t.measure("\tUpload Rco (mem)");  // TIMER_LINE
+
         // Perform our lookup to get our relevant range
         auto ranges = lookup(Hoc, lens);
 
         t.measure("\tLookup Range (cpu)");  // TIMER_LINE
 
+        // Convenience variables
         const auto& cl_points = ranges.first.cl_points;
         const auto& nodes     = ranges.first.nodes;
 
-        // First count the size of the buffer we will need to allocate and create it
+        // First count the size of the buffer we will need to allocate
         int points = 0;
         for (auto& range : ranges.second) {
             points += range.second - range.first;
+        }
+
+        // No point processing if we have no points, return an empty mesh
+        if (points == 0) {
+            return ProjectedMesh();
         }
 
         // Build up our list of indices for OpenCL
@@ -851,7 +850,7 @@ public:
 
         // When everything is uploaded, we can run our projection kernel to get the pixel coordinates
         cl::Event projected;
-        switch (lens.type) {
+        switch (lens.projection) {
             case Lens::RECTILINEAR: {
                 projected = project_rectilinear(
                     cl::EnqueueArgs(
@@ -859,39 +858,50 @@ public:
                     cl_points,
                     indices_map,
                     Rco_buffer,
-                    lens.rectilinear.focal_length_pixels,
+                    lens.focal_length,
                     lens.dimensions,
                     pixel_coordinates);
 
             } break;
-            case Lens::RADIAL: {
-                projected = project_radial(
+            case Lens::EQUIDISTANT: {
+                projected = project_equidistant(
                     cl::EnqueueArgs(
                         exec_queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
                     cl_points,
                     indices_map,
                     Rco_buffer,
-                    lens.radial.pixels_per_radian,
+                    lens.focal_length,
                     lens.dimensions,
                     pixel_coordinates);
-
+            } break;
+            case Lens::EQUISOLID: {
+                projected = project_equisolid(
+                    cl::EnqueueArgs(
+                        exec_queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
+                    cl_points,
+                    indices_map,
+                    Rco_buffer,
+                    lens.focal_length,
+                    lens.dimensions,
+                    pixel_coordinates);
             } break;
         }
         projected.wait();                     // TIMER_LINE
         t.measure("\tProject points (gpu)");  // TIMER_LINE
 
+        // This can happen on the CPU while the OpenCL device is busy
         // Build the reverse lookup map
         std::vector<int> r_indices(nodes.size(), -1);
         for (uint i = 0; i < indices.size(); ++i) {
             r_indices[indices[i]] = i;
         }
 
-        std::vector<int> local_neighbourhood;
-        local_neighbourhood.reserve(points * 6);
-
-        for (const auto& i : indices) {
-            for (const auto& n : nodes[i].neighbours) {
-                local_neighbourhood.push_back(r_indices[n]);
+        // Build the packed neighbourhood map
+        std::vector<std::array<int, 6>> local_neighbourhood(points);
+        for (uint i = 0; i < indices.size(); ++i) {
+            for (uint j = 0; j < 6; ++j) {
+                const auto& n             = nodes[indices[i]].neighbours[j];
+                local_neighbourhood[i][j] = r_indices[n];
             }
         }
 
@@ -906,15 +916,22 @@ public:
         t.measure("\tUpload Local Neighbourhood (mem)");  // TIMER_LINE
 
         // Draw the projection output
-        std::vector<std::array<int, 2>> project_output;
-        project_output.resize(points);
+        std::vector<std::array<int, 2>> projection_output;
+        projection_output.resize(points);
 
-        mem_queue.enqueueReadBuffer(
-            pixel_coordinates, true, 0, points * sizeof(std::array<int, 2>), project_output.data());
+        cl::Event read_projection;
+        std::vector<cl::Event> projection_read_wait = {projected};
+        mem_queue.enqueueReadBuffer(pixel_coordinates,
+                                    false,
+                                    0,
+                                    points * sizeof(std::array<int, 2>),
+                                    projection_output.data(),
+                                    &projection_read_wait,
+                                    &read_projection);
 
         t.measure("\tRead Projected Points");  // TIMER_LINE
 
-        projected.wait();
+        return ProjectedMesh{projection_output, local_neighbourhood};
     }
 
 private:
@@ -981,7 +998,8 @@ private:
         sources.emplace_back(get_scalar_defines(Scalar(0.0)));
 
         // Add our sources
-        sources.emplace_back(PROJECT_RADIAL_CL);
+        sources.emplace_back(PROJECT_EQUIDISTANT_CL);
+        sources.emplace_back(PROJECT_EQUISOLID_CL);
         sources.emplace_back(PROJECT_RECTILINEAR_CL);
         sources.emplace_back(READ_IMAGE_TO_NETWORK_CL);
 
@@ -992,23 +1010,17 @@ private:
             exit(1);
         }
 
-        // Radial projection function
-        project_radial = cl::KernelFunctor<const cl::Buffer&,          // The Scalar4* unit vectors
-                                           const cl::Buffer&,          // The int* index map
-                                           const cl::Buffer&,          // The Rco matrix
-                                           const Scalar&,              // The ratio of pixels per radian
-                                           const std::array<int, 2>&,  // The image dimensions
-                                           cl::Buffer&>                // The output int2 buffer
-            (program, "project_radial");
+        using ProjectionKernelFuctor = cl::KernelFunctor<const cl::Buffer&,          // The Scalar4* unit vectors
+                                                         const cl::Buffer&,          // The int* index map
+                                                         const cl::Buffer&,          // The Rco matrix
+                                                         const Scalar&,              // The focal length in pixels
+                                                         const std::array<int, 2>&,  // The image dimensions
+                                                         cl::Buffer&>;               // The output int2 buffer
 
-        // Rectilinear projection function
-        project_rectilinear = cl::KernelFunctor<const cl::Buffer&,          // The Scalar4* unit vectors
-                                                const cl::Buffer&,          // The int* index map
-                                                const cl::Buffer&,          // The Rco matrix
-                                                const Scalar&,              // The focal length in pixels
-                                                const std::array<int, 2>&,  // The image dimensions
-                                                cl::Buffer&>                // The output int2 buffer
-            (program, "project_rectilinear");
+        // Get our projection functions
+        project_equidistant = ProjectionKernelFuctor(program, "project_equidistant");
+        project_equisolid   = ProjectionKernelFuctor(program, "project_equisolid");
+        project_rectilinear = ProjectionKernelFuctor(program, "project_rectilinear");
 
         // Build functors for reading images into the neural network layer
         read_image_to_network = cl::KernelFunctor<const cl::Buffer&,  // The int* index map
@@ -1027,24 +1039,19 @@ private:
     // OpenCL queue for uploading data to the device
     cl::CommandQueue mem_queue;
 
-    // OpenCL kernel functions
-    std::function<cl::Event(const cl::EnqueueArgs&,     // The number of workers to spawn etc
-                            const cl::Buffer&,          // The Scalar4* unit vectors
-                            const cl::Buffer&,          // The int* index map
-                            const cl::Buffer&,          // The Rco matrix
-                            const Scalar&,              // The ratio of pixels per radian
-                            const std::array<int, 2>&,  // The image dimensions
-                            cl::Buffer&)>               // The output int2 buffer
-        project_radial;
+    using ProjectionFunction = std::function<cl::Event(const cl::EnqueueArgs&,     // The number of workers to spawn etc
+                                                       const cl::Buffer&,          // The Scalar4* unit vectors
+                                                       const cl::Buffer&,          // The int* index map
+                                                       const cl::Buffer&,          // The Rco matrix
+                                                       const Scalar&,              // The focal length in pixels
+                                                       const std::array<int, 2>&,  // The image dimensions
+                                                       cl::Buffer&)>;              // The output int2 buffer
 
-    std::function<cl::Event(const cl::EnqueueArgs&,     // The number of workers to spawn etc
-                            const cl::Buffer&,          // The Scalar4* unit vectors
-                            const cl::Buffer&,          // The int* index map
-                            const cl::Buffer&,          // The Rco matrix
-                            const Scalar&,              // The focal length in pixels
-                            const std::array<int, 2>&,  // The image dimensions
-                            cl::Buffer&)>               // The output int2 buffer
-        project_rectilinear;
+
+    // OpenCL kernel functions
+    ProjectionFunction project_equidistant;
+    ProjectionFunction project_equisolid;
+    ProjectionFunction project_rectilinear;
 
     std::function<cl::Event(const cl::EnqueueArgs&,  // The number of workers to spawn etc
                             const cl::Buffer&,       // The int* index map

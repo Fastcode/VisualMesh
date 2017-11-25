@@ -63,9 +63,10 @@ int main() {
     t.measure("Generated visual mesh");
 
     mesh::VisualMesh<Scalar>::Lens lens;
-    lens.type            = mesh::VisualMesh<Scalar>::Lens::RECTILINEAR;
-    lens.dimensions      = {{1280, 1024}};
-    lens.rectilinear.fov = {{1.0472, 0.785398}};
+    lens.projection   = mesh::VisualMesh<Scalar>::Lens::RECTILINEAR;
+    lens.dimensions   = {{1280, 1024}};
+    lens.fov          = 1.0472;
+    lens.focal_length = (lens.dimensions[0] * 0.5) / std::tan(lens.fov * 0.5);
 
     // lens.type       = mesh::VisualMesh<Scalar>::Lens::RADIAL;
     // lens.radial.fov = 1.0472;
@@ -77,7 +78,7 @@ int main() {
                                0.5);
         t.measure("Generated Hoc");
         try {
-            mesh.classify(nullptr, 0, mesh::VisualMesh<Scalar>::FOURCC::YUYV, Hoc, lens);
+            mesh.project_mesh(Hoc, lens);
         }
         catch (const std::exception& ex) {
             std::cout << ex.what() << std::endl;
