@@ -390,8 +390,11 @@ if bpy.app.background:
 
         # Get the true rotation after constraints are applied
         scene.update()
-        true_rotation = camera.matrix_world.decompose()[1].to_euler()
-        run_data['camera']['rotation'] = (true_rotation[0], true_rotation[1], true_rotation[2])
+        mat = camera.matrix_world
+        run_data['camera']['rotation'] = [[mat[0][0], mat[0][1], mat[0][2]],
+                                          [mat[1][0], mat[1][1], mat[1][2]],
+                                          [mat[2][0], mat[2][1], mat[2][2]],
+        ]
 
         # Render the image
         bpy.context.scene.frame_set(fno)
