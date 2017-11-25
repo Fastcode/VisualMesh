@@ -931,6 +931,8 @@ public:
 
         t.measure("\tRead Projected Points");  // TIMER_LINE
 
+        read_projection.wait();
+
         return ProjectedMesh{projection_output, local_neighbourhood};
     }
 
