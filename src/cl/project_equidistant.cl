@@ -36,7 +36,8 @@ kernel void project_equidistant(global const Scalar4* points,
     const Scalar2 screen = (Scalar2)(r * ray.y / sin_theta, r * ray.z / sin_theta);
 
     // Apply our offset to move into image space (0 at top left, x to the right, y down)
-    const Scalar2 image = (Scalar2)((Scalar)(dimensions.x - 1) * 0.5, (Scalar)(dimensions.y - 1) * 0.5) - screen;
+    const Scalar2 image =
+        (Scalar2)((Scalar)(dimensions.x - 1) * Scalar(0.5), (Scalar)(dimensions.y - 1) * Scalar(0.5)) - screen;
 
     // Apply our lens centre offset
     // TODO apply this

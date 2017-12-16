@@ -421,7 +421,7 @@ public:
         std::vector<std::pair<size_t, size_t>> indices;
 
         // Loop through each phi row
-        for (auto& row : mesh.rows) {
+        for (const auto& row : mesh.rows) {
 
             const auto row_size = row.end - row.begin;
 
@@ -429,7 +429,7 @@ public:
             const auto theta_ranges = theta_limits(row.phi);
 
             // Work out what this range means in terms of theta
-            for (auto& range : theta_ranges) {
+            for (const auto& range : theta_ranges) {
 
                 // Convert our theta values into local indices
                 int begin = std::ceil(row_size * range.first * (Scalar(1.0) / (Scalar(2.0) * M_PI)));
@@ -815,7 +815,7 @@ public:
 
         // First count the size of the buffer we will need to allocate
         int points = 0;
-        for (auto& range : ranges.second) {
+        for (const auto& range : ranges.second) {
             points += range.second - range.first;
         }
 
@@ -828,7 +828,7 @@ public:
         // Use iota to fill in the numbers
         std::vector<int> indices(points);
         auto it = indices.begin();
-        for (auto& range : ranges.second) {
+        for (const auto& range : ranges.second) {
             auto n = std::next(it, range.second - range.first);
             std::iota(it, n, range.first);
             it = n;
