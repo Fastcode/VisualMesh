@@ -166,8 +166,8 @@ for i, c in enumerate(groups):
             with tf.name_scope('Layer_{}'.format(j)):
 
                 # Create weights and biases
-                W = tf.Variable(tf.truncated_normal(shape=[in_s, out_s], mean=0.0, stddev=np.sqrt(in_s)), dtype=tf.float32, name='Weights')
-                b = tf.Variable(tf.truncated_normal(shape=[out_s], mean=0.0, stddev=np.sqrt(out_s)), dtype=tf.float32, name='Biases')
+                W = tf.Variable(tf.truncated_normal(shape=[in_s, out_s], mean=0.0), dtype=tf.float32, name='Weights')
+                b = tf.Variable(tf.truncated_normal(shape=[out_s], mean=0.0), dtype=tf.float32, name='Biases')
 
                 if False:
                     # Multiply each slice by the weights matrix
