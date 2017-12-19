@@ -49,19 +49,24 @@ for i, c in enumerate(groups):
 
             # Construct a 4D tensor of size [?, 200, graph_degree * prev_last_output, 3] filled with a grid of indices
             net_shape = tf.shape(logits)
-            idx_a, idx_b, idx_c = tf.meshgrid(tf.range(net_shape[0]),
-                                              tf.range(net_shape[1]),
-                                              tf.range(graph_degree * prev_last_out),
+            idx_a, idx_b, idx_c = tf.meshgrid(tf.range(net_shape[0], dtype=tf.int32, name='BatchRange'),
+                                              tf.range(net_shape[1], dtype=tf.int32, name='MeshRange'),
+                                              tf.range(graph_degree * prev_last_out, dtype=tf.int32, name='FeatureRange'),
                                               indexing='ij',
                                               name='Indices')
 
-            # Use these indexes to lookup our graph indices
-            # TODO note we have to hack using bitcast as tensorflow won't gather int32s on the GPU FOR NO RAISIN
-            g_idx = tf.stack([idx_a, idx_b, tf.div(idx_c, prev_last_out)], axis=3, name='GraphIndices')
-            idx_b = tf.bitcast(tf.gather_nd(tf.bitcast(G, type=tf.float32), g_idx, name='GraphGather'), type=tf.int32)
+            # Indices to the graph
+            graph_idx = tf.stack([idx_a, idx_b, tf.div(idx_c, prev_last_out)], axis=3, name='GraphIndices')
+
+            # Use these indexes to lookup our graph neighbour indices
+            # TODO note we have to hack using bitcast as tensorflow won't gather int32s on the GPU
+            neighbour_idx = tf.bitcast(tf.gather_nd(tf.bitcast(G, type=tf.float32), graph_idx, name='GraphGather'), type=tf.int32)
+
+            # Input features index cycles through the prev_last_out range
+            in_feature_idx = tf.mod(idx_c, prev_last_out, name='PrevLastOutIndicies')
+            network_idx = tf.stack([idx_a, neighbour_idx, in_feature_idx], axis=3, name='NetworkIndices')
 
             # Now we can use this to lookup our actual network
-            network_idx = tf.stack([idx_a, idx_b, tf.mod(idx_c, prev_last_out)], axis=3, name='NetworkIndices')
             logits = tf.gather_nd(logits, network_idx, name='NetworkGather')
 
         for j, out_s in enumerate(c):
@@ -158,6 +163,9 @@ config.gpu_options.per_process_gpu_memory_fraction = 0.9
 config.gpu_options.allow_growth = True
 config.gpu_options.force_gpu_compatible = True
 
+run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+run_metadata = tf.RunMetadata()
+
 with tf.Session(config=config) as sess:
 
     # Initialise variables
@@ -208,7 +216,7 @@ with tf.Session(config=config) as sess:
                     Y: data[1][i:i + batch_size],
                     Yi: data[2][i:i + batch_size],
                     G: data[3][i:i + batch_size]
-                })
+                }, options=run_options, run_metadata=run_metadata)
 
                 # Write summary log
                 training_samples += len(data[0][i:i + batch_size])
