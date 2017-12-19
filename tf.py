@@ -210,6 +210,10 @@ with tf.Session(config=config) as sess:
                     G: data[3][i:i + batch_size]
                 })
 
+                # Write summary log
+                training_samples += len(data[0][i:i + batch_size])
+                summary_writer.add_summary(summary, training_samples)
+
             # Save the model after each pack
             saver.save(sess, model_path)
 
