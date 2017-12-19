@@ -5,6 +5,7 @@ import tensorflow as tf
 import learning.load as load
 from PIL import Image, ImageDraw
 import os
+import math
 
 # Learning rate
 learning_rate = 0.001
@@ -70,31 +71,31 @@ for i, c in enumerate(groups):
             with tf.variable_scope('Layer_{}'.format(j)):
 
                 # Create weights and biases
-                W = tf.get_variable('Weights', shape=[in_s, out_s], initializer=tf.truncated_normal_initializer(), dtype=tf.float32)
-                b = tf.get_variable('Biases', shape=[out_s], initializer=tf.truncated_normal_initializer(), dtype=tf.float32)
+                W = tf.get_variable('Weights', shape=[in_s, out_s], initializer=tf.truncated_normal_initializer(stddev=math.sqrt(2.0/in_s)), dtype=tf.float32)
+                b = tf.get_variable('Biases', shape=[out_s], initializer=tf.truncated_normal_initializer(stddev=math.sqrt(2.0/out_s)), dtype=tf.float32)
 
                 # Apply our weights and biases
                 logits = tf.tensordot(logits, W, [[2], [0]], name="MatMul")
                 logits = tf.add(logits, b)
 
-                # Apply our activation function unless we are the last pass
-                if i < len(groups) - 1 or j < len(c) - 1:
-                    logits = tf.nn.elu(logits)
+                # Apply our activation function
+                logits = tf.nn.elu(logits)
 
 
 # Softmax our final output for all values in the mesh as our network
-network = tf.nn.softmax(logits, name='Softmax')
+network = tf.nn.softmax(logits, name='Softmax', dim=2)
 
 # Gather our individual output for training
 with tf.name_scope('Training'):
 
     # Get the indices to our selected objects
-    training_indices = tf.stack([tf.range(tf.shape(Yi)[0]), Yi], axis=1)
+    training_indices = tf.bitcast(tf.stack([tf.bitcast(tf.range(tf.shape(Yi)[0], dtype=tf.int32), tf.float32),
+                                            tf.bitcast(Yi, tf.float32)], axis=1), tf.int32)
     train_logits = tf.gather_nd(logits, training_indices)
 
     # Our loss function
     with tf.name_scope('Loss'):
-        cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=train_logits, labels=Y))
+        cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=train_logits, labels=Y, dim=1))
 
     # Our optimiser
     with tf.name_scope('Optimiser'):
@@ -167,21 +168,21 @@ with tf.Session(config=config) as sess:
     model_path = os.path.join('training', 'model.ckpt')
 
     # Load model or not
-    load_model = False
+    load_model = True
     if load_model:
         saver.restore(sess, model_path)
 
     # Setup for tensorboard
     summary_writer = tf.summary.FileWriter('logs', graph=tf.get_default_graph())
 
-    # Grab our training packs
-    pack_dir = os.path.join('training', 'trees')
-    packs = sorted([os.path.join(pack_dir, f) for f in os.listdir(pack_dir) if f.endswith('.bin.gz')])
+    # Grab our training tree packs
+    tree_dir = os.path.join('training', 'trees')
+    trees = sorted([os.path.join(tree_dir, f) for f in os.listdir(tree_dir) if f.endswith('.bin.gz')])
 
     # Grab our validation pack
     validation_dir = os.path.join('training', 'validation')
     validation_pack = os.path.join(validation_dir, 'validation.bin.gz')
-    print('Loading validation pack')
+    print('Loading validation treepack')
     validation = load.validation(validation_pack)
     print('\tloaded')
 
@@ -191,12 +192,12 @@ with tf.Session(config=config) as sess:
     # The number of epochs to train
     for epoch in range(training_epochs):
 
-        # The rest of the packs for training
-        for pack_i, pack in enumerate(packs):
+        # The rest of the trees for training
+        for tree_i, tree in enumerate(trees):
 
-            # Load the pack
-            print('Loading data pack {}'.format(pack))
-            data = load.pack(pack)
+            # Load the tree
+            print('Loading data tree pack {}'.format(tree))
+            data = load.tree(tree)
             print('\tloaded')
 
             # Get the next slice for training
@@ -222,7 +223,7 @@ with tf.Session(config=config) as sess:
             saver.save(sess, model_path)
 
             # Every 5 packs save the images to show training progress
-            if pack_i % 5 == 0:
+            if tree_i % 5 == 0:
                 # Run the network after each pack file for our example images
                 output_file_no += 1
                 for v in validation[:50:5]:

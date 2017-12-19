@@ -2,8 +2,9 @@
 
 import gzip
 import struct
+import io
+import subprocess
 import numpy as np
-
 
 def pack(file):
 
@@ -19,7 +20,8 @@ def pack(file):
     # The adjacency graph
     G = []
 
-    with gzip.open(file, 'rb') as f:
+    p = subprocess.Popen(['gzcat', file], stdout=subprocess.PIPE)
+    with io.BytesIO(p.communicate()[0]) as f:
 
         while True:
 
@@ -54,7 +56,8 @@ def validation(file):
     output = []
 
     # Open the file
-    with gzip.open(file, 'rb') as f:
+    p = subprocess.Popen(['gzcat', file], stdout=subprocess.PIPE)
+    with io.BytesIO(p.communicate()[0]) as f:
 
         while True:
 
