@@ -12,6 +12,9 @@ learning_rate = 0.001
 # Batch size
 batch_size = 1000
 
+# Number of times to train the network
+training_epochs = 10
+
 # Number of classes in the final output
 n_classes = 2  # 2 classes, ball and not ball
 
@@ -21,12 +24,8 @@ graph_degree = 7
 # Each number is output neurons for that layer, each list in the list is a convolution
 groups = [[5, 3], [5, 3], [5, 3], [5, n_classes]]
 
-# The size of the mesh graph
-Gs = tf.placeholder(dtype=tf.int32, name='MeshSize')
-
 # The mesh graph
 G = tf.placeholder(dtype=tf.int32, shape=[None, None, graph_degree], name='MeshGraph')
-
 
 # First input is the number of visual mesh points by 3
 X = tf.placeholder(dtype=tf.float32, shape=[None, None, 3], name='Input')
@@ -35,73 +34,66 @@ X = tf.placeholder(dtype=tf.float32, shape=[None, None, 3], name='Input')
 Y = tf.placeholder(dtype=tf.float32, shape=[None, 2], name='Output')
 
 # The index of the final output we are checking
-Yi = tf.placeholder(dtype=tf.int32, shape=[None, 1], name='OutputIndex')
+Yi = tf.placeholder(dtype=tf.int32, shape=[None], name='OutputIndex')
 
 # Build our tensor
-network = X
+logits = X
 for i, c in enumerate(groups):
     # Which convolution we are on
-    with tf.name_scope('Conv_{}'.format(i)):
+    with tf.variable_scope('Conv_{}'.format(i)):
 
         # The size of the previous output is the size of our input
-        prev_last_out = network.get_shape()[2].value
+        prev_last_out = logits.get_shape()[2].value
 
-        with tf.name_scope('GatherConvolution'):
+        with tf.variable_scope('GatherConvolution'):
 
-            if False:
-                # Construct a 4D tensor of size [?, 200, graph_degree * prev_last_output, 3] filled with a grid of indices
-                net_shape = tf.shape(network)
-                idx_a, idx_b, idx_c = tf.meshgrid(tf.range(net_shape[0]),
-                                                  tf.range(net_shape[1]),
-                                                  tf.range(graph_degree * prev_last_out),
-                                                  indexing='ij',
-                                                  name='Indices')
+            # Construct a 4D tensor of size [?, 200, graph_degree * prev_last_output, 3] filled with a grid of indices
+            net_shape = tf.shape(logits)
+            idx_a, idx_b, idx_c = tf.meshgrid(tf.range(net_shape[0]),
+                                              tf.range(net_shape[1]),
+                                              tf.range(graph_degree * prev_last_out),
+                                              indexing='ij',
+                                              name='Indices')
 
-                # Use these indexes to lookup our graph indices
-                # TODO note we have to hack using bitcast as tensorflow won't gather int32s on the GPU FOR NO RAISIN
-                idx_b = tf.bitcast(tf.gather_nd(tf.bitcast(G, type=tf.float32), tf.stack([idx_a, idx_b, tf.div(idx_c, graph_degree)], axis=3), name='GraphIndices'), type=tf.int32)
+            # Use these indexes to lookup our graph indices
+            # TODO note we have to hack using bitcast as tensorflow won't gather int32s on the GPU FOR NO RAISIN
+            g_idx = tf.stack([idx_a, idx_b, tf.div(idx_c, prev_last_out)], axis=3, name='GraphIndices')
+            idx_b = tf.bitcast(tf.gather_nd(tf.bitcast(G, type=tf.float32), g_idx, name='GraphGather'), type=tf.int32)
 
-                # Now we can use this to lookup our actual network
-                network = tf.gather_nd(network, tf.stack([idx_a, idx_b, tf.mod(idx_c, prev_last_out)], axis=3), name='NetworkIndices')
-
-            else:
-                # create a [None,200,graph_degree,200] tensor of one-hot vectors to select the correct indices of G
-                graph_indices = tf.one_hot(G, Gs)
-                network = tf.einsum("ijk,ibaj->ibak", network, graph_indices)
-                network = tf.reshape(network, [-1, 200, prev_last_out * graph_degree])
+            # Now we can use this to lookup our actual network
+            network_idx = tf.stack([idx_a, idx_b, tf.mod(idx_c, prev_last_out)], axis=3, name='NetworkIndices')
+            logits = tf.gather_nd(logits, network_idx, name='NetworkGather')
 
         for j, out_s in enumerate(c):
 
             # Our input size is the previous output size
-            in_s = network.get_shape()[2].value
+            in_s = logits.get_shape()[2].value
 
             # Which layer we are on
-            with tf.name_scope('Layer_{}'.format(j)):
+            with tf.variable_scope('Layer_{}'.format(j)):
 
                 # Create weights and biases
-                W = tf.Variable(tf.truncated_normal(shape=[in_s, out_s], mean=0.0), dtype=tf.float32, name='Weights')
-                b = tf.Variable(tf.truncated_normal(shape=[out_s], mean=0.0), dtype=tf.float32, name='Biases')
+                W = tf.get_variable('Weights', shape=[in_s, out_s], initializer=tf.truncated_normal_initializer(), dtype=tf.float32)
+                b = tf.get_variable('Biases', shape=[out_s], initializer=tf.truncated_normal_initializer(), dtype=tf.float32)
 
-                if False:
-                    # Multiply each slice by the weights matrix
-                    network = tf.einsum('ijk,kl->ijl', network, W)
+                # Apply our weights and biases
+                logits = tf.tensordot(logits, W, [[2], [0]], name="MatMul")
+                logits = tf.add(logits, b)
 
-                    # Add the bias
-                    network = tf.add(network, b)
-                else:
-                    network = tf.tensordot(network, W, [[2], [0]], name="MatMul1") + b
+                # Apply our activation function unless we are the last pass
+                if i < len(groups) - 1 or j < len(c) - 1:
+                    logits = tf.nn.elu(logits)
 
-                # Apply our activation function
-                network = tf.nn.elu(network)
 
-# Softmax our final output for all values in the mesh
-network = tf.nn.softmax(network, name='Softmax')
+# Softmax our final output for all values in the mesh as our network
+network = tf.nn.softmax(logits, name='Softmax')
 
 # Gather our individual output for training
 with tf.name_scope('Training'):
-    training_indices = tf.one_hot(indices=Yi, depth=Gs, dtype=tf.float32, name='OneHotTrainingIndices')
-    train_logits = tf.einsum('ijk,ibj->ibk', network, training_indices)
-    train_logits = tf.reshape(train_logits, [-1, 2])
+
+    # Get the indices to our selected objects
+    training_indices = tf.stack([tf.range(tf.shape(Yi)[0]), Yi], axis=1)
+    train_logits = tf.gather_nd(logits, training_indices)
 
     # Our loss function
     with tf.name_scope('Loss'):
@@ -112,13 +104,40 @@ with tf.name_scope('Training'):
         optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
 
     # Calculate accuracy
-    with tf.name_scope('Accuracy'):
-        acc = tf.equal(tf.argmax(train_logits, 1), tf.argmax(Y, 1))
-        acc = tf.reduce_mean(tf.cast(acc, tf.float32))
+    with tf.name_scope('Metrics'):
+        # Work out which class is larger and make 1 positive and 0 negative
+        softmax_logits = tf.nn.softmax(train_logits)
+        predictions = tf.argmin(softmax_logits, axis=1)
+        labels = tf.argmin(Y, axis=1)
 
-# Monitor cost and accuracy tensor
-tf.summary.scalar('loss', cost)
-tf.summary.scalar('accuracy', acc)
+        # Get our confusion matrix
+        tp = tf.cast(tf.count_nonzero(predictions * labels), tf.float32)
+        tn = tf.cast(tf.count_nonzero((predictions - 1) * (labels - 1)), tf.float32)
+        fp = tf.cast(tf.count_nonzero(predictions * (labels - 1)), tf.float32)
+        fn = tf.cast(tf.count_nonzero((predictions - 1) * labels), tf.float32)
+
+        # Calculate our confusion matrix
+        tpr = tp / (tp + fn)
+        tnr = tn / (tn + fp)
+        ppv = tp / (tp + fp)
+        npv = tn / (tn + fn)
+        acc = (tp + tn) / (tp + tn + fp + fn)
+        f1 = 2.0 * ((ppv * tpr) / (ppv + tpr))
+        mcc = (tp * tn - fp * fn) / tf.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+
+        # How wide the gap is between the two classes
+        certainty = tf.reduce_mean(tf.abs(tf.subtract(softmax_logits[:, 0], softmax_logits[:, 1])))
+
+# Monitor cost and metrics
+tf.summary.scalar('Loss', cost)
+tf.summary.scalar('True Positive Rate', tpr)
+tf.summary.scalar('True Negative Rate', tnr)
+tf.summary.scalar('Positive Predictive', ppv)
+tf.summary.scalar('Negative Predictive', npv)
+tf.summary.scalar('Accuracy', acc)
+tf.summary.scalar('F1 Score', f1)
+tf.summary.scalar('Matthews', mcc)
+tf.summary.scalar('Certainty', certainty)
 
 # Create summaries to visualize weights
 for var in tf.trainable_variables():
@@ -127,14 +146,30 @@ for var in tf.trainable_variables():
 # Merge all summaries into a single op
 merged_summary_op = tf.summary.merge_all()
 
+# Initialise variables
+init_op = tf.global_variables_initializer()
+
+# We save our trainable variables
+saver = tf.train.Saver({v.name: v for v in tf.trainable_variables()})
+
 config = tf.ConfigProto()
-config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+config.graph_options.build_cost_model = 1
+config.gpu_options.per_process_gpu_memory_fraction = 0.9
+config.gpu_options.allow_growth = True
+config.gpu_options.force_gpu_compatible = True
+
 with tf.Session(config=config) as sess:
 
-    training_epochs = 10
+    # Initialise variables
+    sess.run(init_op)
 
-    # Initialise the variables
-    sess.run(tf.global_variables_initializer())
+    # Checkpoint path
+    model_path = os.path.join('training', 'model.ckpt')
+
+    # Load model or not
+    load_model = False
+    if load_model:
+        saver.restore(sess, model_path)
 
     # Setup for tensorboard
     summary_writer = tf.summary.FileWriter('logs', graph=tf.get_default_graph())
@@ -157,7 +192,7 @@ with tf.Session(config=config) as sess:
     for epoch in range(training_epochs):
 
         # The rest of the packs for training
-        for pack in packs:
+        for pack_i, pack in enumerate(packs):
 
             # Load the pack
             print('Loading data pack {}'.format(pack))
@@ -169,58 +204,55 @@ with tf.Session(config=config) as sess:
 
                 # Run our training step
                 _, c, summary = sess.run([optimizer, cost, merged_summary_op], feed_dict={
-                    Gs: 200,
                     X: data[0][i:i + batch_size],
                     Y: data[1][i:i + batch_size],
-                    Yi: np.array(data[2][i:i + batch_size]).reshape((-1, 1)),
+                    Yi: data[2][i:i + batch_size],
                     G: data[3][i:i + batch_size]
                 })
 
-                # Write summary log
-                training_samples += len(data[0][i:i + batch_size])
-                summary_writer.add_summary(summary, training_samples)
+            # Save the model after each pack
+            saver.save(sess, model_path)
 
-            continue
+            # Every 5 packs save the images to show training progress
+            if pack_i % 5 == 0:
+                # Run the network after each pack file for our example images
+                output_file_no += 1
+                for v in validation[:50:5]:
 
-            # Run the network after each pack file for our example images
-            output_file_no += 1
-            for v in validation:
+                    # Run our network for this validation object
+                    result = sess.run([network], feed_dict={
+                        X: [v['colours']],
+                        G: [v['graph']]
+                    })
 
-                # Run our network for this validation object
-                result = sess.run([network], feed_dict={
-                    Gs: len(v['colours']),
-                    X: [v['colours']],
-                    G: [v['graph']]
-                })
+                    # Load our input image
+                    img = Image.open(os.path.join(validation_dir, 'image{:07d}.png'.format(v['file_no'] - 1)))
+                    d = ImageDraw.Draw(img)
 
-                # Load our input image
-                img = Image.open(os.path.join(validation_dir, 'image{:07d}.png'.format(v['file_no'] - 1)))
-                d = ImageDraw.Draw(img)
+                    # Go through our drawing coordinates
+                    for i in range(len(v['coords'])):
 
-                # Go through our drawing coordinates
-                for i in range(len(v['coords'])):
+                        # The result at our point
+                        r1 = result[0][0][i]
 
-                    # The result at our point
-                    r1 = result[0][0][i]
+                        # The pixel coordinates at our point
+                        p1 = v['coords'][i]
 
-                    # The pixel coordinates at our point
-                    p1 = v['coords'][i]
+                        # Go through our neighbours
+                        for n in v['graph'][i]:
 
-                    # Go through our neighbours
-                    for n in v['graph'][i]:
+                            # The result at our neighbours point
+                            r2 = result[0][0][i]
 
-                        # The result at our neighbours point
-                        r2 = result[0][0][i]
+                            # The coordinate at our neighbours point
+                            p2 = v['coords'][n]
 
-                        # The coordinate at our neighbours point
-                        p2 = v['coords'][n]
+                            # Draw a line if both are in the image
+                            if p2[0] != -1 and p2[1] != -1:
+                                r = max(min(int(round(r1[1] * 255)), 255), 0)
+                                g = max(min(int(round(r1[0] * 255)), 255), 0)
 
-                        # Draw a line if both are in the image
-                        if p2[0] != -1 and p2[1] != -1:
-                            r = max(min(int(round(r1[1] * 255)), 255), 0)
-                            g = max(min(int(round(r1[0] * 255)), 255), 0)
+                                d.line([(p1[0], p1[1]), (p2[0], p2[1])], fill=(r, g, 0, 255))
 
-                            d.line([(p1[0], p1[1]), (p2[0], p2[1])], fill=(r, g, 0, 64))
-
-                # Save our image
-                img.save(os.path.join('output', 'validation', '{:04d}_{:04d}.png'.format(v['file_no'], output_file_no)))
+                    # Save our image
+                    img.save(os.path.join('output', 'validation', '{:04d}_{:04d}.png'.format(v['file_no'] - 1, output_file_no)))
