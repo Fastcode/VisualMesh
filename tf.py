@@ -46,27 +46,19 @@ for i, c in enumerate(groups):
         prev_last_out = logits.get_shape()[2].value
 
         with tf.variable_scope('GatherConvolution'):
-
-            # Construct a 4D tensor of size [?, 200, graph_degree * prev_last_output, 3] filled with a grid of indices
             net_shape = tf.shape(logits)
-            idx_a, idx_b, idx_c = tf.meshgrid(tf.range(net_shape[0], dtype=tf.int32, name='BatchRange'),
-                                              tf.range(net_shape[1], dtype=tf.int32, name='MeshRange'),
-                                              tf.range(graph_degree * prev_last_out, dtype=tf.int32, name='FeatureRange'),
-                                              indexing='ij',
-                                              name='Indices')
 
-            # Indices to the graph
-            graph_idx = tf.stack([idx_a, idx_b, tf.div(idx_c, prev_last_out)], axis=3, name='GraphIndices')
+            batch_idx = tf.bitcast(tf.reshape(tf.tile(tf.reshape(tf.range(net_shape[0], dtype=tf.int32), [-1, 1]), [1, net_shape[1] * graph_degree * prev_last_out]),
+                                [net_shape[0], net_shape[1], graph_degree * prev_last_out]), tf.float32)
 
-            # Use these indexes to lookup our graph neighbour indices
-            # TODO note we have to hack using bitcast as tensorflow won't gather int32s on the GPU
-            neighbour_idx = tf.bitcast(tf.gather_nd(tf.bitcast(G, type=tf.float32), graph_idx, name='GraphGather'), type=tf.int32)
+            neighbour_idx = tf.bitcast(tf.reshape(tf.tile(tf.reshape(G, [-1, 1]), [1, prev_last_out]),
+                                [net_shape[0], net_shape[1], graph_degree * prev_last_out]), tf.float32)
 
-            # Input features index cycles through the prev_last_out range
-            in_feature_idx = tf.mod(idx_c, prev_last_out, name='PrevLastOutIndicies')
-            network_idx = tf.stack([idx_a, neighbour_idx, in_feature_idx], axis=3, name='NetworkIndices')
+            feature_idx = tf.bitcast(tf.reshape(tf.tile(tf.range(prev_last_out, dtype=tf.int32), [net_shape[0] * net_shape[1] * graph_degree]),
+                               [net_shape[0], net_shape[1], graph_degree * prev_last_out]), tf.float32)
 
             # Now we can use this to lookup our actual network
+            network_idx = tf.bitcast(tf.stack([batch_idx, neighbour_idx, feature_idx], axis=3, name='NetworkIndices'), tf.int32)
             logits = tf.gather_nd(logits, network_idx, name='NetworkGather')
 
         for j, out_s in enumerate(c):
@@ -216,11 +208,15 @@ with tf.Session(config=config) as sess:
                     Y: data[1][i:i + batch_size],
                     Yi: data[2][i:i + batch_size],
                     G: data[3][i:i + batch_size]
-                }, options=run_options, run_metadata=run_metadata)
+                })#, options=run_options, run_metadata=run_metadata)
 
                 # Write summary log
                 training_samples += len(data[0][i:i + batch_size])
                 summary_writer.add_summary(summary, training_samples)
+
+                # tf.profiler.profile(tf.get_default_graph(),
+                #                     run_meta=run_metadata,
+                #                     options=(tf.profiler.ProfileOptionBuilder(tf.profiler.ProfileOptionBuilder.time_and_memory()).build()))
 
             # Save the model after each pack
             saver.save(sess, model_path)
