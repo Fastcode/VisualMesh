@@ -14,9 +14,6 @@ def pack(file):
     # The true/falseness of the check point
     Y = []
 
-    # The index of the check point
-    Yi = []
-
     # The adjacency graph
     G = []
 
@@ -24,7 +21,55 @@ def pack(file):
     with io.BytesIO(p.communicate()[0]) as f:
 
         while True:
+            size_data = f.read(4)
 
+            # When we run out of data, stop
+            if len(size_data) != 4:
+                break
+
+            size, = struct.unpack('<I', size_data)
+
+            # Read the graph and adjust for new indexing
+            graph = np.frombuffer(f.read(size * 4 * 7), np.int32).reshape(-1, 7, order='C')
+            graph = graph + 1
+
+            # Insert our 0 row
+            graph = np.insert(graph, 0, [0] * 7, axis=0)
+
+            # Get colours and insert 0 row
+            colours = np.frombuffer(f.read(size * 4 * 3), np.float32).reshape(-1, 3, order='C')
+            colours = np.insert(colours, 0, [0] * 3, axis=0)
+
+            # Get stencil and insert 0 row
+            stencil = np.frombuffer(f.read(size * 4), np.float32)
+            stencil = np.insert(stencil, 0, [0] * 1, axis=0)
+
+            X.append(colours)
+            Y.append(stencil)
+            G.append(graph)
+
+    # Return the loaded data
+    return X, Y, G
+
+
+def tree(file):
+
+    # The 200 point visual mesh input
+    X = []
+
+    # The true/falseness of the check point
+    Y = []
+
+    # The index of the check point
+    Yi = []
+
+    # The adjacency graph
+    G = []
+
+    p = subprocess.Popen(['lz4', '-dc', file], stdout=subprocess.PIPE)
+    with io.BytesIO(p.communicate()[0]) as f:
+
+        while True:
             # Try to read 8 bytes
             d1 = f.read(8)
             if len(d1) < 8:
@@ -56,7 +101,7 @@ def validation(file):
     output = []
 
     # Open the file
-    p = subprocess.Popen(['gzcat', file], stdout=subprocess.PIPE)
+    p = subprocess.Popen(['lz4', '-dc', file], stdout=subprocess.PIPE)
     with io.BytesIO(p.communicate()[0]) as f:
 
         while True:
