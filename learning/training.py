@@ -78,10 +78,6 @@ def build_training_graph(logits, learning_rate, beta):
     tf.summary.scalar('Matthews', mcc)
     tf.summary.scalar('Certainty', certainty)
 
-    # Create summaries to visualize weights
-    for var in tf.trainable_variables():
-        tf.summary.histogram(var.name, var)
-
     # Merge all summaries into a single op
     merged_summary_op = tf.summary.merge_all()
 
@@ -192,12 +188,14 @@ def train(sess, network, paths, load_model=False, learning_rate=0.001, training_
                 batch_no += 1
                 summary_writer.add_summary(summary, batch_no)
 
-                # Save the model
-                saver.save(sess, model_path, batch_no)
 
                 # tf.profiler.profile(tf.get_default_graph(),
                 #                     run_meta=run_metadata,
                 #                     options=(tf.profiler.ProfileOptionBuilder(tf.profiler.ProfileOptionBuilder.time_and_memory()).build()))
+
+
+            # Save the model after every pack
+            saver.save(sess, model_path, batch_no)
 
             # Every 5 packs save the images to show training progress
             if tree_i % 5 == 0:
