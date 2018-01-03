@@ -482,9 +482,8 @@ public:
                 const std::array<Scalar, 3> cam = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
 
                 // Work out how much additional y and z we get from our field of view if we have a focal length of 1
-                const Scalar v_fov    = lens.fov * Scalar(lens.dimensions[1]) / Scalar(lens.dimensions[0]);
                 const Scalar y_extent = std::tan(lens.fov * Scalar(0.5));
-                const Scalar z_extent = std::tan(v_fov * Scalar(0.5));
+                const Scalar z_extent = y_extent * Scalar(lens.dimensions[1]) / Scalar(lens.dimensions[0]);
 
                 /* The labels for each of the corners of the frustum is shown below.
                     ^    T       U
