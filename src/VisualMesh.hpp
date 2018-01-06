@@ -54,6 +54,28 @@ inline std::vector<std::string> split(const std::string& str, char delimeter) {
     return elements;
 }
 
+
+template <typename T>
+struct LazyBufferReader {
+
+    LazyBufferReader() = default;
+
+    LazyBufferReader(cl::CommandQueue queue, cl::Buffer buffer, cl::Event ready, size_t n_elements)
+        : buffer(buffer), ready(ready), n_elements(n_elements) {}
+
+    operator T() {
+        std::vector<T> output(n_elements);
+        std::vector<cl::Event> ready_list = {ready};
+        queue.enqueueReadBuffer(buffer, true, 0, n_elements * sizeof(T), output.data(), &ready_list);
+        return output;
+    }
+
+    cl::CommandQueue queue;
+    cl::Buffer buffer;
+    cl::Event ready;
+    size_t n_elements;
+};
+
 /**
  * @brief Constructs and holds a visual mesh
  * @details [long description]
@@ -80,7 +102,7 @@ public:
     };
 
     struct ProjectedMesh {
-        std::vector<std::array<int, 2>> pixel_coordinates;
+        LazyBufferReader<std::array<int, 2>> pixel_coordinates;
         std::vector<std::array<int, 6>> neighbourhood;
 
         // OpenCL buffers for the data
@@ -473,11 +495,12 @@ public:
 
             // Project our visual mesh
             auto projection = mesh.project(Hoc, lens);
-            int points      = projection.pixel_coordinates.size();
+            int points      = projection.neighbourhood.size();
 
             // Our buffers for each layer
             std::vector<std::pair<cl::Buffer, cl::Event>> layer_buffers;
 
+            // First layer, output from the image
             cl::Buffer img_load_buffer(mesh.context, CL_MEM_READ_WRITE, sizeof(cl_float4) * points);
 
             // Read the pixels into the buffer
@@ -1303,25 +1326,9 @@ public:
         // local_n_event.wait();                             // TIMER_LINE
         // t.measure("\tUpload Local Neighbourhood (mem)");  // TIMER_LINE
 
-        // Draw the projection output
-        std::vector<std::array<int, 2>> projection_output(points);
-
-        cl::Event read_projection;
-        std::vector<cl::Event> projection_read_wait = {projected};
-        mem_queue.enqueueReadBuffer(pixel_coordinates,
-                                    false,
-                                    0,
-                                    points * sizeof(std::array<int, 2>),
-                                    projection_output.data(),
-                                    &projection_read_wait,
-                                    &read_projection);
-
-        // t.measure("\tRead Projected Points");  // TIMER_LINE
-
-        read_projection.wait();
-
-        return ProjectedMesh{
-            projection_output, local_neighbourhood, {pixel_coordinates, projected, local_n_buffer, local_n_event}};
+        return ProjectedMesh{LazyBufferReader<std::array<int, 2>>(mem_queue, pixel_coordinates, projected, points),
+                             local_neighbourhood,
+                             {pixel_coordinates, projected, local_n_buffer, local_n_event}};
     }
 
     Classifier make_classifier(
