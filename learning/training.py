@@ -19,6 +19,9 @@ def build_training_graph(logits, learning_rate, beta):
     # Gather our individual output for training
     with tf.name_scope('Training'):
 
+        # Global training step
+        global_step = tf.Variable(0, dtype=tf.int32, trainable=False, name='global_step')
+
         # Get the indices to our selected objects
         training_indices = tf.bitcast(tf.stack([tf.bitcast(tf.range(tf.shape(Yi)[0], dtype=tf.int32), tf.float32),
                                                 tf.bitcast(Yi, tf.float32)], axis=1), tf.int32)
@@ -40,7 +43,7 @@ def build_training_graph(logits, learning_rate, beta):
 
         # Our optimiser
         with tf.name_scope('Optimiser'):
-            optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
+            optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost, global_step=global_step)
 
         # Calculate accuracy
         with tf.name_scope('Metrics'):
@@ -81,7 +84,7 @@ def build_training_graph(logits, learning_rate, beta):
     # Merge all summaries into a single op
     merged_summary_op = tf.summary.merge_all()
 
-    return Y, Yi, optimizer, merged_summary_op
+    return Y, Yi, optimizer, merged_summary_op, global_step
 
 def save_validation_image(sess, network, v, output_cycle, validation_dir, output_dir):
     # Run our network for this validation object
@@ -107,14 +110,15 @@ def save_validation_image(sess, network, v, output_cycle, validation_dir, output
         # Go through our neighbours
         for n in v['graph'][i]:
 
-            # The result at our neighbours point
-            r2 = result[0][0][i]
-
             # The coordinate at our neighbours point
             p2 = v['coords'][n]
 
             # Draw a line if both are in the image
             if p2[0] != -1 and p2[1] != -1:
+
+                # Draw a line halfway to our target point
+                p2 = p1 + ((p2 - p1) * 0.5)
+
                 r = max(min(int(round(r1[1] * 255)), 255), 0)
                 g = max(min(int(round(r1[0] * 255)), 255), 0)
 
@@ -125,50 +129,76 @@ def save_validation_image(sess, network, v, output_cycle, validation_dir, output
 
 
 # Train the network
-def train(sess, network, paths, load_model=False, learning_rate=0.001, training_epochs=2, regularisation=0.0, dropout=0.9, batch_size=1000):
+def train(sess,
+          network,
+          input_path,
+          output_path,
+          validation_path,
+          load_model=True,
+          learning_rate=0.001,
+          training_epochs=3,
+          regularisation=0.0,
+          dropout=0.9,
+          batch_size=1000):
 
     # Build the training portion of the graph
-    Y, Yi, optimizer, merged_summary_op = build_training_graph(network['logits'], learning_rate, regularisation)
+    Y, Yi, optimizer, merged_summary_op, global_step = build_training_graph(network['logits'], learning_rate, regularisation)
 
     # Setup for tensorboard
-    summary_writer = tf.summary.FileWriter(paths['logs'], graph=tf.get_default_graph())
+    summary_writer = tf.summary.FileWriter(output_path, graph=tf.get_default_graph())
 
-    # Create our model saver to save all the trainable variables
-    saver = tf.train.Saver({v.name: v for v in tf.trainable_variables()})
+    # Create our model saver to save all the trainable variables and the global_step
+    save_vars = {v.name: v for v in tf.trainable_variables()}
+    save_vars.update({global_step.name: global_step})
+    saver = tf.train.Saver(save_vars)
 
     # Initialise global variables
     sess.run(tf.global_variables_initializer())
 
     # Path to model file
-    model_path = os.path.join(paths['logs'], 'model.ckpt')
+    model_path = os.path.join(output_path, 'model.ckpt')
 
     # If we are loading existing training data do that
-    if load_model:
+    if load_model and os.path.isfile(os.path.join(output_path, 'checkpoint')):
         print('Loading model {}'.format(model_path))
         saver.restore(sess, model_path)
     else:
         print('Creating new model {}'.format(model_path))
 
     # Load our validation pack
-    validation_pack = os.path.join(paths['validation'], 'validation.bin.lz4')
-    sys.stdout.write('Loading validation pack {}...'.format(validation_pack));
-    validation = load.validation(validation_pack)
+    validation_image_pack = os.path.join(validation_path, 'validation.bin.lz4')
+    sys.stdout.write('Loading validation image pack {}...'.format(validation_image_pack));
+    sys.stdout.flush()
+    validation_images = load.validation(validation_image_pack)
     sys.stdout.write(' Loaded!\n');
 
     # List all our tree packs
-    trees = sorted([os.path.join(paths['trees'], f) for f in os.listdir(paths['trees']) if f.endswith('.bin.lz4')])
+    trees = sorted([os.path.join(input_path, f) for f in os.listdir(input_path) if f.endswith('.bin.lz4')])
 
-    batch_no = 0
+    # Our last pack is used for validation
+    validation_pack = trees[-1]
+    sys.stdout.write('Loading validation tree pack {}...'.format(validation_pack));
+    sys.stdout.flush()
+    validation = load.tree(validation_pack)
+    sys.stdout.write(' Loaded!\n');
+
+    # The rest is used as our training data
+    trees = trees[:-1]
+
     output_cycle = 0
 
     # The number of epochs to train
     for epoch in range(training_epochs):
+
+        # Shuffle!
+        random.shuffle(trees)
 
         # The rest of the trees for training
         for tree_i, tree in enumerate(trees):
 
             # Load the tree
             sys.stdout.write('Loading data tree pack {}...'.format(tree))
+            sys.stdout.flush()
             data = load.tree(tree)
             sys.stdout.write(' Loaded!\n')
 
@@ -176,34 +206,44 @@ def train(sess, network, paths, load_model=False, learning_rate=0.001, training_
             for i in range(0, len(data[0]), batch_size):
 
                 # Run our training step
-                _, summary = sess.run([optimizer, merged_summary_op], feed_dict={
+                sess.run([optimizer], feed_dict={
                     network['X']: data[0][i:i + batch_size],
                     network['G']: data[3][i:i + batch_size],
                     network['K']: dropout,
                     Y: data[1][i:i + batch_size],
                     Yi: data[2][i:i + batch_size]
-                })#, options=run_options, run_metadata=run_metadata)
-
-                # Write summary log
-                batch_no += 1
-                summary_writer.add_summary(summary, batch_no)
-
+                })  #, options=run_options, run_metadata=run_metadata)
 
                 # tf.profiler.profile(tf.get_default_graph(),
                 #                     run_meta=run_metadata,
                 #                     options=(tf.profiler.ProfileOptionBuilder(tf.profiler.ProfileOptionBuilder.time_and_memory()).build()))
 
+                # Every 20 batches write our summary log
+                if tf.train.global_step(sess, global_step) % 40 == 0:
+
+                    summary, = sess.run([merged_summary_op], feed_dict={
+                        network['X']: validation[0][0:batch_size * 2],
+                        network['G']: validation[3][0:batch_size * 2],
+                        network['K']: 1.0, # No dropout with validation
+                        Y: validation[1][0:batch_size * 2],
+                        Yi: validation[2][0:batch_size * 2]
+                    })
+
+                    summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+
 
             # Save the model after every pack
-            saver.save(sess, model_path, batch_no)
+            saver.save(sess, model_path)
 
             # Every 5 packs save the images to show training progress
             if tree_i % 5 == 0:
+
                 print('Saving images')
+
                 # Run the network after each pack file for our example images
                 output_cycle += 1
-                for v in validation[:50:5]:
-                    save_validation_image(sess, network, v, output_cycle, paths['validation'], paths['output_validation'])
+                for v in validation_images[:50:5]:
+                    save_validation_image(sess, network, v, output_cycle, validation_path, os.path.join(output_path, 'validation'))
 
 
         # Randomly shuffle the packs at the end of each epoch

@@ -1,50 +1,77 @@
 #!/usr/bin/env python3
 
 import os
+import argparse
 
 import tensorflow as tf
 import learning.network as network
 import learning.training as training
 import learning.resample as resample
 
-# Tensorflow configuration
-config = tf.ConfigProto()
-config.allow_soft_placement = True
-config.graph_options.build_cost_model = 1
-config.gpu_options.per_process_gpu_memory_fraction = 0.2
-config.gpu_options.allow_growth = True
-config.gpu_options.force_gpu_compatible = True
 
-with tf.Session(config=config) as sess:
+if __name__ == "__main__":
 
+    # Parse our command line arguments
+    command = argparse.ArgumentParser(description='Utility for training the Visual Mesh')
 
-    # Each number is output neurons for that layer, each list in the list is a convolution
-    groups = [[5], [5], [5], [5, 2]]
-    dropout = 1.0
-    regularisation = 0.00
-    gpu = 2
+    subcommands = command.add_subparsers(dest='command')
 
-    # The name for this network
-    network_name = '_'.join(['-'.join([str(l) for l in g]) for g in groups])
-    network_name = 'n{}d{:.2f}r{:.3f}'.format(network_name, dropout, regularisation)
-
-    # Input paths
-    paths = {
-        'trees': os.path.join('training', 'resample'),
-        'validation': os.path.join('training', 'validation'),
-        'logs': os.path.join('training', 'output', 'logs', network_name),
-        'output_validation': os.path.join('training', 'output', 'validation', network_name),
-        'output_trees': os.path.join('training', 'rstrees', network_name)
+    subcommands = {
+        'train': subcommands.add_parser('train'),
+        'resample': subcommands.add_parser('resample')
     }
 
-    for k, p in paths.items():
-        os.makedirs(p, exist_ok=True)
+    for k, c in subcommands.items():
+        # Which GPU to use and the network structure to use
+        c.add_argument('-g', '--gpu', action='store', default=0)
+        c.add_argument('-s', '--structure', action='store')
 
-    # Select our device
-    with tf.device('/device:GPU:{}'.format(gpu)):
+        # The input and output folders
+        c.add_argument('input', action='store')
+        c.add_argument('output', action='store')
 
-        # Get our network
-        net = network.build(groups)
+    # The directory to the validation images
+    subcommands['train'].add_argument('-v', '--validation', action='store')
+    subcommands['train'].add_argument('-d', '--dropout', action='store', default=1.0)
+    subcommands['train'].add_argument('-r', '--regularisation', action='store', default=0.0)
 
-        # Train our network
-        training.train(sess, net, paths, dropout=dropout, regularisation=regularisation)
+
+    subcommands['resample'].add_argument('-m', '--model', action='store')
+
+    args = command.parse_args()
+
+    # Tensorflow configuration
+    config = tf.ConfigProto()
+    config.allow_soft_placement = True
+    config.graph_options.build_cost_model = 1
+    config.gpu_options.per_process_gpu_memory_fraction = 0.2
+    config.gpu_options.allow_growth = True
+
+    with tf.Session(config=config) as sess:
+
+        # Work out the network structure from the arguments
+        structure = [[int(v) for v in l.split('-')] for l in args.structure.split('_')]
+        network_name = '_'.join(['-'.join([str(l) for l in g]) for g in structure])
+
+        # Select our device to run operations on
+        with tf.device('/device:GPU:{}'.format(args.gpu)):
+
+            # Build our network
+            net = network.build(structure)
+
+            # Run the appropriate action
+            if args.command == 'train':
+
+                os.makedirs(os.path.join(args.output, network_name), exist_ok=True)
+                os.makedirs(os.path.join(args.output, network_name, 'validation'), exist_ok=True)
+
+                training.train(sess,
+                               net,
+                               args.input,
+                               os.path.join(args.output, network_name),
+                               args.validation,
+                               dropout=args.dropout,
+                               regularisation=args.regularisation)
+
+            elif args.command == 'resample':
+                resample.resample(sess, net, os.path.join(args.model, network_name), args.input, args.output)

@@ -17,7 +17,7 @@ def pack(file):
     # The adjacency graph
     G = []
 
-    p = subprocess.Popen(['gzcat', file], stdout=subprocess.PIPE)
+    p = subprocess.Popen(['lz4', '-dc', file], stdout=subprocess.PIPE)
     with io.BytesIO(p.communicate()[0]) as f:
 
         while True:

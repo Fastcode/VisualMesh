@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+import struct
+import subprocess
+import tensorflow as tf
+import numpy as np
+import random
+import collections
+
+from . import load
+
 
 def get_tree_from_point(mesh, index):
 
@@ -49,7 +60,27 @@ def get_tree_from_point(mesh, index):
     return r_indices[index], new_graph, new_colour, new_stencil
 
 
-def resample(sess, network, in_dir, out_dir):
+def resample(sess, network, model_dir, in_dir, out_dir):
+
+    # Make our output directory
+    os.makedirs(out_dir, exist_ok=True)
+
+    # Initialise global variables
+    sess.run(tf.global_variables_initializer())
+
+    save_vars = {v.name: v for v in tf.trainable_variables()}
+    saver = tf.train.Saver(save_vars)
+
+    # Get our model directory and load it if it exists
+    model_path = os.path.join(model_dir, 'model.ckpt')
+    if os.path.isfile(os.path.join(model_dir, 'checkpoint')):
+        print('Loading model {}'.format(model_path))
+        saver.restore(sess, model_path)
+        model_loaded = True
+    else:
+        print('Randomly sampling without a model')
+        model_loaded = False
+
 
     # Minimum chance of being selected is 5%
     min_chance = 0.05
@@ -58,24 +89,30 @@ def resample(sess, network, in_dir, out_dir):
     packs = sorted([f for f in os.listdir(in_dir) if f.endswith('.bin.lz4')])
 
     # Work through each pack
-    for pack in packs:
-        print('Loading data tree pack {}'.format(pack))
+    for pack in packs[362::6]:
+        sys.stdout.write('Loading pack {}...'.format(pack));
+        sys.stdout.flush()
         data = load.pack(os.path.join(in_dir, pack))
-        print('\tloaded')
+        sys.stdout.write(' Loaded!\n')
 
         samples = []
 
         for in_X, in_Y, in_G in zip(*data):
 
-            # Run our network for this input object
-            result, = sess.run([network['network']], feed_dict={
-                network['X']: [in_X],
-                network['G']: [in_G],
-                network['K']: 1.0
-            })
+            if model_loaded:
+                # Run our network for this input object
+                result, = sess.run([network['network']], feed_dict={
+                    network['X']: [in_X],
+                    network['G']: [in_G],
+                    network['K']: 1.0
+                })
 
-            # We are not running batches so this is always 1 element
-            result = result[0]
+                # We are not running batches so this is always 1 element
+                result = result[0]
+
+            # If we have no model sample with equal probability
+            else:
+                result = np.ones([len(in_Y), 2], dtype=np.float32)
 
             # Now we must select all the ball points
             bp, = np.nonzero(in_Y)
@@ -100,7 +137,8 @@ def resample(sess, network, in_dir, out_dir):
                 samples.append(get_tree_from_point((in_X, in_Y, in_G), p))
 
         # Save our samples in a batch
-        with open(os.path.join(out_dir, os.path.splitext(pack)[0]), 'wb') as f:
+        output_file = os.path.join(out_dir, os.path.splitext(pack)[0])
+        with open(output_file, 'wb') as f:
             # Write out the data in a random order
             random.shuffle(samples)
             for i, new_graph, new_colour, new_stencil in samples:
@@ -112,3 +150,6 @@ def resample(sess, network, in_dir, out_dir):
                 f.write(new_graph.tobytes())
                 f.write(new_colour.tobytes())
                 f.write(new_stencil.tobytes())
+
+        # Compress in the background
+        subprocess.Popen(['lz4', '-9', '--rm', output_file, '{}.lz4'.format(output_file)], close_fds=True)

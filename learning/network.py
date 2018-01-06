@@ -19,7 +19,7 @@ def build(groups):
     K = tf.placeholder(dtype=tf.float32, shape=[], name='DropoutKeepProbability')
 
     # Build our tensor
-    logits = tf.nn.dropout(X, keep_prob=K, name='InitialDropout')
+    logits = X
     for i, c in enumerate(groups):
         # Which convolution we are on
         with tf.variable_scope('Conv_{}'.format(i)):
