@@ -115,7 +115,7 @@ int main() {
             // Load our metadata and two images
             nlohmann::json meta;
             std::ifstream(image_path + "/" + p) >> meta;
-            cv::Mat img     = cv::imread(image_path + "/image" + number + ".png");
+            cv::Mat img     = cv::imread(image_path + "/image" + number + ".png", CV_LOAD_IMAGE_UNCHANGED);
             cv::Mat scratch = img.clone();
             cv::Mat stencil = cv::imread(image_path + "/stencil" + number + ".png");
 
@@ -173,7 +173,7 @@ int main() {
             // Project our visual mesh coordinates
             auto projection = mesh.project(Hoc, lens);
 
-            classifier(img.data, mesh::VisualMesh<float>::RGB3, Hoc, lens);
+            classifier(img.data, mesh::VisualMesh<float>::RGBA, Hoc, lens);
 
             t.measure("\tProjected Visual Mesh");
 

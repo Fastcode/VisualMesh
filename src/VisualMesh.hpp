@@ -250,10 +250,10 @@ public:
                 code << "    // Gather from our neighbourhood " << std::endl;
                 if (vector_type(conv_in_size)) {
                     code << "    " << in_type << " in0[7] = {" << std::endl;
-                    for (int i = 0; i < 7; ++i) {
-                        code << "        "
-                             << "input[neighbourhood[idx * 7 + " << i << "]]";
-                        if (i != 6) {
+                    code << "        input[idx]," << std::endl;
+                    for (int i = 0; i < 6; ++i) {
+                        code << "        input[neighbourhood[idx * 6 + " << i << "]]";
+                        if (i != 5) {
                             code << ",";
                         }
                         code << std::endl;
@@ -480,7 +480,7 @@ public:
             // Upload the image using the memory queue
             cl::array<size_t, 3> origin = {{0, 0, 0}};
             cl::array<size_t, 3> region = {{size_t(lens.dimensions[0]), size_t(lens.dimensions[1]), 1}};
-            cl::ImageFormat fmt(CL_RGB, CL_UNORM_INT8);
+            cl::ImageFormat fmt(CL_RGBA, CL_UNORM_INT8);
             cl::Image2D img(mesh.context,
                             CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
                             fmt,
@@ -521,22 +521,23 @@ public:
 
             // Run each of our conv layers
             for (auto& conv : conv_layers) {
-                cl::Buffer out(mesh.context, CL_MEM_READ_WRITE, size_t(conv.second * points));
+                cl::Buffer out_buffer(mesh.context, CL_MEM_READ_WRITE, size_t(conv.second * points));
 
-                conv.first(cl::EnqueueArgs(
-                               mesh.exec_queue,
-                               std::vector<cl::Event>({layer_buffers.back().second, projection.cl.neighbourhood_event}),
-                               cl::NDRange(points)),
-                           projection.cl.neighbourhood,
-                           layer_buffers.back().first,
-                           out);
+                cl::Event event = conv.first(
+                    cl::EnqueueArgs(
+                        mesh.exec_queue,
+                        std::vector<cl::Event>({layer_buffers.back().second, projection.cl.neighbourhood_event}),
+                        cl::NDRange(points)),
+                    projection.cl.neighbourhood,
+                    layer_buffers.back().first,
+                    out_buffer);
+
+                layer_buffers.emplace_back(out_buffer, event);
             }
 
             layer_buffers.back().second.wait();
 
             return 1;
-
-            // Done!
         }
 
     private:
