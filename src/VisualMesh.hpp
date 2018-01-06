@@ -183,7 +183,7 @@ public:
                 return (size == 1 || size == 2 || size == 4 || size == 8 || size == 16) ? size : 0;
             };
 
-            for (int conv_no = 0; conv_no < int(structure.size()); ++conv_no) {
+            for (uint conv_no = 0; conv_no < structure.size(); ++conv_no) {
                 auto& conv = structure[conv_no];
 
                 // We need to work out the input and output sizes for our convolution
@@ -247,7 +247,7 @@ public:
                             code << "        input[neighbourhood[idx * 7 + " << i << "] * " << conv_in_size << " + "
                                  << j << "]";
 
-                            if (i < 6 || j < (conv_in_size - 1)) {
+                            if (i < 6 || j + 1 < conv_in_size) {
                                 code << ",";
                             }
                             code << std::endl;
@@ -265,7 +265,7 @@ public:
 
                 // Now we have to do our layer operations
                 int in_size = conv_in_size;
-                for (int layer_no = 0; layer_no < int(conv.size()); ++layer_no) {
+                for (uint layer_no = 0; layer_no < conv.size(); ++layer_no) {
                     const auto& weights = conv[layer_no].first;
                     const auto& biases  = conv[layer_no].second;
 
@@ -286,9 +286,9 @@ public:
 
                     // Matrix multiplication + bias
                     if (vector_in) {
-                        for (int i = 0; i < int(biases.size()); ++i) {
+                        for (uint i = 0; i < biases.size(); ++i) {
                             code << "        ";
-                            for (int j = 0; j < int(weights.size()); j += vector_in) {
+                            for (uint j = 0; j < weights.size(); j += vector_in) {
 
                                 // If our data is gathered, we need to get our gathered index
                                 std::string gathered_index =
@@ -298,9 +298,9 @@ public:
                                 code << "dot(in" << layer_no << gathered_index << ", (float" << vector_in << ")(";
 
                                 // Write our fixed data
-                                for (int k = j; k < (j + vector_in); ++k) {
+                                for (uint k = j; k < j + vector_in; ++k) {
                                     code << weights[k][i];
-                                    if (k < (j + vector_in - 1)) {
+                                    if (k + 1 < j + vector_in) {
                                         code << ", ";
                                     }
                                 }
@@ -309,20 +309,20 @@ public:
                                 code << ")) + ";
                             }
                             code << biases[i];
-                            if (i < int(biases.size()) - 1) {
+                            if (i + 1 < biases.size()) {
                                 code << ",";
                             }
                             code << std::endl;
                         }
                     }
                     else {
-                        for (int i = 0; i < int(biases.size()); ++i) {
+                        for (uint i = 0; i < biases.size(); ++i) {
                             code << "        ";
-                            for (int j = 0; j < int(weights.size()); ++j) {
+                            for (uint j = 0; j < weights.size(); ++j) {
                                 code << "in" << layer_no << "[" << j << "] * " << weights[j][i] << " + ";
                             }
                             code << biases[i];
-                            if (i < int(biases.size()) - 1) {
+                            if (i + 1 < biases.size()) {
                                 code << ",";
                             }
                             code << std::endl;
@@ -353,7 +353,7 @@ public:
                              << e << " > 0);" << std::endl;  // select(a, b, c) == c ? b : a
                     }
                     else {
-                        for (int i = 0; i < int(biases.size()); ++i) {
+                        for (uint i = 0; i < biases.size(); ++i) {
                             std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
                             code << "    " << e << " = " << e << " > 0 ? " << e << " : native_exp(" << e << ") - 1;"
                                  << std::endl;
@@ -362,7 +362,7 @@ public:
                     code << std::endl;
 
                     // If this is our last layer, apply softmax
-                    if (conv_no == int(structure.size()) - 1 && layer_no == int(conv.size()) - 1) {
+                    if (conv_no + 1 == structure.size() && layer_no + 1 == conv.size()) {
                         code << "    // Apply softmax to our final output" << std::endl;
 
                         if (vector_out) {
@@ -374,20 +374,20 @@ public:
                         else {
 
                             // Apply exp to each of the elements
-                            for (int i = 0; i < int(biases.size()); ++i) {
+                            for (uint i = 0; i < biases.size(); ++i) {
                                 std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
                                 code << "    " << e << " = native_exp(" << e << ");" << std::endl;
                             }
 
                             // Sum up all the values
                             code << "float exp_sum = 0";
-                            for (int i = 0; i < int(biases.size()); ++i) {
+                            for (uint i = 0; i < biases.size(); ++i) {
                                 std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
                                 code << "    exp_sum += " << e << ";" << std::endl;
                             }
 
                             // Divide all the values
-                            for (int i = 0; i < int(biases.size()); ++i) {
+                            for (uint i = 0; i < biases.size(); ++i) {
                                 std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
                                 code << "    " << e << " /= exp_sum" << std::endl;
                             }
@@ -437,7 +437,7 @@ public:
 
                 std::cout << "PROGRAM SOURCE" << std::endl;
                 auto vals = split(code.str(), '\n');
-                for (int i = 0; i < vals.size(); ++i) {
+                for (uint i = 0; i < vals.size(); ++i) {
                     std::cout << (i + 1) << ": " << vals[i] << std::endl;
                 }
 
@@ -445,9 +445,9 @@ public:
                                          + program.getBuildInfo<CL_PROGRAM_BUILD_LOG>().front().second);
             }
 
-            for (int i = 0; i < int(structure.size()); ++i) {
+            for (uint i = 0; i < structure.size(); ++i) {
                 std::string kernel = "conv" + std::to_string(i);
-                int output_size    = structure[i].back().second.size();
+                uint output_size   = structure[i].back().second.size();
                 conv_layers.emplace_back(
                     cl::KernelFunctor<const cl::Buffer&, const cl::Buffer&, cl::Buffer&>(program, kernel), output_size);
             }
@@ -687,7 +687,7 @@ public:
             };
 
             // Now we upwards and downwards to fill in the missing links
-            for (int r = 1; r < int(rows.size()) - 1; ++r) {
+            for (uint r = 1; r + 1 < rows.size(); ++r) {
 
                 // Alias for convenience
                 const auto& prev    = rows[r - 1];
@@ -1058,7 +1058,7 @@ public:
 
                             // If this is entering, point 0 is a start, and point 1 is an end
                             std::vector<std::pair<Scalar, Scalar>> output;
-                            for (size_t i = first_is_end ? 1 : 0; i < limits.size() - 1; i += 2) {
+                            for (size_t i = first_is_end ? 1 : 0; i + 1 < limits.size(); i += 2) {
                                 output.emplace_back(limits[i], limits[i + 1]);
                             }
                             if (first_is_end) {
