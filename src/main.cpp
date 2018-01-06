@@ -78,7 +78,7 @@ int main() {
                                0.5);
         t.measure("Generated Hoc");
         try {
-            mesh.project_mesh(Hoc, lens);
+            mesh.project(Hoc, lens);
         }
         catch (const std::exception& ex) {
             std::cout << ex.what() << std::endl;

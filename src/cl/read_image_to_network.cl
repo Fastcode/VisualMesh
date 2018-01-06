@@ -1,3 +1,5 @@
+const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
+
 enum FOURCC {
     GREY    = 0x59455247,
     Y12     = 0x20323159,
@@ -23,20 +25,23 @@ enum FOURCC {
     UNKNOWN = 0
 };
 
-Scalar3 read_image(global const char* image, const enum FOURCC format, const int2 coordinates) {
+Scalar4 read_image(read_only image2d_t image, const enum FOURCC format, const int2 coordinates) {
     switch (format) {
         case YUYV: {
-            return (Scalar3)(1.0, 1.0, 1.0);
+            return (Scalar4)(1.0);
         }
-        default: { return (Scalar3)(0, 0, 0); }
+        case RGB3: {
+            return read_imagef(image, sampler, coordinates);
+        }
+        default: { return (Scalar4)(0); }
     }
 }
 
 kernel void read_image_to_network(global int* indices,
-                                  global const char* image,
+                                  read_only image2d_t image,
                                   const enum FOURCC format,
                                   global int2* coordinates,
-                                  global Scalar3* network) {
+                                  global Scalar4* network) {
 
     const size_t id    = get_global_id(0);
     const size_t index = indices[id];
