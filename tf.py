@@ -7,6 +7,7 @@ import tensorflow as tf
 import learning.network as network
 import learning.training as training
 import learning.resample as resample
+import learning.show as show
 
 
 if __name__ == "__main__":
@@ -18,7 +19,8 @@ if __name__ == "__main__":
 
     subcommands = {
         'train': subcommands.add_parser('train'),
-        'resample': subcommands.add_parser('resample')
+        'resample': subcommands.add_parser('resample'),
+        'show': subcommands.add_parser('show')
     }
 
     for k, c in subcommands.items():
@@ -28,7 +30,9 @@ if __name__ == "__main__":
 
         # The input and output folders
         c.add_argument('input', action='store')
-        c.add_argument('output', action='store')
+
+    subcommands['train'].add_argument('output', action='store')
+    subcommands['resample'].add_argument('output', action='store')
 
     # The directory to the validation images
     subcommands['train'].add_argument('-v', '--validation', action='store')
@@ -75,3 +79,6 @@ if __name__ == "__main__":
 
             elif args.command == 'resample':
                 resample.resample(sess, net, os.path.join(args.model, network_name), args.input, args.output)
+
+            elif args.command == 'show':
+                show.show(sess, net, os.path.join(args.input, network_name))
