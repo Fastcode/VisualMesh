@@ -43,30 +43,25 @@
 
 namespace mesh {
 
-// http://stackoverflow.com/a/237280
-inline std::vector<std::string> split(const std::string& str, char delimeter) {
-    std::stringstream ss(str);
-    std::string item;
-    std::vector<std::string> elements;
-    while (std::getline(ss, item, delimeter)) {
-        elements.push_back(item);
-    }
-    return elements;
-}
-
-
 template <typename T>
 struct LazyBufferReader {
 
     LazyBufferReader() = default;
 
-    LazyBufferReader(cl::CommandQueue queue, cl::Buffer buffer, cl::Event ready, size_t n_elements)
-        : buffer(buffer), ready(ready), n_elements(n_elements) {}
+    LazyBufferReader(const cl::CommandQueue& queue, const cl::Buffer& buffer, const cl::Event& ready, size_t n_elements)
+        : queue(queue), buffer(buffer), ready(ready), n_elements(n_elements) {}
 
-    operator T() {
+    operator std::vector<T>() {
         std::vector<T> output(n_elements);
         std::vector<cl::Event> ready_list = {ready};
         queue.enqueueReadBuffer(buffer, true, 0, n_elements * sizeof(T), output.data(), &ready_list);
+        return output;
+    }
+
+    operator T() {
+        T output;
+        std::vector<cl::Event> ready_list = {ready};
+        queue.enqueueReadBuffer(buffer, true, 0, sizeof(T), &output, &ready_list);
         return output;
     }
 
@@ -178,6 +173,8 @@ public:
         YM24    = 0x34324d59,
         RGB3    = 0x33424752,
         RGBA    = 0x41424752,
+        BGR3    = 0x33524742,
+        BGRA    = 0x41524742,
         JPEG    = 0x4745504a,
         UNKNOWN = 0
     };
@@ -242,7 +239,6 @@ public:
                 code << "    // Get our kernel index" << std::endl;
                 code << "    const int idx = get_global_id(0);" << std::endl << std::endl;
 
-
                 /*************************************************
                  *                    GATHER                     *
                  *************************************************/
@@ -264,9 +260,15 @@ public:
                 else {
                     code << "    float in0[" << (conv_in_size * 7) << "] = {" << std::endl;
 
-                    for (int i = 0; i < 7; ++i) {
+                    // Read the ones for our own index
+                    for (int j = 0; j < conv_in_size; ++j) {
+                        code << "        input[idx * " << conv_in_size << " + " << j << "]";
+                    }
+
+                    // Read our neighbourhood
+                    for (int i = 0; i < 6; ++i) {
                         for (int j = 0; j < conv_in_size; ++j) {
-                            code << "        input[neighbourhood[idx * 7 + " << i << "] * " << conv_in_size << " + "
+                            code << "        input[neighbourhood[idx * 6 + " << i << "] * " << conv_in_size << " + "
                                  << j << "]";
 
                             if (i < 6 || j + 1 < conv_in_size) {
@@ -279,7 +281,6 @@ public:
                 }
 
                 code << std::endl << std::endl;
-
 
                 /*************************************************
                  *                WEIGHTS + BIAS                 *
@@ -422,7 +423,6 @@ public:
                     in_size = biases.size();
                 }
 
-
                 /*************************************************
                  *                    OUTPUT                     *
                  *************************************************/
@@ -441,8 +441,6 @@ public:
                 code << "}" << std::endl << std::endl;
             }
 
-            std::cout << code.str() << std::endl;
-
             // Compile the OpenCL program
             cl::Program::Sources sources({code.str()});
 
@@ -450,19 +448,13 @@ public:
             program = cl::Program(mesh.context, sources);
 
             try {
-                if (program.build() != CL_SUCCESS) {
+                if (program.build("-cl-single-precision-constant -cl-strict-aliasing -cl-fast-relaxed-math")
+                    != CL_SUCCESS) {
                     throw std::runtime_error("Error building VisualMesh Classifier\n"
                                              + program.getBuildInfo<CL_PROGRAM_BUILD_LOG>().front().second);
                 }
             }
             catch (const cl::BuildError) {
-
-                std::cout << "PROGRAM SOURCE" << std::endl;
-                auto vals = split(code.str(), '\n');
-                for (uint i = 0; i < vals.size(); ++i) {
-                    std::cout << (i + 1) << ": " << vals[i] << std::endl;
-                }
-
                 throw std::runtime_error("Error building VisualMesh Classifier\n"
                                          + program.getBuildInfo<CL_PROGRAM_BUILD_LOG>().front().second);
             }
@@ -475,12 +467,15 @@ public:
             }
         }
 
-        int operator()(const void* image, const FOURCC& format, const mat4& Hoc, const Lens& lens) {
+        std::vector<std::array<float, 2>> operator()(const void* image,
+                                                     const FOURCC& format,
+                                                     const mat4& Hoc,
+                                                     const Lens& lens) {
 
             // Upload the image using the memory queue
             cl::array<size_t, 3> origin = {{0, 0, 0}};
             cl::array<size_t, 3> region = {{size_t(lens.dimensions[0]), size_t(lens.dimensions[1]), 1}};
-            cl::ImageFormat fmt(CL_RGBA, CL_UNORM_INT8);
+            cl::ImageFormat fmt(CL_BGRA, CL_UNORM_INT8);
             cl::Image2D img(mesh.context,
                             CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
                             fmt,
@@ -505,12 +500,9 @@ public:
 
             // Read the pixels into the buffer
             cl::Event img_load_event = mesh.read_image_to_network(
-                cl::EnqueueArgs(
-                    mesh.exec_queue,
-                    std::vector<cl::Event>(
-                        {projection.cl.pixel_coordinates_event, projection.cl.neighbourhood_event, img_event}),
-                    cl::NDRange(points)),
-                projection.cl.neighbourhood,
+                cl::EnqueueArgs(mesh.exec_queue,
+                                std::vector<cl::Event>({projection.cl.pixel_coordinates_event, img_event}),
+                                cl::NDRange(points)),
                 img,
                 format,
                 projection.cl.pixel_coordinates,
@@ -521,7 +513,7 @@ public:
 
             // Run each of our conv layers
             for (auto& conv : conv_layers) {
-                cl::Buffer out_buffer(mesh.context, CL_MEM_READ_WRITE, size_t(conv.second * points));
+                cl::Buffer out_buffer(mesh.context, CL_MEM_READ_WRITE, size_t(conv.second * points * sizeof(float)));
 
                 cl::Event event = conv.first(
                     cl::EnqueueArgs(
@@ -535,9 +527,13 @@ public:
                 layer_buffers.emplace_back(out_buffer, event);
             }
 
-            layer_buffers.back().second.wait();
+            // Read out the final layers output
+            std::vector<std::array<float, 2>> output(points);
+            std::vector<cl::Event> ready_list = {layer_buffers.back().second};
+            mesh.mem_queue.enqueueReadBuffer(
+                layer_buffers.back().first, true, 0, points * sizeof(cl_float2), output.data(), &ready_list);
 
-            return 1;
+            return output;
         }
 
     private:
@@ -1303,7 +1299,7 @@ public:
 
         // This can happen on the CPU while the OpenCL device is busy
         // Build the reverse lookup map
-        std::vector<int> r_indices(nodes.size(), -1);
+        std::vector<int> r_indices(nodes.size(), 0);  // TODO this shouldn't be 0, fix it
         for (uint i = 0; i < indices.size(); ++i) {
             r_indices[indices[i]] = i;
         }
@@ -1326,7 +1322,7 @@ public:
 
         // local_n_event.wait();                             // TIMER_LINE
         // t.measure("\tUpload Local Neighbourhood (mem)");  // TIMER_LINE
-
+        projected.wait();  // TODO why does this fix it!
         return ProjectedMesh{LazyBufferReader<std::array<int, 2>>(mem_queue, pixel_coordinates, projected, points),
                              local_neighbourhood,
                              {pixel_coordinates, projected, local_n_buffer, local_n_event}};
@@ -1433,8 +1429,7 @@ private:
         project_rectilinear = ProjectionKernelFuctor(program, "project_rectilinear");
 
         // Build functors for reading images into the neural network layer
-        read_image_to_network = cl::KernelFunctor<const cl::Buffer&,   // The int* index map
-                                                  const cl::Image2D&,  // The image buffer
+        read_image_to_network = cl::KernelFunctor<const cl::Image2D&,  // The image buffer
                                                   const FOURCC&,       // The binary format the image is in
                                                   const cl::Buffer&,   // The pixel coordinates to lookup
                                                   cl::Buffer&>  // The neural network layer information to output to
@@ -1464,7 +1459,6 @@ private:
     ProjectionFunction project_rectilinear;
 
     std::function<cl::Event(const cl::EnqueueArgs&,  // The number of workers to spawn etc
-                            const cl::Buffer&,       // The int* index map
                             const cl::Image2D&,      // The image buffer
                             const FOURCC&,           // The binary format the image is in
                             const cl::Buffer&,       // The pixel coordinates to lookup

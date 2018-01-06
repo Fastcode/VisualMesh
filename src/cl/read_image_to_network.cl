@@ -1,4 +1,4 @@
-const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
+const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
 
 enum FOURCC {
     GREY    = 0x59455247,
@@ -22,6 +22,8 @@ enum FOURCC {
     YM24    = 0x34324d59,
     RGB3    = 0x33424752,
     RGBA    = 0x41424752,
+    BGR3    = 0x33524742,
+    BGRA    = 0x41524742,
     JPEG    = 0x4745504a,
     UNKNOWN = 0
 };
@@ -29,9 +31,10 @@ enum FOURCC {
 Scalar4 read_image(read_only image2d_t image, const enum FOURCC format, const int2 coordinates) {
     switch (format) {
         case YUYV: {
-            return (Scalar4)(1.0);
+            return (Scalar4)(1.0);  // TODO implement
         }
         case RGB3:
+        case BGRA:
         case RGBA: {
             return read_imagef(image, sampler, coordinates);
         }
@@ -39,15 +42,13 @@ Scalar4 read_image(read_only image2d_t image, const enum FOURCC format, const in
     }
 }
 
-kernel void read_image_to_network(global int* indices,
-                                  read_only image2d_t image,
+kernel void read_image_to_network(read_only image2d_t image,
                                   const enum FOURCC format,
                                   global int2* coordinates,
                                   global Scalar4* network) {
 
-    const size_t id    = get_global_id(0);
-    const size_t index = indices[id];
+    const int idx = get_global_id(0);
 
     // Store our pixel value in the network
-    network[index] = read_image(image, format, coordinates[id]);
+    network[idx] = read_image(image, format, coordinates[idx]);
 }

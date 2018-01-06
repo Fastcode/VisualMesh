@@ -171,27 +171,33 @@ int main() {
             }
 
             // Project our visual mesh coordinates
-            auto projection = mesh.project(Hoc, lens);
-
-            classifier(img.data, mesh::VisualMesh<float>::RGBA, Hoc, lens);
+            auto projection                                   = mesh.project(Hoc, lens);
+            auto& neighbourhood                               = projection.neighbourhood;
+            std::vector<std::array<int, 2>> pixel_coordinates = projection.pixel_coordinates;
 
             t.measure("\tProjected Visual Mesh");
+
+            auto classified = classifier(img.data, mesh::VisualMesh<float>::BGRA, Hoc, lens);
+
+            t.measure("\tClassified Mesh");
 
             cv::imshow("Image", img);
             // Wait for esc key
             if (char(cv::waitKey(0)) == 27) break;
 
-            // Make a rectangle for testing if points are on the image
-            // for (int i = 0; i < projection.pixel_coordinates.size(); ++i) {
-            //     cv::Point p1(projection.pixel_coordinates[i][0], projection.pixel_coordinates[i][1]);
+            for (int i = 0; i < pixel_coordinates.size(); ++i) {
+                cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
 
-            //     for (const auto& n : projection.neighbourhood[i]) {
-            //         if (n > 0) {
-            //             cv::Point p2(projection.pixel_coordinates[n][0], projection.pixel_coordinates[n][1]);
-            //             cv::line(img, p1, p2, cv::Scalar(255, 255, 255), 1);
-            //         }
-            //     }
-            // }
+                cv::Scalar colour(uint8_t(classified[i][0] * 255), 0, uint8_t(classified[i][1] * 255));
+
+                for (const auto& n : neighbourhood[i]) {
+                    if (n > 0) {
+                        cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
+                        cv::Point p2x = p1 + ((p2 - p1) * 0.5);
+                        cv::line(img, p1, p2x, colour, 2);
+                    }
+                }
+            }
 
             cv::imshow("Image", img);
             // Wait for esc key
