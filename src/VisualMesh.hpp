@@ -48,7 +48,7 @@ struct LazyBufferReader {
 
     LazyBufferReader() = default;
 
-    LazyBufferReader(const cl::CommandQueue& queue, const cl::Buffer& buffer, const cl::Event& ready, size_t n_elements)
+    LazyBufferReader(const cl::CommandQueue& queue, const cl::Buffer& buffer, const cl::Event& ready, uint n_elements)
         : queue(queue), buffer(buffer), ready(ready), n_elements(n_elements) {}
 
     operator std::vector<T>() {
@@ -68,7 +68,7 @@ struct LazyBufferReader {
     cl::CommandQueue queue;
     cl::Buffer buffer;
     cl::Event ready;
-    size_t n_elements;
+    uint n_elements;
 };
 
 /**
@@ -365,6 +365,7 @@ public:
                     /*************************************************
                      *                  ACTIVATION.                  *
                      *************************************************/
+
                     // Apply our activation function
                     code << "    // Apply the activation function" << std::endl;
                     if (vector_out) {
@@ -564,7 +565,7 @@ public:
     explicit VisualMesh(const Shape& shape,
                         const Scalar& min_height,
                         const Scalar& max_height,
-                        const size_t& height_resolution,
+                        const uint& height_resolution,
                         const Scalar& min_angular_res)
         : min_angular_res(min_angular_res)
         , min_height(min_height)
@@ -582,14 +583,14 @@ public:
 
             // Loop from directly down up to the horizon (if phi is nan it will stop)
             // So we don't have a single point at the base, we move half a jump forward
-            for (Scalar phi = shape.phi(0, h) * Scalar(0.5); phi < M_PI_2;) {
+            for (Scalar phi = shape.phi(Scalar(0.0), h) * Scalar(0.5); phi < M_PI_2;) {
 
                 // Calculate our theta
                 Scalar theta = std::max(shape.theta(phi, h), min_angular_res);
 
                 if (!std::isnan(theta)) {
                     // Push back the phi, and the number of whole shapes we can fit
-                    phis.emplace_back(phi, size_t(std::ceil(Scalar(2.0) * M_PI / theta)));
+                    phis.emplace_back(phi, uint(std::ceil(Scalar(2.0) * M_PI / theta)));
                 }
 
                 // Move to our next phi
@@ -604,7 +605,7 @@ public:
 
                 if (!std::isnan(theta)) {
                     // Push back the phi, and the number of whole shapes we can fit
-                    phis.emplace_back(phi, size_t(std::ceil(Scalar(2.0) * M_PI / theta)));
+                    phis.emplace_back(phi, uint(std::ceil(Scalar(2.0) * M_PI / theta)));
                 }
 
                 // Move to our next phi
@@ -619,7 +620,7 @@ public:
             std::vector<Node> lut;
 
             // Work out how big our LUT will be
-            size_t lut_size = 0;
+            uint lut_size = 0;
             for (const auto& v : phis) {
                 lut_size += v.second;
             }
@@ -685,7 +686,7 @@ public:
                            const Scalar& pos,
                            const int& start,
                            const int& size,
-                           const size_t offset) {
+                           const uint offset) {
 
                 // Grab our current node
                 auto& node = lut[i];
@@ -746,7 +747,7 @@ public:
                     auto& node = lut[i];
 
                     // Work out which two points are on the opposite side to us
-                    const size_t index = i - front.begin + (front_size / 2);
+                    const uint index = i - front.begin + (front_size / 2);
 
                     // Find where we are in our row as a value between 0 and 1
                     const Scalar pos = Scalar(i - front.begin) / Scalar(front_size);
@@ -766,7 +767,7 @@ public:
                     auto& node = lut[i];
 
                     // Work out which two points are on the opposite side to us
-                    const size_t index = i - back.begin + (back_size / 2);
+                    const uint index = i - back.begin + (back_size / 2);
 
                     // Find where we are in our row as a value between 0 and 1
                     const Scalar pos = Scalar(i - back.begin) / Scalar(back_size);
@@ -821,11 +822,10 @@ public:
     }
 
     template <typename Func>
-    std::pair<const Mesh&, std::vector<std::pair<size_t, size_t>>> lookup(const Scalar& height,
-                                                                          Func&& theta_limits) const {
+    std::pair<const Mesh&, std::vector<std::pair<uint, uint>>> lookup(const Scalar& height, Func&& theta_limits) const {
 
         const auto& mesh = this->height(height);
-        std::vector<std::pair<size_t, size_t>> indices;
+        std::vector<std::pair<uint, uint>> indices;
 
         // Loop through each phi row
         for (const auto& row : mesh.rows) {
@@ -866,7 +866,7 @@ public:
         return {mesh, indices};
     }
 
-    std::pair<const Mesh&, std::vector<std::pair<size_t, size_t>>> lookup(const mat4& Hoc, const Lens& lens) {
+    std::pair<const Mesh&, std::vector<std::pair<uint, uint>>> lookup(const mat4& Hoc, const Lens& lens) {
 
         // We multiply a lot of things by 2
         constexpr const Scalar x2 = Scalar(2.0);
@@ -1025,7 +1025,7 @@ public:
                                     const Scalar z = o[2] + d[2] * t;
 
                                     // If we are both above, or both below the horizon
-                                    if ((z > 0) == (phi > M_PI_2)) {
+                                    if ((z > Scalar(0.0)) == (phi > M_PI_2)) {
 
                                         const Scalar x     = o[0] + d[0] * t;
                                         const Scalar y     = o[1] + d[1] * t;
@@ -1040,7 +1040,7 @@ public:
 
                     // If all solutions are complex we totally enclose the phi however we still need to check the
                     // cone is on the correct side
-                    if (complex_sols == 4 && ((cos_phi > 0) == (cam[2] < 0))) {
+                    if (complex_sols == 4 && ((cos_phi > Scalar(0.0)) == (cam[2] < Scalar(0.0)))) {
 
                         // Make a test unit vector that is on the cone, theta=0 is easiest
                         const vec3 test_vec = {{sin_phi, Scalar(0.0), -cos_phi}};
@@ -1078,7 +1078,7 @@ public:
 
                             // If this is entering, point 0 is a start, and point 1 is an end
                             std::vector<std::pair<Scalar, Scalar>> output;
-                            for (size_t i = first_is_end ? 1 : 0; i + 1 < limits.size(); i += 2) {
+                            for (uint i = first_is_end ? 1 : 0; i + 1 < limits.size(); i += 2) {
                                 output.emplace_back(limits[i], limits[i + 1]);
                             }
                             if (first_is_end) {
@@ -1298,30 +1298,38 @@ public:
         // t.measure("\tProject points (gpu)");  // TIMER_LINE
 
         // This can happen on the CPU while the OpenCL device is busy
-        // Build the reverse lookup map
-        std::vector<int> r_indices(nodes.size(), 0);  // TODO this shouldn't be 0, fix it
+        // Build the reverse lookup map where the offscreen point is one past the end
+        std::vector<int> r_indices(nodes.size(), points);
         for (uint i = 0; i < indices.size(); ++i) {
             r_indices[indices[i]] = i;
         }
 
-        // Build the packed neighbourhood map
-        std::vector<std::array<int, 6>> local_neighbourhood(points);
+        // Build the packed neighbourhood map with an extra offscreen point at the end
+        std::vector<std::array<int, 6>> local_neighbourhood(points + 1);
         for (uint i = 0; i < indices.size(); ++i) {
             for (uint j = 0; j < 6; ++j) {
                 const auto& n             = nodes[indices[i]].neighbours[j];
                 local_neighbourhood[i][j] = r_indices[n];
             }
         }
+        // Fill in the final offscreen point which connects only to itself
+        local_neighbourhood[points] = {{points, points, points, points, points, points}};
 
         // t.measure("\tBuild Local Neighbourhood (cpu)");  // TIMER_LINE
 
         cl::Event local_n_event;
         cl::Buffer local_n_buffer(context, CL_MEM_READ_ONLY, points * sizeof(int) * 6);
-        mem_queue.enqueueWriteBuffer(
-            local_n_buffer, false, 0, points * sizeof(int) * 6, local_neighbourhood.data(), nullptr, &local_n_event);
+        mem_queue.enqueueWriteBuffer(local_n_buffer,
+                                     false,
+                                     0,
+                                     local_neighbourhood.size() * sizeof(int) * 6,
+                                     local_neighbourhood.data(),
+                                     nullptr,
+                                     &local_n_event);
 
         // local_n_event.wait();                             // TIMER_LINE
         // t.measure("\tUpload Local Neighbourhood (mem)");  // TIMER_LINE
+
         projected.wait();  // TODO why does this fix it!
         return ProjectedMesh{LazyBufferReader<std::array<int, 2>>(mem_queue, pixel_coordinates, projected, points),
                              local_neighbourhood,
@@ -1348,7 +1356,7 @@ private:
     }
 
     inline vec3 normalise(const vec3& a) {
-        Scalar length = std::sqrt(a[0] * a[0] + a[1] * a[1] + a[2] + a[2]);
+        Scalar length = Scalar(1.0) / std::sqrt(a[0] * a[0] + a[1] * a[1] + a[2] + a[2]);
         return {{a[0] * length, a[1] * length, a[2] * length}};
     }
 
@@ -1475,8 +1483,8 @@ private:
     // The maximum height the luts are generated for
     Scalar max_height;
     // The number gradations in height
-    size_t height_resolution;
-};  // namespace mesh
+    uint height_resolution;
+};
 
 }  // namespace mesh
 
