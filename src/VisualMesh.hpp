@@ -491,41 +491,51 @@ public:
 
             // Project our visual mesh
             auto projection = mesh.project(Hoc, lens);
-            int points      = projection.neighbourhood.size();
+
+            // This includes the offscreen point at the end
+            int points = projection.neighbourhood.size();
 
             // Our buffers for each layer
-            std::vector<std::pair<cl::Buffer, cl::Event>> layer_buffers;
+            std::vector<std::pair<cl::Buffer, std::vector<cl::Event>>> layer_buffers;
 
             // First layer, output from the image
             cl::Buffer img_load_buffer(mesh.context, CL_MEM_READ_WRITE, sizeof(cl_float4) * points);
+
+            // Zero out the final value in the buffer
+            cl::Event byte_fill_event;
+            mesh.mem_queue.enqueueFillBuffer(img_load_buffer,
+                                             cl_float4{{0.0f, 0.0f, 0.0f, 0.0f}},
+                                             (points - 1) * sizeof(cl_float4),
+                                             sizeof(cl_float4),
+                                             nullptr,
+                                             &byte_fill_event);
 
             // Read the pixels into the buffer
             cl::Event img_load_event = mesh.read_image_to_network(
                 cl::EnqueueArgs(mesh.exec_queue,
                                 std::vector<cl::Event>({projection.cl.pixel_coordinates_event, img_event}),
-                                cl::NDRange(points)),
+                                cl::NDRange(points - 1)),  // -1 as we don't project the offscreen point
                 img,
                 format,
                 projection.cl.pixel_coordinates,
                 img_load_buffer);
 
             // These make up our first buffers
-            layer_buffers.emplace_back(img_load_buffer, img_load_event);
+            layer_buffers.emplace_back(
+                img_load_buffer,
+                std::vector<cl::Event>({img_load_event, byte_fill_event, projection.cl.neighbourhood_event}));
 
             // Run each of our conv layers
             for (auto& conv : conv_layers) {
                 cl::Buffer out_buffer(mesh.context, CL_MEM_READ_WRITE, size_t(conv.second * points * sizeof(float)));
 
-                cl::Event event = conv.first(
-                    cl::EnqueueArgs(
-                        mesh.exec_queue,
-                        std::vector<cl::Event>({layer_buffers.back().second, projection.cl.neighbourhood_event}),
-                        cl::NDRange(points)),
-                    projection.cl.neighbourhood,
-                    layer_buffers.back().first,
-                    out_buffer);
+                cl::Event event =
+                    conv.first(cl::EnqueueArgs(mesh.exec_queue, layer_buffers.back().second, cl::NDRange(points)),
+                               projection.cl.neighbourhood,
+                               layer_buffers.back().first,
+                               out_buffer);
 
-                layer_buffers.emplace_back(out_buffer, event);
+                layer_buffers.emplace_back(out_buffer, std::vector<cl::Event>({event}));
             }
 
             // Read out the final layers output
@@ -1251,7 +1261,7 @@ public:
         // Upload our indices map
         cl::Event indices_event;
         mem_queue.enqueueWriteBuffer(
-            indices_map, false, 0, points * sizeof(cl_int), indices.data(), nullptr, &indices_event);
+            indices_map, false, 0, indices.size() * sizeof(cl_int), indices.data(), nullptr, &indices_event);
 
         // indices_event.wait();               // TIMER_LINE
         // t.measure("\tUpload Range (mem)");  // TIMER_LINE
@@ -1318,7 +1328,7 @@ public:
         // t.measure("\tBuild Local Neighbourhood (cpu)");  // TIMER_LINE
 
         cl::Event local_n_event;
-        cl::Buffer local_n_buffer(context, CL_MEM_READ_ONLY, points * sizeof(int) * 6);
+        cl::Buffer local_n_buffer(context, CL_MEM_READ_ONLY, local_neighbourhood.size() * sizeof(int) * 6);
         mem_queue.enqueueWriteBuffer(local_n_buffer,
                                      false,
                                      0,

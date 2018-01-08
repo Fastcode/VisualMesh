@@ -116,7 +116,6 @@ int main() {
             nlohmann::json meta;
             std::ifstream(image_path + "/" + p) >> meta;
             cv::Mat img     = cv::imread(image_path + "/image" + number + ".png", CV_LOAD_IMAGE_UNCHANGED);
-            cv::Mat scratch = img.clone();
             cv::Mat stencil = cv::imread(image_path + "/stencil" + number + ".png");
 
             t.measure("\tLoaded files");
@@ -182,22 +181,31 @@ int main() {
             t.measure("\tClassified Mesh");
 
             cv::imshow("Image", img);
+
+            cv::Mat scratch = img.clone();
+
             // Wait for esc key
             if (char(cv::waitKey(0)) == 27) break;
 
             for (int i = 0; i < pixel_coordinates.size(); ++i) {
                 cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
 
-                cv::Scalar colour(uint8_t(classified[i][0] * 255), 0, uint8_t(classified[i][1] * 255));
+                // cv::Scalar colour(uint8_t(classified[i][0] * 255), 0, uint8_t(classified[i][1] * 255));
+                cv::Scalar colour(classified[i][0] > 0.5 ? 255 : 0, 0, classified[i][1] >= 0.5 ? 255 : 0);
 
                 for (const auto& n : neighbourhood[i]) {
-                    if (n > 0) {
+                    if (n < pixel_coordinates.size()) {
                         cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
                         cv::Point p2x = p1 + ((p2 - p1) * 0.5);
-                        cv::line(img, p1, p2x, colour, 2);
+                        cv::line(scratch, p1, p2x, colour, 1);
                     }
                 }
             }
+
+            cv::imshow("Image", scratch);
+            // Wait for esc key
+            if (char(cv::waitKey(0)) == 27) break;
+
 
             cv::imshow("Image", img);
             // Wait for esc key
