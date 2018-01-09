@@ -30,16 +30,13 @@
 #define CL_HPP_MINIMUM_OPENCL_VERSION 120
 #define CL_HPP_TARGET_OPENCL_VERSION 120
 #define CL_HPP_ENABLE_EXCEPTIONS
-#include <cl/cl2.hpp>
+#include "cl/cl2.hpp"
 
 // Include our generated OpenCL headers
 #include "cl/project_equidistant.cl.hpp"
 #include "cl/project_equisolid.cl.hpp"
 #include "cl/project_rectilinear.cl.hpp"
 #include "cl/read_image_to_network.cl.hpp"
-
-// Debugging
-#include "Timer.hpp"
 
 namespace mesh {
 
@@ -190,7 +187,9 @@ public:
         using network_structure_t = std::vector<conv_layer_t>;
 
     public:
-        Classifier(VisualMesh& mesh, const network_structure_t& structure) : mesh(mesh) {
+        Classifier() : mesh(nullptr) {}
+
+        Classifier(VisualMesh* mesh, const network_structure_t& structure) : mesh(mesh) {
 
             // Build using a string stream
             std::stringstream code;
@@ -446,7 +445,7 @@ public:
             cl::Program::Sources sources({code.str()});
 
             // Build the program
-            program = cl::Program(mesh.context, sources);
+            program = cl::Program(mesh->context, sources);
 
             try {
                 if (program.build("-cl-single-precision-constant -cl-strict-aliasing -cl-fast-relaxed-math")
@@ -476,8 +475,19 @@ public:
             // Upload the image using the memory queue
             cl::array<size_t, 3> origin = {{0, 0, 0}};
             cl::array<size_t, 3> region = {{size_t(lens.dimensions[0]), size_t(lens.dimensions[1]), 1}};
-            cl::ImageFormat fmt(CL_BGRA, CL_UNORM_INT8);
-            cl::Image2D img(mesh.context,
+            cl::ImageFormat fmt;
+            switch (format) {
+                // Bayer
+                case GRBG:
+                case RGGB:
+                case GBRG:
+                case BGGR: fmt = cl::ImageFormat(CL_R, CL_UNORM_INT8); break;
+                case BGRA:
+                case RGBA: fmt = cl::ImageFormat(CL_RGBA, CL_UNORM_INT8); break;
+                // Oh no...
+                default: throw std::runtime_error("Unsupported image format");
+            }
+            cl::Image2D img(mesh->context,
                             CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
                             fmt,
                             size_t(lens.dimensions[0]),
@@ -486,11 +496,11 @@ public:
                             const_cast<void*>(image));
             std::size_t row_pitch = 0;
             cl::Event img_event;
-            mesh.mem_queue.enqueueMapImage(
+            mesh->queue.enqueueMapImage(
                 img, CL_FALSE, CL_MAP_READ, origin, region, &row_pitch, nullptr, nullptr, &img_event);
 
             // Project our visual mesh
-            auto projection = mesh.project(Hoc, lens);
+            auto projection = mesh->project(Hoc, lens);
 
             // This includes the offscreen point at the end
             int points = projection.neighbourhood.size();
@@ -499,20 +509,20 @@ public:
             std::vector<std::pair<cl::Buffer, std::vector<cl::Event>>> layer_buffers;
 
             // First layer, output from the image
-            cl::Buffer img_load_buffer(mesh.context, CL_MEM_READ_WRITE, sizeof(cl_float4) * points);
+            cl::Buffer img_load_buffer(mesh->context, CL_MEM_READ_WRITE, sizeof(cl_float4) * points);
 
             // Zero out the final value in the buffer
             cl::Event byte_fill_event;
-            mesh.mem_queue.enqueueFillBuffer(img_load_buffer,
-                                             cl_float4{{0.0f, 0.0f, 0.0f, 0.0f}},
-                                             (points - 1) * sizeof(cl_float4),
-                                             sizeof(cl_float4),
-                                             nullptr,
-                                             &byte_fill_event);
+            mesh->queue.enqueueFillBuffer(img_load_buffer,
+                                          cl_float4{{0.0f, 0.0f, 0.0f, 0.0f}},
+                                          (points - 1) * sizeof(cl_float4),
+                                          sizeof(cl_float4),
+                                          nullptr,
+                                          &byte_fill_event);
 
             // Read the pixels into the buffer
-            cl::Event img_load_event = mesh.read_image_to_network(
-                cl::EnqueueArgs(mesh.exec_queue,
+            cl::Event img_load_event = mesh->read_image_to_network(
+                cl::EnqueueArgs(mesh->queue,
                                 std::vector<cl::Event>({projection.cl.pixel_coordinates_event, img_event}),
                                 cl::NDRange(points - 1)),  // -1 as we don't project the offscreen point
                 img,
@@ -527,10 +537,10 @@ public:
 
             // Run each of our conv layers
             for (auto& conv : conv_layers) {
-                cl::Buffer out_buffer(mesh.context, CL_MEM_READ_WRITE, size_t(conv.second * points * sizeof(float)));
+                cl::Buffer out_buffer(mesh->context, CL_MEM_READ_WRITE, size_t(conv.second * points * sizeof(float)));
 
                 cl::Event event =
-                    conv.first(cl::EnqueueArgs(mesh.exec_queue, layer_buffers.back().second, cl::NDRange(points)),
+                    conv.first(cl::EnqueueArgs(mesh->queue, layer_buffers.back().second, cl::NDRange(points)),
                                projection.cl.neighbourhood,
                                layer_buffers.back().first,
                                out_buffer);
@@ -541,14 +551,14 @@ public:
             // Read out the final layers output
             std::vector<std::array<float, 2>> output(points);
             std::vector<cl::Event> ready_list = {layer_buffers.back().second};
-            mesh.mem_queue.enqueueReadBuffer(
+            mesh->queue.enqueueReadBuffer(
                 layer_buffers.back().first, true, 0, points * sizeof(cl_float2), output.data(), &ready_list);
 
             return output;
         }
 
     private:
-        VisualMesh& mesh;
+        VisualMesh* mesh;
         cl::Program program;
         std::vector<std::pair<cl::KernelFunctor<const cl::Buffer&,  // The int* neighbourhood map
                                                 const cl::Buffer&,  // The input buffer for the layer
@@ -1217,7 +1227,7 @@ public:
 
         cl::Event Rco_event;
         cl::Buffer Rco_buffer(context, CL_MEM_READ_ONLY, sizeof(Rco));
-        mem_queue.enqueueWriteBuffer(Rco_buffer, false, 0, sizeof(Rco), Rco.data(), nullptr, &Rco_event);
+        queue.enqueueWriteBuffer(Rco_buffer, false, 0, sizeof(Rco), Rco.data(), nullptr, &Rco_event);
 
         // Rco_event.wait();                 // TIMER_LINE
         // t.measure("\tUpload Rco (mem)");  // TIMER_LINE
@@ -1260,7 +1270,7 @@ public:
 
         // Upload our indices map
         cl::Event indices_event;
-        mem_queue.enqueueWriteBuffer(
+        queue.enqueueWriteBuffer(
             indices_map, false, 0, indices.size() * sizeof(cl_int), indices.data(), nullptr, &indices_event);
 
         // indices_event.wait();               // TIMER_LINE
@@ -1271,8 +1281,7 @@ public:
         switch (lens.projection) {
             case Lens::RECTILINEAR: {
                 projected = project_rectilinear(
-                    cl::EnqueueArgs(
-                        exec_queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
+                    cl::EnqueueArgs(queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
                     cl_points,
                     indices_map,
                     Rco_buffer,
@@ -1283,8 +1292,7 @@ public:
             } break;
             case Lens::EQUIDISTANT: {
                 projected = project_equidistant(
-                    cl::EnqueueArgs(
-                        exec_queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
+                    cl::EnqueueArgs(queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
                     cl_points,
                     indices_map,
                     Rco_buffer,
@@ -1294,8 +1302,7 @@ public:
             } break;
             case Lens::EQUISOLID: {
                 projected = project_equisolid(
-                    cl::EnqueueArgs(
-                        exec_queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
+                    cl::EnqueueArgs(queue, std::vector<cl::Event>({Rco_event, indices_event}), cl::NDRange(points)),
                     cl_points,
                     indices_map,
                     Rco_buffer,
@@ -1329,19 +1336,19 @@ public:
 
         cl::Event local_n_event;
         cl::Buffer local_n_buffer(context, CL_MEM_READ_ONLY, local_neighbourhood.size() * sizeof(int) * 6);
-        mem_queue.enqueueWriteBuffer(local_n_buffer,
-                                     false,
-                                     0,
-                                     local_neighbourhood.size() * sizeof(int) * 6,
-                                     local_neighbourhood.data(),
-                                     nullptr,
-                                     &local_n_event);
+        queue.enqueueWriteBuffer(local_n_buffer,
+                                 false,
+                                 0,
+                                 local_neighbourhood.size() * sizeof(int) * 6,
+                                 local_neighbourhood.data(),
+                                 nullptr,
+                                 &local_n_event);
 
+        projected.wait();
         // local_n_event.wait();                             // TIMER_LINE
         // t.measure("\tUpload Local Neighbourhood (mem)");  // TIMER_LINE
 
-        projected.wait();  // TODO why does this fix it!
-        return ProjectedMesh{LazyBufferReader<std::array<int, 2>>(mem_queue, pixel_coordinates, projected, points),
+        return ProjectedMesh{LazyBufferReader<std::array<int, 2>>(queue, pixel_coordinates, projected, points),
                              local_neighbourhood,
                              {pixel_coordinates, projected, local_n_buffer, local_n_event}};
     }
@@ -1349,7 +1356,7 @@ public:
     Classifier make_classifier(
         const std::vector<std::vector<std::pair<std::vector<std::vector<Scalar>>, std::vector<Scalar>>>>& network) {
 
-        return Classifier(*this, network);
+        return Classifier(this, network);
     }
 
 private:
@@ -1406,8 +1413,8 @@ private:
         context = cl::Context({default_device});
 
         // Create two queues, one for memory transfers and one for execution
-        exec_queue = cl::CommandQueue(context, default_device);
-        mem_queue  = cl::CommandQueue(context, default_device);
+        queue = cl::CommandQueue(context, default_device);
+        queue = cl::CommandQueue(context, default_device);
 
         // Get our program source code
         cl::Program::Sources sources;
@@ -1458,9 +1465,7 @@ private:
     cl::Context context;
 
     // OpenCL queue for executing kernels
-    cl::CommandQueue exec_queue;
-    // OpenCL queue for uploading data to the device
-    cl::CommandQueue mem_queue;
+    cl::CommandQueue queue;
 
     using ProjectionFunction = std::function<cl::Event(const cl::EnqueueArgs&,     // The number of workers to spawn etc
                                                        const cl::Buffer&,          // The Scalar4* unit vectors

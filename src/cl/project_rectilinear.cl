@@ -31,7 +31,8 @@ kernel void project_rectilinear(global const Scalar4* points,
     const Scalar2 screen = (Scalar2)(f * ray.y / ray.x, f * ray.z / ray.x);
 
     // Apply our offset to move into image space (0 at top left, x to the right, y down)
-    const Scalar2 image = (Scalar2)((Scalar)(dimensions.x - 1) * 0.5, (Scalar)(dimensions.y - 1) * 0.5) - screen;
+    const Scalar2 image =
+        (Scalar2)((Scalar)(dimensions.x - 1) * (Scalar)(0.5), (Scalar)(dimensions.y - 1) * (Scalar)(0.5)) - screen;
 
     // Store our output coordinates
     out[index] = (int2)(round(image.x), round(image.y));

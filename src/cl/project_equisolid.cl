@@ -29,7 +29,7 @@ kernel void project_equisolid(global const Scalar4* points,
 
     // Calculate some intermediates
     const Scalar theta     = acos(ray.x);
-    const Scalar r         = (Scalar)(2.0) * f * sin(theta * Scalar(0.5));
+    const Scalar r         = (Scalar)(2.0) * f * sin(theta * (Scalar)(0.5));
     const Scalar sin_theta = sin(theta);
 
     // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
@@ -37,7 +37,7 @@ kernel void project_equisolid(global const Scalar4* points,
 
     // Apply our offset to move into image space (0 at top left, x to the right, y down)
     const Scalar2 image =
-        (Scalar2)((Scalar)(dimensions.x - 1) * Scalar(0.5), (Scalar)(dimensions.y - 1) * Scalar(0.5)) - screen;
+        (Scalar2)((Scalar)(dimensions.x - 1) * (Scalar)(0.5), (Scalar)(dimensions.y - 1) * (Scalar)(0.5)) - screen;
 
     // Apply our lens centre offset
     // TODO apply this
