@@ -28,7 +28,11 @@
 #include <type_traits>
 #include <vector>
 
-#include <OpenCL/cl.h>
+#if defined(__APPLE__) || defined(__MACOSX)
+#include <OpenCL/opencl.h>
+#else
+#include <CL/opencl.h>
+#endif  // !__APPLE__
 
 // Include our generated OpenCL headers
 #include "cl/project_equidistant.cl.hpp"
@@ -58,7 +62,7 @@ namespace cl {
         }
 
     private:
-        T ptr;
+        T ptr = nullptr;
     };
 
     using command_queue = opencl_wrapper<::cl_command_queue>;
@@ -83,7 +87,21 @@ struct LazyBufferReader {
     LazyBufferReader(const cl::command_queue& queue, const cl::mem& buffer, const cl::event& ready, uint n_elements)
         : queue(queue), buffer(buffer), ready(std::vector<cl::event>({ready})), n_elements(n_elements) {}
 
-    operator std::vector<T>() {
+    template <typename U>
+    std::vector<U> as() const {
+        // Number of output elements will change if the sizes are different
+        std::vector<U> output(n_elements * sizeof(T) / sizeof(U));
+
+        std::vector<cl_event> events(ready.begin(), ready.end());
+        cl_int error = ::clEnqueueReadBuffer(
+            queue, buffer, true, 0, n_elements * sizeof(T), output.data(), events.size(), events.data(), nullptr);
+        if (error != CL_SUCCESS) {
+            throw std::system_error(error, opencl_error_category(), "Error reading vector buffer for lazy evaluation");
+        }
+        return output;
+    }
+
+    operator std::vector<T>() const {
         std::vector<T> output(n_elements);
         std::vector<cl_event> events(ready.begin(), ready.end());
         cl_int error = ::clEnqueueReadBuffer(
@@ -94,7 +112,7 @@ struct LazyBufferReader {
         return output;
     }
 
-    operator T() {
+    operator T() const {
         T output;
         std::vector<cl_event> events(ready.begin(), ready.end());
         cl_int error =
@@ -138,30 +156,24 @@ public:
 
     struct ProjectedMesh {
 
-        ProjectedMesh() = default;
-
-        ProjectedMesh(const LazyBufferReader<std::array<int, 2>>& pixel_coordinates,
-                      std::vector<std::array<int, 6>>&& neighbourhood,
-                      const cl::mem& cl_pixel_coordinates,
-                      const cl::event& cl_pixel_coordinates_event,
-                      const cl::mem& cl_neighbourhood,
-                      const cl::event& cl_neighbourhood_event)
-            : pixel_coordinates(pixel_coordinates)
-            , neighbourhood(neighbourhood)
-            , cl_pixel_coordinates(cl_pixel_coordinates)
-            , cl_pixel_coordinates_event(cl_pixel_coordinates_event)
-            , cl_neighbourhood(cl_neighbourhood)
-            , cl_neighbourhood_event(cl_neighbourhood_event) {}
-
         // Host side buffers for the data
         LazyBufferReader<std::array<int, 2>> pixel_coordinates;
         std::vector<std::array<int, 6>> neighbourhood;
+        std::vector<int> global_indices;
 
         // OpenCL buffers for the data
         cl::mem cl_pixel_coordinates;
         cl::event cl_pixel_coordinates_event;
         cl::mem cl_neighbourhood;
         cl::event cl_neighbourhood_event;
+    };
+
+    struct ClassifiedMesh {
+
+        LazyBufferReader<std::array<int, 2>> pixel_coordinates;
+        std::vector<std::array<int, 6>> neighbourhood;
+        std::vector<int> global_indices;
+        std::vector<std::pair<int, LazyBufferReader<Scalar>>> classifications;
     };
 
     struct Node {
@@ -551,10 +563,7 @@ public:
             }
         }
 
-        std::pair<ProjectedMesh, std::vector<std::array<float, 2>>> operator()(const void* image,
-                                                                               const FOURCC& format,
-                                                                               const mat4& Hoc,
-                                                                               const Lens& lens) {
+        ClassifiedMesh operator()(const void* image, const FOURCC& format, const mat4& Hoc, const Lens& lens) {
 
 
             cl_image_format fmt;
@@ -565,7 +574,7 @@ public:
                 case RGGB:
                 case GBRG:
                 case BGGR: fmt = cl_image_format{CL_R, CL_UNORM_INT8}; break;
-                case BGRA:
+                case BGRA: fmt = cl_image_format{CL_BGRA, CL_UNORM_INT8}; break;
                 case RGBA: fmt = cl_image_format{CL_RGBA, CL_UNORM_INT8}; break;
                 // Oh no...
                 default: throw std::runtime_error("Unsupported image format");
@@ -764,10 +773,23 @@ public:
                 }
             }
 
-            // Read out the final layers output
-            auto lazy = LazyBufferReader<std::array<float, 2>>(
-                mesh->queue, layer_buffers.back().first, layer_buffers.back().second, points);
-            return std::make_pair(std::move(projection), lazy);
+            // Flush the queue to ensure it has executed
+            ::clFlush(mesh->queue);
+
+            std::vector<std::pair<int, LazyBufferReader<Scalar>>> outputs;
+            for (uint i = 0; i < layer_buffers.size(); ++i) {
+
+                uint dims = i == 0 ? 4 : conv_layers[i - 1].second;
+
+                outputs.emplace_back(dims,
+                                     LazyBufferReader<Scalar>(
+                                         mesh->queue, layer_buffers[i].first, layer_buffers[i].second, points * dims));
+            }
+
+            return ClassifiedMesh{projection.pixel_coordinates,
+                                  std::move(projection.neighbourhood),
+                                  std::move(projection.global_indices),
+                                  std::move(outputs)};
         }
 
     private:
@@ -890,9 +912,13 @@ public:
                     const int l = i == 0 ? steps - 1 : i - 1;
                     const int r = i == steps - 1 ? 0 : i + 1;
 
-                    // Set these two neighbours
+                    // Set these two neighbours and default the others to ourself
+                    n.neighbours[0] = 0;
+                    n.neighbours[1] = 0;
                     n.neighbours[2] = l - i;  // L
                     n.neighbours[3] = r - i;  // R
+                    n.neighbours[4] = 0;
+                    n.neighbours[5] = 0;
 
                     // Move on to the next theta value
                     theta += dtheta;
@@ -971,44 +997,48 @@ public:
                 const auto& back    = rows.back();
                 const int back_size = back.end - back.begin;
 
-                // Link the front to itself
-                for (int i = front.begin; i < front.end; ++i) {
-                    // Alias our node
-                    auto& node = lut[i];
+                // Link the front to itself if it's at the top
+                if (front.phi < M_PI_2) {
+                    for (int i = front.begin; i < front.end; ++i) {
+                        // Alias our node
+                        auto& node = lut[i];
 
-                    // Work out which two points are on the opposite side to us
-                    const uint index = i - front.begin + (front_size / 2);
+                        // Work out which two points are on the opposite side to us
+                        const uint index = i - front.begin + (front_size / 2);
 
-                    // Find where we are in our row as a value between 0 and 1
-                    const Scalar pos = Scalar(i - front.begin) / Scalar(front_size);
+                        // Find where we are in our row as a value between 0 and 1
+                        const Scalar pos = Scalar(i - front.begin) / Scalar(front_size);
 
-                    // Link to ourself
-                    node.neighbours[0] = front.begin + (index % front_size) - i;
-                    node.neighbours[1] = front.begin + ((index + 1) % front_size) - i;
+                        // Link to ourself
+                        node.neighbours[0] = front.begin + (index % front_size) - i;
+                        node.neighbours[1] = front.begin + ((index + 1) % front_size) - i;
 
-                    // Link to our next row normally
-                    const auto& r2 = rows[1];
-                    link(lut, i, pos, r2.begin, r2.end - r2.begin, 4);
+                        // Link to our next row normally
+                        const auto& r2 = rows[1];
+                        link(lut, i, pos, r2.begin, r2.end - r2.begin, 4);
+                    }
                 }
 
-                // Link the back to itself
-                for (int i = back.begin; i < back.end; ++i) {
-                    // Alias our node
-                    auto& node = lut[i];
+                // Link the back to itself if it's at the bottom
+                if (back.phi > M_PI_2) {
+                    for (int i = back.begin; i < back.end; ++i) {
+                        // Alias our node
+                        auto& node = lut[i];
 
-                    // Work out which two points are on the opposite side to us
-                    const uint index = i - back.begin + (back_size / 2);
+                        // Work out which two points are on the opposite side to us
+                        const uint index = i - back.begin + (back_size / 2);
 
-                    // Find where we are in our row as a value between 0 and 1
-                    const Scalar pos = Scalar(i - back.begin) / Scalar(back_size);
+                        // Find where we are in our row as a value between 0 and 1
+                        const Scalar pos = Scalar(i - back.begin) / Scalar(back_size);
 
-                    // Link to ourself on the other side
-                    node.neighbours[4] = back.begin + (index % back_size) - i;
-                    node.neighbours[5] = back.begin + ((index + 1) % back_size) - i;
+                        // Link to ourself on the other side
+                        node.neighbours[4] = back.begin + (index % back_size) - i;
+                        node.neighbours[5] = back.begin + ((index + 1) % back_size) - i;
 
-                    // Link to our previous row normally
-                    const auto& r2 = rows[rows.size() - 2];
-                    link(lut, i, pos, r2.begin, r2.end - r2.begin, 0);
+                        // Link to our previous row normally
+                        const auto& r2 = rows[rows.size() - 2];
+                        link(lut, i, pos, r2.begin, r2.end - r2.begin, 0);
+                    }
                 }
             }
 
@@ -1045,6 +1075,10 @@ public:
                                            0,
                                            nullptr,
                                            nullptr);
+
+            // Ensure everything is done
+            clFinish(queue);
+
             if (error) {
                 throw std::system_error(error, opencl_error_category(), "Error uploading lookup table to device");
             }
@@ -1337,6 +1371,8 @@ public:
                             return output;
                         }
                         // If we have an odd number of intersections something is wrong
+                        // In this case we err on the side of caution and oversample selecting points at the widest
+                        // marks
                         else {
                             throw std::runtime_error("Odd number of intersections found with cone");
                         }
@@ -1469,33 +1505,6 @@ public:
                           Scalar(0.0),
                           Scalar(0.0)};
 
-
-        // Build Rco by transposing the rotation of Hoc and upload it to the device
-
-        // const mat4 Rco = {{
-        //     {{Hoc[0][0], Hoc[1][0], Hoc[2][0], Scalar(0.0)}},       //
-        //     {{Hoc[0][1], Hoc[1][1], Hoc[2][1], Scalar(0.0)}},       //
-        //     {{Hoc[0][2], Hoc[1][2], Hoc[2][2], Scalar(0.0)}},       //
-        //     {{Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0)}}  //
-        // }};
-
-        // cl::mem Rco_buffer(::clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(Rco), nullptr, &error),
-        //                    ::clReleaseMemObject);
-        // if (error) {
-        //     throw std::system_error(error, opencl_error_category(), "Error allocating Rco buffer");
-        // }
-
-        // cl::event Rco_event;
-        // ev    = nullptr;
-        // error = ::clEnqueueWriteBuffer(queue, Rco_buffer, false, 0, sizeof(Rco), Rco.data(), 0, nullptr, &ev);
-        // if (ev) Rco_event = cl::event(ev, ::clReleaseEvent);
-        // if (error) {
-        //     throw std::system_error(error, opencl_error_category(), "Error uploading Rco to device");
-        // }
-
-        // Rco_event.wait();                 // TIMER_LINE
-        // t.measure("\tUpload Rco (mem)");  // TIMER_LINE
-
         // Perform our lookup to get our relevant range
         auto ranges = lookup(Hoc, lens);
 
@@ -1573,32 +1582,32 @@ public:
             error = ::clSetKernelArg(projection_kernel, 0, cl_points.size(), &cl_points);
             if (error != CL_SUCCESS) {
                 throw std::system_error(
-                    error, opencl_error_category(), "Error setting kernel argument 0 for image load kernel");
+                    error, opencl_error_category(), "Error setting kernel argument 0 for projection kernel");
             }
             error = ::clSetKernelArg(projection_kernel, 1, indices_map.size(), &indices_map);
             if (error != CL_SUCCESS) {
                 throw std::system_error(
-                    error, opencl_error_category(), "Error setting kernel argument 1 for image load kernel");
+                    error, opencl_error_category(), "Error setting kernel argument 1 for projection kernel");
             }
             error = ::clSetKernelArg(projection_kernel, 2, sizeof(cl_float16), &Rco);
             if (error != CL_SUCCESS) {
                 throw std::system_error(
-                    error, opencl_error_category(), "Error setting kernel argument 2 for image load kernel");
+                    error, opencl_error_category(), "Error setting kernel argument 2 for projection kernel");
             }
             error = ::clSetKernelArg(projection_kernel, 3, sizeof(lens.focal_length), &lens.focal_length);
             if (error != CL_SUCCESS) {
                 throw std::system_error(
-                    error, opencl_error_category(), "Error setting kernel argument 3 for image load kernel");
+                    error, opencl_error_category(), "Error setting kernel argument 3 for projection kernel");
             }
             error = ::clSetKernelArg(projection_kernel, 4, sizeof(lens.dimensions), lens.dimensions.data());
             if (error != CL_SUCCESS) {
                 throw std::system_error(
-                    error, opencl_error_category(), "Error setting kernel argument 4 for image load kernel");
+                    error, opencl_error_category(), "Error setting kernel argument 4 for projection kernel");
             }
             error = ::clSetKernelArg(projection_kernel, 5, pixel_coordinates.size(), &pixel_coordinates);
             if (error != CL_SUCCESS) {
                 throw std::system_error(
-                    error, opencl_error_category(), "Error setting kernel argument 5 for image load kernel");
+                    error, opencl_error_category(), "Error setting kernel argument 5 for projection kernel");
             }
 
             // Project!
@@ -1608,7 +1617,7 @@ public:
                 queue, projection_kernel, 1, offset, global_size, nullptr, 1, &indices_event, &ev);
             if (ev) projected = cl::event(ev, ::clReleaseEvent);
             if (error != CL_SUCCESS) {
-                throw std::system_error(error, opencl_error_category(), "Error queueing the image load kernel");
+                throw std::system_error(error, opencl_error_category(), "Error queueing the projection kernel");
             }
         }
         // projected.wait();                     // TIMER_LINE
@@ -1661,14 +1670,15 @@ public:
 
         // local_n_event.wait();                             // TIMER_LINE
         // t.measure("\tUpload Local Neighbourhood (mem)");  // TIMER_LINE
-        ::clWaitForEvents(1, &projected);
+        ::clFlush(queue);
 
-        return ProjectedMesh(LazyBufferReader<std::array<int, 2>>(queue, pixel_coordinates, projected, points),
+        return ProjectedMesh{LazyBufferReader<std::array<int, 2>>(queue, pixel_coordinates, projected, points),
                              std::move(local_neighbourhood),
+                             std::move(indices),
                              pixel_coordinates,
                              projected,
                              local_n_buffer,
-                             local_n_event);
+                             local_n_event};
     }
 
     Classifier make_classifier(
@@ -1717,58 +1727,87 @@ private:
         int best_compute_units       = 0;
 
         // Go through our platforms
-        for (const auto& platform : platforms) {
+        // for (const auto& platform : platforms) {
+        const auto& platform = platforms.front();
 
-            cl_uint device_count = 0;
-            ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, nullptr, &device_count);
-            std::vector<cl_device_id> devices(device_count);
-            ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, device_count, devices.data(), nullptr);
+        cl_uint device_count = 0;
+        ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, nullptr, &device_count);
+        std::vector<cl_device_id> devices(device_count);
+        ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, device_count, devices.data(), nullptr);
 
-            // Go through our devices on the platform
-            for (const auto& device : devices) {
+        // Go through our devices on the platform
+        for (const auto& device : devices) {
 
-                // Length of data for strings
-                size_t len;
-                std::vector<char> data;
+            // Length of data for strings
+            size_t len;
+            std::vector<char> data;
 
-                // Print device details
-                ::clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &len);
-                data.resize(len);
-                ::clGetDeviceInfo(device, CL_DEVICE_NAME, len, data.data(), nullptr);
-                std::cout << "\tDevice: " << std::string(data.begin(), data.end()) << std::endl;
-
-
-                ::clGetDeviceInfo(device, CL_DEVICE_VERSION, 0, nullptr, &len);
-                data.resize(len);
-                ::clGetDeviceInfo(device, CL_DEVICE_VERSION, len, data.data(), nullptr);
-                std::cout << "\tHardware version: " << std::string(data.begin(), data.end()) << std::endl;
+            // Print device details
+            ::clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &len);
+            data.resize(len);
+            ::clGetDeviceInfo(device, CL_DEVICE_NAME, len, data.data(), nullptr);
+            std::cout << "\tDevice: " << std::string(data.begin(), data.end()) << std::endl;
 
 
-                ::clGetDeviceInfo(device, CL_DRIVER_VERSION, 0, nullptr, &len);
-                data.resize(len);
-                ::clGetDeviceInfo(device, CL_DRIVER_VERSION, len, data.data(), nullptr);
-                std::cout << "\tSoftware version: " << std::string(data.begin(), data.end()) << std::endl;
+            ::clGetDeviceInfo(device, CL_DEVICE_VERSION, 0, nullptr, &len);
+            data.resize(len);
+            ::clGetDeviceInfo(device, CL_DEVICE_VERSION, len, data.data(), nullptr);
+            std::cout << "\tHardware version: " << std::string(data.begin(), data.end()) << std::endl;
 
 
-                ::clGetDeviceInfo(device, CL_DEVICE_OPENCL_C_VERSION, 0, nullptr, &len);
-                data.resize(len);
-                ::clGetDeviceInfo(device, CL_DEVICE_OPENCL_C_VERSION, len, data.data(), nullptr);
-                std::cout << "\tOpenCL C version: " << std::string(data.begin(), data.end()) << std::endl;
+            ::clGetDeviceInfo(device, CL_DRIVER_VERSION, 0, nullptr, &len);
+            data.resize(len);
+            ::clGetDeviceInfo(device, CL_DRIVER_VERSION, len, data.data(), nullptr);
+            std::cout << "\tSoftware version: " << std::string(data.begin(), data.end()) << std::endl;
 
 
-                cl_uint max_compute_units = 0;
-                ::clGetDeviceInfo(
-                    device, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(max_compute_units), &max_compute_units, nullptr);
-                std::cout << "\tParallel compute units: " << max_compute_units << std::endl;
+            ::clGetDeviceInfo(device, CL_DEVICE_OPENCL_C_VERSION, 0, nullptr, &len);
+            data.resize(len);
+            ::clGetDeviceInfo(device, CL_DEVICE_OPENCL_C_VERSION, len, data.data(), nullptr);
+            std::cout << "\tOpenCL C version: " << std::string(data.begin(), data.end()) << std::endl;
 
-                if (max_compute_units > best_compute_units) {
-                    best_compute_units = max_compute_units;
-                    best_platform      = platform;
-                    best_device        = device;
-                }
 
-                std::cout << std::endl;
+            cl_uint max_compute_units = 0;
+            ::clGetDeviceInfo(
+                device, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(max_compute_units), &max_compute_units, nullptr);
+            std::cout << "\tParallel compute units: " << max_compute_units << std::endl;
+
+            if (max_compute_units > best_compute_units) {
+                best_compute_units = max_compute_units;
+                best_platform      = platform;
+                best_device        = device;
             }
+
+            std::cout << std::endl;
+        }
+        // }
+
+        // Print information about our selected device
+        {
+            // Length of data for strings
+            size_t len;
+            std::vector<char> data;
+
+            // Print device details
+            ::clGetDeviceInfo(best_device, CL_DEVICE_NAME, 0, nullptr, &len);
+            data.resize(len);
+            ::clGetDeviceInfo(best_device, CL_DEVICE_NAME, len, data.data(), nullptr);
+            std::cout << "\tDevice: " << std::string(data.begin(), data.end()) << std::endl;
+
+            ::clGetDeviceInfo(best_device, CL_DEVICE_VERSION, 0, nullptr, &len);
+            data.resize(len);
+            ::clGetDeviceInfo(best_device, CL_DEVICE_VERSION, len, data.data(), nullptr);
+            std::cout << "\tHardware version: " << std::string(data.begin(), data.end()) << std::endl;
+
+            ::clGetDeviceInfo(best_device, CL_DRIVER_VERSION, 0, nullptr, &len);
+            data.resize(len);
+            ::clGetDeviceInfo(best_device, CL_DRIVER_VERSION, len, data.data(), nullptr);
+            std::cout << "\tSoftware version: " << std::string(data.begin(), data.end()) << std::endl;
+
+            ::clGetDeviceInfo(best_device, CL_DEVICE_OPENCL_C_VERSION, 0, nullptr, &len);
+            data.resize(len);
+            ::clGetDeviceInfo(best_device, CL_DEVICE_OPENCL_C_VERSION, len, data.data(), nullptr);
+            std::cout << "\tOpenCL C version: " << std::string(data.begin(), data.end()) << std::endl;
         }
 
         // Make context
@@ -1776,7 +1815,7 @@ private:
         context =
             cl::context(::clCreateContext(nullptr, 1, &best_device, nullptr, nullptr, &error), ::clReleaseContext);
         if (error) {
-            throw std::system_error(error, opencl_error_category(), "Error creating OpenCL context");
+            throw std::system_error(error, opencl_error_category(), "Error creating the OpenCL context");
         }
 
         // Try to make an out of order queue if we can
@@ -1787,7 +1826,7 @@ private:
             queue = cl::command_queue(::clCreateCommandQueue(context, best_device, 0, &error), ::clReleaseCommandQueue);
         }
         if (error) {
-            throw std::system_error(error, opencl_error_category(), "Error creating OpenCL command queue");
+            throw std::system_error(error, opencl_error_category(), "Error creating the OpenCL command queue");
         }
 
         // Get program sources (this does concatenated strings)

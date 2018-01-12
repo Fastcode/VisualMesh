@@ -172,8 +172,9 @@ int main() {
             // Run our classifier
             auto classified = classifier(img.data, mesh::VisualMesh<float>::BGRA, Hoc, lens);
 
-            auto& neighbourhood                               = classified.first.neighbourhood;
-            std::vector<std::array<int, 2>> pixel_coordinates = classified.first.pixel_coordinates;
+            auto& neighbourhood                               = classified.neighbourhood;
+            std::vector<std::array<int, 2>> pixel_coordinates = classified.pixel_coordinates;
+            auto classification = classified.classifications.back().second.as<std::array<float, 2>>();
 
             t.measure("\tClassified Mesh");
 
@@ -187,8 +188,9 @@ int main() {
             for (int i = 0; i < pixel_coordinates.size(); ++i) {
                 cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
 
-                // cv::Scalar colour(uint8_t(classified[i][0] * 255), 0, uint8_t(classified[i][1] * 255));
-                cv::Scalar colour(classified.second[i][0] > 0.5 ? 255 : 0, 0, classified.second[i][1] >= 0.5 ? 255 : 0);
+                cv::Scalar colour(uint8_t(classification[i][0] * 255), 0, uint8_t(classification[i][1] * 255));
+                // cv::Scalar colour(classification[i][0] > 0.5 ? 255 : 0, 0, classification[i][1] >= 0.5 ? 255 :
+                // 0);
 
                 for (const auto& n : neighbourhood[i]) {
                     if (n < pixel_coordinates.size()) {
