@@ -54,7 +54,7 @@ int main() {
 
     // Construct our VisualMesh
     std::cerr << "Building VisualMesh" << std::endl;
-    const int n_intersections = 4;
+    const int n_intersections = 5;
     mesh::Sphere<float> sphere(0, 0.075, n_intersections, 10);
     mesh::VisualMesh<float> mesh(sphere, 0.5, 1.5, 100, M_PI / 1024.0);
     std::cerr << "Finished building VisualMesh" << std::endl;
@@ -134,26 +134,47 @@ int main() {
                 std::vector<std::array<int, 2>> mesh_px          = projection.pixel_coordinates;
 
                 // Strip our pixel coordinates down to the ones on the screen
-                std::vector<std::array<int, 2>> pixel_coordinates;
-                std::vector<int> pixel_coordinates_index;
-                px_idx.reserve(mesh_px.size());
-                px_val.reserve(mesh_px.size());
+                std::vector<std::array<int, 2>> new_px;
+                std::vector<int> new_px_idx;
+                std::vector<std::array<int, 7>> new_neighbourhood;
+                new_px_idx.reserve(mesh_px.size());
+                new_px.reserve(mesh_px.size());
+                new_neighbourhood.reserve(mesh_neighbours.size());
 
-                for (const int i = 0; i < mesh_px.size(); ++mesh_px) {
+                for (int i = 0; i < mesh_px.size(); ++i) {
                     const auto& px = mesh_px[i];
 
                     // Only copy across if our pixel is on the screen
-                    if (px[0] > 0 && px[0] < lens.dimensions[0] && px[1] > 0 && px[1] > lens.dimensions[1]) {
-                        px_idx.push_back(i);
-                        px_val.push_back(px)
+                    if (0 < px[0] && px[0] < lens.dimensions[0] && 0 < px[1] && px[1] < lens.dimensions[1]) {
+                        new_px_idx.push_back(i);
+                        // Pixels in y,x order for tensorflow
+                        new_px.push_back(std::array<int, 2>{{px[1], px[0]}});
                     }
                 }
 
-                // Make a reverse lookup list
-                std::vector<int> rev_idx(mesh_neighbours.size(), px_val.size());
-                for (int i = 0; i < px_idx; ++i) {
-                    rev_idx[px_idx[i]] = i;
+                // Make a reverse lookup list but put the offscreen point at the start for 0 padding
+                std::vector<int> rev_idx(mesh_neighbours.size(), 0);
+                for (int i = 0; i < new_px_idx.size(); ++i) {
+                    rev_idx[new_px_idx[i]] = i + 1;  // + 1 to handle the null point
                 }
+
+                // Make our new neighbourhood map with the offscreen point at the start
+                new_neighbourhood.resize(new_px_idx.size() + 1);
+                for (int i = 0; i < new_px_idx.size(); ++i) {
+
+                    // Get our old neighbours
+                    const auto& old_neighbours = mesh_neighbours[new_px_idx[i]];
+
+                    // Assign our own index
+                    auto& neighbours = new_neighbourhood[i + 1];  // +1 to account for the offscreen point
+                    neighbours[0]    = i + 1;
+
+                    for (int j = 1; j < neighbours.size(); ++j) {
+                        const auto& n = old_neighbours[j - 1];
+                        neighbours[j] = rev_idx[n];
+                    }
+                }
+                new_neighbourhood.front().fill(0);
 
                 // Work out how big the ball is
                 const float angular = (2 * std::asin(0.075 / 10.0)) / float(n_intersections);
@@ -164,19 +185,15 @@ int main() {
                 std::ofstream out(fmt::format("{}/{}mesh{}.bin", image_path, n_intersections, number),
                                   std::ios::trunc | std::ios::binary);
 
+                // Output our pixel coordinates
+                out.write(reinterpret_cast<const char*>(new_px.data()), new_px.size() * sizeof(new_px[0]));
+
+                // Output our neighbourhood
+                out.write(reinterpret_cast<const char*>(new_neighbourhood.data()),
+                          new_neighbourhood.size() * sizeof(new_neighbourhood[0]));
+
                 // Output the ball pixel size for hexidense training
                 out.write(reinterpret_cast<const char*>(&ball_px_size), sizeof(ball_px_size));
-
-                // Output our pixel coordinates
-                out.write(reinterpret_cast<const char*>(pixel_coordinates.data()),
-                          pixel_coordinates.size() * sizeof(pixel_coordinates[0]));
-
-                for (int32_t i = 0; i < neighbourhood.size(); ++i) {
-
-                    // Output our own index and then our neighbours indices
-                    out.write(reinterpret_cast<const char*>(&i), sizeof(int32_t));
-                    out.write(reinterpret_cast<const char*>(neighbourhood[i].data()), sizeof(neighbourhood[i]));
-                }
 
                 out.close();
             }
