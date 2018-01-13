@@ -15,9 +15,6 @@ def build(groups):
     # First input is the number of visual mesh points by 3
     X = tf.placeholder(dtype=tf.float32, shape=[None, None, 3], name='Input')
 
-    # Probability to keep in dropout
-    K = tf.placeholder(dtype=tf.float32, shape=[], name='DropoutKeepProbability')
-
     # Build our tensor
     logits = X
     for i, c in enumerate(groups):
@@ -60,11 +57,8 @@ def build(groups):
                     logits = tf.add(logits, b)
 
                     # Apply our activation function
-                    logits = tf.nn.elu(logits)
+                    logits = tf.nn.selu(logits)
 
-                    # If we aren't on the last loop do the dropout layer
-                    if i < (len(groups) - 1) or j < (len(c) - 1):
-                        logits = tf.nn.dropout(logits, keep_prob=K, name='Dropout')
 
     # Softmax our final output for all values in the mesh as our network
     network = tf.nn.softmax(logits, name='Softmax', dim=2)
@@ -74,6 +68,5 @@ def build(groups):
         'network': network, # Softmax network output
         'X': X,             # Network input
         'G': G,             # Network graph input
-        'K': K              # Dropout keep probability
     }
 
