@@ -4,17 +4,62 @@ import os
 import sys
 import random
 import tensorflow as tf
-from PIL import Image, ImageDraw
+import yaml
+import re
 
-from . import load
+from . import dataset
 
-def build_training_graph(logits, learning_rate, beta):
+def save_yaml_model(sess, output_path, global_step):
+
+    # Run tf to get all our variables
+    variables = {v.name: sess.run(v) for v in tf.trainable_variables()}
+    output = []
+
+    # So we know when to move to the next list
+    conv = -1
+    layer = -1
+
+    # Sorted so we see earlier layers first
+    for k, v in sorted(variables.items()):
+        key = re.match(r'Conv_(\d+)/Layer_(\d+)/(Weights|Biases):0', k)
+
+        # If this is one of the things we are looking for
+        if key is not None:
+            c = int(key.group(1))
+            l = int(key.group(2))
+            var = key.group(3).lower()
+
+            # If we change convolution add a new element
+            if c != conv:
+                output.append([])
+                conv = c
+                layer = -1
+
+            # If we change layer add a new object
+            if l != layer:
+                output[-1].append({})
+                layer = l
+
+            if var not in output[conv][layer]:
+                output[conv][layer][var] = v.tolist()
+            else:
+                raise Exception('Key already exists!')
+
+    # Print as yaml
+    with open(os.path.join(output_path, 'yaml_models', 'model_{}.yaml'.format(global_step)), 'w') as f:
+        f.write(yaml.dump(output, width=120))
+
+
+def build_training_graph(network, learning_rate):
 
     # The final expected output for the classes
-    Y = tf.placeholder(dtype=tf.float32, shape=[None, 2], name='Output')
+    Y = network['Y']
 
     # The index of the final output we are checking
-    Yi = tf.placeholder(dtype=tf.int32, shape=[None], name='OutputIndex')
+    Yi = network['Yi']
+
+    # The unscaled network output
+    logits = network['logits']
 
     # Gather our individual output for training
     with tf.name_scope('Training'):
@@ -22,24 +67,15 @@ def build_training_graph(logits, learning_rate, beta):
         # Global training step
         global_step = tf.Variable(0, dtype=tf.int32, trainable=False, name='global_step')
 
-        # Get the indices to our selected objects
-        training_indices = tf.bitcast(tf.stack([tf.bitcast(tf.range(tf.shape(Yi)[0], dtype=tf.int32), tf.float32),
-                                                tf.bitcast(Yi, tf.float32)], axis=1), tf.int32)
-        train_logits = tf.gather_nd(logits, training_indices)
+        # Gather all our points with valid probabilities (the sum should always be 1.0)
+        selected = tf.cast(tf.where(tf.reduce_sum(Y, axis=2) > 0.0), dtype=tf.int32)
+        Yi = tf.gather_nd(Yi, selected)
+        Y = tf.gather_nd(Y, selected)
+        train_logits = tf.gather_nd(logits, tf.stack([selected[:,0], Yi], axis=1))
 
         # Our loss function
         with tf.name_scope('Loss'):
-
-            # Get our L2 regularisation information for weights
-            l2_losses = []
-            for var in tf.trainable_variables():
-                if 'Weights' in var.name:
-                    l2_losses.append(tf.nn.l2_loss(var))
-
-            # Sum them up and multiply them by beta
-            regularizers = beta * tf.add_n(l2_losses)
-
-            cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=train_logits, labels=Y, dim=1) + regularizers)
+            cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=train_logits, labels=Y, dim=1))
 
         # Our optimiser
         with tf.name_scope('Optimiser'):
@@ -48,6 +84,7 @@ def build_training_graph(logits, learning_rate, beta):
         # Calculate accuracy
         with tf.name_scope('Metrics'):
             # Work out which class is larger and make 1 positive and 0 negative
+            # TODO these need fixing for the multiple points per image
             softmax_logits = tf.nn.softmax(train_logits)
             predictions = tf.argmin(softmax_logits, axis=1)
             labels = tf.argmin(Y, axis=1)
@@ -81,68 +118,27 @@ def build_training_graph(logits, learning_rate, beta):
     tf.summary.scalar('Matthews', mcc)
     tf.summary.scalar('Certainty', certainty)
 
+    for v in tf.trainable_variables():
+        tf.summary.histogram(v.name, v)
+
     # Merge all summaries into a single op
     merged_summary_op = tf.summary.merge_all()
 
-    return Y, Yi, optimizer, merged_summary_op, global_step
-
-def save_validation_image(sess, network, v, output_cycle, validation_dir, output_dir):
-    # Run our network for this validation object
-    result = sess.run([network['network']], feed_dict={
-        network['X']: [v['colours']],
-        network['G']: [v['graph']],
-        network['K']: 1.0 # don't dropout for images
-    })
-
-    # Load our input image
-    img = Image.open(os.path.join(validation_dir, 'image{:07d}.png'.format(v['file_no'] - 1)))
-    d = ImageDraw.Draw(img)
-
-    # Go through our drawing coordinates
-    for i in range(len(v['coords'])):
-
-        # The result at our point
-        r1 = result[0][0][i]
-
-        # The pixel coordinates at our point
-        p1 = v['coords'][i]
-
-        # Go through our neighbours
-        for n in v['graph'][i]:
-
-            # The coordinate at our neighbours point
-            p2 = v['coords'][n]
-
-            # Draw a line if both are in the image
-            if p2[0] != -1 and p2[1] != -1:
-
-                # Draw a line halfway to our target point
-                p2 = p1 + ((p2 - p1) * 0.5)
-
-                r = max(min(int(round(r1[1] * 255)), 255), 0)
-                g = max(min(int(round(r1[0] * 255)), 255), 0)
-
-                d.line([(p1[0], p1[1]), (p2[0], p2[1])], fill=(r, g, 0, 255))
-
-    # Save our image
-    img.save(os.path.join(output_dir, '{:04d}_{:04d}.png'.format(v['file_no'] - 1, output_cycle)))
-
+    return optimizer, merged_summary_op, global_step
 
 # Train the network
 def train(sess,
           network,
           input_path,
           output_path,
-          validation_path,
           load_model=True,
           learning_rate=0.001,
+          mesh_size=4,
           training_epochs=3,
-          regularisation=0.0,
-          dropout=0.9,
-          batch_size=1000):
+          batch_size=100):
 
     # Build the training portion of the graph
-    Y, Yi, optimizer, merged_summary_op, global_step = build_training_graph(network['logits'], learning_rate, regularisation)
+    optimizer, merged_summary_op, global_step = build_training_graph(network, learning_rate)
 
     # Setup for tensorboard
     summary_writer = tf.summary.FileWriter(output_path, graph=tf.get_default_graph())
@@ -165,86 +161,61 @@ def train(sess,
     else:
         print('Creating new model {}'.format(model_path))
 
-    # Load our validation pack
-    validation_image_pack = os.path.join(validation_path, 'validation.bin.lz4')
-    sys.stdout.write('Loading validation image pack {}...'.format(validation_image_pack));
-    sys.stdout.flush()
-    validation_images = load.validation(validation_image_pack)
-    sys.stdout.write(' Loaded!\n');
-
-    # List all our tree packs
-    trees = sorted([os.path.join(input_path, f) for f in os.listdir(input_path) if f.endswith('.bin.lz4')])
-
-    # Our last pack is used for validation
-    validation_pack = trees[-1]
-    sys.stdout.write('Loading validation tree pack {}...'.format(validation_pack));
-    sys.stdout.flush()
-    validation = load.tree(validation_pack)
-    sys.stdout.write(' Loaded!\n');
-
-    # The rest is used as our training data
-    trees = trees[:-1]
-
-    output_cycle = 0
-
-    # The number of epochs to train
-    for epoch in range(training_epochs):
-
-        # Shuffle!
-        random.shuffle(trees)
-
-        # The rest of the trees for training
-        for tree_i, tree in enumerate(trees):
-
-            # Load the tree
-            sys.stdout.write('Loading data tree pack {}...'.format(tree))
-            sys.stdout.flush()
-            data = load.tree(tree)
-            sys.stdout.write(' Loaded!\n')
-
-            # Get the next slice for training
-            for i in range(0, len(data[0]), batch_size):
-
-                # Run our training step
-                sess.run([optimizer], feed_dict={
-                    network['X']: data[0][i:i + batch_size],
-                    network['G']: data[3][i:i + batch_size],
-                    network['K']: dropout,
-                    Y: data[1][i:i + batch_size],
-                    Yi: data[2][i:i + batch_size]
-                })  #, options=run_options, run_metadata=run_metadata)
-
-                # tf.profiler.profile(tf.get_default_graph(),
-                #                     run_meta=run_metadata,
-                #                     options=(tf.profiler.ProfileOptionBuilder(tf.profiler.ProfileOptionBuilder.time_and_memory()).build()))
-
-                # Every 20 batches write our summary log
-                if tf.train.global_step(sess, global_step) % 40 == 0:
-
-                    summary, = sess.run([merged_summary_op], feed_dict={
-                        network['X']: validation[0][0:batch_size * 2],
-                        network['G']: validation[3][0:batch_size * 2],
-                        network['K']: 1.0, # No dropout with validation
-                        Y: validation[1][0:batch_size * 2],
-                        Yi: validation[2][0:batch_size * 2]
-                    })
-
-                    summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+    # Load our dataset
+    files = dataset.get_files(input_path, mesh_size)
 
 
-            # Save the model after every pack
-            saver.save(sess, model_path)
 
-            # Every 5 packs save the images to show training progress
-            if tree_i % 5 == 0:
+    # First 80% for training
+    train_dataset = dataset.dataset(
+        files[:round(len(files) * 0.8)],
+        variants=True,
+        repeat=training_epochs,
+        batch_size=20
+    )
 
-                print('Saving images')
+    # Last 20% for testing except for last 200 for validation
+    test_dataset = dataset.dataset(
+        files[round(len(files) * 0.8):-200],
+        variants=False,
+        repeat=1,
+        batch_size=100
+    )
 
-                # Run the network after each pack file for our example images
-                output_cycle += 1
-                for v in validation_images[:50:5]:
-                    save_validation_image(sess, network, v, output_cycle, validation_path, os.path.join(output_path, 'validation'))
+    valid_dataset = dataset.dataset(
+        files[-200:],
+        variants=False,
+        repeat=-1,
+        shuffle=False,
+        batch_size=200
+    )
 
+    # Get our handles
+    train_handle, test_handle, valid_handle = sess.run([train_dataset, test_dataset, valid_dataset])
 
-        # Randomly shuffle the packs at the end of each epoch
-        random.shuffle(trees)
+    while True:
+        try:
+            # Run our training step
+            sess.run([optimizer], feed_dict={
+                network['handle']: train_handle
+            })
+
+            # Every N steps do our validation/summary step
+            if tf.train.global_step(sess, global_step) % 40 == 0:
+                summary, = sess.run([merged_summary_op], feed_dict={
+                    network['handle']: valid_handle
+                })
+                summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+
+            # Every N steps save our model
+            if tf.train.global_step(sess, global_step) % 100 == 0:
+
+                # Save the model after every pack
+                saver.save(sess, model_path, tf.train.global_step(sess, global_step))
+
+                # Save our model in yaml format
+                save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
+
+        except tf.errors.OutOfRangeError:
+            print("Training done")
+            break

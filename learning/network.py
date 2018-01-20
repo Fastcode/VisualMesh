@@ -9,11 +9,23 @@ def build(groups):
     # Number of neighbours for each point
     graph_degree = 7
 
-    # The mesh graph
-    G = tf.placeholder(dtype=tf.int32, shape=[None, None, graph_degree], name='MeshGraph')
+    # Our iterator handle
+    handle = tf.placeholder(tf.string, shape=[])
 
-    # First input is the number of visual mesh points by 3
-    X = tf.placeholder(dtype=tf.float32, shape=[None, None, 3], name='Input')
+    # Make our iterator
+    iterator = tf.data.Iterator.from_string_handle(
+        handle,
+        (tf.float32, tf.int32, tf.float32, tf.int32),
+        (
+            [None, None, 3],    # X:  [batch, elements, channels]
+            [None, None, 7],    # G:  [batch, elements, graph_connections]
+            [None, None, None], # Y:  [batch, selected, n_classes]
+            [None, None]        # Yi: [batch, selected]
+        )
+    )
+
+    # Get values from our iterator
+    X, G, Y, Yi = iterator.get_next()
 
     # Build our tensor
     logits = X
@@ -22,7 +34,7 @@ def build(groups):
         with tf.variable_scope('Conv_{}'.format(i)):
 
             # The size of the previous output is the size of our input
-            prev_last_out = logits.get_shape()[2].value
+            prev_last_out = logits.shape[2].value
 
             with tf.variable_scope('GatherConvolution'):
                 net_shape = tf.shape(logits, name='NetworkShape')
@@ -61,12 +73,15 @@ def build(groups):
 
 
     # Softmax our final output for all values in the mesh as our network
-    network = tf.nn.softmax(logits, name='Softmax', dim=2)
+    network = tf.nn.softmax(logits, name='Softmax', axis=2)
 
     return {
-        'logits': logits,   # Raw unscaled output
-        'network': network, # Softmax network output
-        'X': X,             # Network input
-        'G': G,             # Network graph input
+        'handle': handle,   # (input)  Iterator handle
+        'logits': logits,   # (output) Raw unscaled output
+        'network': network, # (output) network output
+        'X': X,             # (output) Data
+        'G': G,             # (output) Graph
+        'Y': Y,             # (output) Labels
+        'Yi': Yi,           # (output) Label Indices
     }
 

@@ -33,13 +33,6 @@ if __name__ == "__main__":
 
     subcommands['train'].add_argument('output', action='store')
     subcommands['resample'].add_argument('output', action='store')
-
-    # The directory to the validation images
-    subcommands['train'].add_argument('-v', '--validation', action='store')
-    subcommands['train'].add_argument('-d', '--dropout', action='store', default=1.0)
-    subcommands['train'].add_argument('-r', '--regularisation', action='store', default=0.0)
-
-
     subcommands['resample'].add_argument('-m', '--model', action='store')
 
     args = command.parse_args()
@@ -48,7 +41,6 @@ if __name__ == "__main__":
     config = tf.ConfigProto()
     config.allow_soft_placement = True
     config.graph_options.build_cost_model = 1
-    config.gpu_options.per_process_gpu_memory_fraction = 0.2
     config.gpu_options.allow_growth = True
 
     with tf.Session(config=config) as sess:
@@ -67,15 +59,12 @@ if __name__ == "__main__":
             if args.command == 'train':
 
                 os.makedirs(os.path.join(args.output, network_name), exist_ok=True)
-                os.makedirs(os.path.join(args.output, network_name, 'validation'), exist_ok=True)
+                os.makedirs(os.path.join(args.output, network_name, 'yaml_models'), exist_ok=True)
 
                 training.train(sess,
                                net,
                                args.input,
-                               os.path.join(args.output, network_name),
-                               args.validation,
-                               dropout=args.dropout,
-                               regularisation=args.regularisation)
+                               os.path.join(args.output, network_name))
 
             elif args.command == 'resample':
                 resample.resample(sess, net, os.path.join(args.model, network_name), args.input, args.output)

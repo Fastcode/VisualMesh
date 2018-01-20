@@ -4,6 +4,20 @@ import tensorflow as tf
 import os
 import re
 
+def get_files(dir, mesh_size):
+
+    # Load the directory that has our files
+    files = sorted([os.path.join(dir, f) for f in os.listdir(dir) if f.startswith('{}mesh'.format(mesh_size))])
+
+    # Get the stencil and image files for our mesh
+    files = [(
+        f,
+        re.sub(r'(.*)\d+mesh(\d+).*', r'\1image\2.png', f),
+        re.sub(r'(.*)\d+mesh(\d+).*', r'\1stencil\2.png', f)
+    ) for f in files]
+
+    return files
+
 def load_data_files(files, mesh_type='VISUALMESH'):
 
     # Load our image and stencil
@@ -82,26 +96,19 @@ def select_points(x, y, g):
     # Gather the relevant ones
     ys = tf.gather(ys, yi)
 
-    return x, yi, ys, g
+    return x, g, ys, yi
 
 
-def dataset(input_dir, mesh_size):
-
-    # Load the directory that has our files
-    files = sorted([os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.startswith('{}mesh'.format(mesh_size))])
-
-    # Get the stencil and image files for our mesh
-    files = [(
-        f,
-        re.sub(r'(.*)\d+mesh(\d+).*', r'\1image\2.png', f),
-        re.sub(r'(.*)\d+mesh(\d+).*', r'\1stencil\2.png', f)
-    ) for f in files]
+def dataset(files, variants=True, repeat=1, batch_size=10, shuffle=True):
 
     # Make a constant tensor to hold them
     dataset = tf.constant(files)
 
     # Create our dataset from our list of files
     dataset = tf.data.Dataset.from_tensor_slices(dataset)
+
+    # Repeat for epochs
+    dataset = dataset.repeat(repeat)
 
     # Load our images
     dataset = dataset.map(load_data_files, 8)
@@ -112,44 +119,30 @@ def dataset(input_dir, mesh_size):
     # Filter out images that are all empty (no objects of interest)
     dataset = dataset.filter(lambda x, y, g: tf.count_nonzero(y) > 0)
 
-    # Repeat number of variant times
-    dataset = dataset.repeat(10)
+    if variants:
+        # Repeat number of variant times
+        dataset = dataset.repeat(10)
 
-    # Apply random brightness
-    dataset = dataset.map(lambda x, y, g: (tf.image.random_brightness(x, 0.5), y, g), 8)
+        # Apply random brightness
+        dataset = dataset.map(lambda x, y, g: (tf.image.random_brightness(x, 0.5), y, g), 8)
 
-    # Apply random contrast
-    dataset = dataset.map(lambda x, y, g: (tf.image.random_contrast(x, 0.5, 1.5), y, g), 8)
+        # Apply random contrast
+        dataset = dataset.map(lambda x, y, g: (tf.image.random_contrast(x, 0.5, 1.5), y, g), 8)
 
-    # Apply random saturation
-    dataset = dataset.map(lambda x, y, g: (tf.image.random_saturation(x, 0.5, 1.5), y, g), 8)
+        # Apply random saturation
+        dataset = dataset.map(lambda x, y, g: (tf.image.random_saturation(x, 0.5, 1.5), y, g), 8)
 
-    # Apply random hue change
-    dataset = dataset.map(lambda x, y, g: (tf.image.random_hue(x, 0.2), y, g), 8)
+        # Apply random hue change
+        dataset = dataset.map(lambda x, y, g: (tf.image.random_hue(x, 0.2), y, g), 8)
 
     # Select our points
     dataset = dataset.map(select_points, 8)
 
     # Shuffle points
-    dataset = dataset.shuffle(buffer_size=1000)
+    if shuffle:
+        dataset = dataset.shuffle(buffer_size=batch_size * 3)
 
     # Pad and batch
-    dataset = dataset.padded_batch(10, ([-1, -1], [-1], [-1, -1], [-1, 7]))
+    dataset = dataset.padded_batch(batch_size, ([-1, -1], [-1, 7], [-1, -1], [-1]))
 
-    # Prefetch elements so we don't stall
-    dataset = dataset.prefetch(10)
-
-    return dataset.make_one_shot_iterator().get_next()
-
-data = dataset('/Users/trent/Code/VisualMesh/training/raw', 4)
-
-with tf.Session() as sess:
-    for i in range(2000):
-        print(f'Running task {i}')
-        # sess.run(tf.write_file('output{}.png'.format(i), tf.image.encode_png(tf.image.convert_image_dtype(data.get_next()[0], tf.uint8, saturate=True))))
-        val = sess.run(data)
-
-        for v in val:
-            print(v.shape)
-
-        print()
+    return dataset.make_one_shot_iterator().string_handle()
