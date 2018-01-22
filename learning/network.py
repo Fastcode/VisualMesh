@@ -61,8 +61,22 @@ def build(groups):
                 with tf.variable_scope('Layer_{}'.format(j)):
 
                     # Create weights and biases
-                    W = tf.get_variable('Weights', shape=[in_s, out_s], initializer=tf.truncated_normal_initializer(stddev=math.sqrt(2.0/in_s)), dtype=tf.float32)
-                    b = tf.get_variable('Biases', shape=[out_s], initializer=tf.truncated_normal_initializer(stddev=math.sqrt(2.0/out_s)), dtype=tf.float32)
+                    W = tf.get_variable(
+                        'Weights',
+                        shape=[in_s, out_s],
+                        initializer=tf.random_normal_initializer(
+                            stddev=math.sqrt(1.0/in_s)
+                        ),
+                        dtype=tf.float32
+                    )
+
+                    b = tf.get_variable('Biases',
+                        shape=[out_s],
+                        initializer=tf.random_normal_initializer(
+                            stddev=math.sqrt(1.0/out_s)
+                        ),
+                        dtype=tf.float32
+                    )
 
                     # Apply our weights and biases
                     logits = tf.tensordot(logits, W, [[2], [0]], name="MatMul")

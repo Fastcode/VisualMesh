@@ -439,19 +439,25 @@ public:
 
                     // Apply our activation function
                     code << "    // Apply the activation function" << std::endl;
+
+                    // selu constants
+                    constexpr const float lambda = 1.0507009873554804934193349852946;
+                    constexpr const float alpha  = 1.6732632423543772848170429916717;
+
                     if (vector_out) {
                         // Apply elu
                         std::string e = "in" + std::to_string(layer_no + 1);
 
                         // TODO Apply selu rather than elu
-                        code << "    " << e << " = select(native_exp(" << e << ") - 1, in" << (layer_no + 1) << ", "
-                             << e << " > 0);" << std::endl;  // select(a, b, c) == c ? b : a
+                        code << "    " << e << " = " << lambda << "f * select(" << alpha << "f * native_exp(" << e
+                             << ") - " << alpha << "f, in" << (layer_no + 1) << ", " << e << " > 0);"
+                             << std::endl;  // select(a, b, c) == c ? b : a
                     }
                     else {
                         for (uint i = 0; i < biases.size(); ++i) {
                             std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
-                            code << "    " << e << " = " << e << " > 0 ? " << e << " : native_exp(" << e << ") - 1;"
-                                 << std::endl;
+                            code << "    " << e << " = " << lambda << "f * (" << e << " > 0 ? " << e << " : " << alpha
+                                 << "f * native_exp(" << e << ") - " << alpha << "f);" << std::endl;
                         }
                     }
                     code << std::endl;
@@ -1633,8 +1639,9 @@ public:
         // Build the packed neighbourhood map with an extra offscreen point at the end
         std::vector<std::array<int, 6>> local_neighbourhood(points + 1);
         for (uint i = 0; i < indices.size(); ++i) {
+            const auto& node = nodes[indices[i]];
             for (uint j = 0; j < 6; ++j) {
-                const auto& n             = nodes[indices[i]].neighbours[j];
+                const auto& n             = node.neighbours[j];
                 local_neighbourhood[i][j] = r_indices[n];
             }
         }

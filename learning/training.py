@@ -162,9 +162,9 @@ def train(sess,
         print('Creating new model {}'.format(model_path))
 
     # Load our dataset
+    print('Loading file list')
     files = dataset.get_files(input_path, mesh_size)
-
-
+    print('Loaded {} files'.format(len(files)))
 
     # First 80% for training
     train_dataset = dataset.dataset(
@@ -191,7 +191,7 @@ def train(sess,
     )
 
     # Get our handles
-    train_handle, test_handle, valid_handle = sess.run([train_dataset, test_dataset, valid_dataset])
+    train_handle, valid_handle = sess.run([train_dataset, valid_dataset])
 
     while True:
         try:
@@ -200,15 +200,17 @@ def train(sess,
                 network['handle']: train_handle
             })
 
+            print("Batch:", tf.train.global_step(sess, global_step))
+
             # Every N steps do our validation/summary step
-            if tf.train.global_step(sess, global_step) % 40 == 0:
+            if tf.train.global_step(sess, global_step) % 25 == 0:
                 summary, = sess.run([merged_summary_op], feed_dict={
                     network['handle']: valid_handle
                 })
                 summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
             # Every N steps save our model
-            if tf.train.global_step(sess, global_step) % 100 == 0:
+            if tf.train.global_step(sess, global_step) % 200 == 0:
 
                 # Save the model after every pack
                 saver.save(sess, model_path, tf.train.global_step(sess, global_step))
