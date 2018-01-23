@@ -5,7 +5,7 @@ import os
 import re
 from PIL import Image, ImageDraw
 
-def get_files(dir, mesh_size):
+def get_files(dir, mesh_type, mesh_size):
 
     # Load the directory that has our files
     files = sorted([os.path.join(dir, f) for f in os.listdir(dir) if f.startswith('{}mesh'.format(mesh_size))])
@@ -14,7 +14,8 @@ def get_files(dir, mesh_size):
     files = [(
         f,
         re.sub(r'(.*)\d+mesh(\d+).*', r'\1image\2.jpg', f),
-        re.sub(r'(.*)\d+mesh(\d+).*', r'\1stencil\2.png', f)
+        re.sub(r'(.*)\d+mesh(\d+).*', r'\1stencil\2.png', f),
+        re.sub(r'(.*)\d+mesh(\d+).*', r'\1{}_sample\2.bin'.format(mesh_type), f),
     ) for f in files]
 
     return files
@@ -64,7 +65,7 @@ def draw_image(file, px, neighbourhood):
     return neighbourhood
 
 
-def load_data_files(files, mesh_type='VISUALMESH'):
+def load_data_files(files, mesh_type):
 
     # Load our image and stencil
     image = tf.image.decode_jpeg(tf.read_file(files[1], name='ReadImage'), 3, name='DecodeImage')
@@ -82,23 +83,23 @@ def load_data_files(files, mesh_type='VISUALMESH'):
     pixel_size = tf.bitcast(mesh_data[-1], tf.float32)
 
     # Grab our pixel coordinates and neighbourhood
-    if mesh_type == 'VISUALMESH':
+    if mesh_type == 'mesh':
         pixel_coordinates = tf.reshape(mesh_data[:(n - 1) * 2], shape=[-1, 2], name='GetPixelCoordinates')
 
         # Get our neighbourhood indices
         neighbourhood = tf.reshape(mesh_data[(n - 1) * 2:-1], shape=[-1, 7], name='GetNeighbourhoodIndices')
 
-    elif mesh_type in ['HEXEQUAL', 'HEXDENSE']:
+    elif mesh_type in ['hexequal', 'hexdense']:
         # Get our image size as floats
         img_size = tf.cast(tf.shape(stencil), tf.float32)
 
-        if mesh_type == 'HEXEQUAL':
+        if mesh_type == 'hexequal':
             c1 = tf.sqrt(tf.cast(n, tf.float32));
             c2 = tf.sqrt(img_size[1] / img_size[0]); # x/y
 
             nx   = tf.cast(c1 * c2, tf.int32);
             ny   = tf.cast(c1 / c2, tf.int32);
-        elif mesh_type == 'HEXDENSE':
+        elif mesh_type == 'hexdense':
             nx = tf.cast(tf.minimum(img_size[1], img_size[1] / pixel_size), tf.int32);
             ny = tf.cast(tf.minimum(img_size[0], img_size[0] / pixel_size), tf.int32);
 
@@ -207,16 +208,17 @@ def load_data_files(files, mesh_type='VISUALMESH'):
         neighbourhood = tf.pad(neighbourhood, [[1, 0], [0, 0]])
 
     # Draw the image
-    neighbourhood = tf.py_func(draw_image, [files[1], pixel_coordinates, neighbourhood], tf.int32)
+    # neighbourhood = tf.py_func(draw_image, [files[1], pixel_coordinates, neighbourhood], tf.int32)
 
     return (
         image,
         stencil,
         neighbourhood,
-        pixel_coordinates
+        pixel_coordinates,
+        files
     )
 
-def select_points(x, y, g):
+def select_points(x, y, g, *args):
 
     x = tf.squeeze(x, name='SqueezeImageDimensions')
 
@@ -235,7 +237,7 @@ def select_points(x, y, g):
     ball_points = tf.tile(tf.squeeze(tf.where(tf.equal(y, classes[0])), [1]), multiples=[2], name='DuplicateBallPoints')
 
     # Get non ball points of equal number to ball points
-    other_points = tf.squeeze(tf.where(tf.equal(y, classes[1])))
+    other_points = tf.squeeze(tf.where(tf.equal(y, classes[1])), [1])
     other_points = tf.random_shuffle(other_points)[:tf.size(ball_points)]
 
     # List of our indices
@@ -247,10 +249,10 @@ def select_points(x, y, g):
     # Gather the relevant ones
     ys = tf.gather(ys, yi)
 
-    return x, g, ys, yi
+    return (x, g, ys, yi, *args)
 
 
-def dataset(files, variants=True, repeat=1, batch_size=10, shuffle=True):
+def dataset(files, mesh_type, variants=True, repeat=1, batch_size=10, shuffle=True):
 
     # Make a constant tensor to hold them
     dataset = tf.constant(files)
@@ -262,29 +264,69 @@ def dataset(files, variants=True, repeat=1, batch_size=10, shuffle=True):
     dataset = dataset.repeat(repeat)
 
     # Load our images
-    dataset = dataset.map(load_data_files, 8)
+    dataset = dataset.map(lambda files: load_data_files(files, mesh_type), 8)
 
     # Extract our relevant points from our image
-    dataset = dataset.map(lambda x, y, g, px: (tf.expand_dims(tf.gather_nd(x, px), 0), tf.squeeze(tf.gather_nd(y, px)), g), 8)
+    dataset = dataset.map(
+        lambda x, y, g, px, *args: (
+            tf.expand_dims(tf.gather_nd(x, px), 0),
+            tf.squeeze(tf.gather_nd(y, px)),
+            g,
+            *args
+        ),
+        8
+    )
 
     # Filter out images that are all empty (no objects of interest)
-    dataset = dataset.filter(lambda x, y, g: tf.count_nonzero(y) > 0)
+    dataset = dataset.filter(lambda x, y, g, *args: tf.count_nonzero(y) > 0)
 
     if variants:
         # Repeat number of variant times
         dataset = dataset.repeat(10)
 
         # Apply random brightness
-        dataset = dataset.map(lambda x, y, g: (tf.image.random_brightness(x, 0.5), y, g), 8)
+        dataset = dataset.map(
+            lambda x, y, g, *args: (
+                tf.image.random_brightness(x, 0.5),
+                y,
+                g,
+                *args
+            ),
+            8
+        )
 
         # Apply random contrast
-        dataset = dataset.map(lambda x, y, g: (tf.image.random_contrast(x, 0.5, 1.5), y, g), 8)
+        dataset = dataset.map(
+            lambda x, y, g, *args: (
+                tf.image.random_contrast(x, 0.5, 1.5),
+                y,
+                g,
+                *args
+            ),
+            8
+        )
 
         # Apply random saturation
-        dataset = dataset.map(lambda x, y, g: (tf.image.random_saturation(x, 0.5, 1.5), y, g), 8)
+        dataset = dataset.map(
+            lambda x, y, g, *args: (
+                tf.image.random_saturation(x, 0.5, 1.5),
+                y,
+                g,
+                *args
+            ),
+            8
+        )
 
         # Apply random hue change
-        dataset = dataset.map(lambda x, y, g: (tf.image.random_hue(x, 0.2), y, g), 8)
+        dataset = dataset.map(
+            lambda x, y, g, *args: (
+                tf.image.random_hue(x, 0.2),
+                y,
+                g,
+                *args
+            ),
+            8
+        )
 
     # Select our points
     dataset = dataset.map(select_points, 8)
@@ -294,7 +336,13 @@ def dataset(files, variants=True, repeat=1, batch_size=10, shuffle=True):
         dataset = dataset.shuffle(buffer_size=batch_size * 3)
 
     # Pad and batch
-    dataset = dataset.padded_batch(batch_size, ([-1, -1], [-1, 7], [-1, -1], [-1]))
+    dataset = dataset.padded_batch(batch_size, (
+        [-1, 3], # X
+        [-1, 7], # G
+        [-1, 2], # Y
+        [-1],    # Yi
+        [4]      # Files
+    ))
 
     # Prefetch 10 elements
     dataset = dataset.prefetch(10)

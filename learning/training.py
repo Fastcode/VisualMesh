@@ -49,7 +49,7 @@ def save_yaml_model(sess, output_path, global_step):
     with open(os.path.join(output_path, 'yaml_models', 'model_{}.yaml'.format(global_step)), 'w') as f:
         f.write(yaml.dump(output, width=120))
 
-
+    return a1
 def build_training_graph(network, learning_rate):
 
     # The final expected output for the classes
@@ -68,7 +68,8 @@ def build_training_graph(network, learning_rate):
         global_step = tf.Variable(0, dtype=tf.int32, trainable=False, name='global_step')
 
         # Gather all our points with valid probabilities (the sum should always be 1.0)
-        selected = tf.cast(tf.where(tf.reduce_sum(Y, axis=2) > 0.0), dtype=tf.int32)
+        selected = tf.cast(tf.where(tf.reduce_sum(Y, axis=2) > 0.5), dtype=tf.int32)
+
         Yi = tf.gather_nd(Yi, selected)
         Y = tf.gather_nd(Y, selected)
         train_logits = tf.gather_nd(logits, tf.stack([selected[:,0], Yi], axis=1))
@@ -84,7 +85,6 @@ def build_training_graph(network, learning_rate):
         # Calculate accuracy
         with tf.name_scope('Metrics'):
             # Work out which class is larger and make 1 positive and 0 negative
-            # TODO these need fixing for the multiple points per image
             softmax_logits = tf.nn.softmax(train_logits)
             predictions = tf.argmin(softmax_logits, axis=1)
             labels = tf.argmin(Y, axis=1)
@@ -126,14 +126,16 @@ def build_training_graph(network, learning_rate):
 
     return optimizer, merged_summary_op, global_step
 
+
 # Train the network
 def train(sess,
           network,
+          mesh_type,
+          mesh_size,
           input_path,
           output_path,
           load_model=True,
           learning_rate=0.001,
-          mesh_size=4,
           training_epochs=3,
           batch_size=100):
 
@@ -156,38 +158,48 @@ def train(sess,
 
     # If we are loading existing training data do that
     if load_model and os.path.isfile(os.path.join(output_path, 'checkpoint')):
-        print('Loading model {}'.format(model_path))
-        saver.restore(sess, model_path)
+        checkpoint_file = tf.train.latest_checkpoint(output_path)
+        print('Loading model {}'.format(checkpoint_file))
+        saver.restore(sess, checkpoint_file)
     else:
         print('Creating new model {}'.format(model_path))
 
     # Load our dataset
     print('Loading file list')
-    files = dataset.get_files(input_path, mesh_size)
+    files = dataset.get_files(input_path, mesh_type, mesh_size)
     print('Loaded {} files'.format(len(files)))
 
-    # First 80% for training
-    train_dataset = dataset.dataset(
-        files[:round(len(files) * 0.8)],
-        variants=True,
-        repeat=training_epochs,
-        batch_size=20
-    )
+    splits = [
+        round(len(files) * 0.1),
+        round(len(files) * 0.8)
+    ]
 
-    # Last 20% for testing except for last 200 for validation
-    test_dataset = dataset.dataset(
-        files[round(len(files) * 0.8):-200],
-        variants=False,
-        repeat=1,
-        batch_size=100
-    )
-
+    # First 10% for validation
     valid_dataset = dataset.dataset(
-        files[-200:],
+        files[:splits[0]],
+        mesh_type=mesh_type,
         variants=False,
         repeat=-1,
         shuffle=False,
-        batch_size=200
+        batch_size=50
+    )
+
+    # Next 70% for training
+    train_dataset = dataset.dataset(
+        files[splits[0]:splits[1]],
+        mesh_type=mesh_type,
+        variants=True,
+        repeat=training_epochs,
+        batch_size=5
+    )
+
+    # Last 20% for testing
+    test_dataset = dataset.dataset(
+        files[splits[1]:],
+        mesh_type=mesh_type,
+        variants=False,
+        repeat=1,
+        batch_size=1
     )
 
     # Get our handles
@@ -219,5 +231,5 @@ def train(sess,
                 save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
 
         except tf.errors.OutOfRangeError:
-            print("Training done")
+            print('Training done')
             break

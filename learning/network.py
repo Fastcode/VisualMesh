@@ -15,21 +15,23 @@ def build(groups):
     # Make our iterator
     iterator = tf.data.Iterator.from_string_handle(
         handle,
-        (tf.float32, tf.int32, tf.float32, tf.int32),
+        (tf.float32, tf.int32, tf.float32, tf.int32, tf.string),
         (
-            [None, None, 3],    # X:  [batch, elements, channels]
-            [None, None, 7],    # G:  [batch, elements, graph_connections]
-            [None, None, None], # Y:  [batch, selected, n_classes]
-            [None, None]        # Yi: [batch, selected]
+            [None, None, 3], # X:     [batch, elements, channels]
+            [None, None, 7], # G:     [batch, elements, graph_connections]
+            [None, None, 2], # Y:     [batch, selected, n_classes]
+            [None, None],    # Yi:    [batch, selected]
+            [None, 4],       # files: [batch, 4]
         )
     )
 
     # Get values from our iterator
-    X, G, Y, Yi = iterator.get_next()
+    X, G, Y, Yi, files = iterator.get_next()
 
     # Build our tensor
     logits = X
     for i, c in enumerate(groups):
+
         # Which convolution we are on
         with tf.variable_scope('Conv_{}'.format(i)):
 
@@ -97,5 +99,6 @@ def build(groups):
         'G': G,             # (output) Graph
         'Y': Y,             # (output) Labels
         'Yi': Yi,           # (output) Label Indices
+        'files': files,     # (output) Files that this came from
     }
 
