@@ -8,14 +8,14 @@ from PIL import Image, ImageDraw
 def get_files(dir, mesh_type, mesh_size):
 
     # Load the directory that has our files
-    files = sorted([os.path.join(dir, f) for f in os.listdir(dir) if f.startswith('{}mesh'.format(mesh_size))])
+    files = sorted([os.path.join(dir, f) for f in os.listdir(dir) if f.startswith('{}mesh0'.format(mesh_size))])
 
     # Get the stencil and image files for our mesh
     files = [(
         f,
         re.sub(r'(.*)\d+mesh(\d+).*', r'\1image\2.jpg', f),
         re.sub(r'(.*)\d+mesh(\d+).*', r'\1stencil\2.png', f),
-        re.sub(r'(.*)\d+mesh(\d+).*', r'\1{}_sample\2.bin'.format(mesh_type), f),
+        re.sub(r'(.*)\d+mesh(\d+).*', r'\1{}{}_sample\2.bin', f).format(mesh_size, mesh_type),
     ) for f in files]
 
     return files
@@ -207,6 +207,13 @@ def load_data_files(files, mesh_type):
         # Add in our offscreen point
         neighbourhood = tf.pad(neighbourhood, [[1, 0], [0, 0]])
 
+    # Read our resample data if it exists, otherwise just do log of 1s
+    sample_data = tf.cond(
+        tf.py_func(os.path.isfile, [files[3]], tf.bool, stateful=False),
+        lambda: tf.decode_raw(tf.read_file(files[3], name='ReadSample'), tf.float32, name='DecodeSample'),
+        lambda: tf.zeros(dtype=tf.float32, shape=[tf.shape(neighbourhood)[0]])
+    )
+
     # Draw the image
     # neighbourhood = tf.py_func(draw_image, [files[1], pixel_coordinates, neighbourhood], tf.int32)
 
@@ -215,10 +222,11 @@ def load_data_files(files, mesh_type):
         stencil,
         neighbourhood,
         pixel_coordinates,
+        sample_data,
         files
     )
 
-def select_points(x, y, g, *args):
+def select_points(x, y, g, sm, files):
 
     x = tf.squeeze(x, name='SqueezeImageDimensions')
 
@@ -238,18 +246,21 @@ def select_points(x, y, g, *args):
 
     # Get non ball points of equal number to ball points
     other_points = tf.squeeze(tf.where(tf.equal(y, classes[1])), [1])
-    other_points = tf.random_shuffle(other_points)[:tf.size(ball_points)]
+
+    # Select the sample values for these points
+    sm = tf.gather(sm, other_points)
+
+    # Do a multinomial sample to get points
+    indices = tf.squeeze(tf.multinomial(tf.expand_dims(sm, 0), tf.size(ball_points)))
+    other_points = tf.gather(other_points, indices)
 
     # List of our indices
     yi = tf.cast(tf.concat([ball_points, other_points], axis=0), tf.int32)
 
     # Convert our single value classes into multiple outputs
-    ys = tf.stack([tf.cast(tf.equal(y, v), tf.float32) for v in classes], axis=1)
+    y = tf.stack([tf.cast(tf.equal(y, v), tf.float32) for v in classes], axis=1)
 
-    # Gather the relevant ones
-    ys = tf.gather(ys, yi)
-
-    return (x, g, ys, yi, *args)
+    return (x, g, y, yi, files)
 
 
 def dataset(files, mesh_type, variants=True, repeat=1, batch_size=10, shuffle=True):
@@ -268,17 +279,18 @@ def dataset(files, mesh_type, variants=True, repeat=1, batch_size=10, shuffle=Tr
 
     # Extract our relevant points from our image
     dataset = dataset.map(
-        lambda x, y, g, px, *args: (
+        lambda x, y, g, px, sm, files: (
             tf.expand_dims(tf.gather_nd(x, px), 0),
             tf.squeeze(tf.gather_nd(y, px)),
             g,
-            *args
+            sm,
+            files
         ),
         8
     )
 
     # Filter out images that are all empty (no objects of interest)
-    dataset = dataset.filter(lambda x, y, g, *args: tf.count_nonzero(y) > 0)
+    dataset = dataset.filter(lambda x, y, g, sm, files: tf.greater(tf.count_nonzero(y), 0))
 
     if variants:
         # Repeat number of variant times
@@ -286,44 +298,48 @@ def dataset(files, mesh_type, variants=True, repeat=1, batch_size=10, shuffle=Tr
 
         # Apply random brightness
         dataset = dataset.map(
-            lambda x, y, g, *args: (
+            lambda x, y, g, sm, files: (
                 tf.image.random_brightness(x, 0.5),
                 y,
                 g,
-                *args
+                sm,
+                files
             ),
             8
         )
 
         # Apply random contrast
         dataset = dataset.map(
-            lambda x, y, g, *args: (
+            lambda x, y, g, sm, files: (
                 tf.image.random_contrast(x, 0.5, 1.5),
                 y,
                 g,
-                *args
+                sm,
+                files
             ),
             8
         )
 
         # Apply random saturation
         dataset = dataset.map(
-            lambda x, y, g, *args: (
+            lambda x, y, g, sm, files: (
                 tf.image.random_saturation(x, 0.5, 1.5),
                 y,
                 g,
-                *args
+                sm,
+                files
             ),
             8
         )
 
         # Apply random hue change
         dataset = dataset.map(
-            lambda x, y, g, *args: (
+            lambda x, y, g, sm, files: (
                 tf.image.random_hue(x, 0.2),
                 y,
                 g,
-                *args
+                sm,
+                files
             ),
             8
         )
@@ -336,13 +352,23 @@ def dataset(files, mesh_type, variants=True, repeat=1, batch_size=10, shuffle=Tr
         dataset = dataset.shuffle(buffer_size=batch_size * 3)
 
     # Pad and batch
-    dataset = dataset.padded_batch(batch_size, (
-        [-1, 3], # X
-        [-1, 7], # G
-        [-1, 2], # Y
-        [-1],    # Yi
-        [4]      # Files
-    ))
+    dataset = dataset.padded_batch(
+        batch_size=batch_size,
+        padded_shapes=(
+            [-1, 3], # X
+            [-1, 7], # G
+            [-1, 2], # Y
+            [-1],    # Yi
+            [4],     # Files
+        ),
+        padding_values=(
+            0.0, # X
+            0,   # G
+            0.0, # Y
+            -1,  # Yi
+            '',  # Files
+        )
+    )
 
     # Prefetch 10 elements
     dataset = dataset.prefetch(10)

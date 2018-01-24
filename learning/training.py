@@ -49,7 +49,7 @@ def save_yaml_model(sess, output_path, global_step):
     with open(os.path.join(output_path, 'yaml_models', 'model_{}.yaml'.format(global_step)), 'w') as f:
         f.write(yaml.dump(output, width=120))
 
-    return a1
+
 def build_training_graph(network, learning_rate):
 
     # The final expected output for the classes
@@ -59,7 +59,7 @@ def build_training_graph(network, learning_rate):
     Yi = network['Yi']
 
     # The unscaled network output
-    logits = network['logits']
+    X = network['logits']
 
     # Gather our individual output for training
     with tf.name_scope('Training'):
@@ -67,16 +67,22 @@ def build_training_graph(network, learning_rate):
         # Global training step
         global_step = tf.Variable(0, dtype=tf.int32, trainable=False, name='global_step')
 
-        # Gather all our points with valid probabilities (the sum should always be 1.0)
-        selected = tf.cast(tf.where(tf.reduce_sum(Y, axis=2) > 0.5), dtype=tf.int32)
+        # Gather all our non padding values
+        selected = tf.cast(tf.where(tf.not_equal(Yi, -1)), dtype=tf.int32)
 
+        # Reselect these points from Yi
         Yi = tf.gather_nd(Yi, selected)
-        Y = tf.gather_nd(Y, selected)
-        train_logits = tf.gather_nd(logits, tf.stack([selected[:,0], Yi], axis=1))
+
+        # Stack Yi with the batches they came from
+        Yi = tf.stack([selected[:,0], Yi], axis=1)
+
+        # Select the relevant Y and X
+        X = tf.gather_nd(X, Yi)
+        Y = tf.gather_nd(Y, Yi)
 
         # Our loss function
         with tf.name_scope('Loss'):
-            cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=train_logits, labels=Y, dim=1))
+            cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=X, labels=Y, dim=1))
 
         # Our optimiser
         with tf.name_scope('Optimiser'):
@@ -85,8 +91,8 @@ def build_training_graph(network, learning_rate):
         # Calculate accuracy
         with tf.name_scope('Metrics'):
             # Work out which class is larger and make 1 positive and 0 negative
-            softmax_logits = tf.nn.softmax(train_logits)
-            predictions = tf.argmin(softmax_logits, axis=1)
+            X = tf.nn.softmax(X)
+            predictions = tf.argmin(X, axis=1)
             labels = tf.argmin(Y, axis=1)
 
             # Get our confusion matrix
@@ -105,7 +111,7 @@ def build_training_graph(network, learning_rate):
             mcc = (tp * tn - fp * fn) / tf.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
 
             # How wide the gap is between the two classes
-            certainty = tf.reduce_mean(tf.abs(tf.subtract(softmax_logits[:, 0], softmax_logits[:, 1])))
+            certainty = tf.reduce_mean(tf.abs(tf.subtract(X[:, 0], X[:, 1])))
 
     # Monitor cost and metrics
     tf.summary.scalar('Loss', cost)

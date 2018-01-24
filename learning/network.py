@@ -19,7 +19,7 @@ def build(groups):
         (
             [None, None, 3], # X:     [batch, elements, channels]
             [None, None, 7], # G:     [batch, elements, graph_connections]
-            [None, None, 2], # Y:     [batch, selected, n_classes]
+            [None, None, 2], # Y:     [batch, elements, classes]
             [None, None],    # Yi:    [batch, selected]
             [None, 4],       # files: [batch, 4]
         )
