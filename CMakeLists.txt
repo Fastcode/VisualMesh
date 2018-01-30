@@ -70,9 +70,6 @@ INCLUDE_DIRECTORIES(SYSTEM ${YAML-CPP_INCLUDE_DIRS})
 
 INCLUDE_DIRECTORIES("${CMAKE_CURRENT_BINARY_DIR}/src")
 
-ADD_EXECUTABLE(generate_training "src/generate_training.cpp" ${hdr})
-TARGET_LINK_LIBRARIES(generate_training ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES})
-
 ADD_EXECUTABLE(view_mesh "src/view_mesh.cpp" ${hdr})
 TARGET_LINK_LIBRARIES(view_mesh ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML-CPP_LIBRARIES})
 
