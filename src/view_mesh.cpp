@@ -53,7 +53,7 @@ int main() {
 
     // Input image path
     std::string image_path = "/Users/trent/Code/VisualMesh/training/raw";
-    std::string model_path = "/Users/trent/Code/VisualMesh/4_4_4_4_2.yaml";
+    std::string model_path = "/Users/trent/Code/VisualMesh/model.yaml";
 
     // Construct our VisualMesh
     std::cerr << "Building VisualMesh" << std::endl;
@@ -115,7 +115,17 @@ int main() {
             // Load our metadata and two images
             nlohmann::json meta;
             std::ifstream(image_path + "/" + p) >> meta;
-            cv::Mat img     = cv::imread(image_path + "/image" + number + ".png", CV_LOAD_IMAGE_UNCHANGED);
+            cv::Mat img = cv::imread(image_path + "/image" + number + ".jpg");
+
+            {
+                std::vector<cv::Mat> split;
+                cv::split(img, split);
+
+                split.push_back(split.back());
+
+                cv::merge(split, img);
+            }
+
             cv::Mat stencil = cv::imread(image_path + "/stencil" + number + ".png");
 
             t.measure("\tLoaded files");
@@ -188,9 +198,8 @@ int main() {
             for (int i = 0; i < pixel_coordinates.size(); ++i) {
                 cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
 
-                cv::Scalar colour(uint8_t(classification[i][0] * 255), 0, uint8_t(classification[i][1] * 255));
-                // cv::Scalar colour(classification[i][0] > 0.5 ? 255 : 0, 0, classification[i][1] >= 0.5 ? 255 :
-                // 0);
+                // cv::Scalar colour(uint8_t(classification[i][0] * 255), 0, uint8_t(classification[i][1] * 255));
+                cv::Scalar colour(classification[i][0] > 0.5 ? 255 : 0, 0, classification[i][1] >= 0.5 ? 255 : 0, 255);
 
                 for (const auto& n : neighbourhood[i]) {
                     if (n < pixel_coordinates.size()) {
@@ -200,6 +209,8 @@ int main() {
                     }
                 }
             }
+
+            cv::imwrite("out.png", scratch);
 
             cv::imshow("Image", scratch);
             // Wait for esc key

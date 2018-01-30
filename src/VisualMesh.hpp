@@ -444,20 +444,19 @@ public:
                     constexpr const float lambda = 1.0507009873554804934193349852946;
                     constexpr const float alpha  = 1.6732632423543772848170429916717;
 
+                    // Apply selu
                     if (vector_out) {
-                        // Apply elu
                         std::string e = "in" + std::to_string(layer_no + 1);
 
-                        // TODO Apply selu rather than elu
-                        code << "    " << e << " = " << lambda << "f * select(" << alpha << "f * native_exp(" << e
-                             << ") - " << alpha << "f, in" << (layer_no + 1) << ", " << e << " > 0);"
+                        code << "    " << e << " = " << lambda << "f * select(" << alpha << "f * exp(" << e << ") - "
+                             << alpha << "f, in" << (layer_no + 1) << ", " << e << " > 0);"
                              << std::endl;  // select(a, b, c) == c ? b : a
                     }
                     else {
                         for (uint i = 0; i < biases.size(); ++i) {
                             std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
                             code << "    " << e << " = " << lambda << "f * (" << e << " > 0 ? " << e << " : " << alpha
-                                 << "f * native_exp(" << e << ") - " << alpha << "f);" << std::endl;
+                                 << "f * exp(" << e << ") - " << alpha << "f);" << std::endl;
                         }
                     }
                     code << std::endl;
@@ -468,7 +467,7 @@ public:
 
                         if (vector_out) {
                             std::string e = "in" + std::to_string(layer_no + 1);
-                            code << "    " << e << " = native_exp(" << e << ");" << std::endl;
+                            code << "    " << e << " = exp(" << e << ");" << std::endl;
                             code << "    " << e << " = " << e << " / dot(" << e << ", (float" << vector_out << ")(1));"
                                  << std::endl;
                         }
@@ -477,7 +476,7 @@ public:
                             // Apply exp to each of the elements
                             for (uint i = 0; i < biases.size(); ++i) {
                                 std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
-                                code << "    " << e << " = native_exp(" << e << ");" << std::endl;
+                                code << "    " << e << " = exp(" << e << ");" << std::endl;
                             }
 
                             // Sum up all the values

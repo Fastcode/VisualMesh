@@ -5,6 +5,7 @@
             "folder_exclude_patterns":
             [
                 "VisualMesh/build*",
+                "training"
             ],
             "path": "."
         }

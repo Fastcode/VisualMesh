@@ -7,6 +7,7 @@ import tensorflow as tf
 import learning.network as network
 import learning.training as training
 import learning.resample as resample
+import learning.test as test
 
 
 if __name__ == "__main__":
@@ -19,6 +20,7 @@ if __name__ == "__main__":
     subcommands = {
         'train': subcommands.add_parser('train'),
         'resample': subcommands.add_parser('resample'),
+        'test': subcommands.add_parser('test'),
     }
 
     for k, c in subcommands.items():
@@ -35,6 +37,7 @@ if __name__ == "__main__":
         c.add_argument('output', action='store')
 
     subcommands['resample'].add_argument('-m', '--model', action='store')
+    subcommands['test'].add_argument('-m', '--model', action='store')
 
     args = command.parse_args()
 
@@ -77,3 +80,12 @@ if __name__ == "__main__":
                                   os.path.join(args.model, '{}{}'.format(args.size, args.type), network_name),
                                   args.input,
                                   args.output)
+
+            elif args.command == 'test':
+                test.test(sess,
+                          net,
+                          args.type,
+                          args.size,
+                          os.path.join(args.model, '{}{}'.format(args.size, args.type), network_name),
+                          args.input,
+                          args.output)
