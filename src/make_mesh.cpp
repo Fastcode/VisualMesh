@@ -54,9 +54,9 @@ int main() {
 
     // Construct our VisualMesh
     std::cerr << "Building VisualMesh" << std::endl;
-    const int n_intersections = 5;
-    mesh::Sphere<float> sphere(0, 0.075, n_intersections, 10);
-    mesh::VisualMesh<float> mesh(sphere, 0.5, 1.5, 100, M_PI / 1024.0);
+    const int n_intersections = 3;
+    mesh::Sphere<float> sphere(0, 0.075, n_intersections, 15);
+    mesh::VisualMesh<float> mesh(sphere, 0.5, 1.5, 100, 0);
     std::cerr << "Finished building VisualMesh" << std::endl;
 
     // Go through all our training data
@@ -131,7 +131,7 @@ int main() {
 
                 // Get our relevant data
                 std::vector<std::array<int, 6>>& mesh_neighbours = projection.neighbourhood;
-                std::vector<std::array<int, 2>> mesh_px          = projection.pixel_coordinates;
+                std::vector<std::array<float, 2>> mesh_px        = projection.pixel_coordinates;
 
                 // Strip our pixel coordinates down to the ones on the screen
                 std::vector<std::array<int, 2>> new_px;
@@ -142,7 +142,7 @@ int main() {
                 new_neighbourhood.reserve(mesh_neighbours.size());
 
                 for (int i = 0; i < mesh_px.size(); ++i) {
-                    const auto& px = mesh_px[i];
+                    std::array<int, 2> px = {int(std::round(mesh_px[i][0])), int(std::round(mesh_px[i][1]))};
 
                     // Only copy across if our pixel is on the screen
                     if (0 < px[0] && px[0] < lens.dimensions[0] && 0 < px[1] && px[1] < lens.dimensions[1]) {

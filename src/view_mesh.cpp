@@ -108,6 +108,8 @@ int main() {
             // Extract the number so we can find the other files
             auto number = p.substr(4, 7);
 
+            if (number != "0000166") continue;
+
             std::cerr << "Processing file " << number << std::endl;
 
             Timer t;
@@ -182,8 +184,8 @@ int main() {
             // Run our classifier
             auto classified = classifier(img.data, mesh::VisualMesh<float>::BGRA, Hoc, lens);
 
-            auto& neighbourhood                               = classified.neighbourhood;
-            std::vector<std::array<int, 2>> pixel_coordinates = classified.pixel_coordinates;
+            auto& neighbourhood                                 = classified.neighbourhood;
+            std::vector<std::array<float, 2>> pixel_coordinates = classified.pixel_coordinates;
             auto classification = classified.classifications.back().second.as<std::array<float, 2>>();
 
             t.measure("\tClassified Mesh");
@@ -205,6 +207,9 @@ int main() {
                     if (n < pixel_coordinates.size()) {
                         cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
                         cv::Point p2x = p1 + ((p2 - p1) * 0.5);
+
+                        std::cout << (pixel_coordinates[i][0]) << "," << (pixel_coordinates[i][1]) << ","
+                                  << (pixel_coordinates[n][0]) << "," << (pixel_coordinates[n][1]) << std::endl;
                         cv::line(scratch, p1, p2x, colour, 1);
                     }
                 }
