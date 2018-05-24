@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -15,8 +15,8 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef OPENCL_ERROR_CATEGORY
-#define OPENCL_ERROR_CATEGORY
+#ifndef VISUALMESH_ENGINE_OPENCL_OPENCL_ERROR_CATEGORY_HPP
+#define VISUALMESH_ENGINE_OPENCL_OPENCL_ERROR_CATEGORY_HPP
 
 #include <system_error>
 
@@ -249,4 +249,4 @@ std::string opencl_error_category_t::message(int code) const noexcept {
   }
 }
 
-#endif  // OPENCL_ERROR_CATEGORY
+#endif  // VISUALMESH_ENGINE_OPENCL_OPENCL_ERROR_CATEGORY_HPP

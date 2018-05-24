@@ -15,35 +15,33 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <tensorflow/core/framework/op.h>
-#include <tensorflow/core/framework/op_kernel.h>
-#include <tensorflow/core/framework/shape_inference.h>
+#ifndef TIMER_HPP
+#define TIMER_HPP
 
-REGISTER_OP("VisualMesh")
-  .Input("shape: ")
-  .Input("lens: lens")
-  .Input("n_sample_points: int32")
-  .Input("cam_to_observation_plane: float32")
-  .Output("pixels: float32")
-  .Output("neighbors: int32")
-  .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-    c->set_output(0, SHAPE_OF_PIXELS);
-    c->set_output(1, SHAPE_OF_NEIGHBOURS);
-    return tensorflow::Status::OK();
-  });
+#include <chrono>
 
-class VisualMeshOp : public tensorflow::OpKernel {
+class Timer {
 public:
-  explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
+  std::chrono::steady_clock::time_point t;
 
-  void Compute(tensorflow::OpKernelContext* context) override {
+  Timer() : t(std::chrono::steady_clock::now()) {}
 
-    // TODO grab the shape, lens, n_sample_points and cam_to_observation_plane
+  template <size_t N>
+  inline void measure(const char (&c)[N]) {
+    auto end = std::chrono::steady_clock::now();
 
-    // TODO Perform a projection operation using the visual mesh
+    auto val = end - t;
 
-    // Return the pixels and neighbourhood graph
+    auto v = std::chrono::duration_cast<std::chrono::duration<uint64_t, std::micro>>(val).count();
+
+    std::cout << c << " " << v << "µs" << std::endl;
+
+    t = std::chrono::steady_clock::now();
+  }
+
+  inline void reset() {
+    t = std::chrono::steady_clock::now();
   }
 };
 
-REGISTER_KERNEL_BUILDER(Name("VisualMesh").Device(tensorflow::DEVICE_CPU), VisualMeshOp);
+#endif  // TIMER_HPP

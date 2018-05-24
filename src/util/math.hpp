@@ -15,35 +15,34 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <tensorflow/core/framework/op.h>
-#include <tensorflow/core/framework/op_kernel.h>
-#include <tensorflow/core/framework/shape_inference.h>
+#ifndef VISUALMESH_UTILITY_MATH_HPP
+#define VISUALMESH_UTILITY_MATH_HPP
 
-REGISTER_OP("VisualMesh")
-  .Input("shape: ")
-  .Input("lens: lens")
-  .Input("n_sample_points: int32")
-  .Input("cam_to_observation_plane: float32")
-  .Output("pixels: float32")
-  .Output("neighbors: int32")
-  .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-    c->set_output(0, SHAPE_OF_PIXELS);
-    c->set_output(1, SHAPE_OF_NEIGHBOURS);
-    return tensorflow::Status::OK();
-  });
+// Typedef some value types we commonly use
+using vec2 = std::array<Scalar, 2>;
+using vec3 = std::array<Scalar, 3>;
+using vec4 = std::array<Scalar, 4>;
+using mat3 = std::array<vec3, 3>;
+using mat4 = std::array<vec4, 4>;
 
-class VisualMeshOp : public tensorflow::OpKernel {
-public:
-  explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
+// I could use Eigen for this, but if I use just the stl, at least nobody will have library problems
+namespace visualmesh {
+inline Scalar dot(const vec3& a, const vec3& b) {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
 
-  void Compute(tensorflow::OpKernelContext* context) override {
+inline vec3 cross(const vec3& a, const vec3& b) {
+  return {{
+    a[1] * b[2] - a[2] * b[1],  // x
+    a[2] * b[0] - a[0] * b[2],  // y
+    a[0] * b[1] - a[1] * b[0]   // z
+  }};
+}
 
-    // TODO grab the shape, lens, n_sample_points and cam_to_observation_plane
+inline vec3 normalise(const vec3& a) {
+  Scalar length = Scalar(1.0) / std::sqrt(a[0] * a[0] + a[1] * a[1] + a[2] + a[2]);
+  return {{a[0] * length, a[1] * length, a[2] * length}};
+}
+}  // namespace visualmesh
 
-    // TODO Perform a projection operation using the visual mesh
-
-    // Return the pixels and neighbourhood graph
-  }
-};
-
-REGISTER_KERNEL_BUILDER(Name("VisualMesh").Device(tensorflow::DEVICE_CPU), VisualMeshOp);
+#endif  // VISUALMESH_UTILITY_MATH_HPP

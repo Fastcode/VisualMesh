@@ -15,35 +15,22 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <tensorflow/core/framework/op.h>
-#include <tensorflow/core/framework/op_kernel.h>
-#include <tensorflow/core/framework/shape_inference.h>
+#ifndef VISUALMESH_MESH_CLASSIFIED_MESH_HPP
+#define VISUALMESH_MESH_CLASSIFIED_MESH_HPP
 
-REGISTER_OP("VisualMesh")
-  .Input("shape: ")
-  .Input("lens: lens")
-  .Input("n_sample_points: int32")
-  .Input("cam_to_observation_plane: float32")
-  .Output("pixels: float32")
-  .Output("neighbors: int32")
-  .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-    c->set_output(0, SHAPE_OF_PIXELS);
-    c->set_output(1, SHAPE_OF_NEIGHBOURS);
-    return tensorflow::Status::OK();
-  });
+#include <array>
+#include <vector>
 
-class VisualMeshOp : public tensorflow::OpKernel {
-public:
-  explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
+namespace visualmesh {
 
-  void Compute(tensorflow::OpKernelContext* context) override {
+struct ClassifiedMesh {
 
-    // TODO grab the shape, lens, n_sample_points and cam_to_observation_plane
-
-    // TODO Perform a projection operation using the visual mesh
-
-    // Return the pixels and neighbourhood graph
-  }
+  std::vector<std::array<Scalar, 2>> pixel_coordinates;
+  std::vector<std::array<int, 6>> neighbourhood;
+  std::vector<int> global_indices;
+  std::vector<Scalar> classifications;
 };
 
-REGISTER_KERNEL_BUILDER(Name("VisualMesh").Device(tensorflow::DEVICE_CPU), VisualMeshOp);
+}  // namespace visualmesh
+
+#endif  // VISUALMESH_MESH_CLASSIFIED_MESH_HPP

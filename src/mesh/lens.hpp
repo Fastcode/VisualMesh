@@ -15,35 +15,28 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <tensorflow/core/framework/op.h>
-#include <tensorflow/core/framework/op_kernel.h>
-#include <tensorflow/core/framework/shape_inference.h>
+#ifndef VISUALMESH_MESH_LENS_HPP
+#define VISUALMESH_MESH_LENS_HPP
 
-REGISTER_OP("VisualMesh")
-  .Input("shape: ")
-  .Input("lens: lens")
-  .Input("n_sample_points: int32")
-  .Input("cam_to_observation_plane: float32")
-  .Output("pixels: float32")
-  .Output("neighbors: int32")
-  .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-    c->set_output(0, SHAPE_OF_PIXELS);
-    c->set_output(1, SHAPE_OF_NEIGHBOURS);
-    return tensorflow::Status::OK();
-  });
+#include <array>
 
-class VisualMeshOp : public tensorflow::OpKernel {
-public:
-  explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
+namespace visualmesh {
 
-  void Compute(tensorflow::OpKernelContext* context) override {
+enum LensProjection { RECTILINEAR, EQUISOLID, EQUIDISTANT };
 
-    // TODO grab the shape, lens, n_sample_points and cam_to_observation_plane
+template <typename Scalar>
+struct Lens {
 
-    // TODO Perform a projection operation using the visual mesh
-
-    // Return the pixels and neighbourhood graph
-  }
+  // The projection that this image is using
+  Projection projection;
+  // The dimensions of the image
+  std::array<int, 2> dimensions;
+  /// The field of view of the camera measured in radians
+  Scalar fov;
+  /// The focal length of the camera, normalised to the image width
+  Scalar focal_length;
 };
 
-REGISTER_KERNEL_BUILDER(Name("VisualMesh").Device(tensorflow::DEVICE_CPU), VisualMeshOp);
+}  // namespace visualmesh
+
+#endif  // VISUALMESH_MESH_LENS_HPP

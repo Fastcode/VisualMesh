@@ -15,35 +15,33 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <tensorflow/core/framework/op.h>
-#include <tensorflow/core/framework/op_kernel.h>
-#include <tensorflow/core/framework/shape_inference.h>
+#ifndef VISUALMESH_ENGINE_OPENCL_SCALARS_HPP
+#define VISUALMESH_ENGINE_OPENCL_SCALARS_HPP
 
-REGISTER_OP("VisualMesh")
-  .Input("shape: ")
-  .Input("lens: lens")
-  .Input("n_sample_points: int32")
-  .Input("cam_to_observation_plane: float32")
-  .Output("pixels: float32")
-  .Output("neighbors: int32")
-  .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-    c->set_output(0, SHAPE_OF_PIXELS);
-    c->set_output(1, SHAPE_OF_NEIGHBOURS);
-    return tensorflow::Status::OK();
-  });
+namespace visualmesh {
+namespace engine {
+  namespace opencl {
 
-class VisualMeshOp : public tensorflow::OpKernel {
-public:
-  explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
+    std::string get_scalar_defines(float) {
+      return "#define Scalar float\n"
+             "#define Scalar2 float2\n"
+             "#define Scalar3 float3\n"
+             "#define Scalar4 float4\n"
+             "#define Scalar8 float8\n"
+             "#define Scalar16 float16\n";
+    }
 
-  void Compute(tensorflow::OpKernelContext* context) override {
+    std::string get_scalar_defines(double) {
+      return "#define Scalar double\n"
+             "#define Scalar2 double2\n"
+             "#define Scalar3 double3\n"
+             "#define Scalar4 double4\n"
+             "#define Scalar8 double8\n"
+             "#define Scalar16 double16\n";
+    }
 
-    // TODO grab the shape, lens, n_sample_points and cam_to_observation_plane
+  }  // namespace opencl
+}  // namespace engine
+}  // namespace visualmesh
 
-    // TODO Perform a projection operation using the visual mesh
-
-    // Return the pixels and neighbourhood graph
-  }
-};
-
-REGISTER_KERNEL_BUILDER(Name("VisualMesh").Device(tensorflow::DEVICE_CPU), VisualMeshOp);
+#endif  // VISUALMESH_ENGINE_OPENCL_SCALARS_HPP
