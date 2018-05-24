@@ -21,9 +21,9 @@ SET(VERSION_MINOR 0)
 SET(VERSION_PATCH 0)
 
 ADD_COMPILE_OPTIONS(
-                    -std=c++14
-                    -march=native
-                    -mtune=native
+    -std=c++14
+    -march=native
+    -mtune=native
 )
 
 # We use additional modules that cmake needs to know about
@@ -32,11 +32,7 @@ SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 # Setup our compiler settings
 INCLUDE(CompilerSetup)
 
-FIND_PACKAGE(OpenCV REQUIRED)
 FIND_PACKAGE(OpenCL REQUIRED)
-FIND_PACKAGE(YAML-CPP REQUIRED)
-FIND_PACKAGE(PythonInterp 3 REQUIRED)
-FIND_PACKAGE(fmt REQUIRED)
 
 # Find our files
 FILE(GLOB hdr
@@ -63,15 +59,18 @@ FOREACH(cl ${cls})
     LIST(APPEND hdr "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp")
 ENDFOREACH(cl ${cls})
 
-INCLUDE_DIRECTORIES(SYSTEM ${OpenCL_INCLUDE_DIRS})
-INCLUDE_DIRECTORIES(SYSTEM ${OpenCV_INCLUDE_DIRS})
-INCLUDE_DIRECTORIES(SYSTEM ${fmt_INCLUDE_DIRS})
-INCLUDE_DIRECTORIES(SYSTEM ${YAML-CPP_INCLUDE_DIRS})
-
+# We must now look in here for headers
 INCLUDE_DIRECTORIES("${CMAKE_CURRENT_BINARY_DIR}/src")
 
-ADD_EXECUTABLE(view_mesh "src/view_mesh.cpp" ${hdr})
-TARGET_LINK_LIBRARIES(view_mesh ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML-CPP_LIBRARIES})
+INCLUDE_DIRECTORIES(SYSTEM ${OpenCL_INCLUDE_DIRS})
 
-ADD_EXECUTABLE(make_mesh "src/make_mesh.cpp" ${hdr})
-TARGET_LINK_LIBRARIES(make_mesh ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML-CPP_LIBRARIES})
+OPTION(BUILD_TENSORFLOW_OP "Build the tensorflow op used for training" ON)
+
+IF(BUILD_TENSORFLOW_OP)
+
+    INCLUDE_DIRECTORIES(SYSTEM ${TENSORFLOW_INCLUDE_DIRS})
+    FIND_PACKAGE(TensorFlow REQUIRED)
+    ADD_LIBRARY(tf_op SHARED "src/tf_op.cpp" ${hdr} )
+    TARGET_LINK_LIBRARIES(tf_op ${TENSORFLOW_LIBRARIES})
+
+ENDIF(BUILD_TENSORFLOW_OP)

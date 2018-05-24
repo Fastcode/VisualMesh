@@ -1,0 +1,12 @@
+{
+    "python.formatting.provider": "yapf",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "files.eol": "\n",
+    "editor.rulers": [
+        120
+    ],
+}
