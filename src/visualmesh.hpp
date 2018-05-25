@@ -19,51 +19,48 @@
 #define VISUALMESH_HPP
 
 #include <algorithm>
-#include <array>
-#include <cmath>
-#include <iomanip>
 #include <map>
-#include <numeric>
-#include <sstream>
-#include <type_traits>
+#include <memory>
 #include <vector>
+#include "engine/cpu/cpu_engine.hpp"
+#include "mesh/mesh.hpp"
 
-namespace mesh {
+namespace visualmesh {
 
 /**
  * An aggregate of many Visual Meshs at different heights that can be looked up
- * Provides convienence functions for accessing projection and classification of the mesh using different engines.
+ * Provides convience functions for accessing projection and classification of the mesh using different engines.
  * The available engines are currently limited to OpenCL and CPU, however CUDA and Vulkan can be added later.
  *
  * @tparam Scalar the type that will hold the vectors <float, double>
  */
-template <typename Scalar = float, typename Engine>
+template <typename Scalar = float, typename Engine = engine::cpu::Engine>
 class VisualMesh {
 public:
   /**
-   * @brief Makes an unallocated visual mesh
+   * @brief Makes an unallocated visual mesh with no LUTs
    */
   VisualMesh() {}
 
   /**
    * @brief Generate a new visual mesh for the given shape.
    *
-   * @param shape             the shape we are generating a visual mesh for
-   * @param min_height        the minimum height that our camera will be at
-   * @param max_height        the maximum height our camera will be at
-   * @param height_resolution the number of look up tables to generated (height gradations)
+   * @param shape        the shape we are generating a visual mesh for
+   * @param min_height   the minimum height that our camera will be at
+   * @param max_height   the maximum height our camera will be at
+   * @param n_heights    the number of look up tables to generated (height gradations)
    */
   template <typename Shape>
   explicit VisualMesh(const Shape& shape,
                       const Scalar& min_height,
                       const Scalar& max_height,
-                      const uint& height_resolution) {  // TODO height resolution is a dumb name
+                      const uint& n_heights) {  // TODO height resolution is a dumb name
 
     // Loop through to make a mesh for each of our height possibilities
-    for (Scalar h = min_height; h < max_height; h += (max_height - min_height) / height_resolution) {
+    for (Scalar h = min_height; h < max_height; h += (max_height - min_height) / n_heights) {
 
       // Insert our constructed mesh into the lookup
-      luts.insert(std::make_pair(h, std::make_shared<Mesh>(shape, h)));
+      luts.insert(std::make_pair(h, std::make_shared<Mesh<Scalar>>(shape, h)));
     }
   }
 
@@ -76,7 +73,7 @@ public:
    *
    * @return        the closest generated visual mesh to the provided height
    */
-  const Mesh& height(const Scalar& height) const {
+  std::shared_ptr<Mesh<Scalar>> height(const Scalar& height) const {
     // Find the bounding height values
     auto range = luts.equal_range(height);
 
@@ -104,8 +101,8 @@ public:
    * @tparam Func        the type of the function that identifies theta ranges given a phi value
    */
   template <typename Func>
-  std::pair<std::shared_ptr<Mesh>, std::vector<std::pair<uint, uint>>> lookup(const Scalar& height,
-                                                                              Func&& theta_limits) const {
+  std::pair<std::shared_ptr<Mesh<Scalar>>, std::vector<std::pair<uint, uint>>> lookup(const Scalar& height,
+                                                                                      Func&& theta_limits) const {
 
     auto mesh = this->height(height);
     return std::make_pair(mesh, mesh->lookup(std::forward<Func>(theta_limits)));
@@ -120,10 +117,13 @@ public:
    * @return             the mesh that was used for this lookup and a vector of start/end indices that are on the
    *                     screen.
    */
-  std::pair<std::shared_ptr<Mesh>, std::vector<std::pair<uint, uint>>> lookup(const mat4& Hoc, const Lens& lens) {
+  std::pair<std::shared_ptr<Mesh<Scalar>>, std::vector<std::pair<uint, uint>>> lookup(const mat4<Scalar>& Hoc,
+                                                                                      const Lens<Scalar>& lens) {
 
-    auto mesh = this->height(height);
-    return return std::make_pair(mesh, mesh->lookup(Hoc, lens));
+    // z height from the transformation matrix
+    const Scalar& h = Hoc[2][3];
+    auto mesh       = height(h);
+    return std::make_pair(mesh, mesh->lookup(Hoc, lens));
   }
 
   // TODO Project using engine
@@ -131,9 +131,9 @@ public:
 
 private:
   /// A map from heights to visual mesh tables
-  std::map<Scalar, std::shared_ptr<Mesh>> luts;
+  std::map<Scalar, std::shared_ptr<Mesh<Scalar>>> luts;
 };
 
-}  // namespace mesh
+}  // namespace visualmesh
 
 #endif  // VISUALMESH_HPP

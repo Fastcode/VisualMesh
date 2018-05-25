@@ -43,7 +43,7 @@ namespace geometry {
      * @param phi_n the current phi value in the series
      * @param h     the height of the camera above the observation plane
      *
-     * @return the next phi in the sequence (phi_n+1)
+     * @return the next phi in the sequence (phi_{n+1})
      */
     Scalar phi(const Scalar& phi_n, const Scalar& h) const {
 
