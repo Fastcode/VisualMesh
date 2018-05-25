@@ -30,37 +30,33 @@ namespace geometry {
     /**
      * @brief Construct a new Circle object for building a visual mesh
      *
-     * @param height the height of the object above the observation plane
      * @param radius the radius of the circle
      * @param intersections the number of intersections to ensure with this object
      * @param max_distance  the maximum distance we want to look for this object
      */
-    Circle(const Scalar& height, const Scalar& radius, const size_t& intersections, const Scalar& max_distance)
-      : h(height), r(radius), i(intersections), d(max_distance) {}
+    Circle(const Scalar& radius, const unsigned int& intersections, const Scalar& max_distance)
+      : r(radius), k(intersections), d(max_distance) {}
 
     /**
      * @brief Given a value for phi and a camera height, return the value to the next phi in the sequence.
      *
-     * @param phi_n the current phi value in the series
-     * @param c     the height of the camera above the observation plane
+     * @param phi_n  the current phi value in the series
+     * @param h      the height of the camera above the observation plane
      *
-     * @return the next phi in the sequence (phi_n+1)
+     * @return the next phi in the sequence (phi_{n+1})
      */
-    Scalar phi(const Scalar& phi_n, const Scalar& c) const {
-
-      // Our effective height above the plane
-      Scalar eh = c - h;
+    Scalar phi(const Scalar& phi_n, const Scalar& h) const {
 
       // If we are beyond our max distance return nan
-      if (std::abs(eh) * tan(phi_n > M_PI_2 ? M_PI - phi_n : phi_n) > d) {
+      if (std::abs(h) * tan(phi_n > M_PI_2 ? M_PI - phi_n : phi_n) > d) {
         return std::numeric_limits<Scalar>::quiet_NaN();
       }
 
       // Valid below the horizon
-      if (eh > 0 && phi_n < M_PI_2) { return atan((2 * r / i + eh * tan(phi_n)) / eh); }
+      if (h > 0 && phi_n < M_PI_2) { return atan((2 * r / k + h * tan(phi_n)) / h); }
       // Valid above the horizon
-      else if (eh < 0 && phi_n > M_PI_2) {
-        return M_PI - atan((2 * r / i - eh * tan(M_PI - phi_n)) / -eh);
+      else if (h < 0 && phi_n > M_PI_2) {
+        return M_PI - atan((2 * r / k - h * tan(M_PI - phi_n)) / -h);
       }
       // Other situations are invalid so return NaN
       else {
@@ -71,24 +67,21 @@ namespace geometry {
     /**
      * @brief Given a value for phi and a camera height, return the angular width for an object
      *
-     * @param phi the phi value to calculate our theta value for
-     * @param c the height of the camera above the observation plane
+     * @param phi  the phi value to calculate our theta value for
+     * @param h    the height of the camera above the observation plane
      *
      * @return the angular width of the object around a phi circle
      */
-    Scalar theta(const Scalar& phi, const Scalar& c) const {
-
-      // Our effective height above the observation plane
-      Scalar eh = c - h;
+    Scalar theta(const Scalar& phi, const Scalar& h) const {
 
       // If we are beyond our max distance return nan
-      if (std::abs(eh) * tan(phi > M_PI_2 ? M_PI - phi : phi) > d) { return std::numeric_limits<Scalar>::quiet_NaN(); }
+      if (std::abs(h) * tan(phi > M_PI_2 ? M_PI - phi : phi) > d) { return std::numeric_limits<Scalar>::quiet_NaN(); }
 
       // Valid below the horizon
-      if (eh > 0 && phi < M_PI_2) { return 2 * asin(r / (eh * tan(phi) + r)) / i; }
+      if (h > 0 && phi < M_PI_2) { return 2 * asin(r / (h * tan(phi) + r)) / k; }
       // Valid above the horizon
-      else if (eh < 0 && phi > M_PI_2) {
-        return 2 * asin(r / (-eh * tan(M_PI - phi) + r)) / i;
+      else if (h < 0 && phi > M_PI_2) {
+        return 2 * asin(r / (-h * tan(M_PI - phi) + r)) / k;
       }
       // Other situations are invalid so return NaN
       else {
@@ -96,12 +89,10 @@ namespace geometry {
       }
     }
 
-    /// The height of the object above the observation plane
-    Scalar h;
     // The radius of the sphere
     Scalar r;
     // The number of intersections the mesh should have with this sphere
-    size_t i;
+    unsigned int k;
     /// The maximum distance we want to see this object
     Scalar d;
   };

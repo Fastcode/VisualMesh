@@ -18,20 +18,30 @@
 #ifndef VISUALMESH_UTILITY_MATH_HPP
 #define VISUALMESH_UTILITY_MATH_HPP
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+
+namespace visualmesh {
+
 // Typedef some value types we commonly use
-using vec2 = std::array<Scalar, 2>;
+template <typename Scalar>
 using vec3 = std::array<Scalar, 3>;
+template <typename Scalar>
 using vec4 = std::array<Scalar, 4>;
-using mat3 = std::array<vec3, 3>;
-using mat4 = std::array<vec4, 4>;
+template <typename Scalar>
+using mat3 = std::array<vec3<Scalar>, 3>;
+template <typename Scalar>
+using mat4 = std::array<vec4<Scalar>, 4>;
 
 // I could use Eigen for this, but if I use just the stl, at least nobody will have library problems
-namespace visualmesh {
-inline Scalar dot(const vec3& a, const vec3& b) {
+template <typename Scalar>
+inline Scalar dot(const vec3<Scalar>& a, const vec3<Scalar>& b) {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-inline vec3 cross(const vec3& a, const vec3& b) {
+template <typename Scalar>
+inline vec3<Scalar> cross(const vec3<Scalar>& a, const vec3<Scalar>& b) {
   return {{
     a[1] * b[2] - a[2] * b[1],  // x
     a[2] * b[0] - a[0] * b[2],  // y
@@ -39,7 +49,8 @@ inline vec3 cross(const vec3& a, const vec3& b) {
   }};
 }
 
-inline vec3 normalise(const vec3& a) {
+template <typename Scalar>
+inline vec3<Scalar> normalise(const vec3<Scalar>& a) {
   Scalar length = Scalar(1.0) / std::sqrt(a[0] * a[0] + a[1] * a[1] + a[2] + a[2]);
   return {{a[0] * length, a[1] * length, a[2] * length}};
 }

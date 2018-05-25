@@ -28,7 +28,7 @@ template <typename Scalar>
 struct Lens {
 
   // The projection that this image is using
-  Projection projection;
+  LensProjection projection;
   // The dimensions of the image
   std::array<int, 2> dimensions;
   /// The field of view of the camera measured in radians

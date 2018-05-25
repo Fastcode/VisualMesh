@@ -26,7 +26,6 @@ namespace visualmesh {
 template <typename Scalar>
 struct ProjectedMesh {
 
-  // Host side buffers for the data
   std::vector<std::array<Scalar, 2>> pixel_coordinates;
   std::vector<std::array<int, 6>> neighbourhood;
   std::vector<int> global_indices;

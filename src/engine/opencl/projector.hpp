@@ -24,22 +24,12 @@ ProjectedMesh project(const mat4& Hoc, const Lens& lens) {
   // Timer t;  // TIMER_LINE
 
   // Pack Rco into a float16
-  cl_float16 Rco = {Hoc[0][0],
-                    Hoc[1][0],
-                    Hoc[2][0],
-                    Scalar(0.0),
-                    Hoc[0][1],
-                    Hoc[1][1],
-                    Hoc[2][1],
-                    Scalar(0.0),
-                    Hoc[0][2],
-                    Hoc[1][2],
-                    Hoc[2][2],
-                    Scalar(0.0),
-                    Scalar(0.0),
-                    Scalar(0.0),
-                    Scalar(0.0),
-                    Scalar(0.0)};
+  // clang-format off
+  cl_float16 Rco = {Hoc[0][0], Hoc[1][0], Hoc[2][0], Scalar(0.0),
+                    Hoc[0][1], Hoc[1][1], Hoc[2][1], Scalar(0.0),
+                    Hoc[0][2], Hoc[1][2], Hoc[2][2], Scalar(0.0),
+                    Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0)};
+  // clang-format on
 
   // Perform our lookup to get our relevant range
   auto ranges = lookup(Hoc, lens);

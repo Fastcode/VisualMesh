@@ -27,8 +27,8 @@ REGISTER_OP("VisualMesh")
   .Output("pixels: float32")
   .Output("neighbors: int32")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-    c->set_output(0, SHAPE_OF_PIXELS);
-    c->set_output(1, SHAPE_OF_NEIGHBOURS);
+    // c->set_output(0, SHAPE_OF_PIXELS);
+    // c->set_output(1, SHAPE_OF_NEIGHBOURS);
     return tensorflow::Status::OK();
   });
 

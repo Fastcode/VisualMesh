@@ -27,34 +27,31 @@ namespace geometry {
   struct Cylinder {
 
     /**
-     * @brief [brief description]
-     * @details [long description]
+     * @brief Construct a new Cylinder object for building a visual mesh.
+     *        This implementation uses the spheres at both ends method rather than an entire cylinder.
      *
-     * @param plane_height the height of the cylinder above the observation plane
      * @param cylinder_height the height of the cylinder
      * @param intersections the number of intersections to ensure with a spherical section of the cylinder
      * @param max_distance  the maximum distance we want to look for this object
      */
-    Cylinder(const Scalar& plane_height,
-             const Scalar& cylinder_height,
+    Cylinder(const Scalar& cylinder_height,
              const Scalar& radius,
-             const size_t& intersections,
+             const unsigned int& intersections,
              const Scalar& max_distance)
-      : upper(plane_height + cylinder_height, radius, intersections, max_distance)
-      , lower(plane_height, radius, intersections, max_distance) {}
+      : ch(cylinder_height), sphere(radius, intersections, max_distance) {}
 
     /**
      * @brief Given a value for phi and a camera height, return the value to the next phi in the sequence.
      *
      * @param phi_n the current phi value in the series
-     * @param c     the height of the camera above the observation plane
+     * @param h     the height of the camera above the observation plane
      *
      * @return the next phi in the sequence (phi_n+1)
      */
-    Scalar phi(const Scalar& phi_n, const Scalar& c) const {
-      // Get values from both the upper and lower sphere
-      Scalar u = upper.phi(phi_n, c);
-      Scalar l = lower.phi(phi_n, c);
+    Scalar phi(const Scalar& phi_n, const Scalar& h) const {
+      // Get values from the upper and lower observation planes
+      Scalar u = sphere.phi(phi_n, h - ch);
+      Scalar l = sphere.phi(phi_n, h);
 
       // If one is nan return the other one
       if (std::isnan(u)) {
@@ -71,14 +68,14 @@ namespace geometry {
      * @brief Given a value for phi and a camera height, return the angular width for an object
      *
      * @param phi the phi value to calculate our theta value for
-     * @param c the height of the camera above the observation plane
+     * @param h the height of the camera above the observation plane
      *
      * @return the angular width of the object around a phi circle
      */
-    Scalar theta(const Scalar& phi, const Scalar& c) const {
+    Scalar theta(const Scalar& phi, const Scalar& h) const {
       // Get values from the upper and lower sphere
-      Scalar u = upper.theta(phi, c);
-      Scalar l = lower.theta(phi, c);
+      Scalar u = sphere.theta(phi, h - ch);
+      Scalar l = sphere.theta(phi, h);
 
       // If one is nan return the other one
       if (std::isnan(u)) {
@@ -91,10 +88,10 @@ namespace geometry {
       }
     }
 
-    /// The sphere used to represent the top of the cylinder
-    Sphere<Scalar> upper;
-    /// The sphere used to represent the bottom of the cylinder
-    Sphere<Scalar> lower;
+    /// The sphere used to represent either end of the cylinder
+    Sphere<Scalar> sphere;
+    /// The height of the cylinder
+    Scalar ch;
   };
 
 }  // namespace geometry

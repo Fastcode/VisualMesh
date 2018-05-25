@@ -30,40 +30,36 @@ namespace geometry {
     /**
      * @brief Construct a new Sphere object for building a visual mesh
      *
-     * @param height the height of the object above the observation plane
      * @param radius the radius of the sphere
      * @param intersections the number of intersections to ensure with this object
      * @param max_distance  the maximum distance we want to look for this object
      */
-    Sphere(const Scalar& height, const Scalar& radius, const size_t& intersections, const Scalar& max_distance)
-      : h(height), r(radius), i(intersections), d(max_distance) {}
+    Sphere(const Scalar& radius, const unsigned int& intersections, const Scalar& max_distance)
+      : r(radius), k(intersections), d(max_distance) {}
 
     /**
      * @brief Given a value for phi and a camera height, return the value to the next phi in the sequence.
      *
      * @param phi_n the current phi value in the series
-     * @param c     the height of the camera above the observation plane
+     * @param h     the height of the camera above the observation plane
      *
      * @return the next phi in the sequence (phi_n+1)
      */
-    Scalar phi(const Scalar& phi_n, const Scalar& c) const {
-
-      // Our effective height above the plane
-      Scalar eh = c - h;
+    Scalar phi(const Scalar& phi_n, const Scalar& h) const {
 
       // If we are beyond our max distance return nan
-      if (std::abs(eh) * tan(phi_n > M_PI_2 ? M_PI - phi_n : phi_n) > d) {
+      if (std::abs(h) * tan(phi_n > M_PI_2 ? M_PI - phi_n : phi_n) > d) {
         return std::numeric_limits<Scalar>::quiet_NaN();
       }
 
       // Our effective radius for the number of intersections
-      Scalar er = effective_radius(std::abs(eh));
+      Scalar er = effective_radius(std::abs(h));
 
       // Valid below the horizon
-      if (eh > 0 && phi_n < M_PI_2) { return phi0(phi_n, er, eh); }
+      if (h > 0 && phi_n < M_PI_2) { return phi0(phi_n, er, h); }
       // Valid above the horizon
-      else if (eh < 0 && phi_n > M_PI_2) {
-        return M_PI - phi0(M_PI - phi_n, er, -eh);
+      else if (h < 0 && phi_n > M_PI_2) {
+        return M_PI - phi0(M_PI - phi_n, er, -h);
       }
       // Other situations are invalid so return NaN
       else {
@@ -75,23 +71,22 @@ namespace geometry {
      * @brief Given a value for phi and a camera height, return the angular width for an object
      *
      * @param phi the phi value to calculate our theta value for
-     * @param c the height of the camera above the observation plane
+     * @param h the height of the camera above the observation plane
      *
      * @return the angular width of the object around a phi circle
      */
-    Scalar theta(const Scalar& phi, const Scalar& c) const {
-
-      // Our effective height above the observation plane
-      Scalar eh = c - h;
+    Scalar theta(const Scalar& phi, const Scalar& h) const {
 
       // If we are beyond our max distance return nan
-      if (std::abs(eh) * tan(phi > M_PI_2 ? M_PI - phi : phi) > d) { return std::numeric_limits<Scalar>::quiet_NaN(); }
+      if (std::abs(h) * std::tan(phi > M_PI_2 ? M_PI - phi : phi) > d) {
+        return std::numeric_limits<Scalar>::quiet_NaN();
+      }
 
       // Valid below the horizon
-      if (eh > 0 && phi < M_PI_2) { return 2 * asin(r / (eh * tan(phi) + r)) / i; }
+      if (h > 0 && phi < M_PI_2) { return 2 * std::asin(r / (h * std::tan(phi) + r)) / k; }
       // Valid above the horizon
-      else if (eh < 0 && phi > M_PI_2) {
-        return 2 * asin(r / (-eh * tan(M_PI - phi) + r)) / i;
+      else if (h < 0 && phi > M_PI_2) {
+        return 2 * std::asin(r / (-h * std::tan(M_PI - phi) + r)) / k;
       }
       // Other situations are invalid so return NaN
       else {
@@ -99,12 +94,10 @@ namespace geometry {
       }
     }
 
-    /// The height of the object above the observation plane
-    Scalar h;
     // The radius of the sphere
     Scalar r;
     // The number of intersections the mesh should have with this sphere
-    size_t i;
+    unsigned int k;
     /// The maximum distance we want to see this object
     Scalar d;
 
@@ -113,49 +106,49 @@ namespace geometry {
      * @brief This function calculates the new phi ignoring number of intersections. It is used to find appropriate
      * radius for a number of intersections.
      *
-     * @param phi_n the phi we are starting at
-     * @param er the effective radius of the sphere
-     * @param eh the effective height above the ground
+     * @param phi_n  the phi we are starting at
+     * @param er     the effective radius of the sphere
+     * @param h      the height of the camera above the observation plane
      *
      * @return the new phi after moving the angular width of sphere at the old phi
      */
-    static Scalar phi0(const Scalar& phi_n, const Scalar& er, const Scalar& eh) {
-      return 2 * atan(er / (cos(phi_n) * (eh - er)) + tan(phi_n)) - phi_n;
+    static Scalar phi0(const Scalar& phi_n, const Scalar& er, const Scalar& h) {
+      return 2 * std::atan(er / (std::cos(phi_n) * (h - er)) + std::tan(phi_n)) - phi_n;
     }
 
     /**
      * @brief Calculates the effective radius of a sphere that will have the correct number of intersections
      *
-     * @param c the height of the camera above the observation plane
+     * @param h the height of the camera above the observation plane
      *
      * @return the radius of a sphere that will intersect an appropriate number of times
      */
-    Scalar effective_radius(const Scalar& eh) const {
+    Scalar effective_radius(const Scalar& h) const {
 
       // If 1 short circuit
-      if (i == 1) { return r; }
+      if (k == 1) { return r; }
 
       // The angle of a single intersection used as our target total phi
-      Scalar p0 = phi0(0, r, eh);
+      Scalar p0 = phi0(0, r, h);
 
       // This function calculates the equation for optimising
       // It works out the difference between the target and obtained total phi
-      auto f = [this, eh, p0](const Scalar& er) {
+      auto f = [this, h, p0](const Scalar& er) {
         // Calculate phi0 once starting at 0
-        Scalar p = phi0(0, er, eh);
+        Scalar p = phi0(0, er, h);
 
         // Update our phi the desired number of times
-        for (size_t v = 1; v < i; ++v) {
-          p = phi0(p, er, eh);
+        for (unsigned int v = 1; v < k; ++v) {
+          p = phi0(p, er, h);
         }
 
         // Return the difference between them
         return p - p0;
       };
 
-      // We know that s > r/i and s < r which give us bounds for the method
+      // We know that s > r/k and s < r which give us bounds for the method
       Scalar x1      = r;                                         // s < r
-      Scalar x2      = r / i;                                     // s > r/i
+      Scalar x2      = r / k;                                     // s > r/i
       Scalar x3      = std::numeric_limits<Scalar>::quiet_NaN();  // The value of our best guess
       Scalar x3_prev = std::numeric_limits<Scalar>::quiet_NaN();  // Our previous best guess
       Scalar y       = std::numeric_limits<Scalar>::max();        // Our best guess error
