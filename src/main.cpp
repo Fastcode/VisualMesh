@@ -10,6 +10,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <string>
+#include "engine/opencl/opencl_engine.hpp"
 #include "geometry/Sphere.hpp"
 #include "util/ArrayPrint.hpp"
 #include "util/Timer.hpp"
@@ -54,7 +55,7 @@ int main() {
   // Construct our VisualMesh
   std::cerr << "Building VisualMesh" << std::endl;
   visualmesh::geometry::Sphere<float> sphere(0.075, 4, 10);
-  visualmesh::VisualMesh<float> mesh(sphere, 0.5, 1.5, 100);
+  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> mesh(sphere, 0.5, 1.5, 100);
   std::cerr << "Finished building VisualMesh" << std::endl;
 
   // Build our classification network

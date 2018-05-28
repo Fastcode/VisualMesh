@@ -33,7 +33,7 @@ FILE(GLOB hdr
     "src/**.hpp")
 
 FILE(GLOB cls
-     "src/cl/**.cl")
+     "src/engine/opencl/kernels/**.cl")
 
 # Convert our opencl files into header files with their contents
 FOREACH(cl IN LISTS cls)
