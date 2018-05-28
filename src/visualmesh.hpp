@@ -34,7 +34,7 @@ namespace visualmesh {
  *
  * @tparam Scalar the type that will hold the vectors <float, double>
  */
-template <typename Scalar = float, typename Engine = engine::cpu::Engine>
+template <typename Scalar = float, template <typename> class Engine = engine::cpu::Engine>
 class VisualMesh {
 public:
   /**
@@ -111,11 +111,10 @@ public:
   /**
    * Performs a visual mesh lookupusing the description of the lens provided to find visual mesh points on the image.
    *
-   * @param height       the height to use for looking up the mesh, follows the same rules as `VisualMesh::height`
-   * @param theta_limits the function that is used to calculate the start/end indices for a specific phi
+   * @param Hoc   A 4x4 homogenous transformation matrix that transforms from the observation plane to camera space.
+   * @param lens  A description of the lens used to project the mesh.
    *
-   * @return             the mesh that was used for this lookup and a vector of start/end indices that are on the
-   *                     screen.
+   * @return      the mesh that was used for this lookup and a vector of start/end indices that are on the screen.
    */
   std::pair<std::shared_ptr<Mesh<Scalar>>, std::vector<std::pair<uint, uint>>> lookup(const mat4<Scalar>& Hoc,
                                                                                       const Lens<Scalar>& lens) {
@@ -126,12 +125,28 @@ public:
     return std::make_pair(mesh, mesh->lookup(Hoc, lens));
   }
 
-  // TODO Project using engine
-  // TODO classify using engine
+  /**
+   * Project a segment of the visual mesh onto an image.
+   *
+   * @param Hoc   A 4x4 homogenous transformation matrix that transforms from the camera space to the observation plane.
+   * @param lens  A description of the lens used to project the mesh.
+   *
+   * @return      the pixel coordinates that the visual mesh projects to, and the neighbourhood graph for those points.
+   */
+  ProjectedMesh<Scalar> project(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) {
+
+    // z height from the transformation matrix
+    const Scalar& h = Hoc[2][3];
+    auto mesh       = height(h);
+    auto range      = mesh->lookup(Hoc, lens);
+    return engine.project(mesh, range, Hoc, lens);
+  }
 
 private:
   /// A map from heights to visual mesh tables
   std::map<Scalar, std::shared_ptr<Mesh<Scalar>>> luts;
+  /// The engine used to do projection and classification
+  Engine<Scalar> engine;
 };
 
 }  // namespace visualmesh

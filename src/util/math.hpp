@@ -26,6 +26,8 @@ namespace visualmesh {
 
 // Typedef some value types we commonly use
 template <typename Scalar>
+using vec2 = std::array<Scalar, 2>;
+template <typename Scalar>
 using vec3 = std::array<Scalar, 3>;
 template <typename Scalar>
 using vec4 = std::array<Scalar, 4>;
@@ -36,12 +38,16 @@ using mat4 = std::array<vec4<Scalar>, 4>;
 
 // I could use Eigen for this, but if I use just the stl, at least nobody will have library problems
 template <typename Scalar>
-inline Scalar dot(const vec3<Scalar>& a, const vec3<Scalar>& b) {
+inline constexpr Scalar dot(const vec3<Scalar>& a, const vec3<Scalar>& b) {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+template <typename Scalar>
+inline constexpr Scalar dot(const vec4<Scalar>& a, const vec4<Scalar>& b) {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
 }
 
 template <typename Scalar>
-inline vec3<Scalar> cross(const vec3<Scalar>& a, const vec3<Scalar>& b) {
+inline constexpr vec3<Scalar> cross(const vec3<Scalar>& a, const vec3<Scalar>& b) {
   return {{
     a[1] * b[2] - a[2] * b[1],  // x
     a[2] * b[0] - a[0] * b[2],  // y
@@ -50,7 +56,15 @@ inline vec3<Scalar> cross(const vec3<Scalar>& a, const vec3<Scalar>& b) {
 }
 
 template <typename Scalar>
-inline vec3<Scalar> normalise(const vec3<Scalar>& a) {
+inline constexpr mat4<Scalar> transpose(const mat4<Scalar> mat) {
+  return mat4<Scalar>{vec4<Scalar>{mat[0][0], mat[1][0], mat[2][0], mat[3][0]},
+                      vec4<Scalar>{mat[0][1], mat[1][1], mat[2][1], mat[3][1]},
+                      vec4<Scalar>{mat[0][2], mat[1][2], mat[2][2], mat[3][2]},
+                      vec4<Scalar>{mat[0][3], mat[1][3], mat[2][3], mat[3][3]}};
+}
+
+template <typename Scalar>
+inline constexpr vec3<Scalar> normalise(const vec3<Scalar>& a) {
   Scalar length = Scalar(1.0) / std::sqrt(a[0] * a[0] + a[1] * a[1] + a[2] + a[2]);
   return {{a[0] * length, a[1] * length, a[2] * length}};
 }

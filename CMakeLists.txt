@@ -20,17 +20,11 @@ SET(VERSION_MAJOR 1)
 SET(VERSION_MINOR 0)
 SET(VERSION_PATCH 0)
 
-ADD_COMPILE_OPTIONS(
-    -std=c++14
-    -march=native
-    -mtune=native
-)
+# We use position independent code
+SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # We use additional modules that cmake needs to know about
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
-
-# Setup our compiler settings
-INCLUDE(CompilerSetup)
 
 FIND_PACKAGE(OpenCL REQUIRED)
 
@@ -42,7 +36,7 @@ FILE(GLOB cls
      "src/cl/**.cl")
 
 # Convert our opencl files into header files with their contents
-FOREACH(cl ${cls})
+FOREACH(cl IN LISTS cls)
 
     FILE(RELATIVE_PATH cl_path ${CMAKE_CURRENT_SOURCE_DIR} ${cl})
 
@@ -71,9 +65,20 @@ IF(BUILD_TENSORFLOW_OP)
 
     INCLUDE_DIRECTORIES(SYSTEM ${TENSORFLOW_INCLUDE_DIRS})
     FIND_PACKAGE(TensorFlow REQUIRED)
-    ADD_LIBRARY(tf_op SHARED "src/tf_op.cpp" ${hdr} )
+
+    ADD_LIBRARY(tf_op SHARED "src/tf_op.cpp" ${hdr})
+    SET_PROPERTY(TARGET tf_op PROPERTY CXX_STANDARD 14)
+    TARGET_COMPILE_OPTIONS(tf_op PRIVATE -fcolor-diagnostics)
     TARGET_LINK_LIBRARIES(tf_op ${TENSORFLOW_LIBRARIES})
 
 ENDIF(BUILD_TENSORFLOW_OP)
 
+# Temp while testing the mesh
+FIND_PACKAGE(OpenCV REQUIRED)
+FIND_PACKAGE(YAML-CPP REQUIRED)
+INCLUDE_DIRECTORIES(SYSTEM ${OpenCV_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(SYSTEM ${YAML_CPP_INCLUDE_DIR})
 ADD_EXECUTABLE(main "src/main.cpp" ${hdr})
+SET_PROPERTY(TARGET main PROPERTY CXX_STANDARD 14)
+TARGET_COMPILE_OPTIONS(main PRIVATE -fcolor-diagnostics -march=native -mtune=native)
+TARGET_LINK_LIBRARIES(main ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES})

@@ -342,9 +342,6 @@ struct Mesh {
       {{Hoc[2][0], Hoc[2][1], Hoc[2][2]}}   //
     }};
 
-    // The height of our camera above the observation plane
-    const Scalar& height = Hoc[2][3];
-
     // Print our camera vector
     const std::array<Scalar, 3> cam = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
 
@@ -552,7 +549,7 @@ struct Mesh {
       return std::vector<std::pair<Scalar, Scalar>>();
     };
 
-    return lookup(height, theta_limits);
+    return lookup(theta_limits);
   }
 
   std::vector<std::pair<unsigned int, unsigned int>> lookup_fisheye(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) {
@@ -578,9 +575,6 @@ struct Mesh {
     // The gradient of our field of view cone
     const Scalar cos_half_fov = std::cos(lens.fov * Scalar(0.5));
     const vec3<Scalar> cam    = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
-
-    // The height of our camera above the observation plane
-    const Scalar& height = Hoc[2][3];
 
     auto theta_limits = [&](const Scalar& phi) -> std::array<std::pair<Scalar, Scalar>, 1> {
       // Check if we are intersecting with an upper or lower cone
@@ -637,7 +631,7 @@ struct Mesh {
     };
 
     // Lookup the mesh
-    return lookup(height, theta_limits);
+    return lookup(theta_limits);
   }
 
   std::vector<std::pair<unsigned int, unsigned int>> lookup(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) {
