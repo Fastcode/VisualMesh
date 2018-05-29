@@ -23,8 +23,6 @@
 #include "geometry/Cylinder.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/mesh.hpp"
-#include "util/ArrayPrint.hpp"
-#include "util/Timer.hpp"
 
 REGISTER_OP("VisualMesh")
   .Attr("T: {float, double}")
@@ -56,7 +54,6 @@ public:
 
   void Compute(tensorflow::OpKernelContext* context) override {
 
-    Timer t;
     // Extract information from our input tensors, flip x and y as tensorflow has them reversed compared to us
     auto image_dimensions                = context->input(0).vec<U>();
     visualmesh::vec2<int32_t> dimensions = {{int32_t(image_dimensions(1)), int32_t(image_dimensions(0))}};
@@ -67,6 +64,8 @@ public:
     T height                             = context->input(5).scalar<T>()(0);
     std::string geometry                 = *context->input(6).flat<tensorflow::string>().data();
     auto g_params                        = context->input(7).vec<T>();
+
+    // TODO validate all the inputs to make sure they are correct
 
     // Create our transformation matrix
     visualmesh::mat4<T> Hoc = {{
@@ -112,40 +111,75 @@ public:
       visualmesh::Mesh<T> mesh(shape, height);
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
+    else {
+      // TODO work out how to throw an error
+    }
 
-    // Make our output tensors
+    // As the algorithms for calculating the edge of fisheye cameras are not perfect yet, we need to remove any pixels
+    // that are off the screen
+    const auto& mesh_px         = projected.pixel_coordinates;
+    const auto& mesh_neighbours = projected.neighbourhood;
+    std::vector<std::array<int, 2>> px;
+    std::vector<int> idx;
+    px.reserve(mesh_px.size());
+    idx.reserve(mesh_px.size());
+
+    for (int i = 0; i < mesh_px.size(); ++i) {
+      // Swap order for tensorflow while we're here
+      std::array<int, 2> p = {int(std::round(mesh_px[i][1])), int(std::round(mesh_px[i][0]))};
+
+      // Only copy across if our pixel is on the screen (note we have to swap dimensions index)
+      if (0 < p[0] && p[0] < lens.dimensions[1] && 0 < p[1] && p[1] < lens.dimensions[0]) {
+        idx.push_back(i);
+        px.push_back(p);
+      }
+    }
+
+    // We can now use this to fill in our tensorflow output matrix
     tensorflow::Tensor* coordinates = nullptr;
     tensorflow::TensorShape coords_shape;
-    coords_shape.AddDim(projected.pixel_coordinates.size());
+    coords_shape.AddDim(px.size());
     coords_shape.AddDim(2);
     OP_REQUIRES_OK(context, context->allocate_output(0, coords_shape, &coordinates));
-    tensorflow::Tensor* neighbours = nullptr;
-    tensorflow::TensorShape neighbours_shape;
-    neighbours_shape.AddDim(projected.neighbourhood.size());
-    neighbours_shape.AddDim(7);
-    OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
 
     // Copy across our pixel coordinates remembering to reverse the order from x,y to y,x
     auto c = coordinates->matrix<T>();
-    for (size_t i = 0; i < projected.pixel_coordinates.size(); ++i) {
-      const auto& px = projected.pixel_coordinates[i];
-      c(i, 0)        = px[1];
-      c(i, 1)        = px[0];
+    for (size_t i = 0; i < px.size(); ++i) {
+      const auto& p = px[i];
+      c(i, 0)       = p[0];
+      c(i, 1)       = p[1];
     }
+
+    // Make a reverse lookup list defaulting to px.size (the null point)
+    std::vector<int> rev_idx(mesh_neighbours.size(), px.size());
+    for (int i = 0; i < idx.size(); ++i) {
+      rev_idx[idx[i]] = i;
+    }
+
+    // We can now build our tensorflow neighbourhood graph
+    tensorflow::Tensor* neighbours = nullptr;
+    tensorflow::TensorShape neighbours_shape;
+    neighbours_shape.AddDim(idx.size() + 1);
+    neighbours_shape.AddDim(7);
+    OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
 
     // Copy across our neighbourhood graph, adding in a point for itself
     auto n = neighbours->matrix<U>();
-    for (int i = 0; i < projected.neighbourhood.size(); ++i) {
-      const auto& neighbour = projected.neighbourhood[i];
-      n(i, 0)               = i;
-      n(i, 1)               = neighbour[0];
-      n(i, 2)               = neighbour[1];
-      n(i, 3)               = neighbour[2];
-      n(i, 4)               = neighbour[3];
-      n(i, 5)               = neighbour[4];
-      n(i, 6)               = neighbour[5];
+    for (int i = 0; i < idx.size(); ++i) {
+      // Get our old neighbours from original output
+      const auto& m = mesh_neighbours[idx[i]];
+      n(i, 0)       = i;
+      n(i, 1)       = rev_idx[m[0]];
+      n(i, 2)       = rev_idx[m[1]];
+      n(i, 3)       = rev_idx[m[2]];
+      n(i, 4)       = rev_idx[m[3]];
+      n(i, 5)       = rev_idx[m[4]];
+      n(i, 6)       = rev_idx[m[5]];
     }
-    t.measure("U fast?");
+
+    // Fill our offscreen point
+    for (int i = 0; i < 7; ++i)
+      n(idx.size(), i) = idx.size();
   }
 };
 
