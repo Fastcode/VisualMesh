@@ -4,11 +4,11 @@ import os
 import argparse
 import yaml
 
-# import tensorflow as tf
-# import learning.network as network
-# import learning.training as training
-# import learning.resample as resample
-# import learning.test as test
+import tensorflow as tf
+import training.network as network
+import training.training as training
+import training.resample as resample
+import training.test as test
 
 if __name__ == "__main__":
 
@@ -26,12 +26,12 @@ if __name__ == "__main__":
     config = yaml.load(f)
 
   # Tensorflow configuration
-  config = tf.ConfigProto()
-  config.allow_soft_placement = True
-  config.graph_options.build_cost_model = 1
-  config.gpu_options.allow_growth = True
+  tf_config = tf.ConfigProto()
+  tf_config.allow_soft_placement = True
+  tf_config.graph_options.build_cost_model = 1
+  tf_config.gpu_options.allow_growth = True
 
-  with tf.Session(config=config) as sess:
+  with tf.Session(config=tf_config) as sess:
 
     # Select our device to run operations on
     with tf.device('/device:GPU:{}'.format(args.gpu)):

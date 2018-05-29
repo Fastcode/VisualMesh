@@ -30,7 +30,7 @@ namespace engine {
     template <typename Scalar>
     class Engine {
     private:
-      vec2<Scalar> project_equidistant(const vec4<Scalar>& p, const Lens<Scalar>& lens) {
+      vec2<Scalar> project_equidistant(const vec4<Scalar>& p, const Lens<Scalar>& lens) const {
         // Calculate some intermediates
         Scalar theta     = std::acos(p[0]);
         Scalar r         = lens.focal_length * theta;
@@ -46,7 +46,7 @@ namespace engine {
         return image;
       }
 
-      vec2<Scalar> project_equisolid(const vec4<Scalar>& p, const Lens<Scalar>& lens) {
+      vec2<Scalar> project_equisolid(const vec4<Scalar>& p, const Lens<Scalar>& lens) const {
         // Calculate some intermediates
         Scalar theta     = std::acos(p[0]);
         Scalar r         = static_cast<Scalar>(2.0) * lens.focal_length * std::sin(theta * static_cast<Scalar>(0.5));
@@ -62,7 +62,7 @@ namespace engine {
         return image;
       }
 
-      vec2<Scalar> project_rectilinear(const vec4<Scalar>& p, const Lens<Scalar>& lens) {
+      vec2<Scalar> project_rectilinear(const vec4<Scalar>& p, const Lens<Scalar>& lens) const {
         // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
         vec2<Scalar> screen = {{lens.focal_length * p[1] / p[0], lens.focal_length * p[2] / p[0]}};
 
@@ -74,13 +74,13 @@ namespace engine {
       }
 
     public:
-      ProjectedMesh<Scalar> project(std::shared_ptr<Mesh<Scalar>> mesh,
+      ProjectedMesh<Scalar> project(const Mesh<Scalar>& mesh,
                                     const std::vector<std::pair<unsigned int, unsigned int>>& ranges,
                                     const mat4<Scalar>& Hoc,
-                                    const Lens<Scalar>& lens) {
+                                    const Lens<Scalar>& lens) const {
 
         // Convenience variables
-        const auto& nodes = mesh->nodes;
+        const auto& nodes = mesh.nodes;
         const auto Hco    = transpose(Hoc);
 
         // Work out how many points total there are

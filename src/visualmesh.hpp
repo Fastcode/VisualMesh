@@ -60,7 +60,7 @@ public:
     for (Scalar h = min_height; h < max_height; h += (max_height - min_height) / n_heights) {
 
       // Insert our constructed mesh into the lookup
-      luts.insert(std::make_pair(h, std::make_shared<Mesh<Scalar>>(shape, h)));
+      luts.insert(std::make_pair(h, Mesh<Scalar>(shape, h)));
     }
   }
 
@@ -73,7 +73,7 @@ public:
    *
    * @return        the closest generated visual mesh to the provided height
    */
-  std::shared_ptr<Mesh<Scalar>> height(const Scalar& height) const {
+  const Mesh<Scalar>& height(const Scalar& height) const {
     // Find the bounding height values
     auto range = luts.equal_range(height);
 
@@ -101,10 +101,10 @@ public:
    * @tparam Func        the type of the function that identifies theta ranges given a phi value
    */
   template <typename Func>
-  std::pair<std::shared_ptr<Mesh<Scalar>>, std::vector<std::pair<uint, uint>>> lookup(const Scalar& height,
-                                                                                      Func&& theta_limits) const {
+  std::pair<const Mesh<Scalar>&, std::vector<std::pair<uint, uint>>> lookup(const Scalar& height,
+                                                                            Func&& theta_limits) const {
 
-    auto mesh = this->height(height);
+    const auto& mesh = this->height(height);
     return std::make_pair(mesh, mesh->lookup(std::forward<Func>(theta_limits)));
   }
 
@@ -116,8 +116,8 @@ public:
    *
    * @return      the mesh that was used for this lookup and a vector of start/end indices that are on the screen.
    */
-  std::pair<std::shared_ptr<Mesh<Scalar>>, std::vector<std::pair<uint, uint>>> lookup(const mat4<Scalar>& Hoc,
-                                                                                      const Lens<Scalar>& lens) {
+  std::pair<const Mesh<Scalar>&, std::vector<std::pair<uint, uint>>> lookup(const mat4<Scalar>& Hoc,
+                                                                            const Lens<Scalar>& lens) const {
 
     // z height from the transformation matrix
     const Scalar& h = Hoc[2][3];
@@ -133,18 +133,18 @@ public:
    *
    * @return      the pixel coordinates that the visual mesh projects to, and the neighbourhood graph for those points.
    */
-  ProjectedMesh<Scalar> project(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) {
+  ProjectedMesh<Scalar> project(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
 
     // z height from the transformation matrix
-    const Scalar& h = Hoc[2][3];
-    auto mesh       = height(h);
-    auto range      = mesh->lookup(Hoc, lens);
+    const Scalar& h  = Hoc[2][3];
+    const auto& mesh = height(h);
+    auto range       = mesh.lookup(Hoc, lens);
     return engine.project(mesh, range, Hoc, lens);
   }
 
 private:
   /// A map from heights to visual mesh tables
-  std::map<Scalar, std::shared_ptr<Mesh<Scalar>>> luts;
+  std::map<Scalar, const Mesh<Scalar>> luts;
   /// The engine used to do projection and classification
   Engine<Scalar> engine;
 };

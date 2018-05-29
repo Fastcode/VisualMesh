@@ -330,7 +330,7 @@ struct Mesh {
   }
 
   std::vector<std::pair<unsigned int, unsigned int>> lookup_rectilinear(const mat4<Scalar>& Hoc,
-                                                                        const Lens<Scalar>& lens) {
+                                                                        const Lens<Scalar>& lens) const {
 
     // We multiply a lot of things by 2
     constexpr const Scalar x2 = Scalar(2.0);
@@ -552,7 +552,8 @@ struct Mesh {
     return lookup(theta_limits);
   }
 
-  std::vector<std::pair<unsigned int, unsigned int>> lookup_fisheye(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) {
+  std::vector<std::pair<unsigned int, unsigned int>> lookup_fisheye(const mat4<Scalar>& Hoc,
+                                                                    const Lens<Scalar>& lens) const {
     // Solution for intersections on the edge is the intersection between a unit sphere, a plane, and a
     // cone The cone is the cone made by the phi angle, and the plane intersects with the unit sphere to
     // form The circle that defines the edge of the field of view of the camera.
@@ -634,7 +635,7 @@ struct Mesh {
     return lookup(theta_limits);
   }
 
-  std::vector<std::pair<unsigned int, unsigned int>> lookup(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) {
+  std::vector<std::pair<unsigned int, unsigned int>> lookup(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
 
     // Cut down how many points we send here by calculating how many will be on screen
     switch (lens.projection) {

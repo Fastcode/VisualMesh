@@ -18,32 +18,146 @@
 #include <tensorflow/core/framework/op.h>
 #include <tensorflow/core/framework/op_kernel.h>
 #include <tensorflow/core/framework/shape_inference.h>
+#include "engine/cpu/cpu_engine.hpp"
+#include "geometry/Circle.hpp"
+#include "geometry/Cylinder.hpp"
+#include "geometry/Sphere.hpp"
+#include "mesh/mesh.hpp"
+#include "util/ArrayPrint.hpp"
+#include "util/Timer.hpp"
 
 REGISTER_OP("VisualMesh")
-  .Input("shape: ")
-  .Input("lens: lens")
-  .Input("n_sample_points: int32")
-  .Input("cam_to_observation_plane: float32")
-  .Output("pixels: float32")
-  .Output("neighbors: int32")
+  .Attr("T: {float, double}")
+  .Attr("U: {int32, int64}")
+  .Input("image_dimensions: U")
+  .Input("lens_type: string")
+  .Input("lens_focal_length: T")
+  .Input("lens_fov: T")
+  .Input("cam_to_observation_plane: T")
+  .Input("height: T")
+  .Input("geometry: string")
+  .Input("geometry_params: T")
+  .Output("pixels: T")
+  .Output("neighbours: int32")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-    // c->set_output(0, SHAPE_OF_PIXELS);
-    // c->set_output(1, SHAPE_OF_NEIGHBOURS);
+    // Lots of these for checking the various things
+
+
+    // nx2 points on image, and n+1x7 neighbours (including off screen point)
+    c->set_output(0, c->MakeShape({c->kUnknownDim, 2}));
+    c->set_output(1, c->MakeShape({c->kUnknownDim, 7}));
     return tensorflow::Status::OK();
   });
 
+template <typename T, typename U>
 class VisualMeshOp : public tensorflow::OpKernel {
 public:
   explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
 
   void Compute(tensorflow::OpKernelContext* context) override {
 
-    // TODO grab the shape, lens, n_sample_points and cam_to_observation_plane
+    Timer t;
+    // Extract information from our input tensors, flip x and y as tensorflow has them reversed compared to us
+    auto image_dimensions                = context->input(0).vec<U>();
+    visualmesh::vec2<int32_t> dimensions = {{int32_t(image_dimensions(1)), int32_t(image_dimensions(0))}};
+    std::string projection               = *context->input(1).flat<tensorflow::string>().data();
+    T focal_length                       = context->input(2).scalar<T>()(0);
+    T fov                                = context->input(3).scalar<T>()(0);
+    auto tRoc                            = context->input(4).matrix<T>();
+    T height                             = context->input(5).scalar<T>()(0);
+    std::string geometry                 = *context->input(6).flat<tensorflow::string>().data();
+    auto g_params                        = context->input(7).vec<T>();
 
-    // TODO Perform a projection operation using the visual mesh
+    // Create our transformation matrix
+    visualmesh::mat4<T> Hoc = {{
+      visualmesh::vec4<T>{tRoc(0, 0), tRoc(0, 1), tRoc(0, 2), 0},
+      visualmesh::vec4<T>{tRoc(1, 0), tRoc(1, 1), tRoc(1, 2), 0},
+      visualmesh::vec4<T>{tRoc(2, 0), tRoc(2, 1), tRoc(2, 2), height},
+      visualmesh::vec4<T>{0, 0, 0, 1},
+    }};
 
-    // Return the pixels and neighbourhood graph
+    // Create our lens
+    visualmesh::Lens<T> lens;
+    lens.dimensions   = dimensions;
+    lens.focal_length = focal_length;
+    lens.fov          = fov;
+    if (projection == "EQUISOLID") {
+      lens.projection = visualmesh::EQUISOLID;  //
+    }
+    else if (projection == "EQUIDISTANT") {
+      lens.projection = visualmesh::EQUIDISTANT;
+    }
+    else if (projection == "RECTILINEAR") {
+      lens.projection = visualmesh::RECTILINEAR;
+    }
+    else {
+      // TODO work out how to throw an error
+    }
+
+    // Project the mesh using our engine and shape
+    visualmesh::engine::cpu::Engine<T> engine;
+    visualmesh::ProjectedMesh<T> projected;
+    if (geometry == "SPHERE") {
+      visualmesh::geometry::Sphere<T> shape(g_params(0), g_params(1), g_params(2));
+      visualmesh::Mesh<T> mesh(shape, height);
+      projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
+    }
+    else if (geometry == "CIRCLE") {
+      visualmesh::geometry::Circle<T> shape(g_params(0), g_params(1), g_params(2));
+      visualmesh::Mesh<T> mesh(shape, height);
+      projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
+    }
+    else if (geometry == "CYLINDER") {
+      visualmesh::geometry::Cylinder<T> shape(g_params(0), g_params(1), g_params(2), g_params(3));
+      visualmesh::Mesh<T> mesh(shape, height);
+      projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
+    }
+
+    // Make our output tensors
+    tensorflow::Tensor* coordinates = nullptr;
+    tensorflow::TensorShape coords_shape;
+    coords_shape.AddDim(projected.pixel_coordinates.size());
+    coords_shape.AddDim(2);
+    OP_REQUIRES_OK(context, context->allocate_output(0, coords_shape, &coordinates));
+    tensorflow::Tensor* neighbours = nullptr;
+    tensorflow::TensorShape neighbours_shape;
+    neighbours_shape.AddDim(projected.neighbourhood.size());
+    neighbours_shape.AddDim(7);
+    OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
+
+    // Copy across our pixel coordinates remembering to reverse the order from x,y to y,x
+    auto c = coordinates->matrix<T>();
+    for (size_t i = 0; i < projected.pixel_coordinates.size(); ++i) {
+      const auto& px = projected.pixel_coordinates[i];
+      c(i, 0)        = px[1];
+      c(i, 1)        = px[0];
+    }
+
+    // Copy across our neighbourhood graph, adding in a point for itself
+    auto n = neighbours->matrix<U>();
+    for (int i = 0; i < projected.neighbourhood.size(); ++i) {
+      const auto& neighbour = projected.neighbourhood[i];
+      n(i, 0)               = i;
+      n(i, 1)               = neighbour[0];
+      n(i, 2)               = neighbour[1];
+      n(i, 3)               = neighbour[2];
+      n(i, 4)               = neighbour[3];
+      n(i, 5)               = neighbour[4];
+      n(i, 6)               = neighbour[5];
+    }
+    t.measure("U fast?");
   }
 };
 
-REGISTER_KERNEL_BUILDER(Name("VisualMesh").Device(tensorflow::DEVICE_CPU), VisualMeshOp);
+REGISTER_KERNEL_BUILDER(
+  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<int32_t>("U"),
+  VisualMeshOp<float, int32_t>);
+REGISTER_KERNEL_BUILDER(
+  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<int64_t>("U"),
+  VisualMeshOp<float, int64_t>);
+REGISTER_KERNEL_BUILDER(
+  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T").TypeConstraint<int32_t>("U"),
+  VisualMeshOp<double, int32_t>);
+REGISTER_KERNEL_BUILDER(
+  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T").TypeConstraint<int64_t>("U"),
+  VisualMeshOp<double, int64_t>);

@@ -53,10 +53,10 @@ int main() {
   std::string model_path = "/Users/trent/Code/VisualMeshData/model.yaml";
 
   // Construct our VisualMesh
-  std::cerr << "Building VisualMesh" << std::endl;
+  Timer t;
   visualmesh::geometry::Sphere<float> sphere(0.075, 4, 10);
   visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> mesh(sphere, 0.5, 1.5, 100);
-  std::cerr << "Finished building VisualMesh" << std::endl;
+  t.measure("Built Visual Mesh");
 
   // Build our classification network
   std::vector<std::vector<std::pair<std::vector<std::vector<float>>, std::vector<float>>>> network;

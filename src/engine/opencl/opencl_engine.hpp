@@ -29,7 +29,6 @@
 #include "engine/opencl/kernels/project_equidistant.cl.hpp"
 #include "engine/opencl/kernels/project_equisolid.cl.hpp"
 #include "engine/opencl/kernels/project_rectilinear.cl.hpp"
-#include "engine/opencl/kernels/read_image_to_network.cl.hpp"
 #include "mesh/mesh.hpp"
 #include "mesh/projected_mesh.hpp"
 #include "opencl_error_category.hpp"
@@ -159,9 +158,8 @@ namespace engine {
         }
 
         // Get program sources (this does concatenated strings)
-        std::string source =
-          PROJECT_EQUIDISTANT_CL PROJECT_EQUISOLID_CL PROJECT_RECTILINEAR_CL READ_IMAGE_TO_NETWORK_CL;
-        source = get_scalar_defines(Scalar(0.0)) + source;
+        std::string source = PROJECT_EQUIDISTANT_CL PROJECT_EQUISOLID_CL PROJECT_RECTILINEAR_CL;
+        source             = get_scalar_defines(Scalar(0.0)) + source;
 
         const char* cstr = source.c_str();
         size_t csize     = source.size();
@@ -199,17 +197,12 @@ namespace engine {
         if (error != CL_SUCCESS) {
           throw std::system_error(error, opencl_error_category(), "Error getting project_equisolid kernel");
         }
-        read_image_to_network =
-          cl::kernel(::clCreateKernel(program, "read_image_to_network", &error), ::clReleaseKernel);
-        if (error != CL_SUCCESS) {
-          throw std::system_error(error, opencl_error_category(), "Error getting read_image_to_network kernel");
-        }
       }
 
-      ProjectedMesh<Scalar> project(std::shared_ptr<Mesh<Scalar>> mesh,
+      ProjectedMesh<Scalar> project(const Mesh<Scalar>& mesh,
                                     const std::vector<std::pair<unsigned int, unsigned int>>& ranges,
                                     const mat4<Scalar>& Hoc,
-                                    const Lens<Scalar>& lens) {
+                                    const Lens<Scalar>& lens) const {
 
         std::vector<std::array<int, 6>> neighbourhood;
         std::vector<int> indices;
@@ -239,10 +232,10 @@ namespace engine {
 
     private:
       std::tuple<std::vector<std::array<int, 6>>, std::vector<int>, cl::mem, cl::event> do_project(
-        std::shared_ptr<Mesh<Scalar>> mesh,
+        const Mesh<Scalar>& mesh,
         const std::vector<std::pair<unsigned int, unsigned int>>& ranges,
         const mat4<Scalar>& Hoc,
-        const Lens<Scalar>& lens) {
+        const Lens<Scalar>& lens) const {
 
         // Reused variables
         cl_int error;
@@ -261,21 +254,21 @@ namespace engine {
         t.measure("\t\tLookup Range (cpu)");  // TIMER_LINE
 
         // Convenience variables
-        const auto& nodes = mesh->nodes;
+        const auto& nodes = mesh.nodes;
 
         // Upload our visual mesh unit vectors if we have to
         cl::mem cl_points;
 
-        auto gpu_mesh = gpu_points.find(mesh);
+        auto gpu_mesh = gpu_points.find(&mesh);
         if (gpu_mesh == gpu_points.end()) {
           cl_points = cl::mem(
-            ::clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(vec4<Scalar>) * mesh->nodes.size(), nullptr, &error),
+            ::clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(vec4<Scalar>) * mesh.nodes.size(), nullptr, &error),
             ::clReleaseMemObject);
 
           // Flatten our rays
           std::vector<std::array<Scalar, 4>> rays;
-          rays.reserve(mesh->nodes.size());
-          for (const auto& n : mesh->nodes) {
+          rays.reserve(mesh.nodes.size());
+          for (const auto& n : mesh.nodes) {
             rays.push_back(n.ray);
           }
 
@@ -284,14 +277,14 @@ namespace engine {
                                          cl_points,
                                          true,
                                          0,
-                                         mesh->nodes.size() * sizeof(std::array<Scalar, 4>),
+                                         mesh.nodes.size() * sizeof(std::array<Scalar, 4>),
                                          rays.data(),
                                          0,
                                          nullptr,
                                          nullptr);
 
-          // Cache for future runs
-          gpu_points[mesh] = cl_points;
+          // Cache for future runs // TODO const cast and potential race condition here
+          const_cast<Engine<Scalar>*>(this)->gpu_points[&mesh] = cl_points;
           t.measure("\t\tUpload points (mem)");
         }
         else {
@@ -349,7 +342,7 @@ namespace engine {
         cl::event projected;
         ev = nullptr;
         /* mutex scope */ {
-          std::lock_guard<std::mutex> lock(projection_mutex);
+          std::lock_guard<std::mutex> lock(const_cast<Engine<Scalar>*>(this)->projection_mutex);
 
           cl::kernel projection_kernel;
 
@@ -454,12 +447,8 @@ namespace engine {
       // Mutex to protect projection functions
       std::mutex projection_mutex;
 
-      cl::kernel read_image_to_network;
-      // Mutex to protect image read
-      std::mutex read_image_to_network_mutex;
-
-      std::map<std::shared_ptr<Mesh<Scalar>>, cl::mem> gpu_points;
-    };  // namespace opencl
+      std::map<const Mesh<Scalar>*, cl::mem> gpu_points;
+    };
 
   }  // namespace opencl
 }  // namespace engine

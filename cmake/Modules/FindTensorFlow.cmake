@@ -1,5 +1,5 @@
 
-find_package(PythonInterp REQUIRED)
+find_package(PythonInterp 3 REQUIRED)
 
 execute_process(
   COMMAND ${PYTHON_EXECUTABLE} -c "import tensorflow; print(tensorflow.__version__)"
