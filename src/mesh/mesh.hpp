@@ -492,9 +492,9 @@ struct Mesh {
         }
       }
 
-      // If all solutions are complex we totally enclose the phi however we still need to check the
-      // cone is on the correct side
-      if (complex_sols == 4 && ((cos_phi > Scalar(0.0)) == (cam[2] < Scalar(0.0)))) {
+      // If at least 3 solutions are complex we totally enclose the phi however we still need to check the cone is on
+      // the correct side. 3 is appropriate here as 3 would mean only 1 intersection (just touching)
+      if (complex_sols >= 3 && ((cos_phi > Scalar(0.0)) == (cam[2] < Scalar(0.0)))) {
 
         // Make a test unit vector that is on the cone, theta=0 is easiest
         const vec3<Scalar> test_vec = {{sin_phi, Scalar(0.0), -cos_phi}};
@@ -508,41 +508,45 @@ struct Mesh {
           return std::vector<std::pair<Scalar, Scalar>>(1, std::make_pair(Scalar(0.0), Scalar(2.0) * M_PI));
         }
       }
-      // If we have intersections
-      else if (!limits.empty()) {
-        // If we have an even number of intersections
-        if (limits.size() % 2 == 0) {
-          // Sort the limits
-          std::sort(limits.begin(), limits.end());
+      // If we have a sane number of intersections
+      else if (limits.size() >= 2) {
+        // Sort the limits
+        std::sort(limits.begin(), limits.end());
 
-          // Get a test point half way between the first two points
-          const Scalar test_theta = (limits[0] + limits[1]) * Scalar(0.5);
-          const Scalar sin_theta  = std::sin(test_theta);
-          const Scalar cos_theta  = std::cos(test_theta);
+        // Get a test point half way between the first two points
+        const Scalar test_theta = (limits[0] + limits[1]) * Scalar(0.5);
+        const Scalar sin_theta  = std::sin(test_theta);
+        const Scalar cos_theta  = std::cos(test_theta);
 
-          // Make a unit vector from the phi and theta
-          const vec3<Scalar> test_vec = {{cos_theta * sin_phi, sin_theta * sin_phi, -cos_phi}};
+        // Make a unit vector from the phi and theta
+        const vec3<Scalar> test_vec = {{cos_theta * sin_phi, sin_theta * sin_phi, -cos_phi}};
 
-          bool first_is_end = false;
-          for (int i = 0; !first_is_end && i < 4; ++i) {
-            // If we get a negative dot product our first point is an end segment
-            first_is_end = Scalar(0.0) > dot(test_vec, edges[i]);
-          }
-
-          // If this is entering, point 0 is a start, and point 1 is an end
-          std::vector<std::pair<Scalar, Scalar>> output;
-          for (unsigned int i = first_is_end ? 1 : 0; i + 1 < limits.size(); i += 2) {
-            output.emplace_back(limits[i], limits[i + 1]);
-          }
-          if (first_is_end) { output.emplace_back(limits.back(), limits.front()); }
-          return output;
+        bool first_is_end = false;
+        for (int i = 0; !first_is_end && i < 4; ++i) {
+          // If we get a negative dot product our first point is an end segment
+          first_is_end = Scalar(0.0) > dot(test_vec, edges[i]);
         }
-        // If we have an odd number of intersections something is wrong
-        // In this case we err on the side of caution and oversample selecting points at the widest
-        // marks
-        else {
-          throw std::runtime_error("Odd number of intersections found with cone");
+
+        // If we have an odd number of solutions, we need to remove one of them (the one that should be just touching)
+        // Now that we know if the first solution is the start or end of the block we can remove the appropriate point
+        if (limits.size() == 3) {
+          if (first_is_end) {
+            // Remove the 3rd element
+            limits.erase(std::next(limits.end(), -1));
+          }
+          else {
+            // Remove the 2nd element
+            limits.erase(std::next(limits.begin(), 1));
+          }
         }
+
+        // If this is entering, point 0 is a start, and point 1 is an end
+        std::vector<std::pair<Scalar, Scalar>> output;
+        for (unsigned int i = first_is_end ? 1 : 0; i + 1 < limits.size(); i += 2) {
+          output.emplace_back(limits[i], limits[i + 1]);
+        }
+        if (first_is_end) { output.emplace_back(limits.back(), limits.front()); }
+        return output;
       }
 
       // Default to returning an empty list
@@ -555,8 +559,8 @@ struct Mesh {
   std::vector<std::pair<unsigned int, unsigned int>> lookup_fisheye(const mat4<Scalar>& Hoc,
                                                                     const Lens<Scalar>& lens) const {
     // Solution for intersections on the edge is the intersection between a unit sphere, a plane, and a
-    // cone The cone is the cone made by the phi angle, and the plane intersects with the unit sphere to
-    // form The circle that defines the edge of the field of view of the camera.
+    // cone. The cone is the cone made by the phi angle, and the plane intersects with the unit sphere to
+    // form the circle that defines the edge of the field of view of the camera.
     //
     // Unit sphere
     // x^2 + y^2 + z^2 = 1
