@@ -3,10 +3,11 @@
 import tensorflow as tf
 import os
 import re
+import math
 import multiprocessing
 
+# Load the visual mesh op
 op_file = os.path.join(os.path.dirname(__file__), 'visualmesh_op.so')
-
 if os.path.isfile(op_file):
   VisualMesh = tf.load_op_library(op_file).visual_mesh
 else:
@@ -82,14 +83,21 @@ class VisualMeshDataset:
 
   def project_mesh(self, args):
 
-    # Adjust our height by a random amount
-    height = args['height'] + tf.random_normal(
-      [1],
-      self.variants['mesh']['height']['mean'],
-      self.variants['mesh']['height']['stddev'],
-    )
+    height = args['height']
+    orientation = args['orientation']
 
-    # TODO create a random rotation for orientation
+    # Adjust our height and orientation
+    if 'mesh' in self.variants:
+      v = self.variants['mesh']
+      if 'height' in v:
+        height = height + tf.random_normal(
+          shape=(),
+          mean=v['height']['mean'],
+          stddev=v['height']['stddev'],
+        )
+      if 'rotation' in v:
+        # Make a random unit vector axis
+        pass
 
     # Run the visual mesh to get our values
     pixels, neighbours = VisualMesh(
@@ -97,7 +105,7 @@ class VisualMeshDataset:
       args['projection'],
       args['focal_length'],
       args['fov'],
-      args['orientation'],
+      orientation,
       height,
       self.geometry,
       self.geometry_params,
@@ -168,17 +176,18 @@ class VisualMeshDataset:
 
   def calculate_weights(self, args):
 
-    # Work out how to arrange the weights of points such that
+    # Arrange our weights such that each class in this batch has equal weight
     W = args['S']
     scatters = []
     for i in range(len(self.classes)):
       idx = tf.where(tf.multiply(args['Y'][:, i], W))
-      weights = tf.cond(
-        tf.equal(tf.size(idx), 0),
-        lambda: tf.zeros_like(W),
-        lambda: tf.scatter_nd(idx, tf.nn.softmax(tf.gather_nd(W, idx)), tf.shape(W, out_type=tf.int64)),
-      )
-      scatters.append(weights)
+      pts = tf.gather_nd(W, idx)
+      pts = tf.divide(pts, tf.reduce_sum(pts))
+      pts = tf.scatter_nd(idx, pts, tf.shape(W, out_type=tf.int64))
+
+      # Either our weights, or if there were none, zeros
+      scatters.append(tf.cond(tf.equal(tf.size(idx), 0), lambda: tf.zeros_like(W), lambda: pts))
+
     W = tf.add_n(scatters)
     W = tf.multiply(
       W,
@@ -192,6 +201,53 @@ class VisualMeshDataset:
       'W': W,
       'G': args['G'],
     }
+
+  def apply_variants(self, args):
+    # Cast the image to a floating point value and make it into an image shape
+    X = tf.expand_dims(tf.image.convert_image_dtype(args['X'], tf.float32), 0)
+
+    # Apply the variants that were listed
+    var = self.variants['image']
+    if 'brightness' in var and var['brightness']['stddev'] > 0:
+      X = tf.image.adjust_brightness(
+        X, tf.truncated_normal(
+          shape=(),
+          mean=var['brightness']['mean'],
+          stddev=var['brightness']['stddev'],
+        )
+      )
+    if 'contrast' in var and var['contrast']['stddev'] > 0:
+      X = tf.image.adjust_contrast(
+        X, tf.truncated_normal(
+          shape=(),
+          mean=var['contrast']['mean'],
+          stddev=var['contrast']['stddev'],
+        )
+      )
+    if 'hue' in var and var['hue']['stddev'] > 0:
+      X = tf.image.adjust_hue(X, tf.truncated_normal(
+        shape=(),
+        mean=var['hue']['mean'],
+        stddev=var['hue']['stddev'],
+      ))
+    if 'saturation' in var and var['saturation']['stddev'] > 0:
+      X = tf.image.adjust_saturation(
+        X, tf.truncated_normal(
+          shape=(),
+          mean=var['saturation']['mean'],
+          stddev=var['saturation']['stddev'],
+        )
+      )
+    if 'gamma' in var and var['gamma']['stddev'] > 0:
+      X = tf.image.adjust_gamma(
+        X, tf.truncated_normal(
+          shape=(),
+          mean=var['gamma']['mean'],
+          stddev=var['gamma']['stddev'],
+        )
+      )
+
+    return {**args, 'X': tf.squeeze(tf.image.convert_image_dtype(X, tf.uint8), 0)}
 
   def build(self):
     # Load our dataset
@@ -241,9 +297,9 @@ class VisualMeshDataset:
     # Calculate the weights to balance classes and resampling
     dataset = dataset.map(self.calculate_weights, num_parallel_calls=multiprocessing.cpu_count())
 
-    # TODO spread the classes
-    # TODO calculate the weights
-    # TODO apply the hue etc variants
+    # Apply visual variations to the data
+    if 'image' in self.variants:
+      dataset = dataset.map(self.apply_variants, num_parallel_calls=multiprocessing.cpu_count())
 
     return dataset
 
@@ -268,6 +324,28 @@ def main():
           'stddev': 0.1,
         },
       },
+      'image': {
+        'brightness': {
+          'mean': 0,
+          'stddev': 0.1
+        },
+        'contrast': {
+          'mean': 0,
+          'stddev': 0.1
+        },
+        'hue': {
+          'mean': 0,
+          'stddev': 0.1
+        },
+        'saturation': {
+          'mean': 0,
+          'stddev': 0.1
+        },
+        'gamma': {
+          'mean': 1,
+          'stddev': 0.1
+        },
+      },
     },
     geometry={
       'shape': 'SPHERE',
@@ -288,8 +366,8 @@ def main():
       t2 = time.time()
       print(t2 - t1)
 
-      # import pdb
-      # pdb.set_trace()
+      import pdb
+      pdb.set_trace()
 
 
 if __name__ == '__main__':
