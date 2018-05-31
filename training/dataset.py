@@ -172,11 +172,19 @@ class VisualMeshDataset:
     W = args['S']
     scatters = []
     for i in range(len(self.classes)):
-      idx = tf.where(args['Y'][:, i])
-      points = tf.gather_nd(W, idx)
-      weights = tf.multiply(tf.nn.softmax(points), tf.cast(tf.shape(W)[0], tf.float32) / len(self.classes))
-      scatters.append(tf.scatter_nd(idx, weights, tf.shape(W, out_type=tf.int64)))
+      idx = tf.where(tf.multiply(args['Y'][:, i], W))
+      weights = tf.cond(
+        tf.equal(tf.size(idx), 0),
+        lambda: tf.zeros_like(W),
+        lambda: tf.scatter_nd(idx, tf.nn.softmax(tf.gather_nd(W, idx)), tf.shape(W, out_type=tf.int64)),
+      )
+      scatters.append(weights)
     W = tf.add_n(scatters)
+    W = tf.multiply(
+      W,
+      tf.cast(tf.shape(W)[0], tf.float32) /
+      tf.cast(tf.count_nonzero(tf.stack([tf.count_nonzero(s) for s in scatters])), tf.float32),
+    )
 
     return {
       'X': args['X'],
@@ -275,13 +283,13 @@ def main():
 
     import time
     while True:
-      t1 = time.clock()
+      t1 = time.time()
       sample = sess.run(ds)
-      t2 = time.clock()
+      t2 = time.time()
       print(t2 - t1)
 
-      import pdb
-      pdb.set_trace()
+      # import pdb
+      # pdb.set_trace()
 
 
 if __name__ == '__main__':
