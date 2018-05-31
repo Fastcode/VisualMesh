@@ -90,14 +90,34 @@ class VisualMeshDataset:
     if 'mesh' in self.variants:
       v = self.variants['mesh']
       if 'height' in v:
-        height = height + tf.random_normal(
+        height = height + tf.truncated_normal(
           shape=(),
           mean=v['height']['mean'],
           stddev=v['height']['stddev'],
         )
       if 'rotation' in v:
-        # Make a random unit vector axis
-        pass
+        # Make 3 random euler angles
+        rotation = tf.truncated_normal(
+          shape=[3],
+          mean=v['rotation']['mean'],
+          stddev=v['rotation']['stddev'],
+        )
+        # Cos and sin for everyone!
+        ca = tf.cos(rotation[0])
+        sa = tf.sin(rotation[0])
+        cb = tf.cos(rotation[1])
+        sb = tf.sin(rotation[0])
+        cc = tf.cos(rotation[2])
+        sc = tf.sin(rotation[0])
+
+        # Convert these into a rotation matrix
+        rot = [cc*ca, -cc*sa*cb + sc*sb, cc*sa*sb + sc*cb,
+                  sa,             ca*cb,         -ca * sb,
+              -sc*ca,  sc*sa*cb + cc*sb, -sc*sa*sb + cc*cb]  # yapf: disable
+        rot = tf.reshape(tf.stack(rot), [3, 3])
+
+        # Apply the rotation
+        orientation = tf.matmul(rot, orientation)
 
     # Run the visual mesh to get our values
     pixels, neighbours = VisualMesh(
