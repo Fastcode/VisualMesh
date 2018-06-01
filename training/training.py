@@ -71,11 +71,11 @@ def build_training_graph(network, learning_rate):
 
     # Our loss function
     with tf.name_scope('Loss'):
-      cost = tf.reduce_mean(tf.multiply(tf.nn.softmax_cross_entropy_with_logits_v2(logits=X, labels=Y, dim=1), W))
+      loss = tf.reduce_mean(tf.multiply(tf.nn.softmax_cross_entropy_with_logits_v2(logits=X, labels=Y, dim=1), W))
 
     # Our optimiser
     with tf.name_scope('Optimiser'):
-      optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost, global_step=global_step)
+      optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_step)
 
     # Calculate accuracy
     with tf.name_scope('Metrics'):
@@ -102,8 +102,8 @@ def build_training_graph(network, learning_rate):
       # How wide the gap is between the two classes
       certainty = tf.reduce_mean(tf.abs(tf.subtract(X[:, 0], X[:, 1])))
 
-  # Monitor cost and metrics
-  tf.summary.scalar('Loss', cost)
+  # Monitor loss and metrics
+  tf.summary.scalar('Loss', loss)
   tf.summary.scalar('True Positive Rate', tpr)
   tf.summary.scalar('True Negative Rate', tnr)
   tf.summary.scalar('Positive Predictive', ppv)
@@ -176,7 +176,7 @@ def train(sess, network, config, output_path):
     batch_size=config['validation']['batch_size'],
     variants={},  # No variations for validation
     resample_files=None,  # No resampling in validation
-  ).build().make_one_shot_iterator().string_handle()
+  ).build().repeat().make_one_shot_iterator().string_handle()
 
   # Get our handles
   training_handle, validation_handle = sess.run([training_dataset, validation_dataset])

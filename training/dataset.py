@@ -22,7 +22,7 @@ class VisualMeshDataset:
     self.batch_size = batch_size
     self.geometry = tf.constant(geometry['shape'], dtype=tf.string, name='GeometryType')
     self.resample_files = resample_files
-    self.shuffle_buffer_size = 10
+    self.shuffle_buffer_size = 1000
 
     self.variants = variants
 
