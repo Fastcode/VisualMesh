@@ -298,6 +298,7 @@ class VisualMeshDataset:
         'm': tf.fill((tf.shape(args['X'])[0], 1), True)}
     )
     dataset = dataset.prefetch(self.batch_size * 2)
+
     dataset = dataset.padded_batch(
       batch_size=self.batch_size,
       padded_shapes={
@@ -320,6 +321,9 @@ class VisualMeshDataset:
     # Apply visual variations to the data
     if 'image' in self.variants:
       dataset = dataset.map(self.apply_variants, num_parallel_calls=multiprocessing.cpu_count())
+
+    # Finally, convert our image to float
+    dataset = dataset.map(lambda args: {**args, 'X': tf.image.convert_image_dtype(args['X'], tf.float32)}, num_parallel_calls=multiprocessing.cpu_count())
 
     return dataset
 

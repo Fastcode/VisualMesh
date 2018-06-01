@@ -6,80 +6,68 @@ import tensorflow as tf
 
 from . import dataset
 
-def resample(sess,
-             network,
-             mesh_type,
-             mesh_size,
-             model_dir,
-             input_path,
-             output_path):
 
-    # Make our output directory
-    os.makedirs(output_path, exist_ok=True)
+def resample(sess, network, config, output_path):
 
-    # Initialise global variables
-    sess.run(tf.global_variables_initializer())
+  # Make our output directory
+  os.makedirs(output_path, exist_ok=True)
 
-    save_vars = {v.name: v for v in tf.trainable_variables()}
-    saver = tf.train.Saver(save_vars)
+  # Initialise global variables
+  sess.run(tf.global_variables_initializer())
 
-    # Get our model directory and load it if it exists
-    model_path = os.path.join(model_dir, 'model.ckpt')
-    checkpoint_file = tf.train.latest_checkpoint(model_dir)
-    print('Loading model {}'.format(checkpoint_file))
-    saver.restore(sess, checkpoint_file)
+  save_vars = {v.name: v for v in tf.trainable_variables()}
+  saver = tf.train.Saver(save_vars)
 
-    # Load our dataset
-    print('Loading file list')
-    files = dataset.get_files(input_path, mesh_type, mesh_size)
-    print('Loaded {} files'.format(len(files)))
+  # Get our model directory and load it
+  model_path = os.path.join(model_dir, 'model.ckpt')
+  checkpoint_file = tf.train.latest_checkpoint(model_dir)
+  print('Loading model {}'.format(checkpoint_file))
+  saver.restore(sess, checkpoint_file)
 
-    # Load all our data
-    data_string = dataset.dataset(
-        files,
-        mesh_type=mesh_type,
-        variants=False,
-        repeat=1,
-        batch_size=1,
-        shuffle=False
-    )
+  # TODO make it possible to choose the number of epochs you do
+  # TODO choose if you want to shuffle the dataset or not
 
-    # Get our iterator handle
-    data_handle = sess.run(data_string)
+  # Load our dataset
+  print('Loading file list')
+  files = dataset.get_files(input_path, mesh_type, mesh_size)
+  print('Loaded {} files'.format(len(files)))
 
-    # Build our resample calculation
-    X = network['network'][0] # 0 to debatch
-    Y = network['Y'][0]       # 0 to debatch
-    X = tf.reduce_sum(tf.abs(X - Y), axis=1)
-    X = X / tf.reduce_sum(X) # Normalise to make sum to 1
+  # Get our iterator handle
+  data_handle = sess.run(data_string)
 
-    # Loop through the data
-    while True:
-        try:
-            # Get the difference between our labels and our expectations
-            result = sess.run([X, network['files']], feed_dict={ network['handle']: data_handle })
+  # Build our resample calculation
+  X = network['network']  # 0 to debatch
+  Y = network['Y']  # 0 to debatch
+  X = tf.reduce_sum(tf.abs(X - Y), axis=1)
+  X = X / tf.reduce_sum(X)  # Normalise to make sum to 1
 
-            # Our output file
-            output_file = result[1][0][3]
+  # Loop through the data
+  while True:
+    try:
+      # Get the difference between our labels and our expectations
+      result = sess.run([X, network['files']], feed_dict={network['handle']: data_handle})
 
-            if os.path.exists(output_file):
-                with open(output_file, 'rb') as f:
-                    print(output_file)
-                    # Read and then exp to undo log
-                    base = np.exp(np.frombuffer(f.read(), np.float32))
-            else:
-                # Everything has 0 probability initially
-                base = np.zeros_like(result[0])
+      # Our output file
+      output_file = result[1][0][3]
 
-            # Add on our probabilities to the base, normalise and log
-            v = base + result[0] + np.ones_like(result[0]) * (5.0 / len(result[0]))
-            v = np.log(v / np.sum(v))
+      if os.path.exists(output_file):
+        with open(output_file, 'rb') as f:
+          print(output_file)
+          # Read and then exp to undo log
+          base = np.exp(np.frombuffer(f.read(), np.float32))
+      else:
+        # Everything has 0 probability initially
+        base = np.zeros_like(result[0])
 
-            # Write to file
-            print(output_file, len(v) * 4)
-            with open(output_file, 'wb') as f:
-                f.write(v.tobytes())
+      # Add on our probabilities to the base, normalise and log
+      v = base + result[0] + np.ones_like(result[0]) * (5.0 / len(result[0]))
+      v = np.log(v / np.sum(v))
 
-        except tf.errors.OutOfRangeError:
-            print('Resampling Done')
-            break
+      # Write to file
+      print(output_file, len(v) * 4)
+      with open(output_file, 'wb') as f:
+        f.write(v.tobytes())
+
+    except tf.errors.OutOfRangeError:
+      print('Resampling Done')
+      break

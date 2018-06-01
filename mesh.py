@@ -18,6 +18,7 @@ if __name__ == "__main__":
   command.add_argument('command', choices=['train', 'test', 'resample'], action='store')
   command.add_argument('-g', '--gpu', action='store', default=0, help='The index of the GPU to use when training')
   command.add_argument('config', action='store', help='Path to the configuration file for training')
+  command.add_argument('output_path', nargs='?', action='store', help='Output directory to store the logs and models')
 
   args = command.parse_args()
 
@@ -37,14 +38,16 @@ if __name__ == "__main__":
     with tf.device('/device:GPU:{}'.format(args.gpu)):
 
       # Build our network
-      net = network.build(config['structure'])
+      net = network.build(config['network']['structure'], len(config['network']['classes']))
+
+      output_path = 'output' if args.output_path is None else args.output_path
 
       # Run the appropriate action
       if args.command == 'train':
-        training.train(sess, net)
+        training.train(sess, net, config, output_path)
 
       elif args.command == 'resample':
-        resample.resample(sess, net)
+        resample.resample(sess, net, config, output_path)
 
       elif args.command == 'test':
-        test.test(sess, net)
+        test.test(sess, net, config, output_path)
