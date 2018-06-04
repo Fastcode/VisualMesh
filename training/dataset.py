@@ -16,13 +16,12 @@ else:
 
 class VisualMeshDataset:
 
-  def __init__(self, input_files, classes, geometry, batch_size, variants, resample_files=None):
+  def __init__(self, input_files, classes, geometry, batch_size, variants):
     self.input_files = input_files
     self.classes = classes
     self.batch_size = batch_size
     self.geometry = tf.constant(geometry['shape'], dtype=tf.string, name='GeometryType')
-    self.resample_files = resample_files
-    self.shuffle_buffer_size = 1000
+    self.shuffle_buffer_size = 10
 
     self.variants = variants
 
@@ -62,23 +61,6 @@ class VisualMeshDataset:
       'fov': example['lens/fov'],
       'orientation': example['mesh/orientation'],
       'height': example['mesh/height']
-    }
-
-  def load_resample(self, proto):
-    example = tf.parse_single_example(proto, {'probability': tf.FixedLenFeature([], tf.string)})
-    return tf.image.decode_png(example['probability'], channels=4)
-
-  def merge_resample(self, args, resample):
-
-    # Add the resample results into the dictionary
-    return {
-      'resample':
-        tf.cond(
-          tf.reduce_all(tf.equal(tf.shape(resample), tf.shape(args['mask']))),
-          lambda: resample,
-          lambda: tf.ones_like(args['mask']) * 255,
-        ),
-      **args,
     }
 
   def project_mesh(self, args):
@@ -141,7 +123,6 @@ class VisualMeshDataset:
     return {
       'X': tf.pad(tf.gather_nd(args['image'], pixels), [[0, 1], [0, 0]]),
       'Y': tf.pad(tf.gather_nd(args['mask'], pixels), [[0, 1], [0, 0]]),
-      'S': tf.pad(tf.gather_nd(args['resample'], pixels), [[0, 1], [0, 0]]),
       'G': neighbours,
     }
 
@@ -156,26 +137,19 @@ class VisualMeshDataset:
     # Use this to lookup each of the vectors
     X = tf.gather_nd(args['X'], idx)
     Y = tf.gather_nd(args['Y'], idx)
-    S = tf.gather_nd(args['S'], idx)
     G = tf.gather_nd(G, idx)
 
     return {
       'X': X,
       'Y': Y,
-      'S': S,
       'G': G,
     }
 
   def expand_classes(self, args):
 
-    # Apply the alpha values from the classes to our weights
-    S = tf.multiply(
-      tf.image.convert_image_dtype(args['S'][:, 1], tf.float32),
-      tf.image.convert_image_dtype(args['Y'][:, 3], tf.float32),
-    )
-
     # Expand the classes from colours into individual columns
     Y = args['Y']
+    W = tf.image.convert_image_dtype(Y[:, 3], tf.float32)  # Alpha channel
     cs = []
     for name, value in self.classes:
       cs.append(
@@ -188,38 +162,9 @@ class VisualMeshDataset:
     Y = tf.stack(cs, axis=-1)
 
     return {
-      'X': args['X'],
+      **args,
       'Y': Y,
-      'S': S,
-      'G': args['G'],
-    }
-
-  def calculate_weights(self, args):
-
-    # Arrange our weights such that each class in this batch has equal weight
-    W = args['S']
-    scatters = []
-    for i in range(len(self.classes)):
-      idx = tf.where(tf.multiply(args['Y'][:, i], W))
-      pts = tf.gather_nd(W, idx)
-      pts = tf.divide(pts, tf.reduce_sum(pts))
-      pts = tf.scatter_nd(idx, pts, tf.shape(W, out_type=tf.int64))
-
-      # Either our weights, or if there were none, zeros
-      scatters.append(tf.cond(tf.equal(tf.size(idx), 0), lambda: tf.zeros_like(W), lambda: pts))
-
-    W = tf.add_n(scatters)
-    W = tf.multiply(
-      W,
-      tf.cast(tf.shape(W)[0], tf.float32) /
-      tf.cast(tf.count_nonzero(tf.stack([tf.count_nonzero(s) for s in scatters])), tf.float32),
-    )
-
-    return {
-      'X': args['X'],
-      'Y': args['Y'],
       'W': W,
-      'G': args['G'],
     }
 
   def apply_variants(self, args):
@@ -274,16 +219,6 @@ class VisualMeshDataset:
     dataset = tf.data.TFRecordDataset(self.input_files)
     dataset = dataset.map(self.load_example, num_parallel_calls=multiprocessing.cpu_count())
 
-    # Try to load the resample dataset if we have one
-    resample_dataset = tf.data.TFRecordDataset(self.resample_files).map(
-      self.load_resample,
-      num_parallel_calls=multiprocessing.cpu_count(),
-    ) if self.resample_files else tf.data.Dataset.from_tensors(tf.constant([], dtype=tf.uint8)).repeat()
-
-    # Merge in the resample dataset
-    dataset = dataset.zip((dataset, resample_dataset))
-    dataset = dataset.map(self.merge_resample, num_parallel_calls=multiprocessing.cpu_count())
-
     # Before we get to the point of making variants etc, shuffle here
     dataset = dataset.shuffle(buffer_size=self.shuffle_buffer_size)
 
@@ -298,13 +233,11 @@ class VisualMeshDataset:
         'm': tf.fill((tf.shape(args['X'])[0], 1), True)}
     )
     dataset = dataset.prefetch(self.batch_size * 2)
-
     dataset = dataset.padded_batch(
       batch_size=self.batch_size,
       padded_shapes={
         'X': (None, 3),
         'Y': (None, 4),
-        'S': (None, 4),
         'G': (None, 7),
         'n': (),
         'm': (None, 1)
@@ -314,9 +247,6 @@ class VisualMeshDataset:
 
     # Expand the classes
     dataset = dataset.map(self.expand_classes, num_parallel_calls=multiprocessing.cpu_count())
-
-    # Calculate the weights to balance classes and resampling
-    dataset = dataset.map(self.calculate_weights, num_parallel_calls=multiprocessing.cpu_count())
 
     # Apply visual variations to the data
     if 'image' in self.variants:

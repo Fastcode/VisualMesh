@@ -1,39 +1,11 @@
 #!/usr/bin/env python3
 
 import math
+import copy
 import tensorflow as tf
 
 
-def build(groups, n_classes):
-
-  # The last layer is the number of classes we have
-  groups[-1].append(n_classes)
-
-  # Number of neighbours for each point
-  graph_degree = 7
-
-  # Our iterator handle
-  handle = tf.placeholder(tf.string, shape=[])
-
-  # Make our iterator
-  iterator = tf.data.Iterator.from_string_handle(
-    handle, {
-      'X': tf.float32,
-      'Y': tf.float32,
-      'G': tf.int32,
-      'W': tf.float32,
-    }, {
-      'X': [None, 3],
-      'Y': [None, n_classes],
-      'G': [None, graph_degree],
-      'W': [None],
-    }
-  )
-
-  # Get values from our iterator
-  data = iterator.get_next()
-  X = data['X']
-  G = data['G']
+def build_network(X, G, groups):
 
   # Build our tensor
   logits = X
@@ -80,12 +52,52 @@ def build(groups, n_classes):
           # Apply our activation function
           logits = tf.nn.selu(logits)
 
-  # Softmax our final output for all values in the mesh as our network
-  network = tf.nn.softmax(logits, name='Softmax', axis=1)
+  return logits
+
+
+def build(groups, n_classes):
+
+  # The last layer is the number of classes we have but the adversary only has two
+  mesh_groups = copy.deepcopy(groups)
+  mesh_groups[-1].append(n_classes)
+  adversary_groups = copy.deepcopy(groups)
+  adversary_groups[-1].append(1)
+
+  # Number of neighbours for each point
+  graph_degree = 7
+
+  # Our iterator handle
+  handle = tf.placeholder(tf.string, shape=[])
+
+  # Make our iterator
+  iterator = tf.data.Iterator.from_string_handle(
+    handle, {
+      'X': tf.float32,
+      'Y': tf.float32,
+      'G': tf.int32,
+      'W': tf.float32,
+    }, {
+      'X': [None, 3],
+      'Y': [None, n_classes],
+      'G': [None, graph_degree],
+      'W': [None],
+    }
+  )
+
+  # Get values from our iterator
+  data = iterator.get_next()
+  X = data['X']
+  G = data['G']
+
+  # Build our normal mesh, and our adverserial mesh
+  with tf.variable_scope('mesh'):
+    mesh = build_network(X, G, mesh_groups)
+  with tf.variable_scope('adversary'):
+    adversary = build_network(X, G, adversary_groups)
 
   return {
     'handle': handle,  # (input)  Iterator handle
-    'logits': logits,  # (output) Raw unscaled output
-    'network': network,  # (output) network output
+    'mesh': mesh,  # (output) Raw unscaled mesh output
+    'adversary': adversary,  # (output) Raw unscaled weights output
     **data,  # Forward all the data from our iterator
   }
