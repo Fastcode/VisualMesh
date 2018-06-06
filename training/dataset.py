@@ -16,12 +16,12 @@ else:
 
 class VisualMeshDataset:
 
-  def __init__(self, input_files, classes, geometry, batch_size, variants):
+  def __init__(self, input_files, classes, geometry, batch_size, shuffle_size, variants):
     self.input_files = input_files
     self.classes = classes
     self.batch_size = batch_size
     self.geometry = tf.constant(geometry['shape'], dtype=tf.string, name='GeometryType')
-    self.shuffle_buffer_size = 10
+    self.shuffle_buffer_size = shuffle_size
 
     self.variants = variants
 
@@ -60,7 +60,8 @@ class VisualMeshDataset:
       'focal_length': example['lens/focal_length'],
       'fov': example['lens/fov'],
       'orientation': example['mesh/orientation'],
-      'height': example['mesh/height']
+      'height': example['mesh/height'],
+      'raw': example['image'],
     }
 
   def project_mesh(self, args):
@@ -124,6 +125,8 @@ class VisualMeshDataset:
       'X': tf.pad(tf.gather_nd(args['image'], pixels), [[0, 1], [0, 0]]),
       'Y': tf.pad(tf.gather_nd(args['mask'], pixels), [[0, 1], [0, 0]]),
       'G': neighbours,
+      'px': pixels,
+      'raw': args['raw'],
     }
 
   def flatten_batch(self, args):
@@ -139,11 +142,7 @@ class VisualMeshDataset:
     Y = tf.gather_nd(args['Y'], idx)
     G = tf.gather_nd(G, idx)
 
-    return {
-      'X': X,
-      'Y': Y,
-      'G': G,
-    }
+    return {'X': X, 'Y': Y, 'G': G, 'n': args['n'], 'px': args['px'], 'raw': args['raw']}
 
   def expand_classes(self, args):
 
@@ -220,7 +219,8 @@ class VisualMeshDataset:
     dataset = dataset.map(self.load_example, num_parallel_calls=multiprocessing.cpu_count())
 
     # Before we get to the point of making variants etc, shuffle here
-    dataset = dataset.shuffle(buffer_size=self.shuffle_buffer_size)
+    if self.shuffle_buffer_size > 0:
+      dataset = dataset.shuffle(buffer_size=self.shuffle_buffer_size)
 
     # Project the visual mesh and select the appropriate pixels
     dataset = dataset.map(self.project_mesh, num_parallel_calls=multiprocessing.cpu_count())
@@ -240,7 +240,9 @@ class VisualMeshDataset:
         'Y': (None, 4),
         'G': (None, 7),
         'n': (),
-        'm': (None, 1)
+        'm': (None, 1),
+        'px': (None, 2),
+        'raw': (),
       },
     )
     dataset = dataset.map(self.flatten_batch, num_parallel_calls=multiprocessing.cpu_count())
@@ -256,73 +258,3 @@ class VisualMeshDataset:
     dataset = dataset.map(lambda args: {**args, 'X': tf.image.convert_image_dtype(args['X'], tf.float32)}, num_parallel_calls=multiprocessing.cpu_count())
 
     return dataset
-
-
-def main():
-  import sys
-  ds = VisualMeshDataset(
-    input_files=sys.argv[1],
-    classes=[
-      ['ball', [255, 255, 255]],
-      ['environment', [0, 0, 0]],
-    ],
-    batch_size=50,
-    variants={
-      'mesh': {
-        'height': {
-          'mean': 0,
-          'stddev': 0.1,
-        },
-        'rotation': {
-          'mean': 0,
-          'stddev': 0.1,
-        },
-      },
-      'image': {
-        'brightness': {
-          'mean': 0,
-          'stddev': 0.1
-        },
-        'contrast': {
-          'mean': 0,
-          'stddev': 0.1
-        },
-        'hue': {
-          'mean': 0,
-          'stddev': 0.1
-        },
-        'saturation': {
-          'mean': 0,
-          'stddev': 0.1
-        },
-        'gamma': {
-          'mean': 1,
-          'stddev': 0.1
-        },
-      },
-    },
-    geometry={
-      'shape': 'SPHERE',
-      'radius': 0.075,
-      'max_distance': 15,
-      'intersections': 4,
-    },
-  )
-
-  ds = ds.build().make_one_shot_iterator().get_next()
-
-  with tf.Session() as sess:
-
-    import time
-    while True:
-      t1 = time.time()
-      sample = sess.run(ds)
-      t2 = time.time()
-      print(t2 - t1)
-
-      import pdb
-      pdb.set_trace()
-
-
-if __name__ == '__main__':
-  main()

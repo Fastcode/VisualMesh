@@ -6,6 +6,12 @@ import random
 import tensorflow as tf
 import yaml
 import re
+import io
+import cv2
+import numpy as np
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
 
 from . import network
 from . import dataset
@@ -53,7 +59,111 @@ def save_yaml_model(sess, output_path, global_step):
     f.write(yaml.dump(output, width=120))
 
 
-def build_training_graph(network, n_classes, learning_rate):
+class MeshDrawer:
+
+  def __init__(self, classes):
+    self.classes = classes
+
+  def mesh_image(self, raws, pxs, ns, X):
+    # Find the edges of the X values
+    cs = np.cumsum(ns)
+    cs = np.concatenate([[0], cs]).tolist()
+    ranges = list(zip(cs, cs[1:]))
+
+    images = []
+
+    for batch, raw in enumerate(raws):
+      img = cv2.imdecode(np.fromstring(raw, np.uint8), cv2.IMREAD_COLOR)
+      img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+      px = pxs[batch, :ns[batch] - 1]  # Skip the null point (which doesn't exist in px)
+      x = X[ranges[batch][0]:ranges[batch][1] - 1]  # Skip the null point
+
+      # Setup the display so everything is all at the correct resolution
+      dpi = 80
+      height, width, nbands = img.shape
+      figsize = width / float(dpi), height / float(dpi)
+      fig = plt.figure(figsize=figsize)
+      ax = fig.add_axes([0, 0, 1, 1])
+      ax.axis('off')
+
+      # Image underlay
+      ax.imshow(img, interpolation='nearest')
+
+      # Now for each class, produce a contour plot
+      for i, data in enumerate(self.classes):
+        r, g, b = data[1]
+        r /= 255
+        g /= 255
+        b /= 255
+
+        ax.tricontour(
+          px[:, 1],
+          px[:, 0],
+          x[:, i],
+          levels=[0.5, 0.75, 0.9],
+          colors=[(r, g, b, 0.33), (r, g, b, 0.66), (r, g, b, 1.0)]
+        )
+
+      ax.set(xlim=[0, width], ylim=[height, 0], aspect=1)
+      data = io.BytesIO()
+      fig.savefig(data, format='jpg', dpi=dpi)
+      data.seek(0)
+      result = cv2.imdecode(np.fromstring(data.read(), np.uint8), cv2.IMREAD_COLOR)
+      images.append(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
+
+      fig.clf()
+      plt.close(fig)
+
+    return np.stack(images)
+
+  def adversary_image(self, raws, pxs, ns, A):
+    # Find the edges of the X values
+    cs = np.cumsum(ns)
+    cs = np.concatenate([[0], cs]).tolist()
+    ranges = list(zip(cs, cs[1:]))
+
+    images = []
+
+    for batch, raw in enumerate(raws):
+      img = cv2.imdecode(np.fromstring(raw, np.uint8), cv2.IMREAD_COLOR)
+      img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+      px = pxs[batch, :ns[batch] - 1]  # Skip the null point (which doesn't exist in px)
+      a = A[ranges[batch][0]:ranges[batch][1] - 1]  # Skip the null point
+
+      # Setup the display so everything is all at the correct resolution
+      dpi = 80
+      height, width, nbands = img.shape
+      figsize = width / float(dpi), height / float(dpi)
+      fig = plt.figure(figsize=figsize)
+      ax = fig.add_axes([0, 0, 1, 1])
+      ax.axis('off')
+
+      # Image underlay
+      ax.imshow(img, interpolation='nearest')
+
+      # Make our adversary plot
+      ax.tricontour(
+        px[:, 1],
+        px[:, 0],
+        a,
+        levels=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+        cmap=plt.get_cmap('jet'),
+      )
+
+      ax.set(xlim=[0, width], ylim=[height, 0], aspect=1)
+      data = io.BytesIO()
+      fig.savefig(data, format='jpg', dpi=dpi)
+      data.seek(0)
+      result = cv2.imdecode(np.fromstring(data.read(), np.uint8), cv2.IMREAD_COLOR)
+      images.append(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
+
+      fig.clf()
+      plt.close(fig)
+
+    return np.stack(images)
+
+
+def build_training_graph(network, classes, learning_rate):
 
   # Truth labels for the network
   Y = network['Y']
@@ -71,6 +181,10 @@ def build_training_graph(network, n_classes, learning_rate):
   X = tf.gather_nd(X, S)
   A = tf.gather_nd(A, S)
 
+  training_summary = []
+  validation_summary = []
+  image_summary = []
+
   # Gather our individual output for training
   with tf.name_scope('Training'):
 
@@ -85,7 +199,7 @@ def build_training_graph(network, n_classes, learning_rate):
       # We need to equalise the loss weights for each class
       scatters = []
       adversary_class_losses = []
-      for i in range(n_classes):
+      for i in range(len(classes)):
         # Indexes of truth samples for this class
         idx = tf.where(Y[:, i])
 
@@ -115,61 +229,107 @@ def build_training_graph(network, n_classes, learning_rate):
       adversary_loss = tf.divide(tf.add_n(adversary_class_losses), active_classes)
 
       # Weighted mesh loss, sum rather than mean as we have already normalised based on number of points
-      weighted_mesh_loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, W))
+      weighted_mesh_loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
 
-      total_loss = adversary_loss + weighted_mesh_loss
+      training_summary.append(tf.summary.scalar('Mesh Loss', weighted_mesh_loss))
+      training_summary.append(tf.summary.scalar('Adversary Loss', adversary_loss))
 
-    # Our optimiser
+    # Our optimisers
     with tf.name_scope('Optimiser'):
-      optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(total_loss, global_step=global_step)
+      mesh_optimiser = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(
+        weighted_mesh_loss, global_step=global_step
+      )
+      adversary_optimiser = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(adversary_loss)
 
-    # Calculate accuracy
-    with tf.name_scope('Metrics'):
-      # Work out which class is larger and make 1 positive and 0 negative
-      X = tf.nn.softmax(X)
-      predictions = tf.argmin(X, axis=1)
-      labels = tf.argmin(Y, axis=1)
+  # Calculate accuracy
+  with tf.name_scope('Validation'):
+    # Work out which class is larger and make 1 positive and 0 negative
+    X = tf.nn.softmax(X)
 
-      # Get our confusion matrix
-      tp = tf.cast(tf.count_nonzero(predictions * labels), tf.float32)
-      tn = tf.cast(tf.count_nonzero((predictions - 1) * (labels - 1)), tf.float32)
-      fp = tf.cast(tf.count_nonzero(predictions * (labels - 1)), tf.float32)
-      fn = tf.cast(tf.count_nonzero((predictions - 1) * labels), tf.float32)
+    for i, c in enumerate(classes):
+      name = c[0]
+      with tf.name_scope(name.title()):
+        idx = tf.where(Y[:, i])
+        predictions = tf.cast(tf.equal(tf.argmax(X, axis=1), i), tf.int32)
+        labels = tf.cast(tf.equal(tf.argmax(Y, axis=1), i), tf.int32)
 
-      # Calculate our confusion matrix
-      tpr = tp / (tp + fn)
-      tnr = tn / (tn + fp)
-      ppv = tp / (tp + fp)
-      npv = tn / (tn + fn)
-      acc = (tp + tn) / (tp + tn + fp + fn)
-      f1 = 2.0 * ((ppv * tpr) / (ppv + tpr))
-      mcc = (tp * tn - fp * fn) / tf.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+        weights = tf.gather_nd(W, idx)
+        unweighted = tf.gather_nd(unweighted_mesh_loss, idx)
 
-      # How wide the gap is between the two classes
-      certainty = tf.reduce_mean(tf.abs(tf.subtract(X[:, 0], X[:, 1])))
+        # Get our confusion matrix
+        tp = tf.cast(tf.count_nonzero(predictions * labels), tf.float32)
+        tn = tf.cast(tf.count_nonzero((predictions - 1) * (labels - 1)), tf.float32)
+        fp = tf.cast(tf.count_nonzero(predictions * (labels - 1)), tf.float32)
+        fn = tf.cast(tf.count_nonzero((predictions - 1) * labels), tf.float32)
 
-  # Monitor loss and metrics
-  tf.summary.scalar('Total Loss', total_loss)
-  tf.summary.scalar('Mesh Loss', weighted_mesh_loss)
-  tf.summary.scalar('Adversary Loss', adversary_loss)
-  tf.summary.scalar('True Positive Rate', tpr)
-  tf.summary.scalar('True Negative Rate', tnr)
-  tf.summary.scalar('Positive Predictive', ppv)
-  tf.summary.scalar('Negative Predictive', npv)
-  tf.summary.scalar('Accuracy', acc)
-  tf.summary.scalar('F1 Score', f1)
-  tf.summary.scalar('Matthews', mcc)
-  tf.summary.scalar('Certainty', certainty)
+        # Calculate our confusion matrix
+        validation_summary.append(tf.summary.scalar('Loss', tf.reduce_sum(tf.multiply(unweighted, weights))))
+        validation_summary.append(tf.summary.scalar('Precision', tp / (tp + fp)))
+        validation_summary.append(tf.summary.scalar('Recall', tp / (tp + fn)))
+        validation_summary.append(tf.summary.scalar('Accuracy', (tp + tn) / (tp + fp + tn + fn)))
+        validation_summary.append(tf.summary.scalar('Certainty', tf.reduce_mean(tf.gather_nd(X[:, i], idx))))
 
-  # TODO make the summary setup for outputting the images
+    with tf.name_scope('Global'):
+      # Monitor loss and metrics
+      validation_summary.append(tf.summary.scalar('Mesh Loss', weighted_mesh_loss))
+      validation_summary.append(tf.summary.scalar('Adversary Loss', adversary_loss))
+
+  with tf.name_scope('Mesh'):
+    mesh_drawer = MeshDrawer(classes)
+    image_summary.append(
+      tf.summary.image(
+        'Mesh',
+        tf.py_func(
+          mesh_drawer.mesh_image, [network['raw'], network['px'], network['n'],
+                                   tf.nn.softmax(network['mesh'])], tf.uint8, False
+        ),
+        max_outputs=10000,  # Doesn't matter as we limit it at the dataset/batch level
+      )
+    )
+
+  with tf.name_scope('Adversary'):
+    # Softmax each of the segments of the image
+    scatters = []
+    adv = network['adversary'][:, 0]
+    for i in range(len(classes)):
+      # Indexes of truth samples for this class
+      idx = tf.where(network['Y'][:, i])
+
+      # Gather the adverserial values and mesh losses
+      pts = tf.gather_nd(adv, idx)
+      pts = tf.nn.softmax(pts)
+      pts = tf.scatter_nd(idx, pts, tf.shape(adv, out_type=tf.int64))
+
+      # Either our weights, or if there were none, zeros
+      scatters.append(tf.cond(tf.equal(tf.size(idx), 0), lambda: tf.zeros_like(A), lambda: pts))
+
+    # Add the weights together
+    adv = tf.add_n(scatters)
+
+    image_summary.append(
+      tf.summary.image(
+        'Adversary',
+        tf.py_func(mesh_drawer.adversary_image, [network['raw'], network['px'], network['n'], adv], tf.uint8, False),
+        max_outputs=10000,  # Doesn't matter as we limit it at the dataset/batch level
+      )
+    )
 
   for v in tf.trainable_variables():
-    tf.summary.histogram(v.name, v)
+    validation_summary.append(tf.summary.histogram(v.name, v))
 
   # Merge all summaries into a single op
-  merged_summary_op = tf.summary.merge_all()
+  training_summary_op = tf.summary.merge(training_summary)
+  validation_summary_op = tf.summary.merge(validation_summary)
+  image_summary_op = tf.summary.merge(image_summary)
 
-  return optimizer, merged_summary_op, global_step
+  return {
+    'mesh_optimiser': mesh_optimiser,
+    'adversary_optimiser': adversary_optimiser,
+    'training_summary': training_summary_op,
+    'validation_summary': validation_summary_op,
+    'image_summary': image_summary_op,
+    'global_step': global_step
+  }
 
 
 # Train the network
@@ -180,7 +340,13 @@ def train(sess, config, output_path):
   net = network.build(config['network']['structure'], n_classes)
 
   # Build the training portion of the graph
-  optimizer, merged_summary_op, global_step = build_training_graph(net, n_classes, config['training']['learning_rate'])
+  training_graph = build_training_graph(net, config['network']['classes'], config['training']['learning_rate'])
+  mesh_optimiser = training_graph['mesh_optimiser']
+  adversary_optimiser = training_graph['adversary_optimiser']
+  training_summary = training_graph['training_summary']
+  validation_summary = training_graph['validation_summary']
+  image_summary = training_graph['image_summary']
+  global_step = training_graph['global_step']
 
   # Setup for tensorboard
   summary_writer = tf.summary.FileWriter(output_path, graph=tf.get_default_graph())
@@ -210,35 +376,49 @@ def train(sess, config, output_path):
     classes=config['network']['classes'],
     geometry=config['geometry'],
     batch_size=config['training']['batch_size'],
+    shuffle_size=config['training']['shuffle_size'],
     variants=config['training']['variants'],
-  ).build().repeat(5).make_one_shot_iterator().string_handle()
+  ).build().repeat(config['training']['epochs']).make_one_shot_iterator().string_handle()
 
   # Load our training and validation dataset
   validation_dataset = dataset.VisualMeshDataset(
     input_files=config['dataset']['validation'],
     classes=config['network']['classes'],
     geometry=config['geometry'],
+    shuffle_size=config['training']['shuffle_size'],
     batch_size=config['validation']['batch_size'],
     variants={},  # No variations for validation
   ).build().repeat().make_one_shot_iterator().string_handle()
 
+  # Build our image dataset for drawing images
+  image_dataset = dataset.VisualMeshDataset(
+    input_files=config['dataset']['validation'],
+    classes=config['network']['classes'],
+    geometry=config['geometry'],
+    shuffle_size=0,  # Don't shuffle so we can resume
+    batch_size=config['validation']['example_images'],
+    variants={},  # No variations for images
+  ).build().make_one_shot_iterator().get_next()
+  # Make a dataset with a single element for generating images off
+  image_dataset = tf.data.Dataset.from_tensors(sess.run(image_dataset)
+                                              ).repeat().make_one_shot_iterator().string_handle()
+
   # Get our handles
-  training_handle, validation_handle = sess.run([training_dataset, validation_dataset])
+  training_handle, validation_handle, image_handle = sess.run([training_dataset, validation_dataset, image_dataset])
 
   while True:
     try:
-      # Run our training step
-      sess.run([optimizer], feed_dict={net['handle']: training_handle})
-
-      print("Batch:", tf.train.global_step(sess, global_step))
-
       # Every N steps do our validation/summary step
       if tf.train.global_step(sess, global_step) % 25 == 0:
-        summary, = sess.run([merged_summary_op], feed_dict={net['handle']: validation_handle})
+        summary, = sess.run([validation_summary], feed_dict={net['handle']: validation_handle})
         summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
       # Every N steps save our model
       if tf.train.global_step(sess, global_step) % 200 == 0:
+
+        # Output the images
+        summary = sess.run(image_summary, feed_dict={net['handle']: image_handle})
+        summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
         # Save the model after every pack
         saver.save(sess, model_path, tf.train.global_step(sess, global_step))
@@ -246,7 +426,12 @@ def train(sess, config, output_path):
         # Save our model in yaml format
         save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
 
-        # TODO run some image outputs for the thing here
+      # Run our training step
+      summary, _, __, = sess.run([training_summary, mesh_optimiser, adversary_optimiser],
+                                 feed_dict={net['handle']: training_handle})
+      summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+
+      print("Batch:", tf.train.global_step(sess, global_step))
 
     except tf.errors.OutOfRangeError:
       print('Training done')

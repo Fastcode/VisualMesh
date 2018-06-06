@@ -76,11 +76,17 @@ def build(groups, n_classes):
       'Y': tf.float32,
       'G': tf.int32,
       'W': tf.float32,
+      'n': tf.int32,
+      'px': tf.int32,
+      'raw': tf.string,
     }, {
       'X': [None, 3],
       'Y': [None, n_classes],
       'G': [None, graph_degree],
       'W': [None],
+      'n': [None],
+      'px': [None, None, 2],
+      'raw': [None],
     }
   )
 
