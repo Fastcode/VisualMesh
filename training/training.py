@@ -196,25 +196,20 @@ def build_training_graph(network, classes, learning_rate):
       # Unweighted loss, before the adversary decides which samples are more important
       unweighted_mesh_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=X, labels=Y, dim=1)
 
-      # We need to equalise the loss weights for each class
+      # Calculate the labels for the adversary
+      error = tf.reduce_sum(tf.abs(tf.subtract(Y, tf.nn.softmax(X, dim=1))), axis=1)
+      adversary_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=A, labels=tf.stop_gradient(error)))
+
+      # Now we can replace A with its sigmoid version
+      A = tf.nn.sigmoid(A)
+
+      # Calculate the loss weights for each of the classes
       scatters = []
-      adversary_class_losses = []
       for i in range(len(classes)):
         # Indexes of truth samples for this class
         idx = tf.where(Y[:, i])
-
-        # Gather the adverserial values and mesh losses
-        adv = tf.gather_nd(A, idx)
-        mesh_loss = tf.gather_nd(unweighted_mesh_loss, idx)
-
-        # Calculate the loss for the adversary for this class
-        mesh_loss = tf.divide(mesh_loss, tf.reduce_sum(mesh_loss))
-        adversary_class_losses.append(
-          tf.nn.softmax_cross_entropy_with_logits_v2(logits=adv, labels=tf.stop_gradient(mesh_loss), dim=0)
-        )
-
-        # Use the adversarial network to calculate the weights for the mesh
-        pts = tf.nn.softmax(adv)
+        pts = tf.gather_nd(A, idx)
+        pts = tf.divide(pts, tf.reduce_sum(pts))
         pts = tf.scatter_nd(idx, pts, tf.shape(A, out_type=tf.int64))
 
         # Either our weights, or if there were none, zeros
@@ -224,9 +219,6 @@ def build_training_graph(network, classes, learning_rate):
       active_classes = tf.cast(tf.count_nonzero(tf.stack([tf.count_nonzero(s) for s in scatters])), tf.float32)
       W = tf.add_n(scatters)
       W = tf.divide(W, active_classes)
-
-      # Adversary is trying to predict the loss distribution for each class
-      adversary_loss = tf.divide(tf.add_n(adversary_class_losses), active_classes)
 
       # Weighted mesh loss, sum rather than mean as we have already normalised based on number of points
       weighted_mesh_loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
@@ -292,7 +284,8 @@ def build_training_graph(network, classes, learning_rate):
         'Adversary',
         tf.py_func(
           mesh_drawer.adversary_image,
-          [network['raw'], network['px'], network['n'], network['adversary'][:, 0]],
+          [network['raw'], network['px'], network['n'],
+           tf.nn.sigmoid(network['adversary'][:, 0])],
           tf.uint8,
           False,
         ),
