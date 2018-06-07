@@ -49,8 +49,9 @@ def build_network(X, G, groups):
           logits = tf.matmul(logits, W)
           logits = tf.add(logits, b)
 
-          # Apply our activation function
-          logits = tf.nn.selu(logits)
+          # Apply our activation function except for the last layer
+          if i + 1 < len(groups) or j + 1 < len(c):
+            logits = tf.nn.selu(logits)
 
   return logits
 

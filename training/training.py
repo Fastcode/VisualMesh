@@ -267,7 +267,6 @@ def build_training_graph(network, classes, learning_rate):
         validation_summary.append(tf.summary.scalar('Precision', tp / (tp + fp)))
         validation_summary.append(tf.summary.scalar('Recall', tp / (tp + fn)))
         validation_summary.append(tf.summary.scalar('Accuracy', (tp + tn) / (tp + fp + tn + fn)))
-        validation_summary.append(tf.summary.scalar('Certainty', tf.reduce_mean(tf.gather_nd(X[:, i], idx))))
 
     with tf.name_scope('Global'):
       # Monitor loss and metrics
@@ -288,28 +287,15 @@ def build_training_graph(network, classes, learning_rate):
     )
 
   with tf.name_scope('Adversary'):
-    # Softmax each of the segments of the image
-    scatters = []
-    adv = network['adversary'][:, 0]
-    for i in range(len(classes)):
-      # Indexes of truth samples for this class
-      idx = tf.where(network['Y'][:, i])
-
-      # Gather the adverserial values and mesh losses
-      pts = tf.gather_nd(adv, idx)
-      pts = tf.nn.softmax(pts)
-      pts = tf.scatter_nd(idx, pts, tf.shape(adv, out_type=tf.int64))
-
-      # Either our weights, or if there were none, zeros
-      scatters.append(tf.cond(tf.equal(tf.size(idx), 0), lambda: tf.zeros_like(A), lambda: pts))
-
-    # Add the weights together
-    adv = tf.add_n(scatters)
-
     image_summary.append(
       tf.summary.image(
         'Adversary',
-        tf.py_func(mesh_drawer.adversary_image, [network['raw'], network['px'], network['n'], adv], tf.uint8, False),
+        tf.py_func(
+          mesh_drawer.adversary_image,
+          [network['raw'], network['px'], network['n'], network['adversary'][:, 0]],
+          tf.uint8,
+          False,
+        ),
         max_outputs=10000,  # Doesn't matter as we limit it at the dataset/batch level
       )
     )
@@ -408,6 +394,13 @@ def train(sess, config, output_path):
 
   while True:
     try:
+      # Run our training step
+      summary, _, __, = sess.run([training_summary, mesh_optimiser, adversary_optimiser],
+                                 feed_dict={net['handle']: training_handle})
+      summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+
+      print("Batch:", tf.train.global_step(sess, global_step))
+
       # Every N steps do our validation/summary step
       if tf.train.global_step(sess, global_step) % 25 == 0:
         summary, = sess.run([validation_summary], feed_dict={net['handle']: validation_handle})
@@ -425,13 +418,6 @@ def train(sess, config, output_path):
 
         # Save our model in yaml format
         save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
-
-      # Run our training step
-      summary, _, __, = sess.run([training_summary, mesh_optimiser, adversary_optimiser],
-                                 feed_dict={net['handle']: training_handle})
-      summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-
-      print("Batch:", tf.train.global_step(sess, global_step))
 
     except tf.errors.OutOfRangeError:
       print('Training done')
