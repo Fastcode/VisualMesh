@@ -179,7 +179,7 @@ def build_training_graph(network, classes, learning_rate):
   S = tf.where(tf.greater(W, 0))
   Y = tf.gather_nd(Y, S)
   X = tf.gather_nd(X, S)
-  A = tf.gather_nd(A, S)
+  A = tf.nn.sigmoid(tf.gather_nd(A, S))  # Sigmoid as the final layer
 
   training_summary = []
   validation_summary = []
@@ -197,11 +197,8 @@ def build_training_graph(network, classes, learning_rate):
       unweighted_mesh_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=X, labels=Y, dim=1)
 
       # Calculate the labels for the adversary
-      error = tf.reduce_sum(tf.abs(tf.subtract(Y, tf.nn.softmax(X, dim=1))), axis=1)
-      adversary_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=A, labels=tf.stop_gradient(error)))
-
-      # Now we can replace A with its sigmoid version
-      A = tf.nn.sigmoid(A)
+      a_labels = tf.reduce_sum(tf.abs(tf.subtract(Y, tf.nn.softmax(X, dim=1))), axis=1) / 2.0
+      adversary_loss = tf.losses.mean_squared_error(predictions=A, labels=tf.stop_gradient(a_labels))
 
       # Calculate the loss weights for each of the classes
       scatters = []
@@ -393,6 +390,10 @@ def train(sess, config, output_path):
       summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
       print("Batch:", tf.train.global_step(sess, global_step))
+
+      # TODO validation frequency
+      # TODO save frequency
+      # TODO image frequency
 
       # Every N steps do our validation/summary step
       if tf.train.global_step(sess, global_step) % 25 == 0:

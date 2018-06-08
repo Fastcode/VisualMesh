@@ -257,4 +257,7 @@ class VisualMeshDataset:
     # Finally, convert our image to float
     dataset = dataset.map(lambda args: {**args, 'X': tf.image.convert_image_dtype(args['X'], tf.float32)}, num_parallel_calls=multiprocessing.cpu_count())
 
+    # And prefetch 2
+    dataset = dataset.prefetch(2)
+
     return dataset
