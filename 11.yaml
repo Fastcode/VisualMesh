@@ -31,8 +31,16 @@ training:
   epochs: 5
   batch_size: 5
   learning_rate: 0.001
-  adversary_learning_rate: 0.1
   shuffle_size: 10
+  save_frequency: 250
+  adversary:
+    learning_rate: 0.1
+    structure_multiplier: 2
+  validation:
+    batch_size: 200
+    progress_images: 10
+    frequency: 50
+    image_frequency: 250
   variants: {}
   #   image: 
   #     brightness: { 'mean': 0, 'stddev': 0.0 }
@@ -43,7 +51,3 @@ training:
   #   mesh: 
   #     height: { 'mean': 0, 'stddev': 0.0 }
   #     rotation: { 'mean': 0, 'stddev': 0.0 }
-
-validation:
-  batch_size: 200
-  example_images: 10

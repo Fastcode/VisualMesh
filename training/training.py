@@ -8,6 +8,7 @@ import yaml
 import re
 import io
 import cv2
+import time
 import numpy as np
 import matplotlib as mpl
 mpl.use('Agg')
@@ -163,7 +164,7 @@ class MeshDrawer:
     return np.stack(images)
 
 
-def build_training_graph(network, classes, learning_rate):
+def build_training_graph(network, classes, learning_rate, adversary_learning_rate):
 
   # Truth labels for the network
   Y = network['Y']
@@ -228,7 +229,8 @@ def build_training_graph(network, classes, learning_rate):
       mesh_optimiser = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(
         weighted_mesh_loss, global_step=global_step
       )
-      adversary_optimiser = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(adversary_loss)
+      adversary_optimiser = tf.train.GradientDescentOptimizer(learning_rate=adversary_learning_rate
+                                                             ).minimize(adversary_loss)
 
   # Calculate accuracy
   with tf.name_scope('Validation'):
@@ -300,25 +302,47 @@ def build_training_graph(network, classes, learning_rate):
 
   return {
     'mesh_optimiser': mesh_optimiser,
+    'mesh_loss': weighted_mesh_loss,
     'adversary_optimiser': adversary_optimiser,
+    'adversary_loss': adversary_loss,
     'training_summary': training_summary_op,
     'validation_summary': validation_summary_op,
     'image_summary': image_summary_op,
-    'global_step': global_step
+    'global_step': global_step,
   }
 
 
 # Train the network
 def train(sess, config, output_path):
 
+  # Extract configuration variables
+  training_files = config['dataset']['training']
+  validation_files = config['dataset']['validation']
+  geometry = config['geometry']
+  classes = config['network']['classes']
+  structure = config['network']['structure']
+  adversary_learning_rate = config['training']['adversary']['learning_rate']
+  adversary_multiplier = config['training']['adversary']['structure_multiplier']
+  training_batch_size = config['training']['batch_size']
+  epochs = config['training']['epochs']
+  training_learning_rate = config['training']['learning_rate']
+  save_frequency = config['training']['save_frequency']
+  shuffle_size = config['training']['shuffle_size']
+  validation_batch_size = config['training']['validation']['batch_size']
+  validation_frequency = config['training']['validation']['frequency']
+  image_frequency = config['training']['validation']['image_frequency']
+  n_progress_images = config['training']['validation']['progress_images']
+  variants = config['training']['variants']
+
   # Build our network and adverserial networks
-  n_classes = len(config['network']['classes'])
-  net = network.build(config['network']['structure'], n_classes)
+  net = network.build(structure, len(classes), adversary_multiplier)
 
   # Build the training portion of the graph
-  training_graph = build_training_graph(net, config['network']['classes'], config['training']['learning_rate'])
+  training_graph = build_training_graph(net, classes, training_learning_rate, adversary_learning_rate)
   mesh_optimiser = training_graph['mesh_optimiser']
+  mesh_loss = training_graph['mesh_loss']
   adversary_optimiser = training_graph['adversary_optimiser']
+  adversary_loss = training_graph['adversary_loss']
   training_summary = training_graph['training_summary']
   validation_summary = training_graph['validation_summary']
   image_summary = training_graph['image_summary']
@@ -348,31 +372,31 @@ def train(sess, config, output_path):
 
   # Load our training and validation dataset
   training_dataset = dataset.VisualMeshDataset(
-    input_files=config['dataset']['training'],
-    classes=config['network']['classes'],
-    geometry=config['geometry'],
-    batch_size=config['training']['batch_size'],
-    shuffle_size=config['training']['shuffle_size'],
-    variants=config['training']['variants'],
-  ).build().repeat(config['training']['epochs']).make_one_shot_iterator().string_handle()
+    input_files=training_files,
+    classes=classes,
+    geometry=geometry,
+    batch_size=training_batch_size,
+    shuffle_size=shuffle_size,
+    variants=variants,
+  ).build().repeat(epochs).make_one_shot_iterator().string_handle()
 
   # Load our training and validation dataset
   validation_dataset = dataset.VisualMeshDataset(
-    input_files=config['dataset']['validation'],
-    classes=config['network']['classes'],
-    geometry=config['geometry'],
-    shuffle_size=config['training']['shuffle_size'],
-    batch_size=config['validation']['batch_size'],
+    input_files=validation_files,
+    classes=classes,
+    geometry=geometry,
+    shuffle_size=shuffle_size,
+    batch_size=validation_batch_size,
     variants={},  # No variations for validation
   ).build().repeat().make_one_shot_iterator().string_handle()
 
   # Build our image dataset for drawing images
   image_dataset = dataset.VisualMeshDataset(
-    input_files=config['dataset']['validation'],
-    classes=config['network']['classes'],
-    geometry=config['geometry'],
+    input_files=validation_files,
+    classes=classes,
+    geometry=geometry,
     shuffle_size=0,  # Don't shuffle so we can resume
-    batch_size=config['validation']['example_images'],
+    batch_size=n_progress_images,
     variants={},  # No variations for images
   ).build().make_one_shot_iterator().get_next()
   # Make a dataset with a single element for generating images off
@@ -385,33 +409,44 @@ def train(sess, config, output_path):
   while True:
     try:
       # Run our training step
-      summary, _, __, = sess.run([training_summary, mesh_optimiser, adversary_optimiser],
-                                 feed_dict={net['handle']: training_handle})
+      start = time.time()
+      summary, ml, al, _, __, = sess.run([
+        training_summary, mesh_loss, adversary_loss, mesh_optimiser, adversary_optimiser
+      ],
+                                         feed_dict={net['handle']: training_handle})
       summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+      end = time.time()
 
-      print("Batch:", tf.train.global_step(sess, global_step))
-
-      # TODO validation frequency
-      # TODO save frequency
-      # TODO image frequency
+      # Print batch info
+      print(
+        'Batch: {} ({}s) Mesh Loss: {} Adversary Loss: {}'.format(
+          tf.train.global_step(sess, global_step),
+          (end - start),
+          ml,
+          al,
+        )
+      )
 
       # Every N steps do our validation/summary step
-      if tf.train.global_step(sess, global_step) % 25 == 0:
+      if tf.train.global_step(sess, global_step) % validation_frequency == 0:
         summary, = sess.run([validation_summary], feed_dict={net['handle']: validation_handle})
         summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
       # Every N steps save our model
-      if tf.train.global_step(sess, global_step) % 200 == 0:
+      if tf.train.global_step(sess, global_step) % save_frequency == 0:
 
-        # Output the images
-        summary = sess.run(image_summary, feed_dict={net['handle']: image_handle})
-        summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-
-        # Save the model after every pack
+        # Save the model in tf format
         saver.save(sess, model_path, tf.train.global_step(sess, global_step))
 
         # Save our model in yaml format
         save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
+
+      # Every N steps save our model
+      if tf.train.global_step(sess, global_step) % image_frequency == 0:
+
+        # Output the images
+        summary = sess.run(image_summary, feed_dict={net['handle']: image_handle})
+        summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
     except tf.errors.OutOfRangeError:
       print('Training done')
