@@ -1,5 +1,7 @@
 # Visual Mesh
 
+[![Join the chat at https://gitter.im/Fastcode/VisualMesh](https://badges.gitter.im/Fastcode/VisualMesh.svg)](https://gitter.im/Fastcode/VisualMesh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 The Visual Mesh is an input transformation that uses knowledge a cameras orientation and position relative to an observation plane to greatly increase the performance and accuracy of a convolutional neural network.
 It utilises the geometry of objects to create a mesh structure that ensures that a similar number of samples points are selected regardless of distance.
 The result is that networks can be much smaller and simpler while still achieving high levels of accuracy.
