@@ -164,7 +164,7 @@ class MeshDrawer:
     return np.stack(images)
 
 
-def build_training_graph(network, classes, learning_rate, adversary_learning_rate):
+def build_training_graph(network, classes, learning_rate, adversary_learning_rate, adversary_threshold):
 
   # Truth labels for the network
   Y = network['Y']
@@ -199,7 +199,15 @@ def build_training_graph(network, classes, learning_rate, adversary_learning_rat
 
       # Calculate the labels for the adversary
       a_labels = tf.reduce_sum(tf.abs(tf.subtract(Y, tf.nn.softmax(X, dim=1))), axis=1) / 2.0
-      adversary_loss = tf.losses.mean_squared_error(predictions=A, labels=tf.stop_gradient(a_labels))
+
+      # Only use gradients from areas where the adversary has larger error, this avoids a large number of smaller
+      # gradients overpowering the areas where the network has legitimate error.
+      # This technique means that the adversary network will never converge, but we don't ever want it to
+      a_idx = tf.where(tf.greater(tf.abs(a_labels - A), adversary_threshold))
+      adversary_loss = tf.losses.mean_squared_error(
+        predictions=tf.gather_nd(A, a_idx),
+        labels=tf.stop_gradient(tf.gather_nd(a_labels, a_idx)),
+      )
 
       # Calculate the loss weights for each of the classes
       scatters = []
@@ -322,7 +330,8 @@ def train(sess, config, output_path):
   classes = config['network']['classes']
   structure = config['network']['structure']
   adversary_learning_rate = config['training']['adversary']['learning_rate']
-  adversary_multiplier = config['training']['adversary']['structure_multiplier']
+  adversary_structure = config['training']['adversary'].get('structure', None)
+  adversary_threshold = config['training']['adversary']['adversary_threshold']
   training_batch_size = config['training']['batch_size']
   epochs = config['training']['epochs']
   training_learning_rate = config['training']['learning_rate']
@@ -335,10 +344,12 @@ def train(sess, config, output_path):
   variants = config['training']['variants']
 
   # Build our network and adverserial networks
-  net = network.build(structure, len(classes), adversary_multiplier)
+  net = network.build(structure, len(classes), structure if adversary_structure is None else adversary_structure)
 
   # Build the training portion of the graph
-  training_graph = build_training_graph(net, classes, training_learning_rate, adversary_learning_rate)
+  training_graph = build_training_graph(
+    net, classes, training_learning_rate, adversary_learning_rate, adversary_threshold
+  )
   mesh_optimiser = training_graph['mesh_optimiser']
   mesh_loss = training_graph['mesh_loss']
   adversary_optimiser = training_graph['adversary_optimiser']
@@ -419,7 +430,7 @@ def train(sess, config, output_path):
 
       # Print batch info
       print(
-        'Batch: {} ({}s) Mesh Loss: {} Adversary Loss: {}'.format(
+        'Batch: {} ({:3g}s) Mesh Loss: {:3g} Adversary Loss: {:3g}'.format(
           tf.train.global_step(sess, global_step),
           (end - start),
           ml,

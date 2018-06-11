@@ -5,11 +5,13 @@
     "editor.insertSpaces": true,
     "files.insertFinalNewline": true,
     "files.trimFinalNewlines": true,
+    "files.trimTrailingWhitespace": true,
     "files.eol": "\n",
     "editor.rulers": [
         120
     ],
     "cSpell.words": [
-        "EQUISOLID"
+        "EQUISOLID",
+        "convolutional"
     ],
 }

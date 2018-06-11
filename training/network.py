@@ -56,17 +56,14 @@ def build_network(X, G, groups):
   return logits
 
 
-def build(groups, n_classes, adversary_multiplier=1):
+def build(groups, n_classes, adversary_groups):
 
   # The last layer is the number of classes we have but the adversary only has two
   mesh_groups = copy.deepcopy(groups)
   mesh_groups[-1].append(n_classes)
 
   # Multiply the size of the adversary layers
-  adversary_groups = copy.deepcopy(groups)
-  for c in adversary_groups:
-    for i, s in enumerate(c):
-      c[i] = s * adversary_multiplier
+  adversary_groups = copy.deepcopy(adversary_groups)
   adversary_groups[-1].append(1)
 
   # Number of neighbours for each point
