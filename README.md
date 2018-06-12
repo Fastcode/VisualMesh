@@ -132,7 +132,7 @@ Then execute the following command
 ./mesh.py [config.yaml] [output_dir]
 ```
 
-The progress of the training can be monitored using with the log dir looking at the output directory (or a parent of it).
+The progress of the training can be monitored using tensorboard with the log dir looking at the output directory (or a parent of it).
 If the output directory is not provided, it will default to `output`.
 
 <!--

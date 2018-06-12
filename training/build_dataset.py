@@ -2,6 +2,7 @@
 
 from tqdm import tqdm
 import sys
+import re
 import os
 import math
 import tensorflow as tf
@@ -34,11 +35,10 @@ def make_tfrecord(output_file, input_files):
 
     with open(meta_file, 'r') as f:
       meta = json.load(f)
-
     with open(image_file, 'rb') as f:
       image = f.read()
     with open(mask_file, 'rb') as f:
-      stencil = f.read()
+      mask = f.read()
 
     im = Image.open(image_file)
     width, height = im.size
@@ -56,13 +56,13 @@ def make_tfrecord(output_file, input_files):
     focal_length = meta['lens']['focal_length']
 
     features = {
-      'image': _bytes_feature(image),
-      'mask': _bytes_feature(stencil),
-      'lens/projection': _bytes_feature(projection.encode('utf-8')),
-      'lens/fov': _float_featur(fov),
-      'lens/focal_length': _float_feature(focal_length),
-      'mesh/orientation': _float_list_feature(Roc),
-      'mesh/height': _float_feature(height),
+      'image': bytes_feature(image),
+      'mask': bytes_feature(mask),
+      'lens/projection': bytes_feature(projection.encode('utf-8')),
+      'lens/fov': float_feature(fov),
+      'lens/focal_length': float_feature(focal_length),
+      'mesh/orientation': float_list_feature(Roc),
+      'mesh/height': float_feature(height),
     }
 
     example = tf.train.Example(features=tf.train.Features(feature=features))
@@ -78,7 +78,25 @@ if __name__ == '__main__':
   mask_path = sys.argv[2]
   meta_path = sys.argv[3]
 
-  files = sorted(glob(os.path.join(path, 'meta*.json')))
+  image_files = glob(os.path.join(image_path, 'image*.jpg'))
+  mask_files = glob(os.path.join(image_path, 'mask*.png'))
+  meta_files = glob(os.path.join(image_path, 'meta*.json'))
+
+  # Extract which numbers are in each of the folders
+  image_re = re.compile(r'image([^.]+)\.jpg$')
+  mask_re = re.compile(r'mask([^.]+)\.png$')
+  meta_re = re.compile(r'meta([^.]+)\.json$')
+  image_nums = set([image_re.search(f).group(1) for f in image_files])
+  mask_nums = set([mask_re.search(f).group(1) for f in mask_files])
+  meta_nums = set([meta_re.search(f).group(1) for f in meta_files])
+  common_nums = image_nums & mask_nums & meta_nums
+
+  files = [(
+    os.path.join(image_path, 'image{}.jpg'.format(n)),
+    os.path.join(mask_path, 'mask{}.png'.format(n)),
+    os.path.join(meta_path, 'meta{}.json'.format(n)),
+  ) for n in common_nums]
+
   nf = len(files)
 
   training = 0.45
@@ -88,8 +106,9 @@ if __name__ == '__main__':
   validation = (round(nf * training), round(nf * (training + validation)))
   training = (0, round(nf * training))
 
+  print('Making training dataset')
   make_tfrecord('training.tfrecord', files[training[0]:training[1]])
+  print('Making validation dataset')
   make_tfrecord('validation.tfrecord', files[validation[0]:validation[1]])
+  print('Making testing dataset')
   make_tfrecord('testing.tfrecord', files[testing[0]:testing[1]])
-
-  output_file = 'test.tfrecord'
