@@ -164,7 +164,7 @@ class MeshDrawer:
     return np.stack(images)
 
 
-def build_training_graph(network, classes, learning_rate, adversary_learning_rate, adversary_threshold):
+def build_training_graph(network, classes, learning_rate, adversary_learning_rate, adversary_threshold, base_weight):
 
   # Truth labels for the network
   Y = network['Y']
@@ -204,10 +204,17 @@ def build_training_graph(network, classes, learning_rate, adversary_learning_rat
       # gradients overpowering the areas where the network has legitimate error.
       # This technique means that the adversary network will never converge, but we don't ever want it to
       a_idx = tf.where(tf.greater(tf.abs(a_labels - A), adversary_threshold))
-      adversary_loss = tf.losses.mean_squared_error(
+
+      # If we have no values that are inaccurate, we will take all the values as normal
+      adversary_loss_cut = tf.losses.mean_squared_error(
         predictions=tf.gather_nd(A, a_idx),
         labels=tf.stop_gradient(tf.gather_nd(a_labels, a_idx)),
       )
+      adversary_loss_full = tf.losses.mean_squared_error(
+        predictions=A,
+        labels=tf.stop_gradient(a_labels),
+      )
+      adversary_loss = tf.cond(tf.equal(tf.size(a_idx), 0), lambda: adversary_loss_full, lambda: adversary_loss_cut)
 
       # Calculate the loss weights for each of the classes
       scatters = []
@@ -215,7 +222,7 @@ def build_training_graph(network, classes, learning_rate, adversary_learning_rat
         # Indexes of truth samples for this class
         idx = tf.where(Y[:, i])
         pts = tf.gather_nd(A, idx)
-        pts = tf.divide(pts, tf.reduce_sum(pts))
+        pts = tf.divide(pts + base_weight, tf.reduce_sum(pts))
         pts = tf.scatter_nd(idx, pts, tf.shape(A, out_type=tf.int64))
 
         # Either our weights, or if there were none, zeros
@@ -329,9 +336,10 @@ def train(sess, config, output_path):
   geometry = config['geometry']
   classes = config['network']['classes']
   structure = config['network']['structure']
+  base_weight = config['training']['adversary']['base_weight']
   adversary_learning_rate = config['training']['adversary']['learning_rate']
   adversary_structure = config['training']['adversary'].get('structure', None)
-  adversary_threshold = config['training']['adversary']['adversary_threshold']
+  adversary_threshold = config['training']['adversary']['threshold']
   training_batch_size = config['training']['batch_size']
   epochs = config['training']['epochs']
   training_learning_rate = config['training']['learning_rate']
@@ -348,7 +356,7 @@ def train(sess, config, output_path):
 
   # Build the training portion of the graph
   training_graph = build_training_graph(
-    net, classes, training_learning_rate, adversary_learning_rate, adversary_threshold
+    net, classes, training_learning_rate, adversary_learning_rate, adversary_threshold, base_weight
   )
   mesh_optimiser = training_graph['mesh_optimiser']
   mesh_loss = training_graph['mesh_loss']

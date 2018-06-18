@@ -213,6 +213,21 @@ class VisualMeshDataset:
 
     return {**args, 'X': tf.squeeze(tf.image.convert_image_dtype(X, tf.uint8), 0)}
 
+  def set_offscreen(self, args):
+    X = args['X']
+    n = args['n']
+
+    # Convert image to floats
+    X = tf.image.convert_image_dtype(X, tf.float32)
+
+    # Get the indices that represent the end points
+    ends = tf.cast(tf.scatter_nd(tf.cumsum(n), tf.ones_like(n), [tf.shape(X)[0]]), tf.bool)
+
+    # Swap out those points for values of -1
+    X = tf.where(ends, x=tf.ones_like(X) * -1, y=X)
+
+    return {**args, 'X': X}
+
   def build(self):
     # Load our dataset
     dataset = tf.data.TFRecordDataset(self.input_files)
@@ -254,8 +269,8 @@ class VisualMeshDataset:
     if 'image' in self.variants:
       dataset = dataset.map(self.apply_variants, num_parallel_calls=multiprocessing.cpu_count())
 
-    # Finally, convert our image to float
-    dataset = dataset.map(lambda args: {**args, 'X': tf.image.convert_image_dtype(args['X'], tf.float32)}, num_parallel_calls=multiprocessing.cpu_count())
+    # Finally, convert our image to float and make our offscreen point -1
+    dataset = dataset.map(self.set_offscreen, num_parallel_calls=multiprocessing.cpu_count())
 
     # And prefetch 2
     dataset = dataset.prefetch(2)

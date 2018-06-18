@@ -63,7 +63,9 @@ training:
     # When the adversarial network starts to get close to a convergent point, it will have many small gradients that
     # don't help the adversarial network do it's job of finding error points. Having a hysteresis value here that
     # ignores small errors will make the larger errors have a greater impact in the training of the adversary.
-    threshold: 0.25
+    threshold: 0.05
+    # The base weight to add to all outputs so that points can't get to 0 weight
+    base_weight: 0.05
     # This allows the adversary to have a different structure than the main network.
     # If this isn't set, the structure of the adversary will be identical to that of the main network.
     structure: [[8], [8], [8], [8], [8], [8], [8], [8], [8], [8], []]
