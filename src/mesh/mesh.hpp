@@ -494,7 +494,7 @@ struct Mesh {
 
       // If at least 3 solutions are complex we totally enclose the phi however we still need to check the cone is on
       // the correct side. 3 is appropriate here as 3 would mean only 1 intersection (just touching)
-      if (complex_sols >= 3 && ((cos_phi > Scalar(0.0)) == (cam[2] < Scalar(0.0)))) {
+      if (complex_sols > 3 && ((cos_phi > Scalar(0.0)) == (cam[2] < Scalar(0.0)))) {
 
         // Make a test unit vector that is on the cone, theta=0 is easiest
         const vec3<Scalar> test_vec = {{sin_phi, Scalar(0.0), -cos_phi}};
