@@ -19,7 +19,9 @@
 #define VISUALMESH_ENGINE_CPU_ENGINE_HPP
 
 #include <numeric>
+#include "classifier.hpp"
 #include "mesh/mesh.hpp"
+#include "mesh/network_structure.hpp"
 #include "mesh/projected_mesh.hpp"
 #include "util/math.hpp"
 
@@ -37,13 +39,12 @@ namespace engine {
         Scalar sin_theta = std::sin(theta);
 
         // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
-        vec2<Scalar> screen = {{r * p[1] / sin_theta, r * p[2] / sin_theta}};
+        vec2<Scalar> screen = p[0] >= 1 ? vec2<Scalar>{{static_cast<Scalar>(0.0), static_cast<Scalar>(0.0)}}
+                                        : vec2<Scalar>{{r * p[1] / sin_theta, r * p[2] / sin_theta}};
 
         // Apply our offset to move into image space (0 at top left, x to the right, y down)
-        vec2<Scalar> image = {{static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0],
-                               static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1]}};
-
-        return image;
+        return vec2<Scalar>{{static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0],
+                             static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1]}};
       }
 
       vec2<Scalar> project_equisolid(const vec4<Scalar>& p, const Lens<Scalar>& lens) const {
@@ -53,13 +54,12 @@ namespace engine {
         Scalar sin_theta = std::sin(theta);
 
         // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
-        vec2<Scalar> screen = {{r * p[1] / sin_theta, r * p[2] / sin_theta}};
+        vec2<Scalar> screen = p[0] >= 1 ? vec2<Scalar>{{static_cast<Scalar>(0.0), static_cast<Scalar>(0.0)}}
+                                        : vec2<Scalar>{{r * p[1] / sin_theta, r * p[2] / sin_theta}};
 
         // Apply our offset to move into image space (0 at top left, x to the right, y down)
-        vec2<Scalar> image = {{static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0],
-                               static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1]}};
-
-        return image;
+        return vec2<Scalar>{{static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0],
+                             static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1]}};
       }
 
       vec2<Scalar> project_rectilinear(const vec4<Scalar>& p, const Lens<Scalar>& lens) const {
@@ -67,10 +67,8 @@ namespace engine {
         vec2<Scalar> screen = {{lens.focal_length * p[1] / p[0], lens.focal_length * p[2] / p[0]}};
 
         // Apply our offset to move into image space (0 at top left, x to the right, y down)
-        vec2<Scalar> image = {{static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0],
-                               static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1]}};
-
-        return image;
+        return vec2<Scalar>{{static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0],
+                             static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1]}};
       }
 
     public:
@@ -149,7 +147,10 @@ namespace engine {
         neighbourhood[n_points].fill(n_points);
 
         return ProjectedMesh<Scalar>{std::move(pixels), std::move(neighbourhood), std::move(global_indices)};
+      }
 
+      auto make_classifier(const network_structure_t<Scalar>& structure) {
+        return Classifier<Scalar>(this, structure);
       }
     };
 

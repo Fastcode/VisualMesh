@@ -14,6 +14,7 @@
 #include "geometry/Sphere.hpp"
 #include "util/ArrayPrint.hpp"
 #include "util/Timer.hpp"
+#include "util/fourcc.hpp"
 #include "visualmesh.hpp"
 
 // List the contents of a directory
@@ -50,12 +51,12 @@ int main() {
 
   // Input image path
   std::string image_path = "/Users/trent/Code/VisualMeshData/training/raw";
-  std::string model_path = "/Users/trent/Code/VisualMeshData/model.yaml";
+  std::string model_path = "/Users/trent/Code/VisualMesh/output/yaml_models/model_82000.yaml";
 
   // Construct our VisualMesh
   Timer t;
   visualmesh::geometry::Sphere<float> sphere(0.075, 4, 10);
-  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> mesh(sphere, 0.5, 1.5, 100);
+  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine> mesh(sphere, 0.5, 1.5, 100);
   t.measure("Built Visual Mesh");
 
   // Build our classification network
@@ -92,8 +93,8 @@ int main() {
     }
   }
 
-  // TODO need to be able to make classifiers
-  // auto classifier = mesh.make_classifier(network);
+  // Make a classifier for this network
+  auto classifier = mesh.make_classifier(network);
 
   // Go through all our training data
   std::cerr << "Looping through training data" << std::endl;
@@ -111,7 +112,6 @@ int main() {
       Timer t;
 
       // Load our metadata and two images
-
       YAML::Node meta = YAML::LoadFile(image_path + "/" + p);
       cv::Mat img     = cv::imread(image_path + "/image" + number + ".jpg");
 
@@ -182,58 +182,39 @@ int main() {
 
       t.measure("\tProject Mesh");
 
-      for (unsigned int i = 0; i < projection.pixel_coordinates.size(); ++i) {
-        const auto& px            = projection.pixel_coordinates[i];
-        const auto& neighbourhood = projection.neighbourhood[i];
+      cv::imshow("Image", img);
+      if (char(cv::waitKey(0)) == 27) break;
 
-        for (const auto& n : neighbourhood) {
-          if (n != projection.pixel_coordinates.size()) {
-            const auto& npx = projection.pixel_coordinates[n];
-            cv::line(img, cv::Point(px[0], px[1]), cv::Point(npx[0], npx[1]), cv::Scalar(255, 255, 255, 1), 1);
+      t.measure("Show projected mesh");
+
+      // Run our classifier
+      auto classified = classifier(mesh.height(Hoc[2][3]), img.data, visualmesh::fourcc("BGRA"), Hoc, lens);
+
+      auto& neighbourhood                                 = classified.neighbourhood;
+      std::vector<std::array<float, 2>> pixel_coordinates = classified.pixel_coordinates;
+      auto classifications                                = classified.classifications;
+
+      t.measure("\tClassified Mesh");
+
+      cv::Mat scratch = img.clone();
+
+      for (int i = 0; i < pixel_coordinates.size(); ++i) {
+        cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
+
+        cv::Scalar colour(uint8_t(classifications[i * 2 + 0] * 255), 0, uint8_t(classifications[i * 2 + 1] * 255));
+        // cv::Scalar colour( classifications[i * 2 + 0] > 0.5 ? 255 : 0, 0, classifications[i * 2 + 1] >= 0.5 ? 255 :
+        // 0, 255);
+
+        for (const auto& n : neighbourhood[i]) {
+          if (n < pixel_coordinates.size()) {
+            cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
+            cv::Point p2x = p1 + ((p2 - p1) * 0.5);
+            cv::line(scratch, p1, p2x, colour, 1);
           }
         }
       }
 
-      // Run our classifier
-      // auto classified = classifier(img.data, fourcc(BGRA), Hoc, lens);
-
-      // auto& neighbourhood                                 = classified.neighbourhood;
-      // std::vector<std::array<float, 2>> pixel_coordinates = classified.pixel_coordinates;
-      // auto classification = classified.classifications.back().second.as<std::array<float, 2>>();
-
-      // t.measure("\tClassified Mesh");
-
-      cv::imshow("Image", img);
-
-      // cv::Mat scratch = img.clone();
-
-      // // Wait for esc key
-      // if (char(cv::waitKey(0)) == 27) break;
-
-      // for (int i = 0; i < pixel_coordinates.size(); ++i) {
-      //   cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
-
-      //   // cv::Scalar colour(uint8_t(classification[i][0] * 255), 0, uint8_t(classification[i][1] * 255));
-      //   cv::Scalar colour(classification[i][0] > 0.5 ? 255 : 0, 0, classification[i][1] >= 0.5 ? 255 : 0, 255);
-
-      //   for (const auto& n : neighbourhood[i]) {
-      //     if (n < pixel_coordinates.size()) {
-      //       cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
-      //       cv::Point p2x = p1 + ((p2 - p1) * 0.5);
-
-      //       std::cout << (pixel_coordinates[i][0]) << "," << (pixel_coordinates[i][1]) << ","
-      //                 << (pixel_coordinates[n][0]) << "," << (pixel_coordinates[n][1]) << std::endl;
-      //       cv::line(scratch, p1, p2x, colour, 1);
-      //     }
-      //   }
-      // }
-
-      // cv::imshow("Image", scratch);
-      // // Wait for esc key
-      // if (char(cv::waitKey(0)) == 27) break;
-
-
-      cv::imshow("Image", img);
+      cv::imshow("Image", scratch);
       // Wait for esc key
       if (char(cv::waitKey(0)) == 27) break;
     }

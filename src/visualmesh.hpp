@@ -142,6 +142,10 @@ public:
     return engine.project(mesh, range, Hoc, lens);
   }
 
+  auto make_classifier(const network_structure_t<Scalar>& structure) {
+    return engine.make_classifier(structure);
+  }
+
 private:
   /// A map from heights to visual mesh tables
   std::map<Scalar, const Mesh<Scalar>> luts;
