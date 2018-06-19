@@ -104,7 +104,7 @@ namespace engine {
               input.emplace_back(im[c + ('R' == (format & 0xFF) ? 0 : 2)] * Scalar(1.0 / 255.0));
               input.emplace_back(im[c + 1] * Scalar(1.0 / 255.0));
               input.emplace_back(im[c + ('R' == (format & 0xFF) ? 2 : 0)] * Scalar(1.0 / 255.0));
-              input.emplace_back(im[c + 3]);
+              input.emplace_back(im[c + 3] * Scalar(1.0 / 255.0));
             }
             break;
           default: throw std::runtime_error("The CPU classifier is unable to decode the format " + fourcc_text(format));

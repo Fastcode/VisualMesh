@@ -22,6 +22,10 @@ namespace visualmesh {
 namespace engine {
   namespace opencl {
 
+    void throw_cl_error(const cl_int& code, const std::string& msg) {
+      if (code != CL_SUCCESS) { throw std::system_error(code, opencl_error_category(), msg); }
+    }
+
     namespace cl {
       template <typename T>
       struct opencl_wrapper : public std::shared_ptr<std::remove_reference_t<decltype(*std::declval<T>())>> {

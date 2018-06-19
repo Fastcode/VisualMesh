@@ -51,12 +51,12 @@ int main() {
 
   // Input image path
   std::string image_path = "/Users/trent/Code/VisualMeshData/training/raw";
-  std::string model_path = "/Users/trent/Code/VisualMesh/output/yaml_models/model_82000.yaml";
+  std::string model_path = "/Users/trent/Code/VisualMesh/model.yaml";
 
   // Construct our VisualMesh
   Timer t;
   visualmesh::geometry::Sphere<float> sphere(0.075, 4, 10);
-  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine> mesh(sphere, 0.5, 1.5, 100);
+  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> mesh(sphere, 0.5, 1.5, 100);
   t.measure("Built Visual Mesh");
 
   // Build our classification network

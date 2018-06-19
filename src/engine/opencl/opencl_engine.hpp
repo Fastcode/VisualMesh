@@ -26,10 +26,12 @@
 
 #include <numeric>
 #include <tuple>
+#include "engine/opencl/classifier.hpp"
 #include "engine/opencl/kernels/project_equidistant.cl.hpp"
 #include "engine/opencl/kernels/project_equisolid.cl.hpp"
 #include "engine/opencl/kernels/project_rectilinear.cl.hpp"
 #include "mesh/mesh.hpp"
+#include "mesh/network_structure.hpp"
 #include "mesh/projected_mesh.hpp"
 #include "opencl_error_category.hpp"
 #include "scalars.hpp"
@@ -40,6 +42,9 @@
 namespace visualmesh {
 namespace engine {
   namespace opencl {
+
+    template <typename Scalar>
+    class Classifier;
 
     template <typename Scalar>
     class Engine {
@@ -62,9 +67,9 @@ namespace engine {
         const auto& platform = platforms.front();
 
         cl_uint device_count = 0;
-        ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU, 0, nullptr, &device_count);
+        ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, nullptr, &device_count);
         std::vector<cl_device_id> devices(device_count);
-        ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU, device_count, devices.data(), nullptr);
+        ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, device_count, devices.data(), nullptr);
 
         // Go through our devices on the platform
         for (const auto& device : devices) {
@@ -79,24 +84,20 @@ namespace engine {
           ::clGetDeviceInfo(device, CL_DEVICE_NAME, len, data.data(), nullptr);
           std::cout << "\tDevice: " << std::string(data.begin(), data.end()) << std::endl;
 
-
           ::clGetDeviceInfo(device, CL_DEVICE_VERSION, 0, nullptr, &len);
           data.resize(len);
           ::clGetDeviceInfo(device, CL_DEVICE_VERSION, len, data.data(), nullptr);
           std::cout << "\tHardware version: " << std::string(data.begin(), data.end()) << std::endl;
-
 
           ::clGetDeviceInfo(device, CL_DRIVER_VERSION, 0, nullptr, &len);
           data.resize(len);
           ::clGetDeviceInfo(device, CL_DRIVER_VERSION, len, data.data(), nullptr);
           std::cout << "\tSoftware version: " << std::string(data.begin(), data.end()) << std::endl;
 
-
           ::clGetDeviceInfo(device, CL_DEVICE_OPENCL_C_VERSION, 0, nullptr, &len);
           data.resize(len);
           ::clGetDeviceInfo(device, CL_DEVICE_OPENCL_C_VERSION, len, data.data(), nullptr);
           std::cout << "\tOpenCL C version: " << std::string(data.begin(), data.end()) << std::endl;
-
 
           cl_uint max_compute_units = 0;
           ::clGetDeviceInfo(
@@ -223,11 +224,13 @@ namespace engine {
                                              events.size(),
                                              events.data(),
                                              nullptr);
-        if (error != CL_SUCCESS) {
-          throw std::system_error(error, opencl_error_category(), "Failed reading projected pixels from the GPU");
-        }
+        throw_cl_error(error, "Failed reading projected pixels from the device");
 
         return ProjectedMesh<Scalar>{std::move(pixels), std::move(neighbourhood), std::move(indices)};
+      }
+
+      auto make_classifier(const network_structure_t<Scalar>& structure) {
+        return Classifier<Scalar>(this, structure);
       }
 
     private:
@@ -259,8 +262,8 @@ namespace engine {
         // Upload our visual mesh unit vectors if we have to
         cl::mem cl_points;
 
-        auto gpu_mesh = gpu_points.find(&mesh);
-        if (gpu_mesh == gpu_points.end()) {
+        auto device_mesh = device_points.find(&mesh);
+        if (device_mesh == device_points.end()) {
           cl_points = cl::mem(
             ::clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(vec4<Scalar>) * mesh.nodes.size(), nullptr, &error),
             ::clReleaseMemObject);
@@ -272,7 +275,7 @@ namespace engine {
             rays.push_back(n.ray);
           }
 
-          // Write the points buffer to the GPU and cache it
+          // Write the points buffer to the device and cache it
           error = ::clEnqueueWriteBuffer(queue,
                                          cl_points,
                                          true,
@@ -282,13 +285,14 @@ namespace engine {
                                          0,
                                          nullptr,
                                          nullptr);
+          throw_cl_error(error, "Error writing points to the device buffer");
 
           // Cache for future runs // TODO const cast and potential race condition here
-          const_cast<Engine<Scalar>*>(this)->gpu_points[&mesh] = cl_points;
+          const_cast<Engine<Scalar>*>(this)->device_points[&mesh] = cl_points;
           t.measure("\t\tUpload points (mem)");
         }
         else {
-          cl_points = gpu_mesh->second;
+          cl_points = device_mesh->second;
           t.measure("\t\tCached Points (mem)");
         }
 
@@ -318,13 +322,11 @@ namespace engine {
         // Create buffers for indices map
         cl::mem indices_map(::clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(cl_int) * points, nullptr, &error),
                             ::clReleaseMemObject);
-        if (error) { throw std::system_error(error, opencl_error_category(), "Error allocating indices_map buffer"); }
+        throw_cl_error(error, "Error allocating indices_map buffer");
         cl::mem pixel_coordinates(
           ::clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(std::array<Scalar, 2>) * points, nullptr, &error),
           ::clReleaseMemObject);
-        if (error) {
-          throw std::system_error(error, opencl_error_category(), "Error allocating pixel_coordinates buffer");
-        }
+        throw_cl_error(error, "Error allocating pixel_coordinates buffer");
 
         // Upload our indices map
         cl::event indices_event;
@@ -332,7 +334,7 @@ namespace engine {
         error = ::clEnqueueWriteBuffer(
           queue, indices_map, false, 0, indices.size() * sizeof(cl_int), indices.data(), 0, nullptr, &ev);
         if (ev) indices_event = cl::event(ev, ::clReleaseEvent);
-        if (error) { throw std::system_error(error, opencl_error_category(), "Error uploading indices_map to device"); }
+        throw_cl_error(error, "Error uploading indices_map to device");
 
         ev = indices_event;                   // TIMER_LINE
         ::clWaitForEvents(1, &ev);            // TIMER_LINE
@@ -355,35 +357,17 @@ namespace engine {
 
           // Load the arguments
           error = ::clSetKernelArg(projection_kernel, 0, cl_points.size(), &cl_points);
-          if (error != CL_SUCCESS) {
-            throw std::system_error(
-              error, opencl_error_category(), "Error setting kernel argument 0 for projection kernel");
-          }
+          throw_cl_error(error, "Error setting kernel argument 0 for projection kernel");
           error = ::clSetKernelArg(projection_kernel, 1, indices_map.size(), &indices_map);
-          if (error != CL_SUCCESS) {
-            throw std::system_error(
-              error, opencl_error_category(), "Error setting kernel argument 1 for projection kernel");
-          }
+          throw_cl_error(error, "Error setting kernel argument 1 for projection kernel");
           error = ::clSetKernelArg(projection_kernel, 2, sizeof(cl_float16), &Rco);
-          if (error != CL_SUCCESS) {
-            throw std::system_error(
-              error, opencl_error_category(), "Error setting kernel argument 2 for projection kernel");
-          }
+          throw_cl_error(error, "Error setting kernel argument 2 for projection kernel");
           error = ::clSetKernelArg(projection_kernel, 3, sizeof(lens.focal_length), &lens.focal_length);
-          if (error != CL_SUCCESS) {
-            throw std::system_error(
-              error, opencl_error_category(), "Error setting kernel argument 3 for projection kernel");
-          }
+          throw_cl_error(error, "Error setting kernel argument 3 for projection kernel");
           error = ::clSetKernelArg(projection_kernel, 4, sizeof(lens.dimensions), lens.dimensions.data());
-          if (error != CL_SUCCESS) {
-            throw std::system_error(
-              error, opencl_error_category(), "Error setting kernel argument 4 for projection kernel");
-          }
+          throw_cl_error(error, "Error setting kernel argument 4 for projection kernel");
           error = ::clSetKernelArg(projection_kernel, 5, pixel_coordinates.size(), &pixel_coordinates);
-          if (error != CL_SUCCESS) {
-            throw std::system_error(
-              error, opencl_error_category(), "Error setting kernel argument 5 for projection kernel");
-          }
+          throw_cl_error(error, "Error setting kernel argument 5 for projection kernel");
 
           // Project!
           size_t offset[1]      = {0};
@@ -391,9 +375,7 @@ namespace engine {
           error =
             ::clEnqueueNDRangeKernel(queue, projection_kernel, 1, offset, global_size, nullptr, 1, &indices_event, &ev);
           if (ev) projected = cl::event(ev, ::clReleaseEvent);
-          if (error != CL_SUCCESS) {
-            throw std::system_error(error, opencl_error_category(), "Error queueing the projection kernel");
-          }
+          throw_cl_error(error, "Error queueing the projection kernel");
         }
 
         ev = projected;                         // TIMER_LINE
@@ -447,7 +429,9 @@ namespace engine {
       // Mutex to protect projection functions
       std::mutex projection_mutex;
 
-      std::map<const Mesh<Scalar>*, cl::mem> gpu_points;
+      std::map<const Mesh<Scalar>*, cl::mem> device_points;
+
+      friend class Classifier<Scalar>;
     };
 
   }  // namespace opencl
