@@ -50,7 +50,8 @@ kernel void project_equisolid(global const Scalar4* points,
   const Scalar sin_theta = sin(theta);
 
   // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
-  const Scalar2 screen = (Scalar2)(r * ray.y / sin_theta, r * ray.z / sin_theta);
+  Scalar2 screen = (Scalar2)(r * ray.y / sin_theta, r * ray.z / sin_theta);
+  screen = ray.x >= 1 ? Scalar2(0.0, 0.0) : screen; // When the pixel is at (1,0,0) lots of NaNs show up
 
   // Apply our offset to move into image space (0 at top left, x to the right, y down)
   const Scalar2 image =

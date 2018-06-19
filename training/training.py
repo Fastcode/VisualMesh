@@ -198,7 +198,7 @@ def build_training_graph(network, classes, learning_rate, adversary_learning_rat
       unweighted_mesh_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=X, labels=Y, dim=1)
 
       # Calculate the labels for the adversary
-      a_labels = tf.reduce_sum(tf.abs(tf.subtract(Y, tf.nn.softmax(X, dim=1))), axis=1) / 2.0
+      a_labels = tf.reduce_sum(tf.abs(tf.subtract(Y, tf.nn.softmax(X, axis=1))), axis=1) / 2.0
 
       # Only use gradients from areas where the adversary has larger error, this avoids a large number of smaller
       # gradients overpowering the areas where the network has legitimate error.

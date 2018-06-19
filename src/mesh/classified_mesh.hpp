@@ -15,14 +15,15 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_MESH_CLASSIFIED_MESH_HPP
-#define VISUALMESH_MESH_CLASSIFIED_MESH_HPP
+#ifndef VISUALMESH_CLASSIFIED_MESH_HPP
+#define VISUALMESH_CLASSIFIED_MESH_HPP
 
 #include <array>
 #include <vector>
 
 namespace visualmesh {
 
+template <typename Scalar>
 struct ClassifiedMesh {
 
   std::vector<std::array<Scalar, 2>> pixel_coordinates;
