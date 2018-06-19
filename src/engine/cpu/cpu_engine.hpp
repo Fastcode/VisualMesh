@@ -90,9 +90,11 @@ namespace engine {
         }
 
         // Output variables
-        std::vector<vec2<Scalar>> pixels(n_points);
         std::vector<int> indices(n_points);
-        std::vector<std::array<int, 6>> neighbourhood(n_points + 1);  // +1 for the null point
+        std::vector<int> global_indices;
+        global_indices.reserve(n_points);
+        std::vector<vec2<Scalar>> pixels;
+        pixels.reserve(n_points);
 
         // Get the indices for each point in the mesh on screen
         auto it = indices.begin();
@@ -102,15 +104,42 @@ namespace engine {
           it = n;
         }
 
-        // Build our reverse lookup, the default point goes to the null point
-        std::vector<int> r_lookup(nodes.size(), n_points);
-        for (unsigned int i = 0; i < indices.size(); ++i) {
-          r_lookup[indices[i]] = i;
-        }
-
-        // Build our local neighbourhood map
+        // Project each of the nodes into pixel space
         for (unsigned int i = 0; i < indices.size(); ++i) {
           const Node<Scalar>& node = nodes[indices[i]];
+
+          // Rotate point by matrix (since we are doing this rowwise, it's like we are transposing at the same time)
+          vec4<Scalar> p = {{dot(node.ray, Hco[0]), dot(node.ray, Hco[1]), dot(node.ray, Hco[2]), 0}};
+          vec2<Scalar> px;
+
+          // Any compiler worth it's salt should move this switch outside the for
+          switch (lens.projection) {
+            case EQUISOLID: px = project_equisolid(p, lens); break;
+            case EQUIDISTANT: px = project_equidistant(p, lens); break;
+            case RECTILINEAR: px = project_rectilinear(p, lens); break;
+          }
+
+          // Check if the pixel is on the screen, this is needed as the cutoffs for some lenses aren't perfect yet
+          if (0 < px[0] && px[0] < lens.dimensions[0] && 0 < px[1] && px[1] < lens.dimensions[1]) {
+            pixels.emplace_back(px);
+            global_indices.emplace_back(indices[i]);
+          }
+        }
+
+        // Update the number of points to account for how many pixels we removed
+        n_points = pixels.size();
+
+        // Build our reverse lookup, the default point goes to the null point
+        std::vector<int> r_lookup(nodes.size(), n_points);
+        for (unsigned int i = 0; i < n_points; ++i) {
+          r_lookup[global_indices[i]] = i;
+        }
+
+
+        // Build our local neighbourhood map
+        std::vector<std::array<int, 6>> neighbourhood(n_points + 1);  // +1 for the null point
+        for (unsigned int i = 0; i < n_points; ++i) {
+          const Node<Scalar>& node = nodes[global_indices[i]];
           for (unsigned int j = 0; j < 6; ++j) {
             const auto& n       = node.neighbours[j];
             neighbourhood[i][j] = r_lookup[n];
@@ -119,22 +148,8 @@ namespace engine {
         // Last point is the null point
         neighbourhood[n_points].fill(n_points);
 
-        // Project each of the nodes into pixel space
-        for (unsigned int i = 0; i < indices.size(); ++i) {
-          const Node<Scalar>& node = nodes[indices[i]];
+        return ProjectedMesh<Scalar>{std::move(pixels), std::move(neighbourhood), std::move(global_indices)};
 
-          // Rotate point by matrix (since we are doing this rowwise, it's like we are transposing at the same time)
-          vec4<Scalar> p = {{dot(node.ray, Hco[0]), dot(node.ray, Hco[1]), dot(node.ray, Hco[2]), 0}};
-
-          // Any compiler worth it's salt should move this switch outside the for
-          switch (lens.projection) {
-            case EQUISOLID: pixels[i] = project_equisolid(p, lens); break;
-            case EQUIDISTANT: pixels[i] = project_equidistant(p, lens); break;
-            case RECTILINEAR: pixels[i] = project_rectilinear(p, lens); break;
-          }
-        }
-
-        return ProjectedMesh<Scalar>{std::move(pixels), std::move(neighbourhood), std::move(indices)};
       }
     };
 

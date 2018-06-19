@@ -117,25 +117,10 @@ public:
 
     // As the algorithms for calculating the edge of fisheye cameras are not perfect yet, we need to remove any pixels
     // that are off the screen
-    const auto& mesh_px         = projected.pixel_coordinates;
-    const auto& mesh_neighbours = projected.neighbourhood;
-    std::vector<std::array<int, 2>> px;
-    std::vector<int> idx;
-    px.reserve(mesh_px.size());
-    idx.reserve(mesh_px.size());
+    const auto& px            = projected.pixel_coordinates;
+    const auto& neighbourhood = projected.neighbourhood;
 
-    for (int i = 0; i < mesh_px.size(); ++i) {
-      // Swap order for tensorflow while we're here
-      std::array<int, 2> p = {int(std::round(mesh_px[i][1])), int(std::round(mesh_px[i][0]))};
-
-      // Only copy across if our pixel is on the screen (note we have to swap dimensions index)
-      if (0 < p[0] && p[0] < lens.dimensions[1] && 0 < p[1] && p[1] < lens.dimensions[0]) {
-        idx.push_back(i);
-        px.push_back(p);
-      }
-    }
-
-    // We can now use this to fill in our tensorflow output matrix
+    // Fill in our tensorflow output matrix
     tensorflow::Tensor* coordinates = nullptr;
     tensorflow::TensorShape coords_shape;
     coords_shape.AddDim(px.size());
@@ -145,41 +130,32 @@ public:
     // Copy across our pixel coordinates remembering to reverse the order from x,y to y,x
     auto c = coordinates->matrix<T>();
     for (size_t i = 0; i < px.size(); ++i) {
+      // Swap x and y here since tensorflow expects them reversed
       const auto& p = px[i];
-      c(i, 0)       = p[0];
-      c(i, 1)       = p[1];
+      c(i, 0)       = p[1];
+      c(i, 1)       = p[0];
     }
 
-    // Make a reverse lookup list defaulting to px.size (the null point)
-    std::vector<int> rev_idx(mesh_neighbours.size(), px.size());
-    for (int i = 0; i < idx.size(); ++i) {
-      rev_idx[idx[i]] = i;
-    }
-
-    // We can now build our tensorflow neighbourhood graph
+    // Build our tensorflow neighbourhood graph
     tensorflow::Tensor* neighbours = nullptr;
     tensorflow::TensorShape neighbours_shape;
-    neighbours_shape.AddDim(idx.size() + 1);
+    neighbours_shape.AddDim(neighbourhood.size());
     neighbours_shape.AddDim(7);
     OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
 
     // Copy across our neighbourhood graph, adding in a point for itself
     auto n = neighbours->matrix<U>();
-    for (int i = 0; i < idx.size(); ++i) {
+    for (int i = 0; i < neighbourhood.size(); ++i) {
       // Get our old neighbours from original output
-      const auto& m = mesh_neighbours[idx[i]];
+      const auto& m = neighbourhood[i];
       n(i, 0)       = i;
-      n(i, 1)       = rev_idx[m[0]];
-      n(i, 2)       = rev_idx[m[1]];
-      n(i, 3)       = rev_idx[m[2]];
-      n(i, 4)       = rev_idx[m[3]];
-      n(i, 5)       = rev_idx[m[4]];
-      n(i, 6)       = rev_idx[m[5]];
+      n(i, 1)       = m[0];
+      n(i, 2)       = m[1];
+      n(i, 3)       = m[2];
+      n(i, 4)       = m[3];
+      n(i, 5)       = m[4];
+      n(i, 6)       = m[5];
     }
-
-    // Fill our offscreen point
-    for (int i = 0; i < 7; ++i)
-      n(idx.size(), i) = idx.size();
   }
 };
 
