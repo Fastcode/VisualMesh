@@ -18,6 +18,12 @@
 #ifndef VISUALMESH_ENGINE_OPENCL_WRAPPER_HPP
 #define VISUALMESH_ENGINE_OPENCL_WRAPPER_HPP
 
+#if defined(__APPLE__) || defined(__MACOSX)
+#  include <OpenCL/opencl.h>
+#else
+#  include <CL/opencl.h>
+#endif  // !__APPLE__
+
 namespace visualmesh {
 namespace engine {
   namespace opencl {
@@ -28,20 +34,11 @@ namespace engine {
 
     namespace cl {
       template <typename T>
-      struct opencl_wrapper : public std::shared_ptr<std::remove_reference_t<decltype(*std::declval<T>())>> {
-        using std::shared_ptr<std::remove_reference_t<decltype(*std::declval<T>())>>::shared_ptr;
-
-        T* operator&() {
-          ptr = this->get();
-          return &ptr;
-        }
+      struct opencl_wrapper : public std::shared_ptr<std::remove_pointer_t<T>> {
+        using std::shared_ptr<std::remove_pointer_t<T>>::shared_ptr;
 
         operator T() const {
           return this->get();
-        }
-
-        size_t size() const {
-          return sizeof(T);
         }
 
       private:

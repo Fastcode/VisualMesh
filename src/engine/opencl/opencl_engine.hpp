@@ -30,11 +30,11 @@
 #include "engine/opencl/kernels/project_equidistant.cl.hpp"
 #include "engine/opencl/kernels/project_equisolid.cl.hpp"
 #include "engine/opencl/kernels/project_rectilinear.cl.hpp"
+#include "engine/opencl/util.hpp"
 #include "mesh/mesh.hpp"
 #include "mesh/network_structure.hpp"
 #include "mesh/projected_mesh.hpp"
 #include "opencl_error_category.hpp"
-#include "scalars.hpp"
 #include "util/Timer.hpp"
 #include "util/math.hpp"
 #include "wrapper.hpp"
@@ -148,19 +148,11 @@ namespace engine {
         if (error) { throw std::system_error(error, opencl_error_category(), "Error creating the OpenCL context"); }
 
         // Try to make an out of order queue if we can
-        queue = cl::command_queue(
-          ::clCreateCommandQueue(context, best_device, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &error),
-          ::clReleaseCommandQueue);
-        if (error == CL_INVALID_VALUE) {
-          queue = cl::command_queue(::clCreateCommandQueue(context, best_device, 0, &error), ::clReleaseCommandQueue);
-        }
-        if (error) {
-          throw std::system_error(error, opencl_error_category(), "Error creating the OpenCL command queue");
-        }
+        queue = make_queue(context, best_device);
 
         // Get program sources (this does concatenated strings)
-        std::string source = PROJECT_EQUIDISTANT_CL PROJECT_EQUISOLID_CL PROJECT_RECTILINEAR_CL;
-        source             = get_scalar_defines(Scalar(0.0)) + source;
+        std::string source = std::string(get_scalar_defines(Scalar(0.0)))
+                             + PROJECT_EQUIDISTANT_CL PROJECT_EQUISOLID_CL PROJECT_RECTILINEAR_CL;
 
         const char* cstr = source.c_str();
         size_t csize     = source.size();
@@ -246,12 +238,14 @@ namespace engine {
 
         Timer t;  // TIMER_LINE
 
-        // Pack Rco into a float16
+        // Pack Rco into a Scalar16
         // clang-format off
-        cl_float16 Rco = {Hoc[0][0], Hoc[1][0], Hoc[2][0], Scalar(0.0),
-                          Hoc[0][1], Hoc[1][1], Hoc[2][1], Scalar(0.0),
-                          Hoc[0][2], Hoc[1][2], Hoc[2][2], Scalar(0.0),
-                          Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(1.0)};
+          std::array<Scalar, 16> Rco{{
+              Hoc[0][0],     Hoc[1][0],   Hoc[2][0], Scalar(0.0),
+              Hoc[0][1],     Hoc[1][1],   Hoc[2][1], Scalar(0.0),
+              Hoc[0][2],     Hoc[1][2],   Hoc[2][2], Scalar(0.0),
+              Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(1.0)
+          }};
         // clang-format on
 
         t.measure("\t\tLookup Range (cpu)");  // TIMER_LINE
@@ -342,7 +336,6 @@ namespace engine {
 
         // When everything is uploaded, we can run our projection kernel to get the pixel coordinates
         cl::event projected;
-        ev = nullptr;
         /* mutex scope */ {
           std::lock_guard<std::mutex> lock(const_cast<Engine<Scalar>*>(this)->projection_mutex);
 
@@ -356,24 +349,29 @@ namespace engine {
           }
 
           // Load the arguments
-          error = ::clSetKernelArg(projection_kernel, 0, cl_points.size(), &cl_points);
+          cl_mem arg;
+          arg   = cl_points;
+          error = ::clSetKernelArg(projection_kernel, 0, sizeof(arg), &arg);
           throw_cl_error(error, "Error setting kernel argument 0 for projection kernel");
-          error = ::clSetKernelArg(projection_kernel, 1, indices_map.size(), &indices_map);
+          arg   = indices_map;
+          error = ::clSetKernelArg(projection_kernel, 1, sizeof(arg), &arg);
           throw_cl_error(error, "Error setting kernel argument 1 for projection kernel");
-          error = ::clSetKernelArg(projection_kernel, 2, sizeof(cl_float16), &Rco);
+          error = ::clSetKernelArg(projection_kernel, 2, sizeof(Rco), Rco.data());
           throw_cl_error(error, "Error setting kernel argument 2 for projection kernel");
           error = ::clSetKernelArg(projection_kernel, 3, sizeof(lens.focal_length), &lens.focal_length);
           throw_cl_error(error, "Error setting kernel argument 3 for projection kernel");
           error = ::clSetKernelArg(projection_kernel, 4, sizeof(lens.dimensions), lens.dimensions.data());
           throw_cl_error(error, "Error setting kernel argument 4 for projection kernel");
-          error = ::clSetKernelArg(projection_kernel, 5, pixel_coordinates.size(), &pixel_coordinates);
+          arg   = pixel_coordinates;
+          error = ::clSetKernelArg(projection_kernel, 5, sizeof(arg), &arg);
           throw_cl_error(error, "Error setting kernel argument 5 for projection kernel");
 
           // Project!
           size_t offset[1]      = {0};
           size_t global_size[1] = {size_t(points)};
-          error =
-            ::clEnqueueNDRangeKernel(queue, projection_kernel, 1, offset, global_size, nullptr, 1, &indices_event, &ev);
+          ev                    = nullptr;
+          cl_event iev          = indices_event;
+          error = ::clEnqueueNDRangeKernel(queue, projection_kernel, 1, offset, global_size, nullptr, 1, &iev, &ev);
           if (ev) projected = cl::event(ev, ::clReleaseEvent);
           throw_cl_error(error, "Error queueing the projection kernel");
         }

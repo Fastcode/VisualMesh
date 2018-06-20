@@ -18,11 +18,29 @@
 #ifndef VISUALMESH_ENGINE_OPENCL_SCALARS_HPP
 #define VISUALMESH_ENGINE_OPENCL_SCALARS_HPP
 
+#if defined(__APPLE__) || defined(__MACOSX)
+#  include <OpenCL/opencl.h>
+#else
+#  include <CL/opencl.h>
+#endif  // !__APPLE__
+
+#include <string>
+#include "wrapper.hpp"
 namespace visualmesh {
 namespace engine {
   namespace opencl {
 
-    std::string get_scalar_defines(float) {
+    inline cl::command_queue make_queue(cl_context context, cl_device_id device) {
+      cl_command_queue queue;
+      cl_int error;
+      // Use out of order execution if we can
+      queue = ::clCreateCommandQueue(context, device, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &error);
+      if (error == CL_INVALID_VALUE) { queue = ::clCreateCommandQueue(context, device, 0, &error); }
+      throw_cl_error(error, "Error creating the OpenCL command queue");
+      return cl::command_queue(queue, ::clReleaseCommandQueue);
+    }
+
+    inline constexpr auto get_scalar_defines(float) {
       return "#define Scalar float\n"
              "#define Scalar2 float2\n"
              "#define Scalar3 float3\n"
@@ -31,7 +49,7 @@ namespace engine {
              "#define Scalar16 float16\n";
     }
 
-    std::string get_scalar_defines(double) {
+    inline constexpr auto get_scalar_defines(double) {
       return "#define Scalar double\n"
              "#define Scalar2 double2\n"
              "#define Scalar3 double3\n"

@@ -30,6 +30,7 @@
 #include <tuple>
 #include "engine/opencl/kernels/read_image_to_network.cl.hpp"
 #include "engine/opencl/opencl_error_category.hpp"
+#include "engine/opencl/util.hpp"
 #include "engine/opencl/wrapper.hpp"
 #include "mesh/classified_mesh.hpp"
 #include "mesh/mesh.hpp"
@@ -59,24 +60,15 @@ namespace engine {
         ::clGetContextInfo(engine->context, CL_CONTEXT_DEVICES, sizeof(cl_device_id), &device, nullptr);
 
         // Make our three OpenCL command queues
-        auto make_queue = [this, device]() {
-          cl_command_queue queue;
-          cl_int error;
-          // Use out of order execution if we can
-          queue = ::clCreateCommandQueue(context, device, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &error);
-          if (error == CL_INVALID_VALUE) { queue = ::clCreateCommandQueue(context, device, 0, &error); }
-          throw_cl_error(error, "Error creating the OpenCL command queue");
-          return cl::command_queue(queue, ::clReleaseCommandQueue);
-        };
-        command_queue = make_queue();
-        read_queue    = make_queue();
-        write_queue   = make_queue();
+        command_queue = make_queue(context, device);
+        read_queue    = make_queue(context, device);
+        write_queue   = make_queue(context, device);
 
         // Build using a string stream
         std::stringstream code;
 
         // Set our precision for how many digits our scalar has
-        code << std::setprecision(std::numeric_limits<Scalar>::digits10 + 1);
+        code << std::setprecision(std::numeric_limits<Scalar>::digits10 + 2);
 
         auto vector_type = [](const int& size) {
           return (size == 1 || size == 2 || size == 4 || size == 8 || size == 16) ? size : 0;
@@ -230,8 +222,8 @@ namespace engine {
             code << "  // Apply the activation function" << std::endl;
 
             // selu constants
-            constexpr const float lambda = 1.0507009873554804934193349852946;
-            constexpr const float alpha  = 1.6732632423543772848170429916717;
+            constexpr const Scalar lambda = 1.0507009873554804934193349852946;
+            constexpr const Scalar alpha  = 1.6732632423543772848170429916717;
 
             // Apply selu
             if (conv_no + 1 < structure.size() || layer_no + 1 < conv.size()) {
@@ -306,10 +298,7 @@ namespace engine {
 
         // Create our OpenCL program, compile it and get our kernels
         cl_int error;
-        std::string source = code.str();
-
-        // Add on our image reading code
-        source += READ_IMAGE_TO_NETWORK_CL;
+        std::string source = std::string(get_scalar_defines(Scalar())) + READ_IMAGE_TO_NETWORK_CL + code.str();
 
         const char* cstr = source.c_str();
         size_t csize     = source.size();
@@ -478,22 +467,27 @@ namespace engine {
 
         // Read the pixels into the buffer
         cl::event img_load_event;
-        ev = nullptr;
+        cl::event network_complete;
         /* Mutex scope */ {
           std::lock_guard<std::mutex> lock(*conv_mutex);
 
-          error = ::clSetKernelArg(read_image_to_network, 0, cl_image.size(), &cl_image);
+          cl_mem arg;
+          arg   = cl_image;
+          error = ::clSetKernelArg(read_image_to_network, 0, sizeof(arg), &arg);
           throw_cl_error(error, "Error setting kernel argument 0 for image load kernel");
           error = ::clSetKernelArg(read_image_to_network, 1, sizeof(format), &format);
           throw_cl_error(error, "Error setting kernel argument 1 for image load kernel");
-          error = ::clSetKernelArg(read_image_to_network, 2, cl_pixels.size(), &cl_pixels);
+          arg   = cl_pixels;
+          error = ::clSetKernelArg(read_image_to_network, 2, sizeof(arg), &arg);
           throw_cl_error(error, "Error setting kernel argument 2 for image load kernel");
-          error = ::clSetKernelArg(read_image_to_network, 3, cl_conv_input.size(), &cl_conv_input);
+          arg   = cl_conv_input;
+          error = ::clSetKernelArg(read_image_to_network, 3, sizeof(arg), &arg);
           throw_cl_error(error, "Error setting kernel argument 3 for image load kernel");
 
           size_t offset[1]       = {0};
           size_t global_size[1]  = {size_t(n_points - 1)};  // -1 as we don't project the offscreen point
           cl_event event_list[2] = {cl_pixels_loaded, cl_image_loaded};
+          ev                     = nullptr;
           error                  = ::clEnqueueNDRangeKernel(
             command_queue, read_image_to_network, 1, offset, global_size, nullptr, 2, event_list, &ev);
           if (ev) img_load_event = cl::event(ev, ::clReleaseEvent);
@@ -503,11 +497,15 @@ namespace engine {
           std::vector<cl::event> events({img_load_event, offscreen_fill_event, cl_neighbourhood_loaded});
 
           for (auto& conv : conv_layers) {
-            error = ::clSetKernelArg(conv.first, 0, cl_neighbourhood.size(), &cl_neighbourhood);
+            cl_mem arg;
+            arg   = cl_neighbourhood;
+            error = ::clSetKernelArg(conv.first, 0, sizeof(arg), &arg);
             throw_cl_error(error, "Error setting argument 0 for convolution kernel");
-            error = ::clSetKernelArg(conv.first, 1, cl_conv_input.size(), &cl_conv_input);
+            arg   = cl_conv_input;
+            error = ::clSetKernelArg(conv.first, 1, sizeof(arg), &arg);
             throw_cl_error(error, "Error setting argument 1 for convolution kernel");
-            error = ::clSetKernelArg(conv.first, 2, cl_conv_output.size(), &cl_conv_output);
+            arg   = cl_conv_output;
+            error = ::clSetKernelArg(conv.first, 2, sizeof(arg), &arg);
             throw_cl_error(error, "Error setting argument 2 for convolution kernel");
 
             size_t offset[1]      = {0};
@@ -521,33 +519,26 @@ namespace engine {
             throw_cl_error(error, "Error queueing convolution kernel");
 
             // Convert our events into a vector of events and ping pong our buffers
-            events         = std::vector<cl::event>({event});
-            auto tmp       = cl_conv_input;
-            cl_conv_input  = cl_conv_output;
-            cl_conv_output = cl_conv_input;
+            events           = std::vector<cl::event>({event});
+            network_complete = event;
+            std::swap(cl_conv_input, cl_conv_output);
           }
         }
-        cl::event last_event(ev, ::clReleaseEvent);
 
         // Read the pixel coordinates off the device
         cl::event pixels_read;
         ev = nullptr;
         std::vector<std::array<Scalar, 2>> pixels(neighbourhood.size() - 1);
-        error = ::clEnqueueReadBuffer(read_queue,
-                                      cl_pixels,
-                                      false,
-                                      0,
-                                      pixels.size() * sizeof(std::array<Scalar, 2>),
-                                      pixels.data(),
-                                      1,
-                                      &cl_pixels_loaded,
-                                      &ev);
+        cl_event iev = cl_pixels_loaded;
+        error        = ::clEnqueueReadBuffer(
+          read_queue, cl_pixels, false, 0, pixels.size() * sizeof(std::array<Scalar, 2>), pixels.data(), 1, &iev, &ev);
         if (ev) pixels_read = cl::event(ev, ::clReleaseEvent);
         throw_cl_error(error, "Error reading projected pixels");
 
         // Read the classifications off the device (they'll be in input)
         cl::event classes_read;
-        ev = nullptr;
+        ev  = nullptr;
+        iev = network_complete;
         std::vector<Scalar> classifications(neighbourhood.size() * conv_layers.back().second);
         error = ::clEnqueueReadBuffer(read_queue,
                                       cl_conv_input,
@@ -556,7 +547,7 @@ namespace engine {
                                       classifications.size() * sizeof(Scalar),
                                       classifications.data(),
                                       1,
-                                      &last_event,
+                                      &iev,
                                       &ev);
         if (ev) classes_read = cl::event(ev, ::clReleaseEvent);
         throw_cl_error(error, "Error reading classified values");
@@ -566,7 +557,7 @@ namespace engine {
         ::clFlush(read_queue);
         ::clFlush(write_queue);
 
-        // Wait for all the events to finish
+        // Wait for the chain to finish up to where we care about it
         cl_event end_events[2] = {pixels_read, classes_read};
         ::clWaitForEvents(2, end_events);
 
