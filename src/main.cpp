@@ -55,7 +55,7 @@ int main() {
 
   // Construct our VisualMesh
   Timer t;
-  visualmesh::geometry::Sphere<float> sphere(0.075, 4, 10);
+  visualmesh::geometry::Sphere<float> sphere(0.075, 5, 10);
   visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> cl_mesh(sphere, 0.5, 1.5, 100);
   visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine> cpu_mesh(sphere, 0.5, 1.5, 100);
   t.measure("Built Visual Mesh");

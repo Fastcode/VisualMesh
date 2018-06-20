@@ -157,7 +157,7 @@ namespace engine {
             }
 
             // If we are not on our last layer apply selu
-            if (conv_no < structure.size() || layer_no < conv.size()) {
+            if (conv_no + 1 < structure.size() || layer_no + 1 < conv.size()) {
               std::transform(output.begin(), output.end(), output.begin(), [](const Scalar& s) {
                 constexpr const Scalar lambda = 1.0507009873554804934193349852946;
                 constexpr const Scalar alpha  = 1.6732632423543772848170429916717;
