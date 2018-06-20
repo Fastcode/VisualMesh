@@ -115,8 +115,7 @@ public:
       // TODO work out how to throw an error
     }
 
-    // As the algorithms for calculating the edge of fisheye cameras are not perfect yet, we need to remove any pixels
-    // that are off the screen
+    // Get the interesting things out of the projected mesh
     const auto& px            = projected.pixel_coordinates;
     const auto& neighbourhood = projected.neighbourhood;
 
