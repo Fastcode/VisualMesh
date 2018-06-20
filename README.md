@@ -37,12 +37,12 @@ Without this adversarial reweighting the network overtrains on grass and is unab
 In order to execute the training for the Visual Mesh, several python libraries are required.
 
 ```
-tqdm
-pyyaml
-numpy
-tensorflow
 matplotlib
+numpy
 opencv-python
+pyyaml
+tensorflow
+tqdm
 ```
 
 Additionally [`cmake`](https://cmake.org/) and a C++ compiler that supports c++11 or later is required for building the c++ TensorFlow op.
