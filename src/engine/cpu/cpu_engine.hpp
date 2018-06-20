@@ -118,7 +118,7 @@ namespace engine {
           }
 
           // Check if the pixel is on the screen, this is needed as the cutoffs for some lenses aren't perfect yet
-          if (0 < px[0] && px[0] < lens.dimensions[1] - 1 && 0 < px[1] && px[1] < lens.dimensions[1] - 1) {
+          if (0 < px[0] && px[0] < lens.dimensions[0] - 1 && 0 < px[1] && px[1] < lens.dimensions[1] - 1) {
             pixels.emplace_back(px);
             global_indices.emplace_back(indices[i]);
           }
