@@ -10,10 +10,10 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <string>
+#include "ArrayPrint.hpp"
+#include "Timer.hpp"
 #include "engine/opencl/opencl_engine.hpp"
 #include "geometry/Sphere.hpp"
-#include "util/ArrayPrint.hpp"
-#include "util/Timer.hpp"
 #include "util/fourcc.hpp"
 #include "visualmesh.hpp"
 
@@ -50,8 +50,8 @@ int main() {
   cv::namedWindow("Image", cv::WINDOW_AUTOSIZE);
 
   // Input image path
-  std::string image_path = "/Users/trent/Code/VisualMeshData/training/raw";
-  std::string model_path = "/Users/trent/Code/VisualMesh/model.yaml";
+  std::string image_path = "../example/images";
+  std::string model_path = "../example/model.yaml";
 
   // Construct our VisualMesh
   Timer t;

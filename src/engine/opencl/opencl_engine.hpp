@@ -31,13 +31,12 @@
 #include "engine/opencl/kernels/project_equisolid.cl.hpp"
 #include "engine/opencl/kernels/project_rectilinear.cl.hpp"
 #include "engine/opencl/util.hpp"
+#include "engine/opencl/wrapper.hpp"
 #include "mesh/mesh.hpp"
 #include "mesh/network_structure.hpp"
 #include "mesh/projected_mesh.hpp"
 #include "opencl_error_category.hpp"
-#include "util/Timer.hpp"
 #include "util/math.hpp"
-#include "wrapper.hpp"
 
 namespace visualmesh {
 namespace engine {
@@ -236,8 +235,6 @@ namespace engine {
         cl_int error;
         cl_event ev = nullptr;
 
-        Timer t;  // TIMER_LINE
-
         // Pack Rco into a Scalar16
         // clang-format off
           std::array<Scalar, 16> Rco{{
@@ -247,8 +244,6 @@ namespace engine {
               Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(1.0)
           }};
         // clang-format on
-
-        t.measure("\t\tLookup Range (cpu)");  // TIMER_LINE
 
         // Convenience variables
         const auto& nodes = mesh.nodes;
@@ -283,11 +278,9 @@ namespace engine {
 
           // Cache for future runs // TODO const cast and potential race condition here
           const_cast<Engine<Scalar>*>(this)->device_points[&mesh] = cl_points;
-          t.measure("\t\tUpload points (mem)");
         }
         else {
           cl_points = device_mesh->second;
-          t.measure("\t\tCached Points (mem)");
         }
 
         // First count the size of the buffer we will need to allocate
@@ -311,8 +304,6 @@ namespace engine {
           it = n;
         }
 
-        t.measure("\t\tBuild Range (cpu)");  // TIMER_LINE
-
         // Create buffers for indices map
         cl::mem indices_map(::clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(cl_int) * points, nullptr, &error),
                             ::clReleaseMemObject);
@@ -329,10 +320,6 @@ namespace engine {
           queue, indices_map, false, 0, indices.size() * sizeof(cl_int), indices.data(), 0, nullptr, &ev);
         if (ev) indices_event = cl::event(ev, ::clReleaseEvent);
         throw_cl_error(error, "Error uploading indices_map to device");
-
-        ev = indices_event;                   // TIMER_LINE
-        ::clWaitForEvents(1, &ev);            // TIMER_LINE
-        t.measure("\t\tUpload Range (mem)");  // TIMER_LINE
 
         // When everything is uploaded, we can run our projection kernel to get the pixel coordinates
         cl::event projected;
@@ -376,10 +363,6 @@ namespace engine {
           throw_cl_error(error, "Error queueing the projection kernel");
         }
 
-        ev = projected;                         // TIMER_LINE
-        ::clWaitForEvents(1, &ev);              // TIMER_LINE
-        t.measure("\t\tProject points (gpu)");  // TIMER_LINE
-
         // This can happen on the CPU while the OpenCL device is busy
         // Build the reverse lookup map where the offscreen point is one past the end
         std::vector<int> r_indices(nodes.size(), points);
@@ -398,8 +381,6 @@ namespace engine {
         }
         // Fill in the final offscreen point which connects only to itself
         local_neighbourhood[points].fill(points);
-
-        t.measure("\t\tBuild Local Neighbourhood (cpu)");  // TIMER_LINE
 
         // This ensures that all elements in the queue have been issued to the device NOT that they are all finished
         // If we don't do this here, some of our buffers can go out of scope before the queue picks them up causing

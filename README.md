@@ -1,6 +1,7 @@
 # Visual Mesh
 
 [![Join the chat at https://gitter.im/Fastcode/VisualMesh](https://badges.gitter.im/Fastcode/VisualMesh.svg)](https://gitter.im/Fastcode/VisualMesh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+If you have any questions or discussions while using the visual mesh, feel free to ask at gitter.
 
 The Visual Mesh is an input transformation that uses knowledge a cameras orientation and position relative to an observation plane to greatly increase the performance and accuracy of a convolutional neural network.
 It utilises the geometry of objects to create a mesh structure that ensures that a similar number of samples points are selected regardless of distance.
@@ -152,18 +153,49 @@ Additionally it allows executing on devices that TensorFlow would not allow such
 Currently there are two engines that are supported when using the Visual Mesh.
 The first of these is the CPU engine.
 This is a basic engine that utilises normal c++ code to execute the Visual Mesh.
+If you intend to use the CPU to execute the visual mesh and have OpenCL available, the OpenCL implementation on the CPU is faster than this one.
 
 The second engine is an OpenCL based engine.
 This engine utilises OpenCL and therefore can execute on a large variety of hardware and take advantage of multiprocessing.
 The hardware it can execute on includes CPUs, Intel integrated GPUs and most NVIDIA or AMD GPUs.
 One unfortunate omission to this is that the Jetson TX2 is unable to execute OpenCL code because NVIDIA are a bunch of evil people who hate things they don't control.
 
-If you would like to contribute to this project, an engine that executes using [Vulkan](https://www.khronos.org/vulkan/), [OpenGL](https://www.opengl.org/), or [CUDA](https://developer.nvidia.com/cuda-zone) would be appreciated.
+An example usage can be found in the example folder [here](./example/main.cpp).
+Or alternatively this is the basic usage.
+```cpp
+#include "visualmesh.hpp"
+#include "engine/opencl/opencl_engine.hpp"
+
+int main() {
+  // Paramters are radius, number of sample points, maximum distance to project
+  visualmesh::geometry::Sphere<float> sphere(0.075, 5, 10);
+  // Paramters are shape, minimum height to generate a LUT for
+  // maximum height to generate a LUT for and the number of LUTs to generate
+  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> mesh(sphere, 0.5, 1.5, 100);
+
+  // When making a classifier make sure to keep a reference to the mesh that created it as it uses it internally
+  // The mesh structure type can be found in src/mesh/network_structure.hpp
+  auto classifier = mesh.make_classifier(structure);
+
+  // Construct an image the lens and transformation matrix from camera to ground and get it's fourcc code
+  void* image_data;
+  uint32_t fourcc_code;
+  visualmesh::mat4<float> Hoc; // A homogenous transformation matrix from the camera to the observation plane
+  visualmesh::Lens<float> lens;
+
+  visualmesh::ClassifiedMesh<float> classified = classifier(mesh.height(camera_height), image_data, fourcc_code, Hoc, lens);
+
+  // The classified variable now contains a visual mesh that has been executed by the network.
+}
+```
 
 ## Contributing
 
 Contributions to this project are welcome via pull request.
-Style guides are enforced by clang-format for c++ and yapf for python
+Style guides are enforced by clang-format for c++ and yapf for python.
+
+If you would like to contribute to this project, an engine that executes using [Vulkan](https://www.khronos.org/vulkan/), [OpenGL](https://www.opengl.org/), or [CUDA](https://developer.nvidia.com/cuda-zone) would be appreciated.
+Also if you use a different lens geometry or image format that is not supported, additions to the current code is welcome.
 
 <!-- ## Citing
 

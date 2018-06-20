@@ -14,4 +14,16 @@
         "EQUISOLID",
         "convolutional"
     ],
+    "files.associations": {
+        "__split_buffer": "cpp",
+        "list": "cpp",
+        "vector": "cpp",
+        "__bit_reference": "cpp",
+        "__string": "cpp",
+        "__tree": "cpp",
+        "string_view": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "string": "cpp"
+    },
 }

@@ -20,22 +20,17 @@ SET(VERSION_MAJOR 1)
 SET(VERSION_MINOR 0)
 SET(VERSION_PATCH 0)
 
-# We use position independent code
+# Always use position independant code
 SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # We use additional modules that cmake needs to know about
-SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
 
-FIND_PACKAGE(OpenCL REQUIRED)
+# All the header files for this library
+FILE(GLOB hdr "src/**.hpp")
 
-# Find our files
-FILE(GLOB hdr
-    "src/**.hpp")
-
-FILE(GLOB cls
-     "src/engine/opencl/kernels/**.cl")
-
-# Convert our opencl files into header files with their contents
+# Convert our opencl files into header files with their contents and put them in the build folder
+FILE(GLOB cls "src/engine/opencl/kernels/**.cl")
 FOREACH(cl IN LISTS cls)
 
     FILE(RELATIVE_PATH cl_path ${CMAKE_CURRENT_SOURCE_DIR} ${cl})
@@ -44,8 +39,8 @@ FOREACH(cl IN LISTS cls)
         OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp"
         COMMAND ${PYTHON_EXECUTABLE}
         ARGS "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py"
-             "${cl}"
-             "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp"
+            "${cl}"
+            "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp"
         DEPENDS "${cl}"
                 "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py"
         COMMENT "Wrapping OpenCL file ${cl_path} in a header"
@@ -53,20 +48,16 @@ FOREACH(cl IN LISTS cls)
     LIST(APPEND hdr "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp")
 ENDFOREACH(cl ${cls})
 
-# We must now look in here for headers
-INCLUDE_DIRECTORIES("${CMAKE_CURRENT_SOURCE_DIR}/src")
-INCLUDE_DIRECTORIES("${CMAKE_CURRENT_BINARY_DIR}/src")
+# TODO have things for CUDA or vulkan or OpenGL? Put them here!
 
-INCLUDE_DIRECTORIES(SYSTEM ${OpenCL_INCLUDE_DIRS})
-
+# Build the tensorflow op for training
 OPTION(BUILD_TENSORFLOW_OP "Build the tensorflow op used for training" ON)
-
 IF(BUILD_TENSORFLOW_OP)
 
     FIND_PACKAGE(TensorFlow REQUIRED)
 
     ADD_LIBRARY(tf_op SHARED "src/tf_op.cpp" ${hdr})
-    TARGET_COMPILE_OPTIONS(tf_op PRIVATE -fcolor-diagnostics -march=native -mtune=native)
+    TARGET_COMPILE_OPTIONS(tf_op PRIVATE -march=native -mtune=native)
     SET_TARGET_PROPERTIES(tf_op PROPERTIES
         CXX_STANDARD 14
         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/training
@@ -75,16 +66,25 @@ IF(BUILD_TENSORFLOW_OP)
         SUFFIX ".so"
     )
     TARGET_INCLUDE_DIRECTORIES(tf_op SYSTEM PRIVATE ${TENSORFLOW_INCLUDE_DIRS})
+    TARGET_INCLUDE_DIRECTORIES(tf_op PRIVATE ${PROJECT_SOURCE_DIR}/src)
     TARGET_LINK_LIBRARIES(tf_op ${TENSORFLOW_LIBRARIES})
 
 ENDIF(BUILD_TENSORFLOW_OP)
 
-# Temp while testing the mesh
-FIND_PACKAGE(OpenCV REQUIRED)
-FIND_PACKAGE(YAML-CPP REQUIRED)
-ADD_EXECUTABLE(main "src/main.cpp" ${hdr})
-TARGET_COMPILE_OPTIONS(main PRIVATE -fcolor-diagnostics -march=native -mtune=native)
-SET_TARGET_PROPERTIES(main PROPERTIES CXX_STANDARD 14)
-TARGET_INCLUDE_DIRECTORIES(tf_op SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
-TARGET_INCLUDE_DIRECTORIES(tf_op SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
-TARGET_LINK_LIBRARIES(main ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES})
+# Build an example program that classifies using the visual mesh
+OPTION(BUILD_EXAMPLE "Build the example program that executes the mesh" OFF)
+IF(BUILD_EXAMPLE)
+
+    FIND_PACKAGE(OpenCV REQUIRED)
+    FIND_PACKAGE(YAML-CPP REQUIRED)
+    FIND_PACKAGE(OpenCL REQUIRED)
+
+    ADD_EXECUTABLE(main "example/main.cpp" ${hdr})
+    TARGET_COMPILE_OPTIONS(main PRIVATE -march=native -mtune=native)
+    SET_TARGET_PROPERTIES(main PROPERTIES CXX_STANDARD 14)
+    TARGET_INCLUDE_DIRECTORIES(main SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
+    TARGET_INCLUDE_DIRECTORIES(main SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
+    TARGET_INCLUDE_DIRECTORIES(main PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    TARGET_INCLUDE_DIRECTORIES(main PRIVATE ${PROJECT_BINARY_DIR}/src)
+    TARGET_LINK_LIBRARIES(main ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES})
+ENDIF(BUILD_EXAMPLE)
