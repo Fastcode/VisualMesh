@@ -31,6 +31,7 @@ REGISTER_OP("VisualMesh")
   .Input("lens_type: string")
   .Input("lens_focal_length: T")
   .Input("lens_fov: T")
+  .Input("lens_centre: T")
   .Input("cam_to_observation_plane: T")
   .Input("height: T")
   .Input("geometry: string")
@@ -60,7 +61,7 @@ public:
     std::string projection               = *context->input(1).flat<tensorflow::string>().data();
     T focal_length                       = context->input(2).scalar<T>()(0);
     T fov                                = context->input(3).scalar<T>()(0);
-    auto lens_centre                     = context->input(4).scalar<T>();
+    auto lens_centre                     = context->input(4).flat<T>();
     auto tRoc                            = context->input(5).matrix<T>();
     T height                             = context->input(6).scalar<T>()(0);
     std::string geometry                 = *context->input(7).flat<tensorflow::string>().data();
