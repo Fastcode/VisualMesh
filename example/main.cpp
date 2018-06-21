@@ -143,7 +143,7 @@ int main() {
       // However blender's camera objects have
       //      z facing away from the object,
       //      y up
-      //      z to the right
+      //      x to the right
       // So to fix this we have to make x = -z, y = -x, z = y (swap cols)
       std::array<std::array<float, 4>, 4> Hoc = {{
         {{-float(r[0][2].as<float>()), -float(r[0][0].as<float>()), r[0][1].as<float>(), 0}},

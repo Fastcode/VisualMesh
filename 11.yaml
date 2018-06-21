@@ -58,7 +58,7 @@ training:
   tutor:
     # The learning rate for the tutor network.
     # This value does not decay as the tutor network is not designed to converge.
-    learning_rate: 0.1
+    learning_rate: 0.05
     # The hysteresis threshold for training in the tutor network.
     # When the tutor network starts to get close to a convergent point, it will have many small gradients that
     # don't help the tutor network do it's job of finding error points. Having a hysteresis value here that

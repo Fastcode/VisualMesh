@@ -90,20 +90,21 @@ class MeshDrawer:
       # Image underlay
       ax.imshow(img, interpolation='nearest')
 
-      # Now for each class, produce a contour plot
-      for i, data in enumerate(self.classes):
-        r, g, b = data[1]
-        r /= 255
-        g /= 255
-        b /= 255
+      if px.shape[0] > 2:
+        # Now for each class, produce a contour plot
+        for i, data in enumerate(self.classes):
+          r, g, b = data[1]
+          r /= 255
+          g /= 255
+          b /= 255
 
-        ax.tricontour(
-          px[:, 1],
-          px[:, 0],
-          x[:, i],
-          levels=[0.5, 0.75, 0.9],
-          colors=[(r, g, b, 0.33), (r, g, b, 0.66), (r, g, b, 1.0)]
-        )
+          ax.tricontour(
+            px[:, 1],
+            px[:, 0],
+            x[:, i],
+            levels=[0.5, 0.75, 0.9],
+            colors=[(r, g, b, 0.33), (r, g, b, 0.66), (r, g, b, 1.0)]
+          )
 
       ax.set(xlim=[0, width], ylim=[height, 0], aspect=1)
       data = io.BytesIO()
@@ -142,14 +143,15 @@ class MeshDrawer:
       # Image underlay
       ax.imshow(img, interpolation='nearest')
 
-      # Make our tutor plot
-      ax.tricontour(
-        px[:, 1],
-        px[:, 0],
-        a,
-        levels=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
-        cmap=plt.get_cmap('jet'),
-      )
+      if px.shape[0] > 2:
+        # Make our tutor plot
+        ax.tricontour(
+          px[:, 1],
+          px[:, 0],
+          a,
+          levels=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+          cmap=plt.get_cmap('jet'),
+        )
 
       ax.set(xlim=[0, width], ylim=[height, 0], aspect=1)
       data = io.BytesIO()
