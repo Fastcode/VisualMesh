@@ -10,6 +10,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <string>
+#include <system_error>
 #include "ArrayPrint.hpp"
 #include "Timer.hpp"
 #include "engine/opencl/opencl_engine.hpp"
@@ -20,7 +21,7 @@
 // List the contents of a directory
 std::vector<std::string> listdir(const std::string& path) {
 
-  auto dir = opendir(path.c_str());
+  auto dir = ::opendir(path.c_str());
   std::vector<std::string> result;
 
   if (dir != nullptr) {
@@ -39,7 +40,7 @@ std::vector<std::string> listdir(const std::string& path) {
     closedir(dir);
   }
   else {
-    // TODO Throw an error or something
+    throw std::system_error(errno, std::system_category(), "Failed to open directory " + path);
   }
 
   return result;
