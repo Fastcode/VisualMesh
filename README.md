@@ -76,7 +76,8 @@ The meta files should look like
   "lens": {
     "fov": 1.270637035369873,
     "focal_length": 868.04095212810634,
-    "type": "RECTILINEAR"
+    "centre": [ 0.0, 0.0 ],
+    "projection": "RECTILINEAR"
   },
   "rotation": [
     [ 0.1441880166530609, 0.937675416469574, 0.3161878287792206 ],
@@ -95,10 +96,12 @@ The structure of the features in each example in the tfrecord file are
   "mask": bytes,
   # The projection of the lens EQUISOLID, EQUIDISTANT, RECTILINEAR
   "lens/projection": string,
-  # The horizontal field of view of the lens
+  # The maximum field of view of the lens
   "lens/fov": float,
-  # The focal length of the lens measured as a fraction of the sensor width
+  # The focal length of the lens measured in pixels
   "lens/focal_length": float,
+  # The offset from the centre of the lens to the centre of the image in pixels, the order is y, x to match tensorflow
+  "lens/centre": float,
   # A 3x3 rotation matrix that stores the rotation from the observation plane to the camera
   # The cameras coordinate system is represented with x forward along the camera axis, y to the right, and z up
   "mesh/orientation": float[3][3],

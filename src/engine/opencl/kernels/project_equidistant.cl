@@ -21,9 +21,10 @@
  * @param points        VisualMesh unit vectors
  * @param indices       map from local indices to global indices
  * @param Rco           rotation from the observation space to camera space
- *                      note that while this is a 4x4, that is for alignment, no translation should exist
+ *                      note that while this is a 4x4, that is for memory alignment, no translation should exist
  * @param f             the focal length of the lens measured in pixels
  * @param dimensions    the dimensions of the input image
+ * @param centre        the offset from the centre of the lens axis to the centre of the image in pixels
  * @param out           the output image coordinates
  */
 kernel void project_equidistant(global const Scalar4* points,
@@ -31,6 +32,7 @@ kernel void project_equidistant(global const Scalar4* points,
                                 const Scalar16 Rco,
                                 const Scalar f,
                                 const int2 dimensions,
+                                const Scalar2 centre,
                                 global Scalar2* out) {
 
   const int index = get_global_id(0);
@@ -54,11 +56,9 @@ kernel void project_equidistant(global const Scalar4* points,
   screen = ray.x >= 1 ? Scalar2(0.0, 0.0) : screen; // When the pixel is at (1,0,0) lots of NaNs show up
 
   // Apply our offset to move into image space (0 at top left, x to the right, y down)
+  // Then apply the offset to the centre of our lens
   const Scalar2 image =
-    (Scalar2)((Scalar)(dimensions.x - 1) * (Scalar)(0.5), (Scalar)(dimensions.y - 1) * (Scalar)(0.5)) - screen;
-
-  // Apply our lens centre offset
-  // TODO apply this
+    (Scalar2)((Scalar)(dimensions.x - 1) * (Scalar)(0.5), (Scalar)(dimensions.y - 1) * (Scalar)(0.5)) - screen - centre;
 
   // Store our output coordinates
   out[index] = image;

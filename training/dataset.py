@@ -48,6 +48,7 @@ class VisualMeshDataset:
         'lens/projection': tf.FixedLenFeature([], tf.string),
         'lens/focal_length': tf.FixedLenFeature([1], tf.float32),
         'lens/fov': tf.FixedLenFeature([1], tf.float32),
+        'lens/centre': tf.FixedLenFeature([2], tf.float32),
         'mesh/orientation': tf.FixedLenFeature([3, 3], tf.float32),
         'mesh/height': tf.FixedLenFeature([1], tf.float32),
       }
@@ -58,6 +59,7 @@ class VisualMeshDataset:
       'mask': tf.image.decode_png(example['mask'], channels=4),
       'projection': example['lens/projection'],
       'focal_length': example['lens/focal_length'],
+      'lens_centre': example['lens/centre'],
       'fov': example['lens/fov'],
       'orientation': example['mesh/orientation'],
       'height': example['mesh/height'],
@@ -108,6 +110,7 @@ class VisualMeshDataset:
       args['projection'],
       args['focal_length'],
       args['fov'],
+      args['lens_centre'],
       orientation,
       height,
       self.geometry,

@@ -342,12 +342,16 @@ struct Mesh {
       {{Hoc[2][0], Hoc[2][1], Hoc[2][2]}}   //
     }};
 
-    // Print our camera vector
+    // Extract the camera vector
     const std::array<Scalar, 3> cam = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
 
     // Work out how much additional y and z we get from our field of view if we have a focal length of 1
-    const Scalar y_extent = std::tan(lens.fov * Scalar(0.5));
-    const Scalar z_extent = y_extent * Scalar(lens.dimensions[1]) / Scalar(lens.dimensions[0]);
+    const Scalar y_extent = (lens.dimensions[0] * static_cast<Scalar>(0.5)) / lens.focal_length;
+    const Scalar z_extent = (lens.dimensions[1] * static_cast<Scalar>(0.5)) / lens.focal_length;
+
+    // The centre offset in this space
+    const Scalar y_offset = -lens.centre[0] / lens.focal_length;
+    const Scalar z_offset = -lens.centre[1] / lens.focal_length;
 
     /* The labels for each of the corners of the frustum is shown below.
         ^    T       U
@@ -355,12 +359,12 @@ struct Mesh {
         z    W       V
         <- y
      */
-    // Make vectors to the corners in cam space
+    // Make vectors to the corners in cam space, making sure to apply
     const std::array<vec3<Scalar>, 4> rNCc = {{
-      {{Scalar(1.0), +y_extent, +z_extent}},  // rTCc
-      {{Scalar(1.0), -y_extent, +z_extent}},  // rUCc
-      {{Scalar(1.0), -y_extent, -z_extent}},  // rVCc
-      {{Scalar(1.0), +y_extent, -z_extent}}   // rWCc
+      {{Scalar(1.0), +y_extent + y_offset, +z_extent + z_offset}},  // rTCc
+      {{Scalar(1.0), -y_extent + y_offset, +z_extent + z_offset}},  // rUCc
+      {{Scalar(1.0), -y_extent + y_offset, -z_extent + z_offset}},  // rVCc
+      {{Scalar(1.0), +y_extent + y_offset, -z_extent + z_offset}}   // rWCc
     }};
 
     // Rotate these into world space by multiplying by the rotation matrix
@@ -459,7 +463,7 @@ struct Mesh {
         // Calculate our denominator
         const Scalar denom = c2 * eq_parts[i][4] + eq_parts[i][5];
 
-        // We need to count how many complex solutions we get, if all 4 are we totally enclose phi
+        // We need to count how many complex solutions we get, if at least 3 are complex phi is totally enclosed
         // We also don't care about the case with one solution (touching an edge)
         if (disc <= Scalar(0.0)) { ++complex_sols; }
         else if (denom != Scalar(0.0)) {

@@ -7,7 +7,6 @@ import os
 import math
 import tensorflow as tf
 import json
-from PIL import Image
 from glob import glob
 
 
@@ -40,18 +39,15 @@ def make_tfrecord(output_file, input_files):
     with open(mask_file, 'rb') as f:
       mask = f.read()
 
-    im = Image.open(image_file)
-    width, height = im.size
-
-    # Convert from blender to visual mesh coordinates
+    # Extract meta information
     rot = meta['rotation']
-    Roc = [-rot[0][2], -rot[0][0], rot[0][1],
-           -rot[1][2], -rot[1][0], rot[1][1],
-           -rot[2][2], -rot[2][0], rot[2][1],
+    Roc = [rot[0][0], rot[0][1], rot[0][2],
+           rot[1][0], rot[1][1], rot[1][2],
+           rot[2][0], rot[2][1], rot[2][2],
     ] # yapf: disable
     height = meta['height']
-
-    projection = meta['lens']['type']
+    projection = meta['lens']['projection']
+    lens_centre = meta['lens']['centre']
     fov = meta['lens']['fov']
     focal_length = meta['lens']['focal_length']
 
@@ -61,6 +57,7 @@ def make_tfrecord(output_file, input_files):
       'lens/projection': bytes_feature(projection.encode('utf-8')),
       'lens/fov': float_feature(fov),
       'lens/focal_length': float_feature(focal_length),
+      'lens/centre': float_list_feature(lens_centre),
       'mesh/orientation': float_list_feature(Roc),
       'mesh/height': float_feature(height),
     }
@@ -102,7 +99,7 @@ if __name__ == '__main__':
   training = 0.45
   validation = 0.10
 
-  testing = (round(nf * (training + validation)), nf)
+  test = (round(nf * (training + validation)), nf)
   validation = (round(nf * training), round(nf * (training + validation)))
   training = (0, round(nf * training))
 
@@ -110,5 +107,5 @@ if __name__ == '__main__':
   make_tfrecord('training.tfrecord', files[training[0]:training[1]])
   print('Making validation dataset')
   make_tfrecord('validation.tfrecord', files[validation[0]:validation[1]])
-  print('Making testing dataset')
-  make_tfrecord('testing.tfrecord', files[testing[0]:testing[1]])
+  print('Making test dataset')
+  make_tfrecord('test.tfrecord', files[test[0]:test[1]])

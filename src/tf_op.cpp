@@ -60,10 +60,11 @@ public:
     std::string projection               = *context->input(1).flat<tensorflow::string>().data();
     T focal_length                       = context->input(2).scalar<T>()(0);
     T fov                                = context->input(3).scalar<T>()(0);
-    auto tRoc                            = context->input(4).matrix<T>();
-    T height                             = context->input(5).scalar<T>()(0);
-    std::string geometry                 = *context->input(6).flat<tensorflow::string>().data();
-    auto g_params                        = context->input(7).vec<T>();
+    auto lens_centre                     = context->input(4).scalar<T>();
+    auto tRoc                            = context->input(5).matrix<T>();
+    T height                             = context->input(6).scalar<T>()(0);
+    std::string geometry                 = *context->input(7).flat<tensorflow::string>().data();
+    auto g_params                        = context->input(8).vec<T>();
 
     // TODO validate all the inputs to make sure they are correct
 
@@ -80,6 +81,7 @@ public:
     lens.dimensions   = dimensions;
     lens.focal_length = focal_length;
     lens.fov          = fov;
+    lens.centre       = {{lens_centre(1), lens_centre(0)}};  // Swap from tf coordinates to our coordinates
     if (projection == "EQUISOLID") {
       lens.projection = visualmesh::EQUISOLID;  //
     }

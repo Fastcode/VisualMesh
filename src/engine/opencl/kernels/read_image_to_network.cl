@@ -14,7 +14,7 @@
  * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
- 
+
 const sampler_t bayer_sampler  = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
 const sampler_t interp_sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_LINEAR;
 
@@ -54,18 +54,18 @@ float fetch(read_only image2d_t raw_image, sampler_t sampler, float2 pos) {
 
 // http://graphics.cs.williams.edu/papers/BayerJGT09/
 float4 bayerToRGB(read_only image2d_t raw_image, sampler_t sampler, float2 coord, float2 first_red) {
-  float4 center = (float4){0.0f, 0.0f, 0.0f, 0.0f};
-  center.xy     = coord;
-  center.zw     = coord + first_red;
+  float4 centre = (float4){0.0f, 0.0f, 0.0f, 0.0f};
+  centre.xy     = coord;
+  centre.zw     = coord + first_red;
 
-  float4 x_coord = center.x + (float4){-2.0f, -1.0f, 1.0f, 2.0f};
-  float4 y_coord = center.y + (float4){-2.0f, -1.0f, 1.0f, 2.0f};
+  float4 x_coord = centre.x + (float4){-2.0f, -1.0f, 1.0f, 2.0f};
+  float4 y_coord = centre.y + (float4){-2.0f, -1.0f, 1.0f, 2.0f};
 
-  float C         = fetch(raw_image, sampler, center.xy);  // ( 0, 0)
+  float C         = fetch(raw_image, sampler, centre.xy);  // ( 0, 0)
   const float4 kC = {0.5f, 0.75f, 0.625f, 0.625f};
 
   // Determine which of four types of pixels we are on.
-  float2 alternate = fmod(floor(center.zw), 2.0f);
+  float2 alternate = fmod(floor(centre.zw), 2.0f);
 
   float4 Dvec = (float4){fetch(raw_image, sampler, (float2){x_coord.y, y_coord.y}),   // (-1,-1)
                          fetch(raw_image, sampler, (float2){x_coord.y, y_coord.z}),   // (-1, 1)
@@ -80,15 +80,15 @@ float4 bayerToRGB(read_only image2d_t raw_image, sampler_t sampler, float2 coord
   Dvec.xy += Dvec.zw;
   Dvec.x += Dvec.y;
 
-  float4 value = (float4){fetch(raw_image, sampler, (float2){center.x, y_coord.x}),   // ( 0,-2)
-                          fetch(raw_image, sampler, (float2){center.x, y_coord.y}),   // ( 0,-1)
-                          fetch(raw_image, sampler, (float2){x_coord.x, center.y}),   // (-1, 0)
-                          fetch(raw_image, sampler, (float2){x_coord.y, center.y})};  // (-2, 0)
+  float4 value = (float4){fetch(raw_image, sampler, (float2){centre.x, y_coord.x}),   // ( 0,-2)
+                          fetch(raw_image, sampler, (float2){centre.x, y_coord.y}),   // ( 0,-1)
+                          fetch(raw_image, sampler, (float2){x_coord.x, centre.y}),   // (-1, 0)
+                          fetch(raw_image, sampler, (float2){x_coord.y, centre.y})};  // (-2, 0)
 
-  float4 temp = (float4){fetch(raw_image, sampler, (float2){center.x, y_coord.w}),   // ( 0, 2)
-                         fetch(raw_image, sampler, (float2){center.x, y_coord.z}),   // ( 0, 1)
-                         fetch(raw_image, sampler, (float2){x_coord.w, center.y}),   // ( 2, 0)
-                         fetch(raw_image, sampler, (float2){x_coord.z, center.y})};  // ( 1, 0)
+  float4 temp = (float4){fetch(raw_image, sampler, (float2){centre.x, y_coord.w}),   // ( 0, 2)
+                         fetch(raw_image, sampler, (float2){centre.x, y_coord.z}),   // ( 0, 1)
+                         fetch(raw_image, sampler, (float2){x_coord.w, centre.y}),   // ( 2, 0)
+                         fetch(raw_image, sampler, (float2){x_coord.z, centre.y})};  // ( 1, 0)
 
   // Even the simplest compilers should be able to constant-fold these to avoid the division.
   // Note that on scalar processors these constants force computation of some identical products twice.

@@ -354,9 +354,11 @@ namespace engine {
           throw_cl_error(error, "Error setting kernel argument 3 for projection kernel");
           error = ::clSetKernelArg(projection_kernel, 4, sizeof(lens.dimensions), lens.dimensions.data());
           throw_cl_error(error, "Error setting kernel argument 4 for projection kernel");
-          arg   = pixel_coordinates;
-          error = ::clSetKernelArg(projection_kernel, 5, sizeof(arg), &arg);
+          error = ::clSetKernelArg(projection_kernel, 5, sizeof(lens.centre), lens.centre.data());
           throw_cl_error(error, "Error setting kernel argument 5 for projection kernel");
+          arg   = pixel_coordinates;
+          error = ::clSetKernelArg(projection_kernel, 6, sizeof(arg), &arg);
+          throw_cl_error(error, "Error setting kernel argument 6 for projection kernel");
 
           // Project!
           size_t offset[1]      = {0};

@@ -43,8 +43,10 @@ namespace engine {
                                         : vec2<Scalar>{{r * p[1] / sin_theta, r * p[2] / sin_theta}};
 
         // Apply our offset to move into image space (0 at top left, x to the right, y down)
-        return vec2<Scalar>{{static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0],
-                             static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1]}};
+        // Then apply the offset to the centre of our lens
+        return vec2<Scalar>{
+          {static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0] - lens.centre[0],
+           static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1] - lens.centre[1]}};
       }
 
       vec2<Scalar> project_equisolid(const vec4<Scalar>& p, const Lens<Scalar>& lens) const {
@@ -58,8 +60,10 @@ namespace engine {
                                         : vec2<Scalar>{{r * p[1] / sin_theta, r * p[2] / sin_theta}};
 
         // Apply our offset to move into image space (0 at top left, x to the right, y down)
-        return vec2<Scalar>{{static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0],
-                             static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1]}};
+        // Then apply the offset to the centre of our lens
+        return vec2<Scalar>{
+          {static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0] - lens.centre[0],
+           static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1] - lens.centre[1]}};
       }
 
       vec2<Scalar> project_rectilinear(const vec4<Scalar>& p, const Lens<Scalar>& lens) const {
@@ -67,8 +71,10 @@ namespace engine {
         vec2<Scalar> screen = {{lens.focal_length * p[1] / p[0], lens.focal_length * p[2] / p[0]}};
 
         // Apply our offset to move into image space (0 at top left, x to the right, y down)
-        return vec2<Scalar>{{static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0],
-                             static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1]}};
+        // Then apply the offset to the centre of our lens
+        return vec2<Scalar>{
+          {static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0] - lens.centre[0],
+           static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1] - lens.centre[1]}};
       }
 
     public:

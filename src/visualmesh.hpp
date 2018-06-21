@@ -51,10 +51,7 @@ public:
    * @param n_heights    the number of look up tables to generated (height gradations)
    */
   template <typename Shape>
-  explicit VisualMesh(const Shape& shape,
-                      const Scalar& min_height,
-                      const Scalar& max_height,
-                      const uint& n_heights) {  // TODO height resolution is a dumb name
+  explicit VisualMesh(const Shape& shape, const Scalar& min_height, const Scalar& max_height, const uint& n_heights) {
 
     // Loop through to make a mesh for each of our height possibilities
     for (Scalar h = min_height; h < max_height; h += (max_height - min_height) / n_heights) {

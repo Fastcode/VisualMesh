@@ -35,6 +35,8 @@ struct Lens {
   Scalar fov;
   /// The focal length of the camera, normalised to the image width
   Scalar focal_length;
+  /// The pixel coordinates of the centre of the lens
+  std::array<Scalar, 2> centre;
 };
 
 }  // namespace visualmesh
