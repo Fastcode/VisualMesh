@@ -99,9 +99,9 @@ def build(groups, n_classes, tutor_groups):
   G = data['G']
 
   # Build our normal mesh, and our tutor mesh
-  with tf.variable_scope('Mesh'):
+  with tf.variable_scope('MeshNetwork'):
     mesh = build_network(X, G, mesh_groups)
-  with tf.variable_scope('Tutor'):
+  with tf.variable_scope('TutorNetwork'):
     tutor = build_network(X, G, tutor_groups)
 
   return {

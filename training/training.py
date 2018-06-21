@@ -278,7 +278,7 @@ def build_training_graph(network, classes, learning_rate, tutor_learning_rate, t
       validation_summary.append(tf.summary.scalar('Mesh Loss', weighted_mesh_loss))
       validation_summary.append(tf.summary.scalar('Tutor Loss', tutor_loss))
 
-  with tf.name_scope('Mesh'):
+  with tf.name_scope('MeshImage'):
     mesh_drawer = MeshDrawer(classes)
     image_summary.append(
       tf.summary.image(
@@ -291,7 +291,7 @@ def build_training_graph(network, classes, learning_rate, tutor_learning_rate, t
       )
     )
 
-  with tf.name_scope('Tutor'):
+  with tf.name_scope('TutorImage'):
     image_summary.append(
       tf.summary.image(
         'Tutor',
