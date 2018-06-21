@@ -581,14 +581,13 @@ struct Mesh {
     const Scalar cos_half_fov = std::cos(lens.fov * Scalar(0.5));
     const vec3<Scalar> cam    = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
 
+    // The cameras inclination from straight down (same reference frame as phi)
+    const Scalar cam_inc  = std::acos(-cam[2]);
+    const Scalar half_fov = lens.fov * 0.5;
+
     auto theta_limits = [&](const Scalar& phi) -> std::array<std::pair<Scalar, Scalar>, 1> {
       // Check if we are intersecting with an upper or lower cone
       const bool upper = phi > M_PI_2;
-
-      // The cameras inclination from straight down (same reference frame as phi)
-      const Scalar cam_inc  = std::acos(-cam[2]);
-      const Scalar half_fov = lens.fov * 0.5;
-      // TODO work out if you can move these out of the lambda?
 
       // First we should check if this phi is totally contained in our fov
       // Work out what our largest fully contained phi value is

@@ -224,6 +224,10 @@ namespace engine {
         return Classifier<Scalar>(this, structure);
       }
 
+      void clear_cache() {
+        device_points_cache.clear();
+      }
+
     private:
       std::tuple<std::vector<std::array<int, 6>>, std::vector<int>, cl::mem, cl::event> do_project(
         const Mesh<Scalar>& mesh,
@@ -251,8 +255,8 @@ namespace engine {
         // Upload our visual mesh unit vectors if we have to
         cl::mem cl_points;
 
-        auto device_mesh = device_points.find(&mesh);
-        if (device_mesh == device_points.end()) {
+        auto device_mesh = device_points_cache.find(&mesh);
+        if (device_mesh == device_points_cache.end()) {
           cl_points = cl::mem(
             ::clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(vec4<Scalar>) * mesh.nodes.size(), nullptr, &error),
             ::clReleaseMemObject);
@@ -276,8 +280,9 @@ namespace engine {
                                          nullptr);
           throw_cl_error(error, "Error writing points to the device buffer");
 
-          // Cache for future runs // TODO const cast and potential race condition here
-          const_cast<Engine<Scalar>*>(this)->device_points[&mesh] = cl_points;
+          // Cache for future runs
+          std::lock_guard<std::mutex> lock(cache_mutex);
+          device_points_cache[&mesh] = cl_points;
         }
         else {
           cl_points = device_mesh->second;
@@ -324,7 +329,7 @@ namespace engine {
         // When everything is uploaded, we can run our projection kernel to get the pixel coordinates
         cl::event projected;
         /* mutex scope */ {
-          std::lock_guard<std::mutex> lock(const_cast<Engine<Scalar>*>(this)->projection_mutex);
+          std::lock_guard<std::mutex> lock(projection_mutex);
 
           cl::kernel projection_kernel;
 
@@ -406,9 +411,12 @@ namespace engine {
       cl::kernel project_equisolid;
       cl::kernel project_rectilinear;
       // Mutex to protect projection functions
-      std::mutex projection_mutex;
+      mutable std::mutex projection_mutex;
 
-      std::map<const Mesh<Scalar>*, cl::mem> device_points;
+      // Cache of opencl buffers from mesh objects
+      mutable std::map<const Mesh<Scalar>*, cl::mem> device_points_cache;
+      // A mutex to protect the cache
+      mutable std::mutex cache_mutex;
 
       friend class Classifier<Scalar>;
     };
