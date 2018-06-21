@@ -26,11 +26,11 @@ Once a network has been trained however, there exists custom OpenCL code that ca
 
 ## Training
 
-The training of the visual mesh using this implementation takes advantage of adversarial neural networks to improve the training accuracy.
-This adversarial network weights the gradients by learning the error that occurs during the training.
+The training of the visual mesh using this implementation takes advantage of a tutor neural network to improve the training accuracy.
+This tutor network weights the gradients by learning the error that occurs during the training.
 Outlier sections are learned effectively.
 For example, in the example training for detecting soccer balls, the field class contains many green points, and only a few points for field lines.
-Without this adversarial reweighting the network overtrains on grass and is unable to effectively interpret other objects that are not balls.
+Without this tutor reweighting the network overtrains on grass and is unable to effectively interpret other objects that are not balls.
 
 ### Requirements
 

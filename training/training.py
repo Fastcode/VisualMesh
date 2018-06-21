@@ -117,7 +117,7 @@ class MeshDrawer:
 
     return np.stack(images)
 
-  def adversary_image(self, raws, pxs, ns, A):
+  def tutor_image(self, raws, pxs, ns, A):
     # Find the edges of the X values
     cs = np.cumsum(ns)
     cs = np.concatenate([[0], cs]).tolist()
@@ -142,7 +142,7 @@ class MeshDrawer:
       # Image underlay
       ax.imshow(img, interpolation='nearest')
 
-      # Make our adversary plot
+      # Make our tutor plot
       ax.tricontour(
         px[:, 1],
         px[:, 0],
@@ -164,7 +164,7 @@ class MeshDrawer:
     return np.stack(images)
 
 
-def build_training_graph(network, classes, learning_rate, adversary_learning_rate, adversary_threshold, base_weight):
+def build_training_graph(network, classes, learning_rate, tutor_learning_rate, tutor_threshold, base_weight):
 
   # Truth labels for the network
   Y = network['Y']
@@ -172,8 +172,8 @@ def build_training_graph(network, classes, learning_rate, adversary_learning_rat
   # The unscaled network output
   X = network['mesh']
 
-  # The unscaled adverserial networks output
-  A = network['adversary'][:, 0]
+  # The unscaled tutor networks output
+  A = network['tutor'][:, 0]
 
   # The alpha channel from the training data to remove unlabelled points from the gradients
   W = network['W']
@@ -194,27 +194,27 @@ def build_training_graph(network, classes, learning_rate, adversary_learning_rat
 
     # Our loss function
     with tf.name_scope('Loss'):
-      # Unweighted loss, before the adversary decides which samples are more important
+      # Unweighted loss, before the tutor decides which samples are more important
       unweighted_mesh_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=X, labels=Y, dim=1)
 
-      # Calculate the labels for the adversary
+      # Calculate the labels for the tutor
       a_labels = tf.reduce_sum(tf.abs(tf.subtract(Y, tf.nn.softmax(X, axis=1))), axis=1) / 2.0
 
-      # Only use gradients from areas where the adversary has larger error, this avoids a large number of smaller
+      # Only use gradients from areas where the tutor has larger error, this avoids a large number of smaller
       # gradients overpowering the areas where the network has legitimate error.
-      # This technique means that the adversary network will never converge, but we don't ever want it to
-      a_idx = tf.where(tf.greater(tf.abs(a_labels - A), adversary_threshold))
+      # This technique means that the tutor network will never converge, but we don't ever want it to
+      a_idx = tf.where(tf.greater(tf.abs(a_labels - A), tutor_threshold))
 
       # If we have no values that are inaccurate, we will take all the values as normal
-      adversary_loss_cut = tf.losses.mean_squared_error(
+      tutor_loss_cut = tf.losses.mean_squared_error(
         predictions=tf.gather_nd(A, a_idx),
         labels=tf.stop_gradient(tf.gather_nd(a_labels, a_idx)),
       )
-      adversary_loss_full = tf.losses.mean_squared_error(
+      tutor_loss_full = tf.losses.mean_squared_error(
         predictions=A,
         labels=tf.stop_gradient(a_labels),
       )
-      adversary_loss = tf.cond(tf.equal(tf.size(a_idx), 0), lambda: adversary_loss_full, lambda: adversary_loss_cut)
+      tutor_loss = tf.cond(tf.equal(tf.size(a_idx), 0), lambda: tutor_loss_full, lambda: tutor_loss_cut)
 
       # Calculate the loss weights for each of the classes
       scatters = []
@@ -237,15 +237,14 @@ def build_training_graph(network, classes, learning_rate, adversary_learning_rat
       weighted_mesh_loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
 
       training_summary.append(tf.summary.scalar('Mesh Loss', weighted_mesh_loss))
-      training_summary.append(tf.summary.scalar('Adversary Loss', adversary_loss))
+      training_summary.append(tf.summary.scalar('Tutor Loss', tutor_loss))
 
     # Our optimisers
     with tf.name_scope('Optimiser'):
       mesh_optimiser = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(
         weighted_mesh_loss, global_step=global_step
       )
-      adversary_optimiser = tf.train.GradientDescentOptimizer(learning_rate=adversary_learning_rate
-                                                             ).minimize(adversary_loss)
+      tutor_optimiser = tf.train.GradientDescentOptimizer(learning_rate=tutor_learning_rate).minimize(tutor_loss)
 
   # Calculate accuracy
   with tf.name_scope('Validation'):
@@ -277,7 +276,7 @@ def build_training_graph(network, classes, learning_rate, adversary_learning_rat
     with tf.name_scope('Global'):
       # Monitor loss and metrics
       validation_summary.append(tf.summary.scalar('Mesh Loss', weighted_mesh_loss))
-      validation_summary.append(tf.summary.scalar('Adversary Loss', adversary_loss))
+      validation_summary.append(tf.summary.scalar('Tutor Loss', tutor_loss))
 
   with tf.name_scope('Mesh'):
     mesh_drawer = MeshDrawer(classes)
@@ -292,14 +291,14 @@ def build_training_graph(network, classes, learning_rate, adversary_learning_rat
       )
     )
 
-  with tf.name_scope('Adversary'):
+  with tf.name_scope('Tutor'):
     image_summary.append(
       tf.summary.image(
-        'Adversary',
+        'Tutor',
         tf.py_func(
-          mesh_drawer.adversary_image,
+          mesh_drawer.tutor_image,
           [network['raw'], network['px'], network['n'],
-           tf.nn.sigmoid(network['adversary'][:, 0])],
+           tf.nn.sigmoid(network['tutor'][:, 0])],
           tf.uint8,
           False,
         ),
@@ -318,8 +317,8 @@ def build_training_graph(network, classes, learning_rate, adversary_learning_rat
   return {
     'mesh_optimiser': mesh_optimiser,
     'mesh_loss': weighted_mesh_loss,
-    'adversary_optimiser': adversary_optimiser,
-    'adversary_loss': adversary_loss,
+    'tutor_optimiser': tutor_optimiser,
+    'tutor_loss': tutor_loss,
     'training_summary': training_summary_op,
     'validation_summary': validation_summary_op,
     'image_summary': image_summary_op,
@@ -336,10 +335,10 @@ def train(sess, config, output_path):
   geometry = config['geometry']
   classes = config['network']['classes']
   structure = config['network']['structure']
-  base_weight = config['training']['adversary']['base_weight']
-  adversary_learning_rate = config['training']['adversary']['learning_rate']
-  adversary_structure = config['training']['adversary'].get('structure', None)
-  adversary_threshold = config['training']['adversary']['threshold']
+  base_weight = config['training']['tutor']['base_weight']
+  tutor_learning_rate = config['training']['tutor']['learning_rate']
+  tutor_structure = config['training']['tutor'].get('structure', None)
+  tutor_threshold = config['training']['tutor']['threshold']
   training_batch_size = config['training']['batch_size']
   epochs = config['training']['epochs']
   training_learning_rate = config['training']['learning_rate']
@@ -351,17 +350,17 @@ def train(sess, config, output_path):
   n_progress_images = config['training']['validation']['progress_images']
   variants = config['training']['variants']
 
-  # Build our network and adverserial networks
-  net = network.build(structure, len(classes), structure if adversary_structure is None else adversary_structure)
+  # Build our student and tutor networks
+  net = network.build(structure, len(classes), structure if tutor_structure is None else tutor_structure)
 
   # Build the training portion of the graph
   training_graph = build_training_graph(
-    net, classes, training_learning_rate, adversary_learning_rate, adversary_threshold, base_weight
+    net, classes, training_learning_rate, tutor_learning_rate, tutor_threshold, base_weight
   )
   mesh_optimiser = training_graph['mesh_optimiser']
   mesh_loss = training_graph['mesh_loss']
-  adversary_optimiser = training_graph['adversary_optimiser']
-  adversary_loss = training_graph['adversary_loss']
+  tutor_optimiser = training_graph['tutor_optimiser']
+  tutor_loss = training_graph['tutor_loss']
   training_summary = training_graph['training_summary']
   validation_summary = training_graph['validation_summary']
   image_summary = training_graph['image_summary']
@@ -429,16 +428,14 @@ def train(sess, config, output_path):
     try:
       # Run our training step
       start = time.time()
-      summary, ml, al, _, __, = sess.run([
-        training_summary, mesh_loss, adversary_loss, mesh_optimiser, adversary_optimiser
-      ],
+      summary, ml, al, _, __, = sess.run([training_summary, mesh_loss, tutor_loss, mesh_optimiser, tutor_optimiser],
                                          feed_dict={net['handle']: training_handle})
       summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
       end = time.time()
 
       # Print batch info
       print(
-        'Batch: {} ({:3g}s) Mesh Loss: {:3g} Adversary Loss: {:3g}'.format(
+        'Batch: {} ({:3g}s) Mesh Loss: {:3g} Tutor Loss: {:3g}'.format(
           tf.train.global_step(sess, global_step),
           (end - start),
           ml,

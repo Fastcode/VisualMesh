@@ -54,20 +54,20 @@ training:
   # How many batches between saving the progress of the network.
   save_frequency: 250
 
-  # Settings for the adversarial network.
-  adversary:
-    # The learning rate for the adversarial network.
-    # This value does not decay as the adversarial network is not designed to converge.
+  # Settings for the tutor network.
+  tutor:
+    # The learning rate for the tutor network.
+    # This value does not decay as the tutor network is not designed to converge.
     learning_rate: 0.1
-    # The hysteresis threshold for training in the adversarial network.
-    # When the adversarial network starts to get close to a convergent point, it will have many small gradients that
-    # don't help the adversarial network do it's job of finding error points. Having a hysteresis value here that
-    # ignores small errors will make the larger errors have a greater impact in the training of the adversary.
+    # The hysteresis threshold for training in the tutor network.
+    # When the tutor network starts to get close to a convergent point, it will have many small gradients that
+    # don't help the tutor network do it's job of finding error points. Having a hysteresis value here that
+    # ignores small errors will make the larger errors have a greater impact in the training of the tutor.
     threshold: 0.05
     # The base weight to add to all outputs so that points can't get to 0 weight
     base_weight: 0.05
-    # This allows the adversary to have a different structure than the main network.
-    # If this isn't set, the structure of the adversary will be identical to that of the main network.
+    # This allows the tutor to have a different structure than the main network.
+    # If this isn't set, the structure of the tutor will be identical to that of the main network.
     structure: [[8], [8], [8], [8], [8], [8], [8], [8], [8], [8], []]
 
   # Settings for the validation step of the network.

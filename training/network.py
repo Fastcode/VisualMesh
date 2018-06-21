@@ -56,15 +56,15 @@ def build_network(X, G, groups):
   return logits
 
 
-def build(groups, n_classes, adversary_groups):
+def build(groups, n_classes, tutor_groups):
 
-  # The last layer is the number of classes we have but the adversary only has two
+  # The last layer is the number of classes we have but the tutor only has two
   mesh_groups = copy.deepcopy(groups)
   mesh_groups[-1].append(n_classes)
 
-  # Multiply the size of the adversary layers
-  adversary_groups = copy.deepcopy(adversary_groups)
-  adversary_groups[-1].append(1)
+  # Multiply the size of the tutor layers
+  tutor_groups = copy.deepcopy(tutor_groups)
+  tutor_groups[-1].append(1)
 
   # Number of neighbours for each point
   graph_degree = 7
@@ -98,15 +98,15 @@ def build(groups, n_classes, adversary_groups):
   X = data['X']
   G = data['G']
 
-  # Build our normal mesh, and our adverserial mesh
-  with tf.variable_scope('mesh'):
+  # Build our normal mesh, and our tutor mesh
+  with tf.variable_scope('Mesh'):
     mesh = build_network(X, G, mesh_groups)
-  with tf.variable_scope('adversary'):
-    adversary = build_network(X, G, adversary_groups)
+  with tf.variable_scope('Tutor'):
+    tutor = build_network(X, G, tutor_groups)
 
   return {
     'handle': handle,  # (input)  Iterator handle
     'mesh': mesh,  # (output) Raw unscaled mesh output
-    'adversary': adversary,  # (output) Raw unscaled weights output
+    'tutor': tutor,  # (output) Raw unscaled weights output
     **data,  # Forward all the data from our iterator
   }
