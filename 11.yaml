@@ -39,6 +39,11 @@ network:
     - [ball, [255, 255, 255]]
     - [environment, [0, 0, 0]]
 
+# Testing
+testing:
+  # How many elements to process at a time during testing
+  batch_size: 20
+
 # Settings to use when training the network
 training:
   # The number of epochs to train for (number of times to loop through the training data).

@@ -41,6 +41,7 @@ matplotlib
 numpy
 opencv-python
 pyyaml
+rdp
 tensorflow
 tqdm
 ```
@@ -133,17 +134,22 @@ To train a new network, create a yaml configuration file.
 Then execute the following command
 
 ```sh
-./mesh.py [config.yaml] [output_dir]
+./mesh.py train [config.yaml] [output_dir]
 ```
 
 The progress of the training can be monitored using tensorboard with the log dir looking at the output directory (or a parent of it).
 If the output directory is not provided, it will default to `output`.
 
-<!--
+
 ## Testing
 
-todo talk about testing and what it outputs
-todo talk about how to make a pr curve using the output -->
+Once you have a trained network, you can test it using the test command.
+
+```sh
+./mesh.py test [config.yaml] [output_dir]
+```
+
+This will output the average precision for each class, as well as the precision/recall curves and the final mean average precision (mAP).
 
 ## Using the VisualMesh
 
