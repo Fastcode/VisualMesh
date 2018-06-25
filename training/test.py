@@ -183,7 +183,13 @@ def test(sess, config, output_path):
       print('{} Average Precision: {}'.format(k.title(), v['ap']))
       apf.write('{} {}\n'.format(k, v['ap']))
 
-      np.savetxt('{}_pr.csv'.format(k), v['pr'])
+      np.savetxt(
+        '{}_pr.csv'.format(k),
+        v['pr'],
+        comments='',
+        header='Confidence,Precision,Recall',
+        delimiter=',',
+      )
 
     mean_ap = mean_ap / len(results)
 
