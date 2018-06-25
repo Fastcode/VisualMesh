@@ -185,6 +185,7 @@ def test(sess, config, output_path):
 
       np.savetxt('{}_pr.csv'.format(k), v['pr'])
 
+    mean_ap = mean_ap / len(results)
+
     print('Mean Average Precision: {}'.format(mean_ap))
     apf.write('mAP {}\n'.format(k, mean_ap))
-    mean_ap = mean_ap / len(results)
