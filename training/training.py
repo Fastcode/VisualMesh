@@ -223,8 +223,8 @@ def build_training_graph(network, classes, learning_rate, tutor_learning_rate, t
       for i in range(len(classes)):
         # Indexes of truth samples for this class
         idx = tf.where(Y[:, i])
-        pts = tf.gather_nd(A, idx)
-        pts = tf.divide(pts + base_weight, tf.reduce_sum(pts))
+        pts = tf.gather_nd(A, idx) + base_weight
+        pts = tf.divide(pts, tf.reduce_sum(pts))
         pts = tf.scatter_nd(idx, pts, tf.shape(A, out_type=tf.int64))
 
         # Either our weights, or if there were none, zeros
@@ -253,6 +253,7 @@ def build_training_graph(network, classes, learning_rate, tutor_learning_rate, t
     # Work out which class is larger and make 1 positive and 0 negative
     X = tf.nn.softmax(X)
 
+    unweighted_means = []
     for i, c in enumerate(classes):
       name = c[0]
       with tf.name_scope(name.title()):
@@ -263,6 +264,9 @@ def build_training_graph(network, classes, learning_rate, tutor_learning_rate, t
         weights = tf.gather_nd(W, idx)
         unweighted = tf.gather_nd(unweighted_mesh_loss, idx)
 
+        # Store the unweighted means here for the global unweighted loss
+        unweighted_means.append(tf.reduce_mean(unweighted))
+
         # Get our confusion matrix
         tp = tf.cast(tf.count_nonzero(predictions * labels), tf.float32)
         tn = tf.cast(tf.count_nonzero((predictions - 1) * (labels - 1)), tf.float32)
@@ -270,14 +274,18 @@ def build_training_graph(network, classes, learning_rate, tutor_learning_rate, t
         fn = tf.cast(tf.count_nonzero((predictions - 1) * labels), tf.float32)
 
         # Calculate our confusion matrix
-        validation_summary.append(tf.summary.scalar('Loss', tf.reduce_sum(tf.multiply(unweighted, weights))))
+        validation_summary.append(tf.summary.scalar('Tutored Loss', tf.reduce_sum(tf.multiply(unweighted, weights))))
+        validation_summary.append(tf.summary.scalar('Untutored Loss', unweighted_means[-1]))
         validation_summary.append(tf.summary.scalar('Precision', tp / (tp + fp)))
         validation_summary.append(tf.summary.scalar('Recall', tp / (tp + fn)))
         validation_summary.append(tf.summary.scalar('Accuracy', (tp + tn) / (tp + fp + tn + fn)))
 
     with tf.name_scope('Global'):
+      active_classes = tf.cast(tf.count_nonzero(tf.stack([tf.count_nonzero(m) for m in unweighted_means])), tf.float32)
+      unweighted_mesh_loss = tf.divide(tf.add_n(unweighted_means), active_classes)
       # Monitor loss and metrics
-      validation_summary.append(tf.summary.scalar('Mesh Loss', weighted_mesh_loss))
+      validation_summary.append(tf.summary.scalar('Untutored Mesh Loss', unweighted_mesh_loss))
+      validation_summary.append(tf.summary.scalar('Tutored Mesh Loss', weighted_mesh_loss))
       validation_summary.append(tf.summary.scalar('Tutor Loss', tutor_loss))
 
   with tf.name_scope('MeshImage'):
