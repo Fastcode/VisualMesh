@@ -48,15 +48,15 @@ namespace geometry {
     Scalar phi(const Scalar& phi_n, const Scalar& h) const {
 
       // If we are beyond our max distance return nan
-      if (std::abs(h) * tan(phi_n > M_PI_2 ? M_PI - phi_n : phi_n) > d) {
+      if (std::abs(h) * std::tan(phi_n > M_PI_2 ? M_PI - phi_n : phi_n) > d) {
         return std::numeric_limits<Scalar>::quiet_NaN();
       }
 
       // Valid below the horizon
-      if (h > 0 && phi_n < M_PI_2) { return atan((2 * r / k + h * tan(phi_n)) / h); }
+      if (h > 0 && phi_n < M_PI_2) { return std::atan((2 * r / k + h * std::tan(phi_n)) / h); }
       // Valid above the horizon
       else if (h < 0 && phi_n > M_PI_2) {
-        return M_PI - atan((2 * r / k - h * tan(M_PI - phi_n)) / -h);
+        return M_PI - std::atan((2 * r / k - h * std::tan(M_PI - phi_n)) / -h);
       }
       // Other situations are invalid so return NaN
       else {
@@ -78,10 +78,10 @@ namespace geometry {
       if (std::abs(h) * tan(phi > M_PI_2 ? M_PI - phi : phi) > d) { return std::numeric_limits<Scalar>::quiet_NaN(); }
 
       // Valid below the horizon
-      if (h > 0 && phi < M_PI_2) { return 2 * asin(r / (h * tan(phi) + r)) / k; }
+      if (h > 0 && phi < M_PI_2) { return 2 * std::asin(r / (h * std::tan(phi) + r)) / k; }
       // Valid above the horizon
       else if (h < 0 && phi > M_PI_2) {
-        return 2 * asin(r / (-h * tan(M_PI - phi) + r)) / k;
+        return 2 * std::asin(r / (-h * std::tan(M_PI - phi) + r)) / k;
       }
       // Other situations are invalid so return NaN
       else {
@@ -89,9 +89,9 @@ namespace geometry {
       }
     }
 
-    // The radius of the sphere
+    // The radius of the circle
     Scalar r;
-    // The number of intersections the mesh should have with this sphere
+    // The number of intersections the mesh should have with this circle
     unsigned int k;
     /// The maximum distance we want to see this object
     Scalar d;

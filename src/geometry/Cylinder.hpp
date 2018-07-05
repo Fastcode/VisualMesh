@@ -19,6 +19,7 @@
 #define VISUALMESH_GEOMETRY_CYLINDER_HPP
 
 #include "Sphere.hpp"
+#include <cmath>
 
 namespace visualmesh {
 namespace geometry {
