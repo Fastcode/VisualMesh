@@ -28,5 +28,11 @@ docs/doxygen
 docs/doxygen_sqlite3.db
 *.sublime-workspace
 
+# Compiled python
 *.pyc
-output
+
+# Default output location for data
+/output
+
+# Location for raw input data
+/data
