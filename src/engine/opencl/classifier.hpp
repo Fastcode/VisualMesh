@@ -126,7 +126,7 @@ namespace engine {
 
             // Read the ones for our own index
             for (int j = 0; j < conv_in_size; ++j) {
-              code << "    input[idx * " << conv_in_size << " + " << j << "]";
+              code << "    input[idx * " << conv_in_size << " + " << j << "]," << std::endl;
             }
 
             // Read our neighbourhood
