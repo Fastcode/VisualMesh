@@ -76,6 +76,8 @@ namespace engine {
 
         // Based on the fourcc code, load the data from the image into input
         input.reserve(n_points * 4);
+        const int R = ('R' == (format & 0xFF) ? 0 : 2);
+        const int B = ('R' == (format & 0xFF) ? 2 : 0);
         switch (format) {
           case fourcc("RGB8"):
           case fourcc("RGB3"):
@@ -87,9 +89,9 @@ namespace engine {
 
               int c = (std::round(px[1]) * lens.dimensions[0] + std::round(px[0])) * 3;
 
-              input.emplace_back(im[c + ('R' == (format & 0xFF) ? 0 : 2)] * Scalar(1.0 / 255.0));
+              input.emplace_back(im[c + R] * Scalar(1.0 / 255.0));
               input.emplace_back(im[c + 1] * Scalar(1.0 / 255.0));
-              input.emplace_back(im[c + ('R' == (format & 0xFF) ? 2 : 0)] * Scalar(1.0 / 255.0));
+              input.emplace_back(im[c + B] * Scalar(1.0 / 255.0));
               input.emplace_back(0.0);
             }
             break;
@@ -101,9 +103,9 @@ namespace engine {
 
               int c = (std::round(px[1]) * lens.dimensions[0] + std::round(px[0])) * 4;
 
-              input.emplace_back(im[c + ('R' == (format & 0xFF) ? 0 : 2)] * Scalar(1.0 / 255.0));
+              input.emplace_back(im[c + R] * Scalar(1.0 / 255.0));
               input.emplace_back(im[c + 1] * Scalar(1.0 / 255.0));
-              input.emplace_back(im[c + ('R' == (format & 0xFF) ? 2 : 0)] * Scalar(1.0 / 255.0));
+              input.emplace_back(im[c + B] * Scalar(1.0 / 255.0));
               input.emplace_back(im[c + 3] * Scalar(1.0 / 255.0));
             }
             break;
