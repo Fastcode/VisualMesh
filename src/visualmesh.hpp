@@ -29,7 +29,7 @@ namespace visualmesh {
 
 /**
  * An aggregate of many Visual Meshs at different heights that can be looked up
- * Provides convience functions for accessing projection and classification of the mesh using different engines.
+ * Provides convenience functions for accessing projection and classification of the mesh using different engines.
  * The available engines are currently limited to OpenCL and CPU, however CUDA and Vulkan can be added later.
  *
  * @tparam Scalar the type that will hold the vectors <float, double>
@@ -106,9 +106,9 @@ public:
   }
 
   /**
-   * Performs a visual mesh lookupusing the description of the lens provided to find visual mesh points on the image.
+   * Performs a visual mesh lookup using the description of the lens provided to find visual mesh points on the image.
    *
-   * @param Hoc   A 4x4 homogenous transformation matrix that transforms from the observation plane to camera space.
+   * @param Hoc   A 4x4 homogeneous transformation matrix that transforms from the observation plane to camera space.
    * @param lens  A description of the lens used to project the mesh.
    *
    * @return      the mesh that was used for this lookup and a vector of start/end indices that are on the screen.
@@ -125,10 +125,10 @@ public:
   /**
    * Project a segment of the visual mesh onto an image.
    *
-   * @param Hoc   A 4x4 homogenous transformation matrix that transforms from the camera space to the observation plane.
-   * @param lens  A description of the lens used to project the mesh.
+   * @param Hoc  A 4x4 homogeneous transformation matrix that transforms from the camera space to the observation plane.
+   * @param lens A description of the lens used to project the mesh.
    *
-   * @return      the pixel coordinates that the visual mesh projects to, and the neighbourhood graph for those points.
+   * @return     the pixel coordinates that the visual mesh projects to, and the neighbourhood graph for those points.
    */
   ProjectedMesh<Scalar> project(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
 
