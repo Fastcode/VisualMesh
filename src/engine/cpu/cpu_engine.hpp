@@ -34,13 +34,13 @@ namespace engine {
     private:
       vec2<Scalar> project_equidistant(const vec4<Scalar>& p, const Lens<Scalar>& lens) const {
         // Calculate some intermediates
-        Scalar theta     = std::acos(p[0]);
-        Scalar r         = lens.focal_length * theta;
-        Scalar sin_theta = std::sin(theta);
+        Scalar theta      = std::acos(p[0]);
+        Scalar r          = lens.focal_length * theta;
+        Scalar rsin_theta = static_cast<Scalar>(1) / std::sqrt(static_cast<Scalar>(1) - p[0] * p[0]);
 
         // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
         vec2<Scalar> screen = p[0] >= 1 ? vec2<Scalar>{{static_cast<Scalar>(0.0), static_cast<Scalar>(0.0)}}
-                                        : vec2<Scalar>{{r * p[1] / sin_theta, r * p[2] / sin_theta}};
+                                        : vec2<Scalar>{{r * p[1] * rsin_theta, r * p[2] * rsin_theta}};
 
         // Apply our offset to move into image space (0 at top left, x to the right, y down)
         // Then apply the offset to the centre of our lens
@@ -51,13 +51,13 @@ namespace engine {
 
       vec2<Scalar> project_equisolid(const vec4<Scalar>& p, const Lens<Scalar>& lens) const {
         // Calculate some intermediates
-        Scalar theta     = std::acos(p[0]);
-        Scalar r         = static_cast<Scalar>(2.0) * lens.focal_length * std::sin(theta * static_cast<Scalar>(0.5));
-        Scalar sin_theta = std::sin(theta);
+        Scalar theta      = std::acos(p[0]);
+        Scalar r          = static_cast<Scalar>(2.0) * lens.focal_length * std::sin(theta * static_cast<Scalar>(0.5));
+        Scalar rsin_theta = static_cast<Scalar>(1) / std::sqrt(static_cast<Scalar>(1) - p[0] * p[0]);
 
         // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
         vec2<Scalar> screen = p[0] >= 1 ? vec2<Scalar>{{static_cast<Scalar>(0.0), static_cast<Scalar>(0.0)}}
-                                        : vec2<Scalar>{{r * p[1] / sin_theta, r * p[2] / sin_theta}};
+                                        : vec2<Scalar>{{r * p[1] * rsin_theta, r * p[2] * rsin_theta}};
 
         // Apply our offset to move into image space (0 at top left, x to the right, y down)
         // Then apply the offset to the centre of our lens
