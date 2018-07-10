@@ -48,7 +48,7 @@ namespace geometry {
     Scalar phi(const Scalar& phi_n, const Scalar& h) const {
 
       // If we are beyond our max distance return nan
-      if (std::abs(h) * tan(phi_n > M_PI_2 ? M_PI - phi_n : phi_n) > d) {
+      if (std::abs(h) * std::tan(phi_n > M_PI_2 ? M_PI - phi_n : phi_n) > d) {
         return std::numeric_limits<Scalar>::quiet_NaN();
       }
 
