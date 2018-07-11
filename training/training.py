@@ -460,20 +460,28 @@ def train(sess, config, output_path):
 
       # Every N steps save our model
       if tf.train.global_step(sess, global_step) % save_frequency == 0:
-
-        # Save the model in tf format
         saver.save(sess, model_path, tf.train.global_step(sess, global_step))
-
-        # Save our model in yaml format
         save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
 
-      # Every N steps save our model
+      # Every N steps show our image summary
       if tf.train.global_step(sess, global_step) % image_frequency == 0:
-
-        # Output the images
         summary = sess.run(image_summary, feed_dict={net['handle']: image_handle})
         summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
+    # We have finished the dataset
     except tf.errors.OutOfRangeError:
+
+      # Do a validation step
+      summary, = sess.run([validation_summary], feed_dict={net['handle']: validation_handle})
+      summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+
+      # Output some images
+      summary = sess.run(image_summary, feed_dict={net['handle']: image_handle})
+      summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+
+      # Save the model
+      saver.save(sess, model_path, tf.train.global_step(sess, global_step))
+      save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
+
       print('Training done')
       break
