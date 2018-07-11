@@ -224,7 +224,8 @@ class VisualMeshDataset:
     X = tf.image.convert_image_dtype(X, tf.float32)
 
     # Get the indices that represent the end points
-    ends = tf.cast(tf.scatter_nd(tf.cumsum(n) - 1, tf.ones_like(n), [tf.shape(X)[0]]), tf.bool)
+    idx = tf.expand_dims(tf.cumsum(n) - 1, axis=-1)
+    ends = tf.cast(tf.scatter_nd(idx, tf.ones_like(n), [tf.shape(X)[0]]), tf.bool)
 
     # Swap out those points for values of -1
     X = tf.where(ends, x=tf.ones_like(X) * -1, y=X)
