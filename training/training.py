@@ -31,7 +31,7 @@ def save_yaml_model(sess, output_path, global_step):
   # Convert the keys into useful data
   items = []
   for k, v in variables.items():
-    info = re.match(r'mesh/Conv_(\d+)/Layer_(\d+)/(Weights|Biases):0', k)
+    info = re.match(r'MeshNetwork/Conv_(\d+)/Layer_(\d+)/(Weights|Biases):0', k)
     if info:
       items.append(((int(info.group(1)), int(info.group(2)), info.group(3).lower()), v))
 
@@ -275,7 +275,7 @@ def build_training_graph(network, classes, learning_rate, tutor_learning_rate, t
 
         # Calculate our confusion matrix
         validation_summary.append(tf.summary.scalar('Tutored Loss', tf.reduce_sum(tf.multiply(unweighted, weights))))
-        validation_summary.append(tf.summary.scalar('Untutored Loss', unweighted_means[-1]))
+        validation_summary.append(tf.summary.scalar('True Loss', unweighted_means[-1]))
         validation_summary.append(tf.summary.scalar('Precision', tp / (tp + fp)))
         validation_summary.append(tf.summary.scalar('Recall', tp / (tp + fn)))
         validation_summary.append(tf.summary.scalar('Accuracy', (tp + tn) / (tp + fp + tn + fn)))
@@ -284,7 +284,7 @@ def build_training_graph(network, classes, learning_rate, tutor_learning_rate, t
       active_classes = tf.cast(tf.count_nonzero(tf.stack([tf.count_nonzero(m) for m in unweighted_means])), tf.float32)
       unweighted_mesh_loss = tf.divide(tf.add_n(unweighted_means), active_classes)
       # Monitor loss and metrics
-      validation_summary.append(tf.summary.scalar('Untutored Mesh Loss', unweighted_mesh_loss))
+      validation_summary.append(tf.summary.scalar('True Mesh Loss', unweighted_mesh_loss))
       validation_summary.append(tf.summary.scalar('Tutored Mesh Loss', weighted_mesh_loss))
       validation_summary.append(tf.summary.scalar('Tutor Loss', tutor_loss))
 
