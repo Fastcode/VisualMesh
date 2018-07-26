@@ -75,7 +75,14 @@ public:
     auto range = luts.equal_range(height);
 
     // If we reached the end of the list return the lower bound
-    if (range.second == luts.end()) { return range.first->second; }
+    if (range.second == luts.end()) {
+      if (ranges.first == luts.end()) {  // We are off the larger end
+        return luts.rbegin()->second;
+      }
+      else {  // We are off the smaller end
+        return luts.begin()->second;
+      }
+    }
     // Otherwise see which is closer
     else if (std::abs(range.first->first - height) < std::abs(range.second->first - height)) {
       return range.first->second;
