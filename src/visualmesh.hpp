@@ -76,7 +76,7 @@ public:
 
     // If we reached the end of the list return the lower bound
     if (range.second == luts.end()) {
-      if (ranges.first == luts.end()) {  // We are off the larger end
+      if (range.first == luts.end()) {  // We are off the larger end
         return luts.rbegin()->second;
       }
       else {  // We are off the smaller end
