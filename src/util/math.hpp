@@ -36,14 +36,26 @@ using mat3 = std::array<vec3<Scalar>, 3>;
 template <typename Scalar>
 using mat4 = std::array<vec4<Scalar>, 4>;
 
-// I could use Eigen for this, but if I use just the stl, at least nobody will have library problems
-template <typename Scalar>
-inline constexpr Scalar dot(const vec3<Scalar>& a, const vec3<Scalar>& b) {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-template <typename Scalar>
-inline constexpr Scalar dot(const vec4<Scalar>& a, const vec4<Scalar>& b) {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+template <typename T, std::size_t I>
+struct Dot;
+
+template <typename Scalar, std::size_t L>
+struct Dot<std::array<Scalar, L>, L - 1> {
+  static inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+    return a.back() * b.back();
+  }
+};
+
+template <typename Scalar, std::size_t L, std::size_t I>
+struct Dot<std::array<Scalar, L>, I> {
+  static inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+    return a[I] * b[I] + Dot<std::array<Scalar, L>, I + 1>::dot(a, b);
+  }
+};
+
+template <typename Scalar, std::size_t L>
+Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+  return Dot<std::array<Scalar, L>, 0>::dot(a, b);
 }
 
 template <typename Scalar>
@@ -63,10 +75,11 @@ inline constexpr mat4<Scalar> transpose(const mat4<Scalar> mat) {
                        vec4<Scalar>{{mat[0][3], mat[1][3], mat[2][3], mat[3][3]}}}};
 }
 
-template <typename Scalar>
-inline constexpr vec3<Scalar> normalise(const vec3<Scalar>& a) {
-  Scalar length = Scalar(1.0) / std::sqrt(a[0] * a[0] + a[1] * a[1] + a[2] + a[2]);
-  return {{a[0] * length, a[1] * length, a[2] * length}};
+template <typename Scalar, std::size_t L>
+inline constexpr std::array<Scalar, L> normalise(std::array<Scalar, L> a) {
+  const Scalar len = static_cast<Scalar>(1.0) / std::sqrt(dot(a, a));
+  std::transform(a.begin(), a.end(), [len](const Scalar& s) { return s * len; });
+  return a;
 }
 }  // namespace visualmesh
 
