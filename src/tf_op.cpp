@@ -162,14 +162,14 @@ public:
 };
 
 REGISTER_KERNEL_BUILDER(
-  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<int32_t>("U"),
-  VisualMeshOp<float, int32_t>);
+  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<tensorflow::int32>("U"),
+  VisualMeshOp<float, tensorflow::int32>);
 REGISTER_KERNEL_BUILDER(
-  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<int64_t>("U"),
-  VisualMeshOp<float, int64_t>);
+  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<tensorflow::int64>("U"),
+  VisualMeshOp<float, tensorflow::int64>);
 REGISTER_KERNEL_BUILDER(
-  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T").TypeConstraint<int32_t>("U"),
-  VisualMeshOp<double, int32_t>);
+  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T").TypeConstraint<tensorflow::int32>("U"),
+  VisualMeshOp<double, tensorflow::int32>);
 REGISTER_KERNEL_BUILDER(
-  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T").TypeConstraint<int64_t>("U"),
-  VisualMeshOp<double, int64_t>);
+  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T").TypeConstraint<tensorflow::int64>("U"),
+  VisualMeshOp<double, tensorflow::int64>);

@@ -14,16 +14,6 @@
         "EQUISOLID",
         "convolutional"
     ],
-    "files.associations": {
-        "__split_buffer": "cpp",
-        "list": "cpp",
-        "vector": "cpp",
-        "__bit_reference": "cpp",
-        "__string": "cpp",
-        "__tree": "cpp",
-        "string_view": "cpp",
-        "map": "cpp",
-        "set": "cpp",
-        "string": "cpp"
-    },
+    "python.pythonPath": "/usr/bin/python3",
+    "opencl.formatting.name": "clang-format",
 }

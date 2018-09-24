@@ -40,22 +40,22 @@ template <typename T, std::size_t I>
 struct Dot;
 
 template <typename Scalar, std::size_t L>
-struct Dot<std::array<Scalar, L>, L - 1> {
-  static inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
-    return a.back() * b.back();
+struct Dot<std::array<Scalar, L>, 0> {
+  static Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+    return a[0] * b[0];
   }
 };
 
 template <typename Scalar, std::size_t L, std::size_t I>
 struct Dot<std::array<Scalar, L>, I> {
-  static inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
-    return a[I] * b[I] + Dot<std::array<Scalar, L>, I + 1>::dot(a, b);
+  static Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+    return a[I] * b[I] + Dot<std::array<Scalar, L>, I - 1>::dot(a, b);
   }
 };
 
 template <typename Scalar, std::size_t L>
 Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
-  return Dot<std::array<Scalar, L>, 0>::dot(a, b);
+  return Dot<std::array<Scalar, L>, L - 1>::dot(a, b);
 }
 
 template <typename Scalar>
