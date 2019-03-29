@@ -85,10 +85,10 @@ namespace geometry {
       }
 
       // Valid below the horizon
-      if (h > 0 && phi < M_PI_2) { return 2 * std::asin(r / (h * std::tan(phi) + r)) / k; }
+      if (h > 0 && phi < M_PI_2) { return 2 * std::asin(r / ((h-r) * std::tan(phi)) / k; }
       // Valid above the horizon
       else if (h < 0 && phi > M_PI_2) {
-        return 2 * std::asin(r / (-h * std::tan(M_PI - phi) + r)) / k;
+        return 2 * std::asin(r / (-(h-r) * std::tan(M_PI - phi))) / k;
       }
       // Other situations are invalid so return NaN
       else {
