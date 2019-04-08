@@ -4,7 +4,6 @@ import tensorflow as tf
 import os
 import re
 import math
-import multiprocessing
 
 # Load the visual mesh op
 op_file = os.path.join(os.path.dirname(__file__), 'visualmesh_op.so')
@@ -40,7 +39,7 @@ class VisualMeshDataset:
     else:
       raise Exception('Unknown geometry type {}'.format(self.geometry))
 
-  def load_example(self, proto):
+  def _load_example(self, proto):
     example = tf.parse_single_example(
       proto, {
         'image': tf.FixedLenFeature([], tf.string),
@@ -66,7 +65,7 @@ class VisualMeshDataset:
       'raw': example['image'],
     }
 
-  def project_mesh(self, args):
+  def _project_mesh(self, args):
 
     height = args['height']
     orientation = args['orientation']
@@ -120,37 +119,15 @@ class VisualMeshDataset:
 
     # Round to integer pixels
     # TODO one day someone could do linear interpolation here, like what happens in the OpenCL version
-    pixels = tf.cast(tf.round(pixels), dtype=tf.int32)
+    int_pixels = tf.cast(tf.round(pixels), dtype=tf.int32)
 
     # Select the points in the network and discard the old dictionary data
     # We pad one extra point at the end for the offscreen point
-    return {
-      'X': tf.pad(tf.gather_nd(args['image'], pixels), [[0, 1], [0, 0]]),
-      'Y': tf.pad(tf.gather_nd(args['mask'], pixels), [[0, 1], [0, 0]]),
-      'G': neighbours,
-      'px': pixels,
-      'raw': args['raw'],
-    }
+    return tf.gather_nd(args['image'], int_pixels), tf.gather_nd(args['mask'], int_pixels), neighbours, pixels
 
-  def flatten_batch(self, args):
-
-    # This adds an offset to the graph indices so they will be correct once flattened
-    G = args['G'] + tf.cumsum(args['n'], exclusive=True)[:, tf.newaxis, tf.newaxis]
-
-    # Find the indices of valid points from the mask
-    idx = tf.where(tf.squeeze(args['m'], axis=-1))
-
-    # Use this to lookup each of the vectors
-    X = tf.gather_nd(args['X'], idx)
-    Y = tf.gather_nd(args['Y'], idx)
-    G = tf.gather_nd(G, idx)
-
-    return {'X': X, 'Y': Y, 'G': G, 'n': args['n'], 'px': args['px'], 'raw': args['raw']}
-
-  def expand_classes(self, args):
+  def _expand_classes(self, Y):
 
     # Expand the classes from colours into individual columns
-    Y = args['Y']
     W = tf.image.convert_image_dtype(Y[:, 3], tf.float32)  # Alpha channel
     cs = []
     for name, value in self.classes:
@@ -163,11 +140,7 @@ class VisualMeshDataset:
       )
     Y = tf.stack(cs, axis=-1)
 
-    return {
-      **args,
-      'Y': Y,
-      'W': W,
-    }
+    return Y, W
 
   def apply_variants(self, args):
     # Cast the image to a floating point value and make it into an image shape
@@ -216,67 +189,78 @@ class VisualMeshDataset:
 
     return {**args, 'X': tf.squeeze(tf.image.convert_image_dtype(X, tf.uint8), 0)}
 
-  def set_offscreen(self, args):
-    X = args['X']
-    n = args['n']
+  def _reduce_batch(self, state, proto):
 
-    # Convert image to floats
-    X = tf.image.convert_image_dtype(X, tf.float32)
+    # Load the example from the proto
+    example = self._load_example(proto)
 
-    # Get the indices that represent the end points
-    idx = tf.expand_dims(tf.cumsum(n) - 1, axis=-1)
-    ends = tf.cast(tf.scatter_nd(idx, tf.ones_like(n), [tf.shape(X)[0]]), tf.bool)
+    # Project the visual mesh for this example
+    X, Y, G, px = self._project_mesh(example)
 
-    # Swap out those points for values of -1
-    X = tf.where(ends, x=tf.ones_like(X) * -1, y=X)
+    # Expand the classes for this value
+    Y, W = self._expand_classes(Y)
 
-    return {**args, 'X': X}
+    # Add the size of this element on to our n vector
+    n = tf.concat([state['n'], tf.expand_dims(tf.shape(X)[0], axis=0)], axis=0)
+
+    # Concatenate X with the new X, and move the -1 to the end for the null point
+    X = tf.image.convert_image_dtype(X, dtype=tf.float32)
+    X = tf.concat([state['X'][:-1], X, state['X'][-1:]], axis=0)
+
+    # Concatenate the Y, W, px and raw vectors
+    Y = tf.concat([state['Y'], Y], axis=0)
+    W = tf.concat([state['W'], W], axis=0)
+    px = tf.concat([state['px'], px], axis=0)
+    raw = tf.concat([state['raw'], tf.expand_dims(example['raw'], axis=0)], axis=0)
+
+    # Concatenate the graph, and adjust the offsets to be consistent
+    # Also update the coordinate of the null point for existing state
+    n_elems = tf.shape(state['Y'])[0]
+    G = tf.concat(
+      [
+        tf.where(
+          state['G'][:-1] == n_elems,
+          tf.broadcast_to(n_elems + n[-1], shape=tf.shape(state['G'][:-1])),
+          state['G'][:-1],
+        ),
+        G + n_elems,
+      ],
+      axis=0,
+    )
+
+    # Return the results
+    return {'X': X, 'Y': Y, 'W': W, 'n': n, 'G': G, 'px': px, 'raw': raw}
 
   def build(self):
-    # Load our dataset
-    dataset = tf.data.TFRecordDataset(self.input_files)
-    dataset = dataset.map(self.load_example, num_parallel_calls=multiprocessing.cpu_count())
 
-    # Before we get to the point of making variants etc, shuffle here
-    if self.shuffle_buffer_size > 0:
-      dataset = dataset.shuffle(buffer_size=self.shuffle_buffer_size)
+    # Load our dataset records
+    dataset = tf.data.TFRecordDataset(self.input_files, buffer_size=2**30)
 
-    # Project the visual mesh and select the appropriate pixels
-    dataset = dataset.map(self.project_mesh, num_parallel_calls=multiprocessing.cpu_count())
+    # Window the dataset by our batch size
+    dataset = dataset.window(self.batch_size)
 
-    # Batch the visual mesh by concatenating meshes and graphs and updating the graph coordinates to match
+    # Apply our reduction function to project/squash our dataset into a batch
     dataset = dataset.map(
-      lambda args: {
-        **args,
-        'n': tf.shape(args['X'])[0],
-        'm': tf.fill((tf.shape(args['X'])[0], 1), True)}
+      lambda ds: ds.reduce(
+        {
+          'X': tf.ones([1, 3], dtype=tf.float32) * -1,  # -1 for null point that will always be at the end
+          'Y': tf.zeros([0, len(self.classes)], dtype=tf.float32),  # 0 * num classes
+          'W': tf.zeros([0], dtype=tf.float32),  # 0 length Weights
+          'G': tf.zeros([0, 7], dtype=tf.int32),  # 0 size Graph Degree
+          'n': tf.zeros([1], dtype=tf.int32),  # A single element for the start of the first element
+          'px': tf.zeros([0, 2], dtype=tf.float32),  # 0 * 2 pixel coordinates
+          'raw':
+            tf.zeros([0], dtype=tf.string)  # List of raw images
+        },
+        self._reduce_batch
+      ),
+      num_parallel_calls=tf.data.experimental.AUTOTUNE
     )
-    dataset = dataset.prefetch(self.batch_size * 2)
-    dataset = dataset.padded_batch(
-      batch_size=self.batch_size,
-      padded_shapes={
-        'X': (None, 3),
-        'Y': (None, 4),
-        'G': (None, 7),
-        'n': (),
-        'm': (None, 1),
-        'px': (None, 2),
-        'raw': (),
-      },
-    )
-    dataset = dataset.map(self.flatten_batch, num_parallel_calls=multiprocessing.cpu_count())
 
-    # Expand the classes
-    dataset = dataset.map(self.expand_classes, num_parallel_calls=multiprocessing.cpu_count())
+    dataset = dataset.prefetch(10)
 
-    # Apply visual variations to the data
-    if 'image' in self.variants:
-      dataset = dataset.map(self.apply_variants, num_parallel_calls=multiprocessing.cpu_count())
-
-    # Finally, convert our image to float and make our offscreen point -1
-    dataset = dataset.map(self.set_offscreen, num_parallel_calls=multiprocessing.cpu_count())
-
-    # And prefetch 2
-    dataset = dataset.prefetch(2)
+    # And prefetch
+    dataset = dataset.apply(tf.data.experimental.copy_to_device('/device:GPU:0'))
+    dataset = dataset.prefetch(5)
 
     return dataset

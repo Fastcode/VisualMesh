@@ -72,7 +72,8 @@ def build(groups, n_classes, tutor_groups):
   # Our iterator handle
   handle = tf.placeholder(tf.string, shape=[])
 
-  # Make our iterator
+  # Make our iterator on the CPU
+  with tf.device("/device:CPU:0"):
   iterator = tf.data.Iterator.from_string_handle(
     handle, {
       'X': tf.float32,
@@ -80,7 +81,7 @@ def build(groups, n_classes, tutor_groups):
       'G': tf.int32,
       'W': tf.float32,
       'n': tf.int32,
-      'px': tf.int32,
+        'px': tf.float32,
       'raw': tf.string,
     }, {
       'X': [None, 3],
@@ -88,7 +89,7 @@ def build(groups, n_classes, tutor_groups):
       'G': [None, graph_degree],
       'W': [None],
       'n': [None],
-      'px': [None, None, 2],
+        'px': [None, 2],
       'raw': [None],
     }
   )
