@@ -46,7 +46,7 @@ def build_network(X, G, groups):
           )
 
           # Apply our weights and biases
-          logits = tf.matmul(logits, W)
+          logits = tf.nn.xw_plus_b(logits, W, b)
           logits = tf.add(logits, b)
 
           # Apply our activation function except for the last layer

@@ -197,7 +197,7 @@ def build_training_graph(network, classes, learning_rate, tutor_learning_rate, t
     # Our loss function
     with tf.name_scope('Loss'):
       # Unweighted loss, before the tutor decides which samples are more important
-      unweighted_mesh_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=X, labels=Y, dim=1)
+      unweighted_mesh_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=X, labels=Y, axis=1)
 
       # Calculate the labels for the tutor
       a_labels = tf.reduce_sum(tf.abs(tf.subtract(Y, tf.nn.softmax(X, axis=1))), axis=1) / 2.0
@@ -455,7 +455,7 @@ def train(sess, config, output_path):
 
       # Every N steps do our validation/summary step
       if tf.train.global_step(sess, global_step) % validation_frequency == 0:
-        summary, = sess.run([validation_summary], feed_dict={net['handle']: validation_handle})
+        summary = sess.run(validation_summary, feed_dict={net['handle']: validation_handle})
         summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
       # Every N steps save our model
