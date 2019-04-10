@@ -47,7 +47,6 @@ def build_network(X, G, groups):
 
           # Apply our weights and biases
           logits = tf.nn.xw_plus_b(logits, W, b)
-          logits = tf.add(logits, b)
 
           # Apply our activation function except for the last layer
           if i + 1 < len(groups) or j + 1 < len(c):
@@ -74,25 +73,25 @@ def build(groups, n_classes, tutor_groups):
 
   # Make our iterator on the CPU
   with tf.device("/device:CPU:0"):
-  iterator = tf.data.Iterator.from_string_handle(
-    handle, {
-      'X': tf.float32,
-      'Y': tf.float32,
-      'G': tf.int32,
-      'W': tf.float32,
-      'n': tf.int32,
+    iterator = tf.data.Iterator.from_string_handle(
+      handle, {
+        'X': tf.float32,
+        'Y': tf.float32,
+        'G': tf.int32,
+        'W': tf.float32,
+        'n': tf.int32,
         'px': tf.float32,
-      'raw': tf.string,
-    }, {
-      'X': [None, 3],
-      'Y': [None, n_classes],
-      'G': [None, graph_degree],
-      'W': [None],
-      'n': [None],
+        'raw': tf.string,
+      }, {
+        'X': [None, 3],
+        'Y': [None, n_classes],
+        'G': [None, graph_degree],
+        'W': [None],
+        'n': [None],
         'px': [None, 2],
-      'raw': [None],
-    }
-  )
+        'raw': [None],
+      }
+    )
 
   # Get values from our iterator
   data = iterator.get_next()

@@ -201,7 +201,7 @@ class VisualMeshDataset:
     Y, W = self._expand_classes(Y)
 
     # Add the size of this element on to our n vector
-    n = tf.concat([state['n'], tf.expand_dims(tf.shape(X)[0], axis=0)], axis=0)
+    n = tf.concat([state['n'], state['n'][-1] + tf.expand_dims(tf.shape(X)[0], axis=0)], axis=0)
 
     # Concatenate X with the new X, and move the -1 to the end for the null point
     X = tf.image.convert_image_dtype(X, dtype=tf.float32)
@@ -215,15 +215,16 @@ class VisualMeshDataset:
 
     # Concatenate the graph, and adjust the offsets to be consistent
     # Also update the coordinate of the null point for existing state
-    n_elems = tf.shape(state['Y'])[0]
+    current_n_elems = tf.shape(state['Y'])[0]
+    next_n_elems = tf.shape(Y)[0]
     G = tf.concat(
       [
         tf.where(
-          state['G'][:-1] == n_elems,
-          tf.broadcast_to(n_elems + n[-1], shape=tf.shape(state['G'][:-1])),
+          state['G'][:-1] == current_n_elems,
+          tf.broadcast_to(next_n_elems, shape=tf.shape(state['G'][:-1])),
           state['G'][:-1],
         ),
-        G + n_elems,
+        G + current_n_elems,
       ],
       axis=0,
     )

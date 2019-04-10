@@ -428,6 +428,7 @@ def train(sess, config, output_path):
     variants={},  # No variations for images
   ).build().make_one_shot_iterator().get_next()
   # Make a dataset with a single element for generating images off
+  # TODO replace this with tf.data.experimental.get_single_element(image_dataset)
   image_dataset = tf.data.Dataset.from_tensors(sess.run(image_dataset)
                                               ).repeat().make_one_shot_iterator().string_handle()
 
@@ -437,11 +438,12 @@ def train(sess, config, output_path):
   while True:
     try:
       # Run our training step
-      start = time.time()
+      start = time.perf_counter()
+
       summary, ml, al, _, __, = sess.run([training_summary, mesh_loss, tutor_loss, mesh_optimiser, tutor_optimiser],
                                          feed_dict={net['handle']: training_handle})
       summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-      end = time.time()
+      end = time.perf_counter()
 
       # Print batch info
       print(
