@@ -22,7 +22,7 @@ class VisualMeshDataset:
     self.geometry = tf.constant(geometry['shape'], dtype=tf.string, name='GeometryType')
     self.shuffle_buffer_size = shuffle_size
 
-    self.variants = variants
+    self._variants = variants
 
     # Convert our geometry into a set of numbers
     if geometry['shape'] in ['CIRCLE', 'SPHERE']:
@@ -71,8 +71,8 @@ class VisualMeshDataset:
     orientation = args['orientation']
 
     # Adjust our height and orientation
-    if 'mesh' in self.variants:
-      v = self.variants['mesh']
+    if 'mesh' in self._variants:
+      v = self._variants['mesh']
       if 'height' in v:
         height = height + tf.truncated_normal(
           shape=(),
@@ -127,6 +127,7 @@ class VisualMeshDataset:
     y_w = pixels[:, 0] - y_0
     x_w = pixels[:, 1] - x_0
 
+
     # Pixel coordinates to values to weighted values to X
     p_idx = [
       tf.cast(tf.stack([a, b], axis=-1), tf.int32) for a, b in [
@@ -136,9 +137,11 @@ class VisualMeshDataset:
         (y_1, x_1),
       ]
     ]
-    p_val = [tf.gather_nd(args['image'], idx) for idx in p_idx]
+    p_val = [
+      tf.image.convert_image_dtype(tf.gather_nd(args['image'], idx), tf.float32) for idx in p_idx
+    ]
     p_weighted = [
-      tf.multiply(val, w) for val, w in zip(
+      tf.multiply(val, tf.expand_dims(w, axis=-1)) for val, w in zip(
         p_val, [
           tf.multiply(1 - y_w, 1 - x_w),
           tf.multiply(1 - y_w, x_w),
@@ -150,7 +153,7 @@ class VisualMeshDataset:
     X = tf.add_n(p_weighted)
 
     # For the segmentation just use the nearest neighbour
-    Y = tf.gather_nd(args['mask'], tf.round(pixels))
+    Y = tf.gather_nd(args['mask'], tf.cast(tf.round(pixels), tf.int32))
 
     return X, Y, neighbours, pixels
 
@@ -176,7 +179,7 @@ class VisualMeshDataset:
     X = tf.expand_dims(X, axis=0)
 
     # Apply the variants that were listed
-    var = self.variants['image']
+    var = self._variants['image']
     if 'brightness' in var and var['brightness']['stddev'] > 0:
       X = tf.image.adjust_brightness(
         X, tf.truncated_normal(
@@ -228,7 +231,8 @@ class VisualMeshDataset:
     X, Y, G, px = self._project_mesh(example)
 
     # Apply any visual augmentations we may want
-    X = self._apply_variants(X)
+    if 'image' in self._variants:
+      X = self._apply_variants(X)
 
     # Expand the classes for this value
     Y, W = self._expand_classes(Y)
@@ -237,7 +241,6 @@ class VisualMeshDataset:
     n = tf.concat([state['n'], tf.expand_dims(tf.shape(Y)[0], axis=0)], axis=0)
 
     # Concatenate X with the new X, and move the -1 to the end for the null point
-    X = tf.image.convert_image_dtype(X, dtype=tf.float32)
     X = tf.concat([state['X'][:-1], X, state['X'][-1:]], axis=0)
 
     # Concatenate the Y, W, px and raw vectors
