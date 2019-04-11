@@ -399,34 +399,47 @@ def train(sess, config, output_path):
     print('Creating new model {}'.format(model_path))
 
   # Load our training and validation dataset
-  training_dataset = dataset.VisualMeshDataset(
-    input_files=training_files,
-    classes=classes,
-    geometry=geometry,
-    batch_size=training_batch_size,
-    shuffle_size=shuffle_size,
-    variants=variants,
-  ).build().repeat(epochs).make_one_shot_iterator().string_handle()
+  with tf.name_scope("TrainingDataset"):
+    training_dataset, training_ds_stats = dataset.VisualMeshDataset(
+      input_files=training_files,
+      classes=classes,
+      geometry=geometry,
+      batch_size=training_batch_size,
+      shuffle_size=shuffle_size,
+      variants=variants,
+    ).build()
+    training_dataset = training_dataset.repeat(epochs).make_initializable_iterator()
+    sess.run(training_dataset.initializer)
+    training_dataset = training_dataset.string_handle()
+    training_summary = tf.summary.merge([training_summary, training_ds_stats])
 
   # Load our training and validation dataset
-  validation_dataset = dataset.VisualMeshDataset(
-    input_files=validation_files,
-    classes=classes,
-    geometry=geometry,
-    shuffle_size=shuffle_size,
-    batch_size=validation_batch_size,
-    variants={},  # No variations for validation
-  ).build().repeat().make_one_shot_iterator().string_handle()
+  with tf.name_scope("ValidationDataset"):
+    validation_dataset, validation_ds_stats = dataset.VisualMeshDataset(
+      input_files=validation_files,
+      classes=classes,
+      geometry=geometry,
+      shuffle_size=shuffle_size,
+      batch_size=validation_batch_size,
+      variants={},  # No variations for validation
+    ).build()
+    validation_dataset = validation_dataset.repeat().make_initializable_iterator()
+    sess.run(validation_dataset.initializer)
+    validation_dataset = validation_dataset.string_handle()
+    validation_summary = tf.summary.merge([validation_summary, validation_ds_stats])
 
   # Build our image dataset for drawing images
-  image_dataset = dataset.VisualMeshDataset(
+  image_dataset, _ = dataset.VisualMeshDataset(
     input_files=validation_files,
     classes=classes,
     geometry=geometry,
     shuffle_size=0,  # Don't shuffle so we can resume
     batch_size=n_progress_images,
     variants={},  # No variations for images
-  ).build().make_one_shot_iterator().get_next()
+  ).build()
+  image_dataset=image_dataset.make_initializable_iterator()
+  sess.run(image_dataset.initializer)
+  image_dataset = image_dataset.get_next()
   # Make a dataset with a single element for generating images off
   # TODO replace this with tf.data.experimental.get_single_element(image_dataset)
   image_dataset = tf.data.Dataset.from_tensors(sess.run(image_dataset)

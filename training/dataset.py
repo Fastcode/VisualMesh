@@ -4,6 +4,7 @@ import tensorflow as tf
 import os
 import re
 import math
+import multiprocessing
 
 # Load the visual mesh op
 op_file = os.path.join(os.path.dirname(__file__), 'visualmesh_op.so')
@@ -127,7 +128,6 @@ class VisualMeshDataset:
     y_w = pixels[:, 0] - y_0
     x_w = pixels[:, 1] - x_0
 
-
     # Pixel coordinates to values to weighted values to X
     p_idx = [
       tf.cast(tf.stack([a, b], axis=-1), tf.int32) for a, b in [
@@ -137,9 +137,7 @@ class VisualMeshDataset:
         (y_1, x_1),
       ]
     ]
-    p_val = [
-      tf.image.convert_image_dtype(tf.gather_nd(args['image'], idx), tf.float32) for idx in p_idx
-    ]
+    p_val = [tf.image.convert_image_dtype(tf.gather_nd(args['image'], idx), tf.float32) for idx in p_idx]
     p_weighted = [
       tf.multiply(val, tf.expand_dims(w, axis=-1)) for val, w in zip(
         p_val, [
@@ -222,85 +220,88 @@ class VisualMeshDataset:
     # Remove the extra dimension we added
     return tf.squeeze(X, axis=0)
 
-  def _reduce_batch(self, state, proto):
+  def _reduce_batch(self, protos):
 
-    # Load the example from the proto
-    example = self._load_example(proto)
+    Xs = []
+    Ys = []
+    Ws = []
+    Gs = []
+    pxs = []
+    ns = []
+    raws = []
+    n_elems = tf.zeros(shape=(), dtype=tf.int32)
 
-    # Project the visual mesh for this example
-    X, Y, G, px = self._project_mesh(example)
+    for i in range(self.batch_size):
 
-    # Apply any visual augmentations we may want
-    if 'image' in self._variants:
-      X = self._apply_variants(X)
+      # Load the example from the proto
+      example = self._load_example(protos[i])
 
-    # Expand the classes for this value
-    Y, W = self._expand_classes(Y)
+      # Project the visual mesh for this example
+      X, Y, G, px = self._project_mesh(example)
 
-    # Add the size of this element on to our n vector
-    n = tf.concat([state['n'], tf.expand_dims(tf.shape(Y)[0], axis=0)], axis=0)
+      # Apply any visual augmentations we may want
+      if 'image' in self._variants:
+        X = self._apply_variants(X)
 
-    # Concatenate X with the new X, and move the -1 to the end for the null point
-    X = tf.concat([state['X'][:-1], X, state['X'][-1:]], axis=0)
+      # Expand the classes for this value
+      Y, W = self._expand_classes(Y)
 
-    # Concatenate the Y, W, px and raw vectors
-    Y = tf.concat([state['Y'], Y], axis=0)
-    W = tf.concat([state['W'], W], axis=0)
-    px = tf.concat([state['px'], px], axis=0)
-    raw = tf.concat([state['raw'], tf.expand_dims(example['raw'], axis=0)], axis=0)
+      # Number of elements in this component
+      n = tf.shape(Y)[0]
 
-    # Concatenate the graph, and adjust the offsets to be consistent
-    # Also update the coordinate of the null point for existing state
-    # We can use the shape of Y for this task as it does not have the extra null point on the end so its
-    # size will be the index of the null point
-    current_n_elems = tf.shape(state['Y'])[0]  # Previous last index
-    next_n_elems = tf.shape(Y)[0]  # New last index
-    G = tf.concat(
-      [
-        tf.where(
-          state['G'][:-1] == current_n_elems,
-          tf.broadcast_to(next_n_elems, shape=tf.shape(state['G'][:-1])),
-          state['G'][:-1],
-        ),
-        G + current_n_elems,
-      ],
-      axis=0,
-    )
+      # Cut off the null point and replace with -1s
+      G = G[:-1] + n_elems
+      G = tf.where(G == n+n_elems, tf.broadcast_to(-1, tf.shape(G)), G)
+
+      # Move along our number of elements
+      n_elems = n_elems + n
+
+      # Add all the elements to the lists
+      Xs.append(X)
+      Ys.append(Y)
+      Ws.append(W)
+      Gs.append(G)
+      pxs.append(px)
+      raws.append(example['raw'])
+      ns.append(n)
+
+    # Add on the null point for X and G
+    Xs.append(tf.constant([[-1.0, -1.0, -1.0]], dtype=tf.float32))
+    Gs.append(tf.fill([1, 7], n_elems))
+
+    X = tf.concat(Xs, axis=0)
+    Y = tf.concat(Ys, axis=0)
+    W = tf.concat(Ws, axis=0)
+    G = tf.concat(Gs, axis=0)
+    n = tf.stack(ns, axis=-1)
+    px = tf.concat(pxs, axis=0)
+    raw = tf.stack(raws, axis=-1)
+
+    # Fix the null point for G
+    G = tf.where(G == -1, tf.broadcast_to(n_elems, tf.shape(G)), G)
 
     # Return the results
     return {'X': X, 'Y': Y, 'W': W, 'n': n, 'G': G, 'px': px, 'raw': raw}
 
   def build(self):
 
-    # Load our dataset records
-    dataset = tf.data.TFRecordDataset(self.input_files, buffer_size=2**30)
+    # Make the statistics aggregator
+    aggregator = tf.data.experimental.StatsAggregator()
 
-    # Window the dataset by our batch size
-    dataset = dataset.window(self.batch_size)
+    # Load our dataset records and batch them while they are still compressed
+    dataset = tf.data.TFRecordDataset(self.input_files, buffer_size=2**28)
+    dataset = dataset.batch(self.batch_size)
 
     # Apply our reduction function to project/squash our dataset into a batch
-    dataset = dataset.map(
-      lambda ds: ds.reduce(
-        {
-          'X': tf.ones([1, 3], dtype=tf.float32) * -1,  # -1 for null point that will always be at the end
-          'Y': tf.zeros([0, len(self.classes)], dtype=tf.float32),  # 0 * num classes
-          'W': tf.zeros([0], dtype=tf.float32),  # 0 length Weights
-          'G': tf.zeros([0, 7], dtype=tf.int32),  # 0 size Graph Degree
-          'n': tf.zeros([0], dtype=tf.int32),  # 0 size list of number of points
-          'px': tf.zeros([0, 2], dtype=tf.float32),  # 0 * 2 pixel coordinates
-          'raw':
-            tf.zeros([0], dtype=tf.string)  # List of raw images
-        },
-        self._reduce_batch
-      ),
-      num_parallel_calls=tf.data.experimental.AUTOTUNE
-    )
+    dataset = dataset.map(self._reduce_batch, num_parallel_calls=4)
 
-    # Prefetch a few elements
-    dataset = dataset.prefetch(10)
-
-    # Prefetch to the GPU
+    # Prefetch some data to the GPU
     dataset = dataset.apply(tf.data.experimental.copy_to_device('/device:GPU:0'))
-    dataset = dataset.prefetch(5)
+    dataset = dataset.prefetch(3)
 
-    return dataset
+    # Add the statistics
+    options = tf.data.Options()
+    options.experimental_stats.aggregator = aggregator
+    dataset = dataset.with_options(options)
+
+    return dataset, aggregator.get_summary()

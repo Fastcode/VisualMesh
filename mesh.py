@@ -31,15 +31,11 @@ if __name__ == "__main__":
   tf_config.gpu_options.allow_growth = True
 
   with tf.Session(config=tf_config) as sess:
+    output_path = 'output' if args.output_path is None else args.output_path
 
-    # Select our device to run operations on
-    with tf.device('/device:GPU:{}'.format(args.gpu)):
+    # Run the appropriate action
+    if args.command == 'train':
+      training.train(sess, config, output_path)
 
-      output_path = 'output' if args.output_path is None else args.output_path
-
-      # Run the appropriate action
-      if args.command == 'train':
-        training.train(sess, config, output_path)
-
-      elif args.command == 'test':
-        test.test(sess, config, output_path)
+    elif args.command == 'test':
+      test.test(sess, config, output_path)
