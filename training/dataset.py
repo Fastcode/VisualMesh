@@ -10,7 +10,7 @@ op_file = os.path.join(os.path.dirname(__file__), 'visualmesh_op.so')
 if os.path.isfile(op_file):
   VisualMesh = tf.load_op_library(op_file).visual_mesh
 else:
-  raise Exception("Please build the tensorflow visual mesh op before running training")
+  raise Exception("Please build the tensorflow visual mesh op before running")
 
 
 class VisualMeshDataset:
@@ -205,7 +205,7 @@ class VisualMeshDataset:
     Y, W = self._expand_classes(Y)
 
     # Add the size of this element on to our n vector
-    n = tf.concat([state['n'], state['n'][-1] + tf.expand_dims(tf.shape(X)[0], axis=0)], axis=0)
+    n = tf.concat([state['n'], tf.expand_dims(tf.shape(Y)[0], axis=0)], axis=0)
 
     # Concatenate X with the new X, and move the -1 to the end for the null point
     X = tf.image.convert_image_dtype(X, dtype=tf.float32)
@@ -219,8 +219,10 @@ class VisualMeshDataset:
 
     # Concatenate the graph, and adjust the offsets to be consistent
     # Also update the coordinate of the null point for existing state
-    current_n_elems = tf.shape(state['Y'])[0]
-    next_n_elems = tf.shape(Y)[0]
+    # We can use the shape of Y for this task as it does not have the extra null point on the end so its
+    # size will be the index of the null point
+    current_n_elems = tf.shape(state['Y'])[0]  # Previous last index
+    next_n_elems = tf.shape(Y)[0]  # New last index
     G = tf.concat(
       [
         tf.where(
@@ -252,7 +254,7 @@ class VisualMeshDataset:
           'Y': tf.zeros([0, len(self.classes)], dtype=tf.float32),  # 0 * num classes
           'W': tf.zeros([0], dtype=tf.float32),  # 0 length Weights
           'G': tf.zeros([0, 7], dtype=tf.int32),  # 0 size Graph Degree
-          'n': tf.zeros([1], dtype=tf.int32),  # A single element for the start of the first element
+          'n': tf.zeros([0], dtype=tf.int32),  # 0 size list of number of points
           'px': tf.zeros([0, 2], dtype=tf.float32),  # 0 * 2 pixel coordinates
           'raw':
             tf.zeros([0], dtype=tf.string)  # List of raw images
@@ -262,9 +264,10 @@ class VisualMeshDataset:
       num_parallel_calls=tf.data.experimental.AUTOTUNE
     )
 
+    # Prefetch a few elements
     dataset = dataset.prefetch(10)
 
-    # And prefetch
+    # Prefetch to the GPU
     dataset = dataset.apply(tf.data.experimental.copy_to_device('/device:GPU:0'))
     dataset = dataset.prefetch(5)
 
