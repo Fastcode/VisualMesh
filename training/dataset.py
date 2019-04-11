@@ -117,13 +117,42 @@ class VisualMeshDataset:
       name='ProjectVisualMesh',
     )
 
-    # Round to integer pixels
-    # TODO one day someone could do linear interpolation here, like what happens in the OpenCL version
-    int_pixels = tf.cast(tf.round(pixels), dtype=tf.int32)
+    # Bilinearly interpolate our image based on our floating point pixel coordinate
+    y_0 = tf.floor(pixels[:, 0])
+    x_0 = tf.floor(pixels[:, 1])
+    y_1 = y_0 + 1
+    x_1 = x_0 + 1
 
-    # Select the points in the network and discard the old dictionary data
-    # We pad one extra point at the end for the offscreen point
-    return tf.gather_nd(args['image'], int_pixels), tf.gather_nd(args['mask'], int_pixels), neighbours, pixels
+    # Weights for the x and y axis
+    y_w = pixels[:, 0] - y_0
+    x_w = pixels[:, 1] - x_0
+
+    # Pixel coordinates to values to weighted values to X
+    p_idx = [
+      tf.cast(tf.stack([a, b], axis=-1), tf.int32) for a, b in [
+        (y_0, x_0),
+        (y_0, x_1),
+        (y_1, x_0),
+        (y_1, x_1),
+      ]
+    ]
+    p_val = [tf.gather_nd(args['image'], idx) for idx in p_idx]
+    p_weighted = [
+      tf.multiply(val, w) for val, w in zip(
+        p_val, [
+          tf.multiply(1 - y_w, 1 - x_w),
+          tf.multiply(1 - y_w, x_w),
+          tf.multiply(y_w, 1 - x_w),
+          tf.multiply(y_w, x_w),
+        ]
+      )
+    ]
+    X = tf.add_n(p_weighted)
+
+    # For the segmentation just use the nearest neighbour
+    Y = tf.gather_nd(args['mask'], tf.round(pixels))
+
+    return X, Y, neighbours, pixels
 
   def _expand_classes(self, Y):
 
