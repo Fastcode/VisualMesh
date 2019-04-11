@@ -142,9 +142,9 @@ class VisualMeshDataset:
 
     return Y, W
 
-  def apply_variants(self, args):
-    # Cast the image to a floating point value and make it into an image shape
-    X = tf.expand_dims(tf.image.convert_image_dtype(args['X'], tf.float32), 0)
+  def _apply_variants(self, X):
+    # Make the shape of X back into an imageish shape for the functions
+    X = tf.expand_dims(X, axis=0)
 
     # Apply the variants that were listed
     var = self.variants['image']
@@ -187,7 +187,8 @@ class VisualMeshDataset:
         )
       )
 
-    return {**args, 'X': tf.squeeze(tf.image.convert_image_dtype(X, tf.uint8), 0)}
+    # Remove the extra dimension we added
+    return tf.squeeze(X, axis=0)
 
   def _reduce_batch(self, state, proto):
 
@@ -196,6 +197,9 @@ class VisualMeshDataset:
 
     # Project the visual mesh for this example
     X, Y, G, px = self._project_mesh(example)
+
+    # Apply any visual augmentations we may want
+    X = self._apply_variants(X)
 
     # Expand the classes for this value
     Y, W = self._expand_classes(Y)
