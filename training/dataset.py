@@ -16,12 +16,13 @@ else:
 
 class VisualMeshDataset:
 
-  def __init__(self, input_files, classes, geometry, batch_size, shuffle_size, variants):
+  def __init__(self, input_files, classes, geometry, batch_size, shuffle_size, prefetch, variants):
     self.input_files = input_files
     self.classes = classes
     self.batch_size = batch_size
     self.geometry = tf.constant(geometry['shape'], dtype=tf.string, name='GeometryType')
     self.shuffle_buffer_size = shuffle_size
+    self.prefetch = prefetch
 
     self._variants = variants
 
@@ -293,11 +294,11 @@ class VisualMeshDataset:
     dataset = dataset.batch(self.batch_size)
 
     # Apply our reduction function to project/squash our dataset into a batch
-    dataset = dataset.map(self._reduce_batch, num_parallel_calls=4)
+    dataset = dataset.map(self._reduce_batch, num_parallel_calls=self.prefetch)
 
     # Prefetch some data to the GPU
     dataset = dataset.apply(tf.data.experimental.copy_to_device('/device:GPU:0'))
-    dataset = dataset.prefetch(3)
+    dataset = dataset.prefetch(self.prefetch)
 
     # Add the statistics
     options = tf.data.Options()
