@@ -414,7 +414,7 @@ def train(config, output_path):
         geometry=geometry,
         batch_size=training_batch_size,
         shuffle_size=shuffle_size,
-        prefetch=4,
+        prefetch=tf.data.experimental.AUTOTUNE,
         variants=variants,
       ).build()
       training_dataset = training_dataset.repeat(epochs).make_initializable_iterator()

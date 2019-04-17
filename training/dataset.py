@@ -296,8 +296,7 @@ class VisualMeshDataset:
     # Apply our reduction function to project/squash our dataset into a batch
     dataset = dataset.map(self._reduce_batch, num_parallel_calls=self.prefetch)
 
-    # Prefetch some data to the GPU
-    dataset = dataset.apply(tf.data.experimental.copy_to_device('/device:GPU:0'))
+    # Prefetch some elements to ensure training smoothness
     dataset = dataset.prefetch(self.prefetch)
 
     # Add the statistics
