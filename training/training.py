@@ -339,33 +339,22 @@ def build_training_graph(network, classes, learning_rate, tutor_learning_rate, t
 # Train the network
 def train(config, output_path):
 
-  # Extract configuration variables
-  training_files = config['dataset']['training']
-  validation_files = config['dataset']['validation']
-  geometry = config['geometry']
-  classes = config['network']['classes']
-  structure = config['network']['structure']
-  base_weight = config['training']['tutor']['base_weight']
-  tutor_learning_rate = config['training']['tutor']['learning_rate']
-  tutor_structure = config['training']['tutor'].get('structure', None)
-  tutor_threshold = config['training']['tutor']['threshold']
-  training_batch_size = config['training']['batch_size']
-  epochs = config['training']['epochs']
-  training_learning_rate = config['training']['learning_rate']
-  save_frequency = config['training']['save_frequency']
-  shuffle_size = config['training']['shuffle_size']
-  validation_batch_size = config['training']['validation']['batch_size']
-  validation_frequency = config['training']['validation']['frequency']
-  image_frequency = config['training']['validation']['image_frequency']
-  n_progress_images = config['training']['validation']['progress_images']
-  variants = config['training']['variants']
+  # TODO make the iterator
+  # TODO build the network for each GPU
+  # TODO build the loss function for each GPU
+  # TODO calculate the gradients for that minibatch
+  # TODO average the gradients from all the minibatches and apply
 
   # Build our student and tutor networks
-  net = network.build(structure, len(classes), structure if tutor_structure is None else tutor_structure)
+  net = network.build(
+    config.network.structure, len(config.network.classes),
+    config.network.structure if 'structure' not in config.training.tutor else config.training.tutor.structure
+  )
 
   # Build the training portion of the graph
   training_graph = build_training_graph(
-    net, classes, training_learning_rate, tutor_learning_rate, tutor_threshold, base_weight
+    net, config.network.classes, config.training.learning_rate, config.training.tutor.learning_rate,
+    config.training.tutor.threshold, config.training.tutor.base_weight
   )
   mesh_optimiser = training_graph['mesh_optimiser']
   mesh_loss = training_graph['mesh_loss']
@@ -409,15 +398,14 @@ def train(config, output_path):
     # Load our training and validation dataset
     with tf.name_scope("TrainingDataset"):
       training_dataset, training_ds_stats = dataset.VisualMeshDataset(
-        input_files=training_files,
-        classes=classes,
-        geometry=geometry,
-        batch_size=training_batch_size,
-        shuffle_size=shuffle_size,
+        input_files=config.dataset.training,
+        classes=config.network.classes,
+        geometry=config.geometry,
+        batch_size=config.training.batch_size,
         prefetch=tf.data.experimental.AUTOTUNE,
-        variants=variants,
+        variants=config.training.variants,
       ).build()
-      training_dataset = training_dataset.repeat(epochs).make_initializable_iterator()
+      training_dataset = training_dataset.repeat(config.training.epochs).make_initializable_iterator()
       sess.run(training_dataset.initializer)
       training_dataset = training_dataset.string_handle()
       training_summary = tf.summary.merge([training_summary, training_ds_stats])
@@ -425,11 +413,10 @@ def train(config, output_path):
     # Load our training and validation dataset
     with tf.name_scope("ValidationDataset"):
       validation_dataset, validation_ds_stats = dataset.VisualMeshDataset(
-        input_files=validation_files,
-        classes=classes,
-        geometry=geometry,
-        shuffle_size=shuffle_size,
-        batch_size=validation_batch_size,
+        input_files=config.dataset.validation,
+        classes=config.network.classes,
+        geometry=config.geometry,
+        batch_size=config.training.validation.batch_size,
         prefetch=1,
         variants={},  # No variations for validation
       ).build()
@@ -440,11 +427,10 @@ def train(config, output_path):
 
     # Build our image dataset for drawing images
     image_dataset, _ = dataset.VisualMeshDataset(
-      input_files=validation_files,
-      classes=classes,
-      geometry=geometry,
-      shuffle_size=0,  # Don't shuffle so we can resume
-      batch_size=n_progress_images,
+      input_files=config.dataset.validation,
+      classes=config.network.classes,
+      geometry=config.geometry,
+      batch_size=config.training.validation.progress_images,
       prefetch=1,
       variants={},  # No variations for images
     ).build()
@@ -480,19 +466,19 @@ def train(config, output_path):
         )
 
         # Every N steps do our validation/summary step
-        if tf.train.global_step(sess, global_step) % validation_frequency == 0:
+        if tf.train.global_step(sess, global_step) % config.training.validation.frequency == 0:
           summary = sess.run(validation_summary, feed_dict={net['handle']: validation_handle})
           summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
         # Every N steps save our model
-        if tf.train.global_step(sess, global_step) % save_frequency == 0:
+        if tf.train.global_step(sess, global_step) % config.training.save_frequency == 0:
           saver.save(sess, model_path, tf.train.global_step(sess, global_step))
           save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
 
         # Every N steps show our image summary
-        if tf.train.global_step(sess, global_step) % image_frequency == 0:
-          summary = sess.run(image_summary, feed_dict={net['handle']: image_handle})
-          summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+        # if tf.train.global_step(sess, global_step) % config.training.validation.image_frequency == 0:
+        #   summary = sess.run(image_summary, feed_dict={net['handle']: image_handle})
+        #   summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
       # We have finished the dataset
       except tf.errors.OutOfRangeError:

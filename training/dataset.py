@@ -16,25 +16,24 @@ else:
 
 class VisualMeshDataset:
 
-  def __init__(self, input_files, classes, geometry, batch_size, shuffle_size, prefetch, variants):
+  def __init__(self, input_files, classes, geometry, batch_size, prefetch, variants):
     self.input_files = input_files
     self.classes = classes
     self.batch_size = batch_size
-    self.geometry = tf.constant(geometry['shape'], dtype=tf.string, name='GeometryType')
-    self.shuffle_buffer_size = shuffle_size
+    self.geometry = tf.constant(geometry.shape, dtype=tf.string, name='GeometryType')
     self.prefetch = prefetch
 
     self._variants = variants
 
     # Convert our geometry into a set of numbers
-    if geometry['shape'] in ['CIRCLE', 'SPHERE']:
-      self.geometry_params = tf.constant([geometry['radius'], geometry['intersections'], geometry['max_distance']],
+    if geometry.shape in ['CIRCLE', 'SPHERE']:
+      self.geometry_params = tf.constant([geometry.radius, geometry.intersections, geometry.max_distance],
                                          dtype=tf.float32,
                                          name='GeometryParams')
 
-    elif geometry['shape'] in ['CYLINDER']:
+    elif geometry.shape in ['CYLINDER']:
       self.geometry_params = tf.constant([
-        geometry['height'], geometry['radius'], geometry['intersections'], geometry['max_distance']
+        geometry.height, geometry.radius, geometry.intersections, geometry.max_distance
       ],
                                          dtype=tf.float32,
                                          name='GeometryParams')
@@ -74,19 +73,19 @@ class VisualMeshDataset:
 
     # Adjust our height and orientation
     if 'mesh' in self._variants:
-      v = self._variants['mesh']
+      v = self._variants.mesh
       if 'height' in v:
         height = height + tf.truncated_normal(
           shape=(),
-          mean=v['height']['mean'],
-          stddev=v['height']['stddev'],
+          mean=v.height.mean,
+          stddev=v.height.stddev,
         )
       if 'rotation' in v:
         # Make 3 random euler angles
         rotation = tf.truncated_normal(
           shape=[3],
-          mean=v['rotation']['mean'],
-          stddev=v['rotation']['stddev'],
+          mean=v.rotation.mean,
+          stddev=v.rotation.stddev,
         )
         # Cos and sin for everyone!
         ca = tf.cos(rotation[0])
