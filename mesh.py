@@ -14,7 +14,6 @@ if __name__ == "__main__":
   command = argparse.ArgumentParser(description='Utility for training a Visual Mesh network')
 
   command.add_argument('command', choices=['train', 'test'], action='store')
-  command.add_argument('-g', '--gpu', action='store', default=0, help='The index of the GPU to use when training')
   command.add_argument('config', action='store', help='Path to the configuration file for training')
   command.add_argument('output_path', nargs='?', action='store', help='Output directory to store the logs and models')
 
@@ -24,18 +23,11 @@ if __name__ == "__main__":
   with open(args.config) as f:
     config = yaml.load(f)
 
-  # Tensorflow configuration
-  tf_config = tf.ConfigProto()
-  tf_config.allow_soft_placement = True
-  tf_config.graph_options.build_cost_model = 1
-  tf_config.gpu_options.allow_growth = True
+  output_path = 'output' if args.output_path is None else args.output_path
 
-  with tf.Session(config=tf_config) as sess:
-    output_path = 'output' if args.output_path is None else args.output_path
+  # Run the appropriate action
+  if args.command == 'train':
+    training.train(config, output_path)
 
-    # Run the appropriate action
-    if args.command == 'train':
-      training.train(sess, config, output_path)
-
-    elif args.command == 'test':
-      test.test(sess, config, output_path)
+  elif args.command == 'test':
+    test.test(config, output_path)
