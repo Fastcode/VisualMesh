@@ -252,7 +252,7 @@ class VisualMeshDataset:
 
       # Cut off the null point and replace with -1s
       G = G[:-1] + n_elems
-      G = tf.where(G == n+n_elems, tf.broadcast_to(-1, tf.shape(G)), G)
+      G = tf.where(G == n + n_elems, tf.broadcast_to(-1, tf.shape(G)), G)
 
       # Move along our number of elements
       n_elems = n_elems + n
@@ -291,7 +291,7 @@ class VisualMeshDataset:
 
     # Load our dataset records and batch them while they are still compressed
     dataset = tf.data.TFRecordDataset(self.input_files, buffer_size=2**28)
-    dataset = dataset.batch(self.batch_size)
+    dataset = dataset.batch(self.batch_size, drop_remainder=True)
 
     # Apply our reduction function to project/squash our dataset into a batch
     dataset = dataset.map(self._reduce_batch, num_parallel_calls=self.prefetch)
