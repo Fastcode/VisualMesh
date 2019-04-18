@@ -567,12 +567,12 @@ def train(config, output_path):
       except tf.errors.OutOfRangeError:
 
         # Do a validation step
-        summary, = sess.run([validation_summary], feed_dict={net['handle']: validation_handle})
-        summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+        output = sess.run(ops['validate'], feed_dict={ops['handle']: validation_handle})
+        summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
 
         # Output some images
-        summary = sess.run(image_summary, feed_dict={net['handle']: image_handle})
-        summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+        # summary = sess.run(image_summary, feed_dict={net['handle']: image_handle})
+        # summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
         # Save the model
         saver.save(sess, model_path, tf.train.global_step(sess, global_step))
