@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import math
-import copy
 import tensorflow as tf
 
 
@@ -28,22 +27,23 @@ def build_network(X, G, groups):
         in_s = logits.get_shape()[1].value
 
         # Which layer we are on
-        with tf.variable_scope('Layer_{}'.format(j)):
+        with tf.variable_scope('Layer_{}'.format(j), reuse=tf.AUTO_REUSE):
 
           # Create weights and biases
-          W = tf.get_variable(
-            'Weights',
-            shape=[in_s, out_s],
-            initializer=tf.random_normal_initializer(stddev=math.sqrt(1.0 / in_s)),
-            dtype=tf.float32
-          )
+          with tf.device('/device:CPU:0'):
+            W = tf.get_variable(
+              'Weights',
+              shape=[in_s, out_s],
+              initializer=tf.random_normal_initializer(stddev=math.sqrt(1.0 / in_s)),
+              dtype=tf.float32
+            )
 
-          b = tf.get_variable(
-            'Biases',
-            shape=[out_s],
-            initializer=tf.random_normal_initializer(stddev=math.sqrt(1.0 / out_s)),
-            dtype=tf.float32
-          )
+            b = tf.get_variable(
+              'Biases',
+              shape=[out_s],
+              initializer=tf.random_normal_initializer(stddev=math.sqrt(1.0 / out_s)),
+              dtype=tf.float32
+            )
 
           # Apply our weights and biases
           logits = tf.nn.xw_plus_b(logits, W, b)
@@ -53,60 +53,3 @@ def build_network(X, G, groups):
             logits = tf.nn.selu(logits)
 
   return logits
-
-
-def build(groups, n_classes, tutor_groups):
-
-  # The last layer is the number of classes we have but the tutor only has two
-  mesh_groups = copy.deepcopy(groups)
-  mesh_groups[-1].append(n_classes)
-
-  # Multiply the size of the tutor layers
-  tutor_groups = copy.deepcopy(tutor_groups)
-  tutor_groups[-1].append(1)
-
-  # Number of neighbours for each point
-  graph_degree = 7
-
-  # Our iterator handle
-  handle = tf.placeholder(tf.string, shape=[])
-
-  # Make our iterator on the CPU
-  with tf.device("/device:CPU:0"):
-    iterator = tf.data.Iterator.from_string_handle(
-      handle, {
-        'X': tf.float32,
-        'Y': tf.float32,
-        'G': tf.int32,
-        'W': tf.float32,
-        'n': tf.int32,
-        'px': tf.float32,
-        'raw': tf.string,
-      }, {
-        'X': [None, 3],
-        'Y': [None, n_classes],
-        'G': [None, graph_degree],
-        'W': [None],
-        'n': [None],
-        'px': [None, 2],
-        'raw': [None],
-      }
-    )
-
-  # Get values from our iterator
-  data = iterator.get_next()
-  X = data['X']
-  G = data['G']
-
-  # Build our normal mesh, and our tutor mesh
-  with tf.variable_scope('MeshNetwork'):
-    mesh = build_network(X, G, mesh_groups)
-  with tf.variable_scope('TutorNetwork'):
-    tutor = build_network(X, G, tutor_groups)
-
-  return {
-    'handle': handle,  # (input)  Iterator handle
-    'mesh': mesh,  # (output) Raw unscaled mesh output
-    'tutor': tutor,  # (output) Raw unscaled weights output
-    **data,  # Forward all the data from our iterator
-  }

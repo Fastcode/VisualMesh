@@ -283,10 +283,11 @@ class VisualMeshDataset:
     # Return the results
     return {'X': X, 'Y': Y, 'W': W, 'n': n, 'G': G, 'px': px, 'raw': raw}
 
-  def build(self):
+  def build(self, stats=False):
 
     # Make the statistics aggregator
-    aggregator = tf.data.experimental.StatsAggregator()
+    if stats:
+      aggregator = tf.data.experimental.StatsAggregator()
 
     # Load our dataset records and batch them while they are still compressed
     dataset = tf.data.TFRecordDataset(self.input_files, buffer_size=2**28)
@@ -299,8 +300,9 @@ class VisualMeshDataset:
     dataset = dataset.prefetch(self.prefetch)
 
     # Add the statistics
-    options = tf.data.Options()
-    options.experimental_stats.aggregator = aggregator
-    dataset = dataset.with_options(options)
+    if stats:
+      options = tf.data.Options()
+      options.experimental_stats.aggregator = aggregator
+      dataset = dataset.with_options(options)
 
-    return dataset, aggregator.get_summary()
+    return (dataset, aggregator.get_summary()) if stats else dataset
