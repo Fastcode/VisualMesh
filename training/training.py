@@ -4,6 +4,7 @@ import os
 import sys
 import random
 import tensorflow as tf
+import numpy as np
 from tensorflow.python.client import device_lib
 import copy
 import yaml
@@ -11,7 +12,6 @@ import re
 import io
 import cv2
 import time
-import numpy as np
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
@@ -282,8 +282,22 @@ def _metrics(X, Y, config):
       # Get the loss for this specific class
       class_loss = tf.reduce_mean(tf.gather_nd(network_loss, tf.where(Y[:, i])))
 
+      # Work out what class this is confused with (precision/recall breakdown)
+      precision_dist = tf.reduce_sum(tf.gather(Y, tf.where(predictions)), axis=0)
+      recall_dist = tf.reduce_sum(tf.gather(X, tf.where(labels)), axis=0)
+
       # Add to our metrics object
-      metrics[c[0]] = {'loss': class_loss, 'tp': tp, 'tn': tn, 'fp': fp, 'fn': fn}
+      metrics[c[0]] = {
+        'loss': class_loss,
+        'dist': {
+          'precision': precision_dist,
+          'recall': recall_dist
+        },
+        'tp': tp,
+        'tn': tn,
+        'fp': fp,
+        'fn': fn
+      }
 
     # Count how many losses were non 0 (0 loss means there were none of this class in the batch)
     class_losses = [tf.count_nonzero(m['loss']) for k, m in metrics.items()]
@@ -438,7 +452,11 @@ def _build_training_graph(gpus, config):
       'summary': loss_summary_op
     },
     'validate': {
-      'summary': validation_summary_op
+      'summary': validation_summary_op,
+      'dist': {
+        'precision': {k: m['dist']['precision'] for k, m in ops['metrics'].items() if k != 'Global'},
+        'recall': {k: m['dist']['recall'] for k, m in ops['metrics'].items() if k != 'Global'}
+      },
     },
     'image': {
       'summary': []  #TODO
@@ -552,6 +570,31 @@ def train(config, output_path):
         if tf.train.global_step(sess, global_step) % config.training.validation.frequency == 0:
           output = sess.run(ops['validate'], feed_dict={ops['handle']: validation_handle})
           summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
+
+          # Histogram summary
+          histograms = []
+          for name, classes in output['dist'].items():
+            for k, vs in classes.items():
+
+              # Normalise the vector so they sum to 1.0
+              vs = vs[0] / np.sum(vs[0])
+
+              # Make a pretend bar chart
+              edges = []
+              buckets = []
+              for i, v in enumerate(vs):
+                edges.extend([i - 2 / 6, i - 1 / 6, i, i + 1 / 6, i + 2 / 6, i + 3 / 6])
+                buckets.extend([0, v, v, v, v, 0])
+
+              # Interleave with 0s so it looks like categories
+              histograms.append(
+                tf.Summary.Value(
+                  tag='{}/Confusion/{}'.format(k.title(), name.title()),
+                  histo=tf.HistogramProto(min=-0.5, max=vs.size - 0.5, bucket_limit=edges, bucket=buckets)
+                )
+              )
+          histograms = tf.Summary(value=histograms)
+          summary_writer.add_summary(histograms, tf.train.global_step(sess, global_step))
 
         # Every N steps save our model
         if tf.train.global_step(sess, global_step) % config.training.save_frequency == 0:
