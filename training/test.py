@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 
 import os
-import re
-import math
-import json
 import rdp
-import yaml
 import numpy as np
 import tensorflow as tf
-from tqdm import tqdm, trange
+from tqdm import trange
 
 from . import dataset
 from . import network

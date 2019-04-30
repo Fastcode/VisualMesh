@@ -1,20 +1,13 @@
 #!/usr/bin/env python3
 
 import os
-import sys
-import random
 import tensorflow as tf
 import numpy as np
 from tensorflow.python.client import device_lib
 import copy
 import yaml
 import re
-import io
-import cv2
 import time
-import matplotlib as mpl
-mpl.use('Agg')
-import matplotlib.pyplot as plt
 
 from . import network
 from . import dataset
@@ -61,113 +54,6 @@ def save_yaml_model(sess, output_path, global_step):
   with open(os.path.join(output_path, 'yaml_models', 'model_{}.yaml'.format(global_step)), 'w') as f:
     f.write(yaml.dump(output, width=120))
 
-
-class MeshDrawer:
-
-  def __init__(self, classes):
-    self.classes = classes
-
-  def mesh_image(self, raws, pxs, ns, X):
-    # Find the edges of the X values
-    cs = np.cumsum(ns)
-    cs = np.concatenate([[0], cs]).tolist()
-    ranges = list(zip(cs, cs[1:]))
-
-    images = []
-
-    for batch, raw in enumerate(raws):
-      img = cv2.imdecode(np.fromstring(raw, np.uint8), cv2.IMREAD_COLOR)
-      img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-      px = pxs[batch, :ns[batch] - 1]  # Skip the null point (which doesn't exist in px)
-      x = X[ranges[batch][0]:ranges[batch][1] - 1]  # Skip the null point
-
-      # Setup the display so everything is all at the correct resolution
-      dpi = 80
-      height, width, nbands = img.shape
-      figsize = width / float(dpi), height / float(dpi)
-      fig = plt.figure(figsize=figsize)
-      ax = fig.add_axes([0, 0, 1, 1])
-      ax.axis('off')
-
-      # Image underlay
-      ax.imshow(img, interpolation='nearest')
-
-      if px.shape[0] > 2:
-        # Now for each class, produce a contour plot
-        for i, data in enumerate(self.classes):
-          r, g, b = data[1]
-          r /= 255
-          g /= 255
-          b /= 255
-
-          ax.tricontour(
-            px[:, 1],
-            px[:, 0],
-            x[:, i],
-            levels=[0.5, 0.75, 0.9],
-            colors=[(r, g, b, 0.33), (r, g, b, 0.66), (r, g, b, 1.0)]
-          )
-
-      ax.set(xlim=[0, width], ylim=[height, 0], aspect=1)
-      data = io.BytesIO()
-      fig.savefig(data, format='jpg', dpi=dpi)
-      data.seek(0)
-      result = cv2.imdecode(np.fromstring(data.read(), np.uint8), cv2.IMREAD_COLOR)
-      images.append(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
-
-      fig.clf()
-      plt.close(fig)
-
-    return np.stack(images)
-
-  def tutor_image(self, raws, pxs, ns, A):
-    # Find the edges of the X values
-    cs = np.cumsum(ns)
-    cs = np.concatenate([[0], cs]).tolist()
-    ranges = list(zip(cs, cs[1:]))
-
-    images = []
-
-    for batch, raw in enumerate(raws):
-      img = cv2.imdecode(np.fromstring(raw, np.uint8), cv2.IMREAD_COLOR)
-      img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-      px = pxs[batch, :ns[batch] - 1]  # Skip the null point (which doesn't exist in px)
-      a = A[ranges[batch][0]:ranges[batch][1] - 1]  # Skip the null point
-
-      # Setup the display so everything is all at the correct resolution
-      dpi = 80
-      height, width, nbands = img.shape
-      figsize = width / float(dpi), height / float(dpi)
-      fig = plt.figure(figsize=figsize)
-      ax = fig.add_axes([0, 0, 1, 1])
-      ax.axis('off')
-
-      # Image underlay
-      ax.imshow(img, interpolation='nearest')
-
-      if px.shape[0] > 2:
-        # Make our tutor plot
-        ax.tricontour(
-          px[:, 1],
-          px[:, 0],
-          a,
-          levels=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
-          cmap=plt.get_cmap('jet'),
-        )
-
-      ax.set(xlim=[0, width], ylim=[height, 0], aspect=1)
-      data = io.BytesIO()
-      fig.savefig(data, format='jpg', dpi=dpi)
-      data.seek(0)
-      result = cv2.imdecode(np.fromstring(data.read(), np.uint8), cv2.IMREAD_COLOR)
-      images.append(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
-
-      fig.clf()
-      plt.close(fig)
-
-    return np.stack(images)
-
-
 def _device_graph(data, network_structure, tutor_structure, config, network_optimiser, tutor_optimiser):
   # Create the network and tutor graph ops for this device
   with tf.variable_scope('Network'):
@@ -176,6 +62,10 @@ def _device_graph(data, network_structure, tutor_structure, config, network_opti
     T = tf.squeeze(network.build_network(data['X'], data['G'], tutor_structure), axis=-1)
     # Apply sigmoid to the tutor network
     T = tf.nn.sigmoid(T)
+
+  # Keep our un alpha masked inferences for drawing images later
+  img_x = X
+  img_t = T
 
   # First eliminate points that were masked out with alpha
   with tf.name_scope('AlphaMask'):
@@ -423,9 +313,9 @@ def _build_training_graph(gpus, config):
   # Create the loss summary op
   with tf.name_scope('Training'):
     loss_summary_op = tf.summary.merge([
-      tf.summary.scalar('Raw Loss', ops['loss']['u']),
-      tf.summary.scalar('Weighted Loss', ops['loss']['x']),
-      tf.summary.scalar('Tutor Loss', ops['loss']['t']),
+      tf.summary.scalar('Raw_Loss', ops['loss']['u']),
+      tf.summary.scalar('Weighted_Loss', ops['loss']['x']),
+      tf.summary.scalar('Tutor_Loss', ops['loss']['t']),
     ])
 
   # Now use the metrics to calculate interesting validation details
