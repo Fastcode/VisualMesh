@@ -8,7 +8,9 @@ import copy
 import yaml
 import re
 import time
+import multiprocessing
 
+from . import mesh_drawer
 from . import network
 from . import dataset
 
@@ -54,6 +56,7 @@ def save_yaml_model(sess, output_path, global_step):
   with open(os.path.join(output_path, 'yaml_models', 'model_{}.yaml'.format(global_step)), 'w') as f:
     f.write(yaml.dump(output, width=120))
 
+
 def _device_graph(data, network_structure, tutor_structure, config, network_optimiser, tutor_optimiser):
   # Create the network and tutor graph ops for this device
   with tf.variable_scope('Network'):
@@ -63,9 +66,9 @@ def _device_graph(data, network_structure, tutor_structure, config, network_opti
     # Apply sigmoid to the tutor network
     T = tf.nn.sigmoid(T)
 
-  # Keep our un alpha masked inferences for drawing images later
-  img_x = X
-  img_t = T
+  # Capture these before they are filtered
+  X_0 = tf.nn.softmax(X, axis=-1)
+  T_0 = T
 
   # First eliminate points that were masked out with alpha
   with tf.name_scope('AlphaMask'):
@@ -86,9 +89,14 @@ def _device_graph(data, network_structure, tutor_structure, config, network_opti
 
   # Store the ops that have been done on this device
   return {
-    'data': data,
-    'X': X,
-    'T': T,
+    'inference': {
+      'X': X_0,
+      'T': T_0,
+      'G': data['G'],
+      'n': data['n'],
+      'px': data['px'],
+      'raw': data['raw']
+    },
     'loss': {
       'u': u_loss,
       'x': x_loss,
@@ -98,7 +106,7 @@ def _device_graph(data, network_structure, tutor_structure, config, network_opti
       'x': x_grads,
       't': t_grads
     },
-    'metrics': metrics
+    'metrics': metrics,
   }
 
 
@@ -237,9 +245,7 @@ def _merge_ops(device_ops):
     metrics = {k: {**m, 'loss': tf.divide(m['loss'], len(device_ops))} for k, m in metrics.items()}
 
     return {
-      'data': [op['data'] for op in device_ops],
-      'X': [op['X'] for op in device_ops],
-      'T': [op['T'] for op in device_ops],
+      'inference': [op['inference'] for op in device_ops],
       'loss': {
         'u': u_loss,
         'x': x_loss,
@@ -249,8 +255,50 @@ def _merge_ops(device_ops):
         'x': x_grads,
         't': t_grads
       },
-      'metrics': metrics
+      'metrics': metrics,
     }
+
+
+def _progress_images(pool, inferences, config):
+  # Arguments for creating each image
+  image_args = []
+
+  # For each of the GPUs outputs
+  for inference in inferences:
+    # Find the edges
+    cs = [0] + np.cumsum(inference['n']).tolist()
+    ranges = list(zip(cs, cs[1:]))
+
+    # For each image from the GPU
+    for i, r in enumerate(ranges):
+      image_args.append((
+        inference['raw'][i], inference['px'][r[0]:r[1]], inference['X'][r[0]:r[1]],
+        [c[1] for c in config.network.classes]
+      ))
+      image_args.append((inference['raw'][i], inference['px'][r[0]:r[1]], inference['T'][r[0]:r[1]]))
+
+  # Process all images and then split the mesh and tutor images
+  processed = pool.starmap(mesh_drawer.draw, image_args)
+  x_imgs = processed[0::2]
+  t_imgs = processed[1::2]
+
+  # Sort by the hash so we have a consistent order
+  x_imgs.sort(key=lambda k: k[0])
+  t_imgs.sort(key=lambda k: k[0])
+
+  return tf.Summary(
+    value=[
+      tf.Summary.Value(
+        tag='Mesh/Image/{}'.format(i),
+        image=tf.Summary.Image(height=data[1], width=data[2], colorspace=3, encoded_image_string=data[3])
+      ) for i, data in enumerate(x_imgs)
+    ] + [
+      tf.Summary.Value(
+        tag='Tutor/Image/{}'.format(i),
+        image=tf.Summary.Image(height=data[1], width=data[2], colorspace=3, encoded_image_string=data[3])
+      ) for i, data in enumerate(t_imgs)
+    ]
+  )
 
 
 def _build_training_graph(gpus, config):
@@ -349,7 +397,7 @@ def _build_training_graph(gpus, config):
       },
     },
     'image': {
-      'summary': []  #TODO
+      'inference': ops['inference'],
     },
   }
 
@@ -357,119 +405,122 @@ def _build_training_graph(gpus, config):
 # Train the network
 def train(config, output_path):
 
-  # Find the GPUs we have available and if we don't have any, fallback to CPU
-  gpus = [x.name for x in device_lib.list_local_devices() if x.device_type == 'GPU']
-  gpus = ['/device:CPU:0'] if len(gpus) == 0 else gpus
+  # Thread pool for multiprocessing
+  with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
 
-  # Build the training graph operations we need
-  ops = _build_training_graph(gpus, config)
-  global_step = ops['global_step']
+    # Find the GPUs we have available and if we don't have any, fallback to CPU
+    gpus = [x.name for x in device_lib.list_local_devices() if x.device_type == 'GPU']
+    gpus = ['/device:CPU:0'] if len(gpus) == 0 else gpus
 
-  # Setup for tensorboard
-  summary_writer = tf.summary.FileWriter(output_path, graph=tf.get_default_graph())
+    # Build the training graph operations we need
+    ops = _build_training_graph(gpus, config)
+    global_step = ops['global_step']
 
-  # Create our model saver to save all the trainable variables and the global_step
-  save_vars = {v.name: v for v in tf.trainable_variables()}
-  save_vars.update({global_step.name: global_step})
-  saver = tf.train.Saver(save_vars)
+    # Setup for tensorboard
+    summary_writer = tf.summary.FileWriter(output_path, graph=tf.get_default_graph())
 
-  # Load our training and validation dataset
-  training_dataset, training_ds_stats = dataset.VisualMeshDataset(
-    input_files=config.dataset.training,
-    classes=config.network.classes,
-    geometry=config.geometry,
-    batch_size=config.training.batch_size // len(gpus),
-    prefetch=tf.data.experimental.AUTOTUNE,
-    variants=config.training.variants,
-  ).build(stats=True)
-  training_dataset = training_dataset.repeat(config.training.epochs).make_initializable_iterator()
+    # Create our model saver to save all the trainable variables and the global_step
+    save_vars = {v.name: v for v in tf.trainable_variables()}
+    save_vars.update({global_step.name: global_step})
+    saver = tf.train.Saver(save_vars)
 
-  # Merge in the dataset stats into the training summary
-  ops['train']['summary'] = tf.summary.merge([ops['train']['summary'], training_ds_stats])
+    # Load our training and validation dataset
+    training_dataset, training_ds_stats = dataset.VisualMeshDataset(
+      input_files=config.dataset.training,
+      classes=config.network.classes,
+      geometry=config.geometry,
+      batch_size=config.training.batch_size // len(gpus),
+      prefetch=tf.data.experimental.AUTOTUNE,
+      variants=config.training.variants,
+    ).build(stats=True)
+    training_dataset = training_dataset.repeat(config.training.epochs).make_initializable_iterator()
 
-  # Load our training and validation dataset
-  validation_dataset = dataset.VisualMeshDataset(
-    input_files=config.dataset.validation,
-    classes=config.network.classes,
-    geometry=config.geometry,
-    batch_size=config.training.validation.batch_size // len(gpus),
-    prefetch=tf.data.experimental.AUTOTUNE,
-    variants={},  # No variations for validation
-  ).build().repeat().make_one_shot_iterator()
+    # Merge in the dataset stats into the training summary
+    ops['train']['summary'] = tf.summary.merge([ops['train']['summary'], training_ds_stats])
 
-  # Build our image dataset for drawing images
-  image_dataset = dataset.VisualMeshDataset(
-    input_files=config.dataset.validation,
-    classes=config.network.classes,
-    geometry=config.geometry,
-    batch_size=config.training.validation.progress_images // len(gpus),
-    prefetch=1,
-    variants={},  # No variations for images
-  ).build()
-  image_dataset = image_dataset.take(1).repeat().make_one_shot_iterator()
+    # Load our training and validation dataset
+    validation_dataset = dataset.VisualMeshDataset(
+      input_files=config.dataset.validation,
+      classes=config.network.classes,
+      geometry=config.geometry,
+      batch_size=config.training.validation.batch_size // len(gpus),
+      prefetch=tf.data.experimental.AUTOTUNE,
+      variants={},  # No variations for validation
+    ).build().repeat().make_one_shot_iterator()
 
-  # Tensorflow session configuration
-  tf_config = tf.ConfigProto()
-  tf_config.allow_soft_placement = False
-  tf_config.graph_options.build_cost_model = 1
-  tf_config.gpu_options.allow_growth = True
+    # Build our image dataset for drawing images
+    image_dataset = dataset.VisualMeshDataset(
+      input_files=config.dataset.validation,
+      classes=config.network.classes,
+      geometry=config.geometry,
+      batch_size=config.training.validation.progress_images // len(gpus),
+      prefetch=tf.data.experimental.AUTOTUNE,
+      variants={},  # No variations for images
+    ).build()
+    image_dataset = image_dataset.take(len(gpus)).repeat().make_one_shot_iterator()
 
-  with tf.Session(config=tf_config) as sess:
+    # Tensorflow session configuration
+    tf_config = tf.ConfigProto()
+    tf_config.allow_soft_placement = False
+    tf_config.graph_options.build_cost_model = 1
+    tf_config.gpu_options.allow_growth = True
 
-    # Initialise global variables
-    sess.run(tf.global_variables_initializer())
+    with tf.Session(config=tf_config) as sess:
 
-    # Path to model file
-    model_path = os.path.join(output_path, 'model.ckpt')
+      # Initialise global variables
+      sess.run(tf.global_variables_initializer())
 
-    # If we are loading existing training data do that
-    if os.path.isfile(os.path.join(output_path, 'checkpoint')):
-      checkpoint_file = tf.train.latest_checkpoint(output_path)
-      print('Loading model {}'.format(checkpoint_file))
-      saver.restore(sess, checkpoint_file)
-    else:
-      print('Creating new model {}'.format(model_path))
+      # Path to model file
+      model_path = os.path.join(output_path, 'model.ckpt')
 
-    # Initialise our dataset and get our string handles for use
-    sess.run([training_dataset.initializer])
-    training_handle, validation_handle, image_handle = sess.run([
-      training_dataset.string_handle(),
-      validation_dataset.string_handle(),
-      image_dataset.string_handle()
-    ])
+      # If we are loading existing training data do that
+      if os.path.isfile(os.path.join(output_path, 'checkpoint')):
+        checkpoint_file = tf.train.latest_checkpoint(output_path)
+        print('Loading model {}'.format(checkpoint_file))
+        saver.restore(sess, checkpoint_file)
+      else:
+        print('Creating new model {}'.format(model_path))
 
-    while True:
-      try:
-        # Run our training step
-        start = time.perf_counter()
-        output = sess.run(ops['train'], feed_dict={ops['handle']: training_handle})
-        summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
-        end = time.perf_counter()
+      # Initialise our dataset and get our string handles for use
+      sess.run([training_dataset.initializer])
+      training_handle, validation_handle, image_handle = sess.run([
+        training_dataset.string_handle(),
+        validation_dataset.string_handle(),
+        image_dataset.string_handle()
+      ])
 
-        # Print batch info
-        print(
-          'Batch: {} ({:3g}s) Mesh Loss: {:3g} Tutor Loss: {:3g}'.format(
-            tf.train.global_step(sess, global_step),
-            (end - start),
-            output['loss']['u'],
-            output['loss']['t'],
-          )
-        )
-
-        # Every N steps do our validation/summary step
-        if tf.train.global_step(sess, global_step) % config.training.validation.frequency == 0:
-          output = sess.run(ops['validate'], feed_dict={ops['handle']: validation_handle})
+      while True:
+        try:
+          # Run our training step
+          start = time.perf_counter()
+          output = sess.run(ops['train'], feed_dict={ops['handle']: training_handle})
           summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
+          end = time.perf_counter()
 
-          # Histogram summary
-          histograms = []
-          for name, classes in output['dist'].items():
-            for k, vs in classes.items():
+          # Print batch info
+          print(
+            'Batch: {} ({:3g}s) Mesh Loss: {:3g} Tutor Loss: {:3g}'.format(
+              tf.train.global_step(sess, global_step),
+              (end - start),
+              output['loss']['u'],
+              output['loss']['t'],
+            )
+          )
 
-              # Normalise the vector so they sum to 1.0
-              vs = vs[0] / np.sum(vs[0])
+          # Every N steps do our validation/summary step
+          if tf.train.global_step(sess, global_step) % config.training.validation.frequency == 0:
+            output = sess.run(ops['validate'], feed_dict={ops['handle']: validation_handle})
+            summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
 
-              # Make a pretend bar chart
+            # Histogram summary
+            histograms = []
+            for name, classes in output['dist'].items():
+              for k, vs in classes.items():
+
+                # Normalise the vector so they sum to 1.0
+                vs = vs[0] / np.sum(vs[0])
+
+                # Make a pretend bar chart
               edges = []
               buckets = []
               for i, v in enumerate(vs):
@@ -483,33 +534,35 @@ def train(config, output_path):
                   histo=tf.HistogramProto(min=-0.5, max=vs.size - 0.5, bucket_limit=edges, bucket=buckets)
                 )
               )
-          histograms = tf.Summary(value=histograms)
-          summary_writer.add_summary(histograms, tf.train.global_step(sess, global_step))
+            histograms = tf.Summary(value=histograms)
+            summary_writer.add_summary(histograms, tf.train.global_step(sess, global_step))
 
-        # Every N steps save our model
-        if tf.train.global_step(sess, global_step) % config.training.save_frequency == 0:
+          # Every N steps save our model
+          if tf.train.global_step(sess, global_step) % config.training.save_frequency == 0:
+            saver.save(sess, model_path, tf.train.global_step(sess, global_step))
+            save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
+
+          # Every N steps show our image summary
+          if tf.train.global_step(sess, global_step) % config.training.validation.image_frequency == 0:
+            output = sess.run(ops['image'], feed_dict={ops['handle']: image_handle})
+            summary = _progress_images(pool, output['inference'], config)
+            summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+
+        # We have finished the dataset
+        except tf.errors.OutOfRangeError:
+
+          # Do a validation step
+          output = sess.run(ops['validate'], feed_dict={ops['handle']: validation_handle})
+          summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
+
+          # Output some images
+          output = sess.run(ops['image'], feed_dict={ops['handle']: image_handle})
+          summary = _progress_images(pool, output['inference'], config)
+          summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+
+          # Save the model
           saver.save(sess, model_path, tf.train.global_step(sess, global_step))
           save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
 
-        # Every N steps show our image summary
-        # if tf.train.global_step(sess, global_step) % config.training.validation.image_frequency == 0:
-        #   summary = sess.run(image_summary, feed_dict={net['handle']: image_handle})
-        #   summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-
-      # We have finished the dataset
-      except tf.errors.OutOfRangeError:
-
-        # Do a validation step
-        output = sess.run(ops['validate'], feed_dict={ops['handle']: validation_handle})
-        summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
-
-        # Output some images
-        # summary = sess.run(image_summary, feed_dict={net['handle']: image_handle})
-        # summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-
-        # Save the model
-        saver.save(sess, model_path, tf.train.global_step(sess, global_step))
-        save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
-
-        print('Training done')
-        break
+          print('Training done')
+          break

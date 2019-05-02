@@ -273,7 +273,7 @@ class VisualMeshDataset:
     G = tf.concat(Gs, axis=0)
     n = tf.stack(ns, axis=-1)
     px = tf.concat(pxs, axis=0)
-    raw = tf.stack(raws, axis=-1)
+    raw = tf.stack(raws, axis=0)
 
     # Fix the null point for G
     G = tf.where(G == -1, tf.broadcast_to(n_elems, tf.shape(G)), G)
