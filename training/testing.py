@@ -191,7 +191,7 @@ def test(config, output_path):
           progress.update(len(batch))
 
       except tf.errors.OutOfRangeError:
-        print('Loaded into batches'.format(len(batches)))
+        print('Loaded into {} batches'.format(len(batches)))
 
     # Feed the megabatches and batches together into a merger
     op, feed_dict = _distribute_megabatch(config.network.classes, input_ops, output_ops, batches)

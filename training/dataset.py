@@ -89,9 +89,9 @@ class VisualMeshDataset:
         ca = tf.cos(rotation[0])
         sa = tf.sin(rotation[0])
         cb = tf.cos(rotation[1])
-        sb = tf.sin(rotation[0])
+        sb = tf.sin(rotation[1])
         cc = tf.cos(rotation[2])
-        sc = tf.sin(rotation[0])
+        sc = tf.sin(rotation[2])
 
         # Convert these into a rotation matrix
         rot = [cc*ca, -cc*sa*cb + sc*sb, cc*sa*sb + sc*cb,
@@ -175,43 +175,43 @@ class VisualMeshDataset:
     X = tf.expand_dims(X, axis=0)
 
     # Apply the variants that were listed
-    var = self._variants['image']
-    if 'brightness' in var and var['brightness']['stddev'] > 0:
+    var = self._variants.image
+    if 'brightness' in var and var.brightness.stddev > 0:
       X = tf.image.adjust_brightness(
         X, tf.truncated_normal(
           shape=(),
-          mean=var['brightness']['mean'],
-          stddev=var['brightness']['stddev'],
+          mean=var.brightness.mean,
+          stddev=var.brightness.stddev,
         )
       )
-    if 'contrast' in var and var['contrast']['stddev'] > 0:
+    if 'contrast' in var and var.contrast.stddev > 0:
       X = tf.image.adjust_contrast(
         X, tf.truncated_normal(
           shape=(),
-          mean=var['contrast']['mean'],
-          stddev=var['contrast']['stddev'],
+          mean=var.contrast.mean,
+          stddev=var.contrast.stddev,
         )
       )
-    if 'hue' in var and var['hue']['stddev'] > 0:
+    if 'hue' in var and var.hue.stddev > 0:
       X = tf.image.adjust_hue(X, tf.truncated_normal(
         shape=(),
-        mean=var['hue']['mean'],
-        stddev=var['hue']['stddev'],
+        mean=var.hue.mean,
+        stddev=var.hue.stddev,
       ))
-    if 'saturation' in var and var['saturation']['stddev'] > 0:
+    if 'saturation' in var and var.saturation.stddev > 0:
       X = tf.image.adjust_saturation(
         X, tf.truncated_normal(
           shape=(),
-          mean=var['saturation']['mean'],
-          stddev=var['saturation']['stddev'],
+          mean=var.saturation.mean,
+          stddev=var.saturation.stddev,
         )
       )
-    if 'gamma' in var and var['gamma']['stddev'] > 0:
+    if 'gamma' in var and var.gamma.stddev > 0:
       X = tf.image.adjust_gamma(
         X, tf.truncated_normal(
           shape=(),
-          mean=var['gamma']['mean'],
-          stddev=var['gamma']['stddev'],
+          mean=var.gamma.mean,
+          stddev=var.gamma.stddev,
         )
       )
 
