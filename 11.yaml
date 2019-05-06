@@ -1,22 +1,22 @@
 # Section that defines the dataset files.
 dataset:
   # Training file, used for training the network.
-  training: training.tfrecord
+  training: dataset/training.tfrecord
   # Validation file, used to inspect progress of the network as it is training.
   # It is also used as the source for progress images.
-  validation: validation.tfrecord
+  validation: dataset/validation.tfrecord
   # Test dataset, used for performing final evaluations on the performance of the network.
-  test: test.tfrecord
+  testing: dataset/testing.tfrecord
 
 # The geometry of the object we are detecting in the visual mesh.
 geometry:
   # How many intersections with the target object we should have.
-  intersections: 4
+  intersections: 6
   # The maximum distance the visual mesh will be projected for. This should be slightly further than the most distant
   # object that you wish to detect to account for noises in the projection.
-  max_distance: 15
+  max_distance: 20
   # The radius of the object to be detected.
-  radius: 0.075
+  radius: 0.0949996
   # The shape to project, either CYLINDER, CIRCLE or SPHERE.
   shape: SPHERE
   # The height of the cylinder, only used for the cylinder geometry.
@@ -31,31 +31,34 @@ network:
   # Having an empty list (e.g.) [[], [2]] would correspond to two stacked convolutions.
   # The final layer of the network is always equal to the number of classes and should be omitted, typically by an
   # empty list.
-  structure: [[4], [4], [4], [4], [4], [4], [4], [4], [4], [4], []]
+  structure: [[16], [16], [16], [16], [16], [8], [8], [8], [8], [8], []]
   # This is a mapping of the classes to the colours that represent them in the mask images.
   # Each of the elements has a name, and an RGB value that stores it in the mask image.
   # The index of the final output layer will be the same as the order provided in this list.
   classes:
-    - [ball, [255, 255, 255]]
+    - [ball, [255, 0, 0]]
+    - [goal, [255, 255, 0]]
+    - [line, [255, 255, 255]]
+    - [field, [0, 255, 0]]
     - [environment, [0, 0, 0]]
 
 # Testing
 testing:
-  # How many elements to process at a time during testing
-  batch_size: 20
+  # How many raw elements to process at a time during testing
+  batch_size: 200
+  # The number of bins to use when calculating the PR curve
+  num_bins: 1000
 
 # Settings to use when training the network
 training:
   # The number of epochs to train for (number of times to loop through the training data).
   # Note that if you restart the training, it will loose track of how many epochs it has done so far.
-  epochs: 5
+  epochs: 50
   # The batch size to use when training the network (how many images to feed in a single training step).
   # Do not make this number too large or it will create poor gradients.
-  batch_size: 5
+  batch_size: 50
   # The learning rate for the Adam optimiser.
   learning_rate: 0.001
-  # The size of the buffer used for shuffling the input data.
-  shuffle_size: 1000
   # How many batches between saving the progress of the network.
   save_frequency: 250
 
@@ -73,18 +76,18 @@ training:
     base_weight: 0.05
     # This allows the tutor to have a different structure than the main network.
     # If this isn't set, the structure of the tutor will be identical to that of the main network.
-    structure: [[8], [8], [8], [8], [8], [8], [8], [8], [8], [8], []]
+    structure: [[16], [16], [16], [16], [16], [8], [8], [8], [8], [8], []]
 
   # Settings for the validation step of the network.
   validation:
     # How big the batch should be for validation step.
     batch_size: 200
     # How many images to show in tensorboard, they are taken as the first n images of the validation set.
-    progress_images: 10
+    progress_images: 20
     # How often to perform a validation step.
     frequency: 50
     # How often to update the progress images.
-    image_frequency: 250
+    image_frequency: 1000
 
   # Variations to apply to the training data, note this only applies to training data and not validation.
   # They are defined using a mean value and a standard deviation using a truncated normal distribution.

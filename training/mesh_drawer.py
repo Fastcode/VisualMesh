@@ -61,5 +61,6 @@ def draw(img, px, X, colours=None):
   # Write the image as a jpg to a BytesIO and return it
   data = io.BytesIO()
   fig.savefig(data, format='jpg', dpi=dpi)
+  plt.close('all')
   data.seek(0)
   return (img_hash, height, width, data.read())

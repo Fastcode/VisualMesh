@@ -288,7 +288,7 @@ class VisualMeshDataset:
       aggregator = tf.data.experimental.StatsAggregator()
 
     # Load our dataset records and batch them while they are still compressed
-    dataset = tf.data.TFRecordDataset(self.input_files, buffer_size=2**28)
+    dataset = tf.data.TFRecordDataset(self.input_files)
     dataset = dataset.batch(self.batch_size, drop_remainder=True)
 
     # Apply our reduction function to project/squash our dataset into a batch

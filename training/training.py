@@ -57,7 +57,7 @@ def save_yaml_model(sess, output_path, global_step):
     f.write(yaml.dump(output, width=120))
 
 
-def _device_graph(data, network_structure, tutor_structure, config, network_optimiser, tutor_optimiser):
+def _build_device_training_graph(data, network_structure, tutor_structure, config, network_optimiser, tutor_optimiser):
   # Create the network and tutor graph ops for this device
   with tf.variable_scope('Network'):
     X = network.build_network(data['X'], data['G'], network_structure)
@@ -345,7 +345,7 @@ def _build_training_graph(gpus, config):
   for i, gpu in enumerate(gpus):
     with tf.device(gpu), tf.name_scope('Tower_{}'.format(i)):
       device_ops.append(
-        _device_graph(
+        _build_device_training_graph(
           iterator.get_next(), network_structure, tutor_structure, config, network_optimiser, tutor_optimiser
         )
       )
@@ -429,7 +429,7 @@ def train(config, output_path):
       input_files=config.dataset.training,
       classes=config.network.classes,
       geometry=config.geometry,
-      batch_size=config.training.batch_size // len(gpus),
+      batch_size=max(1, config.training.batch_size // len(gpus)),
       prefetch=tf.data.experimental.AUTOTUNE,
       variants=config.training.variants,
     ).build(stats=True)
@@ -443,7 +443,7 @@ def train(config, output_path):
       input_files=config.dataset.validation,
       classes=config.network.classes,
       geometry=config.geometry,
-      batch_size=config.training.validation.batch_size // len(gpus),
+      batch_size=max(1, config.training.validation.batch_size // len(gpus)),
       prefetch=tf.data.experimental.AUTOTUNE,
       variants={},  # No variations for validation
     ).build().repeat().make_one_shot_iterator()
@@ -453,7 +453,7 @@ def train(config, output_path):
       input_files=config.dataset.validation,
       classes=config.network.classes,
       geometry=config.geometry,
-      batch_size=config.training.validation.progress_images // len(gpus),
+      batch_size=max(1, config.training.validation.progress_images // len(gpus)),
       prefetch=tf.data.experimental.AUTOTUNE,
       variants={},  # No variations for images
     ).build()
@@ -462,7 +462,6 @@ def train(config, output_path):
     # Tensorflow session configuration
     tf_config = tf.ConfigProto()
     tf_config.allow_soft_placement = False
-    tf_config.graph_options.build_cost_model = 1
     tf_config.gpu_options.allow_growth = True
 
     with tf.Session(config=tf_config) as sess:
