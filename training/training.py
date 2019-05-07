@@ -198,7 +198,7 @@ def _metrics(X, Y, config):
       }
 
     # Count how many losses were non 0 (0 loss means there were none of this class in the batch)
-    class_losses = [tf.count_nonzero(m['loss']) for k, m in metrics.items()]
+    class_losses = [m['loss'] for k, m in metrics.items()]
     active_classes = tf.add_n([tf.count_nonzero(l) for l in class_losses])
     metrics['Global'] = {
       'loss': tf.divide(tf.add_n(class_losses), active_classes),
