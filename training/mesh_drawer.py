@@ -5,6 +5,7 @@ import cv2
 import io
 import warnings
 import matplotlib as mpl
+import gc
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
@@ -64,5 +65,6 @@ def draw(img, px, X, colours=None):
   ax.cla()
   fig.clf()
   plt.close(fig)
+  gc.collect()
   data.seek(0)
   return (img_hash, height, width, data.read())
