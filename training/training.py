@@ -199,7 +199,7 @@ def _metrics(X, Y, config):
 
     # Count how many losses were non 0 (0 loss means there were none of this class in the batch)
     class_losses = [m['loss'] for k, m in metrics.items()]
-    active_classes = tf.add_n([tf.count_nonzero(l) for l in class_losses])
+    active_classes = tf.cast(tf.add_n([tf.count_nonzero(l) for l in class_losses]), dtype=tf.float32)
     metrics['Global'] = {
       'loss': tf.divide(tf.add_n(class_losses), active_classes),
       'tp': tf.add_n([m['tp'] for k, m in metrics.items()]),
@@ -520,19 +520,20 @@ def train(config, output_path):
                 vs = vs[0] / np.sum(vs[0])
 
                 # Make a pretend bar chart
-              edges = []
-              buckets = []
-              for i, v in enumerate(vs):
-                edges.extend([i - 2 / 6, i - 1 / 6, i, i + 1 / 6, i + 2 / 6, i + 3 / 6])
-                buckets.extend([0, v, v, v, v, 0])
+                edges = []
+                buckets = []
+                for i, v in enumerate(vs):
+                  edges.extend([i - 2 / 6, i - 1 / 6, i, i + 1 / 6, i + 2 / 6, i + 3 / 6])
+                  buckets.extend([0, v, v, v, v, 0])
 
-              # Interleave with 0s so it looks like categories
-              histograms.append(
-                tf.Summary.Value(
-                  tag='{}/Confusion/{}'.format(k.title(), name.title()),
-                  histo=tf.HistogramProto(min=-0.5, max=vs.size - 0.5, bucket_limit=edges, bucket=buckets)
+                # Interleave with 0s so it looks like categories
+                histograms.append(
+                  tf.Summary.Value(
+                    tag='{}/Confusion/{}'.format(k.title(), name.title()),
+                    histo=tf.HistogramProto(min=-0.5, max=vs.size - 0.5, bucket_limit=edges, bucket=buckets)
+                  )
                 )
-              )
+
             histograms = tf.Summary(value=histograms)
             summary_writer.add_summary(histograms, tf.train.global_step(sess, global_step))
 
