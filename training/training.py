@@ -488,6 +488,9 @@ def train(config, output_path):
         image_dataset.string_handle()
       ])
 
+      # We are done messing with the graph
+      tf.get_default_graph().finalize()
+
       while True:
         try:
           # Run our training step
