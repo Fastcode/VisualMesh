@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
+import hashlib
 import cv2
 import io
 import warnings
@@ -13,7 +14,9 @@ import matplotlib.pyplot as plt
 def draw(img, px, X, colours=None):
 
   # hash of the image file for sorting later
-  img_hash = hash(img)
+  img_hash = hashlib.md5()
+  img_hash.update(img)
+  img_hash = img_hash.digest()
 
   # Decode the image
   img = cv2.cvtColor(cv2.imdecode(np.fromstring(img, np.uint8), cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
