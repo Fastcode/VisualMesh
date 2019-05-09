@@ -118,7 +118,7 @@ def _loss(X, T, Y, config):
     unweighted_mesh_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=X, labels=Y, axis=1)
 
     # Labels for the tutor are the absolute error
-    tutor_labels = tf.reduce_sum(tf.square(tf.subtract(Y, tf.nn.softmax(X, axis=1))), axis=1) / 2.0
+    tutor_labels = tf.reduce_sum(tf.squared_difference(Y, tf.nn.softmax(X, axis=1)), axis=1) / 2.0
 
     # Only use gradients from areas where the tutor has larger error, this avoids a large number of smaller
     # gradients overpowering the areas where the network has legitimate error.
