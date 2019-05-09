@@ -4,7 +4,19 @@ import math
 import tensorflow as tf
 
 
-def build_network(X, G, groups):
+def build_network(X, G, groups, activation_fn):
+
+  # Work out our activation function
+  activation_fn = {
+    'selu': tf.nn.selu,
+    'elu': tf.nn.elu,
+    'relu': tf.nn.relu,
+    'relu6': tf.nn.relu6,
+    'leaky_relu': tf.nn.leaky_relu,
+    'swish': tf.nn.swish,
+    'sigmoid': tf.nn.sigmoid,
+    'tanh': tf.tanh,
+  }[activation_fn]
 
   # Build our tensor
   logits = X
@@ -50,6 +62,6 @@ def build_network(X, G, groups):
 
           # Apply our activation function except for the last layer
           if i + 1 < len(groups) or j + 1 < len(c):
-            logits = tf.nn.selu(logits)
+            logits = activation_fn(logits)
 
   return logits

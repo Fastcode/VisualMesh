@@ -60,9 +60,9 @@ def save_yaml_model(sess, output_path, global_step):
 def _build_device_training_graph(data, network_structure, tutor_structure, config, network_optimiser, tutor_optimiser):
   # Create the network and tutor graph ops for this device
   with tf.variable_scope('Network'):
-    X = network.build_network(data['X'], data['G'], network_structure)
+    X = network.build_network(data['X'], data['G'], network_structure, config.network.activation_fn)
   with tf.variable_scope('Tutor'):
-    T = tf.squeeze(network.build_network(data['X'], data['G'], tutor_structure), axis=-1)
+    T = tf.squeeze(network.build_network(data['X'], data['G'], tutor_structure, config.network.activation_fn), axis=-1)
     # Apply sigmoid to the tutor network
     T = tf.nn.sigmoid(T)
 

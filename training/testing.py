@@ -74,7 +74,7 @@ def _build_device_testing_graph(data, network_structure, config, device_no):
 
   # Create the network graph ops for this device
   with tf.variable_scope("Network"):
-    X = network.build_network(data["X"], data["G"], network_structure)
+    X = network.build_network(data["X"], data["G"], network_structure, config.network.activation_fn)
 
   # Truth labels for the network
   Y = data["Y"]
