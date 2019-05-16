@@ -138,6 +138,7 @@ def _loss(X, T, Y, config):
 
     # Calculate the loss weights for each of the classes
     scatters = []
+    active_classes = []
     for i in range(len(config.network.classes)):
       # Indexes of truth samples for this class
       idx = tf.where(Y[:, i])
@@ -146,10 +147,12 @@ def _loss(X, T, Y, config):
       pts = tf.scatter_nd(idx, pts, tf.shape(T, out_type=tf.int64))
 
       # Either our weights, or if there were none, zeros
-      scatters.append(tf.cond(tf.equal(tf.size(idx), 0), lambda: tf.zeros_like(T), lambda: pts))
+      active = tf.equal(tf.size(idx), 0)
+      scatters.append(tf.cond(active, lambda: tf.zeros_like(T), lambda: pts))
+      active_classes.append(active)
 
     # Even if we don't have all classes, the weights should sum to 1
-    active_classes = tf.cast(tf.count_nonzero(tf.stack([tf.count_nonzero(s) for s in scatters])), tf.float32)
+    active_classes = tf.add_n([tf.cast(a, tf.int32) for a in active_classes])
     W = tf.add_n(scatters)
     W = tf.divide(W, active_classes)
 
@@ -172,10 +175,10 @@ def _metrics(X, Y, config):
       # Get our confusion matrix
       predictions = tf.cast(tf.equal(tf.argmax(X, axis=1), i), tf.int32)
       labels = tf.cast(tf.equal(tf.argmax(Y, axis=1), i), tf.int32)
-      tp = tf.cast(tf.count_nonzero(predictions * labels), tf.float32)
-      tn = tf.cast(tf.count_nonzero((predictions - 1) * (labels - 1)), tf.float32)
-      fp = tf.cast(tf.count_nonzero(predictions * (labels - 1)), tf.float32)
-      fn = tf.cast(tf.count_nonzero((predictions - 1) * labels), tf.float32)
+      tp = tf.count_nonzero(predictions * labels, dtype=tf.float32)
+      tn = tf.count_nonzero((predictions - 1) * (labels - 1), dtype=tf.float32)
+      fp = tf.count_nonzero(predictions * (labels - 1), dtype=tf.float32)
+      fn = tf.count_nonzero((predictions - 1) * labels, dtype=tf.float32)
 
       # Get the loss for this specific class
       class_loss = tf.reduce_mean(tf.gather_nd(network_loss, tf.where(Y[:, i])))
@@ -199,7 +202,7 @@ def _metrics(X, Y, config):
 
     # Count how many losses were non 0 (0 loss means there were none of this class in the batch)
     class_losses = [m['loss'] for k, m in metrics.items()]
-    active_classes = tf.cast(tf.add_n([tf.count_nonzero(l) for l in class_losses]), dtype=tf.float32)
+    active_classes = tf.add_n([tf.count_nonzero(l, dtype=tf.float32) for l in class_losses])
     metrics['Global'] = {
       'loss': tf.divide(tf.add_n(class_losses), active_classes),
       'tp': tf.add_n([m['tp'] for k, m in metrics.items()]),
