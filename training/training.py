@@ -123,7 +123,7 @@ def _loss(X, T, Y, config):
     # Only use gradients from areas where the tutor has larger error, this avoids a large number of smaller
     # gradients overpowering the areas where the network has legitimate error.
     # This technique means that the tutor network will never converge, but we don't ever want it to
-    tutor_idx = tf.where(tf.greater(tf.abs(tutor_labels - T), config.training.tutor.threshold))
+    tutor_idx = tf.cast(tf.where(tf.greater(tf.abs(tutor_labels - T), config.training.tutor.threshold)), dtype=tf.int32)
 
     # If we have no values that are inaccurate, we will take all the values as normal
     tutor_loss = tf.cond(
@@ -139,10 +139,11 @@ def _loss(X, T, Y, config):
     )
 
     # Calculate the loss weights for each of the classes
-    W = tf.multiply(Y, tf.add(T, config.training.tutor.base_weight))
+    W = tf.multiply(Y, tf.expand_dims(tf.add(T, config.training.tutor.base_weight), axis=-1))
     class_weights = tf.reduce_sum(W, axis=0)
     W = tf.divide(W, class_weights)
     W = tf.divide(W, tf.count_nonzero(class_weights, dtype=tf.float32))
+    W = tf.reduce_sum(W, axis=-1)
 
     # Weighted mesh loss, sum rather than mean as we have already normalised based on number of points
     weighted_mesh_loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
