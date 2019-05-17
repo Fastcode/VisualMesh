@@ -126,15 +126,17 @@ def _loss(X, T, Y, config):
     tutor_idx = tf.where(tf.greater(tf.abs(tutor_labels - T), config.training.tutor.threshold))
 
     # If we have no values that are inaccurate, we will take all the values as normal
-    tutor_loss_cut = tf.losses.mean_squared_error(
-      predictions=tf.gather_nd(T, tutor_idx),
-      labels=tf.stop_gradient(tf.gather_nd(tutor_labels, tutor_idx)),
+    tutor_loss = tf.cond(
+      tf.equal(tf.size(tutor_idx), 0),
+      lambda: tf.losses.mean_squared_error(
+        predictions=T,
+        labels=tf.stop_gradient(tutor_labels),
+      ),
+      lambda: tf.losses.mean_squared_error(
+        predictions=tf.gather_nd(T, tutor_idx),
+        labels=tf.stop_gradient(tf.gather_nd(tutor_labels, tutor_idx)),
+      ),
     )
-    tutor_loss_full = tf.losses.mean_squared_error(
-      predictions=T,
-      labels=tf.stop_gradient(tutor_labels),
-    )
-    tutor_loss = tf.cond(tf.equal(tf.size(tutor_idx), 0), lambda: tutor_loss_full, lambda: tutor_loss_cut)
 
     # Calculate the loss weights for each of the classes
     scatters = []
