@@ -139,24 +139,10 @@ def _loss(X, T, Y, config):
     )
 
     # Calculate the loss weights for each of the classes
-    scatters = []
-    active_classes = []
-    for i in range(len(config.network.classes)):
-      # Indexes of truth samples for this class
-      idx = tf.where(Y[:, i])
-      pts = tf.gather_nd(T, idx) + config.training.tutor.base_weight
-      pts = tf.divide(pts, tf.reduce_sum(pts))
-      pts = tf.scatter_nd(idx, pts, tf.shape(T, out_type=tf.int64))
-
-      # Either our weights, or if there were none, zeros
-      active = tf.equal(tf.size(idx), 0)
-      scatters.append(tf.cond(active, lambda: tf.zeros_like(T), lambda: pts))
-      active_classes.append(active)
-
-    # Even if we don't have all classes, the weights should sum to 1
-    active_classes = tf.add_n([tf.cast(a, tf.int32) for a in active_classes])
-    W = tf.add_n(scatters)
-    W = tf.divide(W, active_classes)
+    W = tf.multiply(Y, tf.add(T, config.training.tutor.base_weight))
+    class_weights = tf.reduce_sum(W, axis=0)
+    W = tf.divide(W, class_weights)
+    W = tf.divide(W, tf.count_nonzero(class_weights, dtype=tf.float32))
 
     # Weighted mesh loss, sum rather than mean as we have already normalised based on number of points
     weighted_mesh_loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
