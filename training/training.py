@@ -10,6 +10,7 @@ import re
 import time
 import multiprocessing
 
+import training.lr_policy as lr_policy
 from . import mesh_drawer
 from . import network
 from . import dataset
@@ -142,13 +143,23 @@ def _loss(X, T, Y, config):
     W = tf.multiply(Y, tf.expand_dims(tf.add(T, config.training.tutor.base_weight), axis=-1))
     class_weights = tf.reduce_sum(W, axis=0)
     W = tf.divide(W, class_weights)
-    W = tf.divide(W, tf.count_nonzero(class_weights, dtype=tf.float32))
     W = tf.reduce_sum(W, axis=-1)
+    W = tf.divide(W, tf.count_nonzero(class_weights, dtype=tf.float32))
 
     # Weighted mesh loss, sum rather than mean as we have already normalised based on number of points
-    weighted_mesh_loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
+    tutored_mesh_loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
 
-  return tf.reduce_mean(unweighted_mesh_loss), weighted_mesh_loss, tutor_loss
+    # Untutored balanced mesh loss
+    W = Y
+    class_weights = tf.reduce_sum(Y, axis=0)
+    W = tf.divide(W, class_weights)
+    W = tf.reduce_sum(W, axis=-1)
+    W = tf.divide(W, tf.count_nonzero(class_weights, dtype=tf.float32))
+
+    # Weighted mesh loss, sum rather than mean as we have already normalised based on number of points
+    balanced_mesh_loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
+
+  return balanced_mesh_loss, weighted_mesh_loss, tutor_loss
 
 
 def _metrics(X, Y, config):
@@ -298,7 +309,12 @@ def _build_training_graph(gpus, config):
   with tf.device('/device:CPU:0'):
     # Optimiser, and global_step variables on the CPU
     global_step = tf.Variable(0, dtype=tf.int32, trainable=False, name='global_step')
-    network_optimiser = tf.train.AdamOptimizer(learning_rate=config.training.learning_rate)
+
+    # Expose the learning rate as a placeholder so we can utilise them in our training
+    learning_rate = tf.placeholder(dtype=tf.float32)
+
+    # Create our optimisers
+    network_optimiser = tf.train.AdamOptimizer(learning_rate=learning_rate)
     tutor_optimiser = tf.train.GradientDescentOptimizer(learning_rate=config.training.tutor.learning_rate)
 
     # This iterator is used so we can swap datasets as we go
@@ -353,9 +369,10 @@ def _build_training_graph(gpus, config):
   # Create the loss summary op
   with tf.name_scope('Training'):
     loss_summary_op = tf.summary.merge([
-      tf.summary.scalar('Raw_Loss', ops['loss']['u']),
-      tf.summary.scalar('Weighted_Loss', ops['loss']['x']),
+      tf.summary.scalar('Loss', ops['loss']['u']),
+      tf.summary.scalar('Tutored_Loss', ops['loss']['x']),
       tf.summary.scalar('Tutor_Loss', ops['loss']['t']),
+      tf.summary.scalar('Learning_Rate', learning_rate),
     ])
 
   # Now use the metrics to calculate interesting validation details
@@ -373,10 +390,12 @@ def _build_training_graph(gpus, config):
   return {
     'handle': handle,
     'global_step': global_step,
+    'learning_rate': learning_rate,
     'train': {
       'train': [optimise_mesh_op, optimise_tutor_op],
       'loss': {
         'u': ops['loss']['u'],
+        'x': ops['loss']['x'],
         't': ops['loss']['t'],
       },
       'summary': loss_summary_op
@@ -425,7 +444,7 @@ def train(config, output_path):
       prefetch=tf.data.experimental.AUTOTUNE,
       variants=config.training.variants,
     ).build(stats=True)
-    training_dataset = training_dataset.repeat(config.training.epochs).make_initializable_iterator()
+    training_dataset = training_dataset.repeat().make_initializable_iterator()
 
     # Merge in the dataset stats into the training summary
     ops['train']['summary'] = tf.summary.merge([ops['train']['summary'], training_ds_stats])
@@ -480,84 +499,95 @@ def train(config, output_path):
         image_dataset.string_handle()
       ])
 
+      # Our learning rate policy
+      rate_policy = {
+        'STATIC': lr_policy.Static,
+        'ONE_CYCLE': lr_policy.OneCycle
+      }[config.training.learning_policy.type](
+        config.training.learning_policy
+      )
+
       # We are done messing with the graph
       tf.get_default_graph().finalize()
 
-      while True:
-        try:
-          # Run our training step
-          start = time.perf_counter()
-          output = sess.run(ops['train'], feed_dict={ops['handle']: training_handle})
-          summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
-          end = time.perf_counter()
+      while not rate_policy.finished(tf.train.global_step(sess, global_step)):
+        # Run our training step
+        start = time.perf_counter()
+        output = sess.run(
+          ops['train'], feed_dict={
+            ops['handle']: training_handle,
+            ops['learning_rate']: rate_policy.learning_rate,
+          }
+        )
+        summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
+        end = time.perf_counter()
 
-          # Print batch info
-          print(
-            'Batch: {} ({:3g}s) Mesh Loss: {:3g} Tutor Loss: {:3g}'.format(
-              tf.train.global_step(sess, global_step),
-              (end - start),
-              output['loss']['u'],
-              output['loss']['t'],
-            )
+        # Update the rate policy
+        rate_policy.update(tf.train.global_step(sess, global_step))
+
+        # Print batch info
+        print(
+          'Batch: {} ({:3g}s) Mesh Loss: {:3g} Tutor Loss: {:3g}'.format(
+            tf.train.global_step(sess, global_step),
+            (end - start),
+            output['loss']['u'],
+            output['loss']['t'],
           )
+        )
 
-          # Every N steps do our validation/summary step
-          if tf.train.global_step(sess, global_step) % config.training.validation.frequency == 0:
-            output = sess.run(ops['validate'], feed_dict={ops['handle']: validation_handle})
-            summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
-
-            # Histogram summary
-            histograms = []
-            for name, classes in output['dist'].items():
-              for k, vs in classes.items():
-
-                # Normalise the vector so they sum to 1.0
-                vs = vs[0] / np.sum(vs[0])
-
-                # Make a pretend bar chart
-                edges = []
-                buckets = []
-                for i, v in enumerate(vs):
-                  edges.extend([i - 2 / 6, i - 1 / 6, i, i + 1 / 6, i + 2 / 6, i + 3 / 6])
-                  buckets.extend([0, v, v, v, v, 0])
-
-                # Interleave with 0s so it looks like categories
-                histograms.append(
-                  tf.Summary.Value(
-                    tag='{}/Confusion/{}'.format(k.title(), name.title()),
-                    histo=tf.HistogramProto(min=-0.5, max=vs.size - 0.5, bucket_limit=edges, bucket=buckets)
-                  )
-                )
-
-            histograms = tf.Summary(value=histograms)
-            summary_writer.add_summary(histograms, tf.train.global_step(sess, global_step))
-
-          # Every N steps save our model
-          if tf.train.global_step(sess, global_step) % config.training.save_frequency == 0:
-            saver.save(sess, model_path, tf.train.global_step(sess, global_step))
-            save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
-
-          # Every N steps show our image summary
-          if tf.train.global_step(sess, global_step) % config.training.validation.image_frequency == 0:
-            output = sess.run(ops['image'], feed_dict={ops['handle']: image_handle})
-            summary = _progress_images(pool, output['inference'], config)
-            summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-
-        # We have finished the dataset
-        except tf.errors.OutOfRangeError:
-
-          # Do a validation step
+        # Every N steps do our validation/summary step
+        if tf.train.global_step(sess, global_step) % config.training.validation.frequency == 0:
           output = sess.run(ops['validate'], feed_dict={ops['handle']: validation_handle})
           summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
 
-          # Output some images
+          # Histogram summary
+          histograms = []
+          for name, classes in output['dist'].items():
+            for k, vs in classes.items():
+
+              # Normalise the vector so they sum to 1.0
+              vs = vs[0] / np.sum(vs[0])
+
+              # Make a pretend bar chart
+              edges = []
+              buckets = []
+              for i, v in enumerate(vs):
+                edges.extend([i - 2 / 6, i - 1 / 6, i, i + 1 / 6, i + 2 / 6, i + 3 / 6])
+                buckets.extend([0, v, v, v, v, 0])
+
+              # Interleave with 0s so it looks like categories
+              histograms.append(
+                tf.Summary.Value(
+                  tag='{}/Confusion/{}'.format(k.title(), name.title()),
+                  histo=tf.HistogramProto(min=-0.5, max=vs.size - 0.5, bucket_limit=edges, bucket=buckets)
+                )
+              )
+
+          histograms = tf.Summary(value=histograms)
+          summary_writer.add_summary(histograms, tf.train.global_step(sess, global_step))
+
+        # Every N steps save our model
+        if tf.train.global_step(sess, global_step) % config.training.save_frequency == 0:
+          saver.save(sess, model_path, tf.train.global_step(sess, global_step))
+          save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
+
+        # Every N steps show our image summary
+        if tf.train.global_step(sess, global_step) % config.training.validation.image_frequency == 0:
           output = sess.run(ops['image'], feed_dict={ops['handle']: image_handle})
           summary = _progress_images(pool, output['inference'], config)
           summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
-          # Save the model
-          saver.save(sess, model_path, tf.train.global_step(sess, global_step))
-          save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
+      # Do a validation step
+      output = sess.run(ops['validate'], feed_dict={ops['handle']: validation_handle})
+      summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
 
-          print('Training done')
-          break
+      # Output some images
+      output = sess.run(ops['image'], feed_dict={ops['handle']: image_handle})
+      summary = _progress_images(pool, output['inference'], config)
+      summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+
+      # Save the model
+      saver.save(sess, model_path, tf.train.global_step(sess, global_step))
+      save_yaml_model(sess, output_path, tf.train.global_step(sess, global_step))
+
+      print('Training done')

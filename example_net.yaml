@@ -31,7 +31,9 @@ network:
   # Having an empty list (e.g.) [[], [2]] would correspond to two stacked convolutions.
   # The final layer of the network is always equal to the number of classes and should be omitted, typically by an
   # empty list.
-  structure: [[16], [16], [16], [16], [16], [8], [8], [8], [8], [8], []]
+  structure: [[16], [16], [16], [16], [16], [16], [16], [8], [8], [8], [8], [8], []]
+  # Activation Function
+  activation_fn: selu
   # This is a mapping of the classes to the colours that represent them in the mask images.
   # Each of the elements has a name, and an RGB value that stores it in the mask image.
   # The index of the final output layer will be the same as the order provided in this list.
@@ -51,22 +53,44 @@ testing:
 
 # Settings to use when training the network
 training:
-  # The number of epochs to train for (number of times to loop through the training data).
-  # Note that if you restart the training, it will loose track of how many epochs it has done so far.
-  epochs: 50
   # The batch size to use when training the network (how many images to feed in a single training step).
   # Do not make this number too large or it will create poor gradients.
   batch_size: 50
-  # The learning rate for the Adam optimiser.
-  learning_rate: 0.001
   # How many batches between saving the progress of the network.
-  save_frequency: 250
-
+  save_frequency: 1000
+  # The policy to use for controlling the learning rate and number of batches when training
+  learning_policy:
+    # One cycle policy, this involves a linear increase, and then decrease of the learning rate followed by a decay
+    type: ONE_CYCLE
+    # Minimum learning rate to cycle up from
+    min_learning_rate: 0.0004
+    # Maximum learning rate at peak
+    max_learning_rate: 0.004
+    # Learning rate to decay down to during the decay step
+    decay_learning_rate: 0.00004
+    # Number of batches to do in the cycle
+    cycle_batches: 100000
+    # Number of batches to spend decaying the learning rate
+    decay_batches: 50000
+    # If hot_start is true, the training will restart it's training as if beginning at 0 without resetting the network
+    # This means the one cycle will begin again treating the current global_step as the 0 point and going
+    # cycle_batches + decay_batches more
+    hot_start: False
+  # learning_policy:
+  #   # Static learning rate policy, the learning rate remains fixed for the entirety of training
+  #   type: STATIC
+  #   # The learning rate to use for the optimiser
+  #   learning_rate: 0.0001
+  #   # The number of batches to train for
+  #   batches: 250000
+  #   If hot_start is true, the training will restart it's training as if beginning at 0 without resetting the network
+  #   For static this means the final training will be global_step + `batches` total steps
+  #   hot_start: False
   # Settings for the tutor network.
   tutor:
     # The learning rate for the tutor network.
     # This value does not decay as the tutor network is not designed to converge.
-    learning_rate: 0.05
+    learning_rate: 0.02
     # The hysteresis threshold for training in the tutor network.
     # When the tutor network starts to get close to a convergent point, it will have many small gradients that
     # don't help the tutor network do it's job of finding error points. Having a hysteresis value here that
@@ -76,7 +100,7 @@ training:
     base_weight: 0.05
     # This allows the tutor to have a different structure than the main network.
     # If this isn't set, the structure of the tutor will be identical to that of the main network.
-    structure: [[16], [16], [16], [16], [16], [8], [8], [8], [8], [8], []]
+    structure: [[16], [16], [16], [16], [16], [16], [16], [8], [8], [8], [8], [8], []]
 
   # Settings for the validation step of the network.
   validation:
@@ -93,20 +117,9 @@ training:
   # They are defined using a mean value and a standard deviation using a truncated normal distribution.
   # If the values are greater than 2 standard deviations from the mean they will be resampled.
   variants:
-    image:
-      # Image brightness adjustment.
-      brightness: { 'mean': 0, 'stddev': 0.0 }
-      # Image contrast adjustment.
-      contrast: { 'mean': 0, 'stddev': 0.0 }
-      # Image saturation adjustment.
-      saturation: { 'mean': 0, 'stddev': 0.0 }
-      # Image gamma adjustment (make sure this value is always positive).
-      gamma: { 'mean': 1, 'stddev': 0.0 }
-      # Image hue adjustment.
-      hue: { 'mean': 0, 'stddev': 0.0 }
     mesh:
       # Adjustments to the height of the mesh above the observation plane.
-      height: { 'mean': 0, 'stddev': 0.0 }
+      height: { 'mean': 0, 'stddev': 0.05 }
       # Adjustments to the orientation of the observation plane.
       # This value is used as three componentwise euler rotations added to the initial rotation in radians.
-      rotation: { 'mean': 0, 'stddev': 0.0 }
+      rotation: { 'mean': 0, 'stddev': 0.0872665 }
