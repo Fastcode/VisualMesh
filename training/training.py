@@ -159,7 +159,7 @@ def _loss(X, T, Y, config):
     # Weighted mesh loss, sum rather than mean as we have already normalised based on number of points
     balanced_mesh_loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
 
-  return balanced_mesh_loss, weighted_mesh_loss, tutor_loss
+  return balanced_mesh_loss, tutored_mesh_loss, tutor_loss
 
 
 def _metrics(X, Y, config):
