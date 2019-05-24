@@ -361,7 +361,7 @@ def _build_training_graph(gpus, config):
   # If we have multiple GPUs we need to do a merge operation, otherwise just take the element
   ops = _merge_ops(device_ops) if len(device_ops) > 1 else device_ops[0]
 
-
+  # Set up variables to accumulate gradients over multiple batche
   with tf.device('/device:CPU:0'):
     # Get all trainable variables in the current tower
     x_tvs = tf.trainable_variables(scope='^Network')
@@ -379,12 +379,19 @@ def _build_training_graph(gpus, config):
 
   # Apply the gradients as part of the optimisation
   with tf.device('/device:CPU:0'):
-    optimise_mesh_op = network_optimiser.apply_gradients(
-        [(x_accum_ops[i], gv[1]) for i, gv in enumerate(ops['grads']['x'])], global_step=global_step
-    )
-    optimise_tutor_op = tutor_optimiser.apply_gradients(
-        [(t_accum_ops[i], gv[1]) for i, gv in enumerate(ops['grads']['t'])]
-    )
+    # Average the accumulated gradients over the number of batches that we accumulated
+    x_divide_ops = [
+        (tf.divide(x_accum_vars[i], config.training.batch_accumulation), gv[1])
+        for i, gv in enumerate(ops["grads"]["x"])
+    ]
+    t_divide_ops = [
+        (tf.divide(t_accum_vars[i], config.training.batch_accumulation), gv[1])
+        for i, gv in enumerate(ops["grads"]["t"])
+    ]
+
+    # Apply the averaged gradients
+    optimise_mesh_op = network_optimiser.apply_gradients(x_divide_ops, global_step=global_step)
+    optimise_tutor_op = tutor_optimiser.apply_gradients(t_divide_ops)
 
   # Create the loss summary op
   with tf.name_scope('Training'):
@@ -410,6 +417,7 @@ def _build_training_graph(gpus, config):
   return {
     'handle': handle,
     'global_step': global_step,
+    'initialisers': [x_zero_ops, t_zero_ops],
     'learning_rate': learning_rate,
     'train': [x_accum_ops, t_accum_ops],
     'update': {
