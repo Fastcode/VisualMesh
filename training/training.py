@@ -361,10 +361,30 @@ def _build_training_graph(gpus, config):
   # If we have multiple GPUs we need to do a merge operation, otherwise just take the element
   ops = _merge_ops(device_ops) if len(device_ops) > 1 else device_ops[0]
 
+
+  with tf.device('/device:CPU:0'):
+    # Get all trainable variables in the current tower
+    x_tvs = tf.trainable_variables(scope='^Network')
+    t_tvs = tf.trainable_variables(scope='^Tutor')
+
+    # Create a list of variables with the same shape as the trainable ones initialized with zeros
+    x_accum_vars = [tf.Variable(tf.zeros_like(tv.initialized_value()), trainable=False) for tv in x_tvs]
+    t_accum_vars = [tf.Variable(tf.zeros_like(tv.initialized_value()), trainable=False) for tv in t_tvs]
+    x_zero_ops = [tv.assign(tf.zeros_like(tv)) for tv in x_accum_vars]
+    t_zero_ops = [tv.assign(tf.zeros_like(tv)) for tv in t_accum_vars]
+
+    # Accumulate gradients
+    x_accum_ops = [x_accum_vars[i].assign_add(gv[0]) for i, gv in enumerate(ops['grads']['x'])]
+    t_accum_ops = [t_accum_vars[i].assign_add(gv[0]) for i, gv in enumerate(ops['grads']['t'])]
+
   # Apply the gradients as part of the optimisation
   with tf.device('/device:CPU:0'):
-    optimise_mesh_op = network_optimiser.apply_gradients(ops['grads']['x'], global_step=global_step)
-    optimise_tutor_op = tutor_optimiser.apply_gradients(ops['grads']['t'])
+    optimise_mesh_op = network_optimiser.apply_gradients(
+        [(x_accum_ops[i], gv[1]) for i, gv in enumerate(ops['grads']['x'])], global_step=global_step
+    )
+    optimise_tutor_op = tutor_optimiser.apply_gradients(
+        [(t_accum_ops[i], gv[1]) for i, gv in enumerate(ops['grads']['t'])]
+    )
 
   # Create the loss summary op
   with tf.name_scope('Training'):
@@ -391,8 +411,9 @@ def _build_training_graph(gpus, config):
     'handle': handle,
     'global_step': global_step,
     'learning_rate': learning_rate,
-    'train': {
-      'train': [optimise_mesh_op, optimise_tutor_op],
+    'train': [x_accum_ops, t_accum_ops],
+    'update': {
+      'update': [optimise_mesh_op, optimise_tutor_op],
       'loss': {
         'u': ops['loss']['u'],
         'x': ops['loss']['x'],
@@ -447,7 +468,7 @@ def train(config, output_path):
     training_dataset = training_dataset.repeat().make_initializable_iterator()
 
     # Merge in the dataset stats into the training summary
-    ops['train']['summary'] = tf.summary.merge([ops['train']['summary'], training_ds_stats])
+    ops['update']['summary'] = tf.summary.merge([ops['update']['summary'], training_ds_stats])
 
     # Load our training and validation dataset
     validation_dataset = dataset.VisualMeshDataset(
@@ -511,15 +532,31 @@ def train(config, output_path):
       tf.get_default_graph().finalize()
 
       while not rate_policy.finished(tf.train.global_step(sess, global_step)):
-        # Run our training step
         start = time.perf_counter()
+
+        # Initialise/reset accumulators
+        sess.run(ops['initialisers'])
+
+        # Run minibatches and accumulate gradients
+        for _ in range(config.training.batch_accumulation):
+            sess.run(
+              ops['train'], feed_dict={
+                ops['handle']: training_handle,
+                ops['learning_rate']: rate_policy.learning_rate
+              }
+            )
+
+        # Apply accumulated gradients and calculate loss
         output = sess.run(
-          ops['train'], feed_dict={
+          ops['update'], feed_dict={
             ops['handle']: training_handle,
-            ops['learning_rate']: rate_policy.learning_rate,
+            ops['learning_rate']: rate_policy.learning_rate
           }
         )
+
+        # Add summary for tensorboard
         summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
+
         end = time.perf_counter()
 
         # Update the rate policy
@@ -527,9 +564,9 @@ def train(config, output_path):
 
         # Print batch info
         print(
-          'Batch: {} ({:3g}s) Mesh Loss: {:3g} Tutor Loss: {:3g}'.format(
+          'Batch: {} ({:3g}s avg.) Mesh Loss: {:3g} Tutor Loss: {:3g}'.format(
             tf.train.global_step(sess, global_step),
-            (end - start),
+            (end - start) / config.training.batch_accumulation,
             output['loss']['u'],
             output['loss']['t'],
           )
