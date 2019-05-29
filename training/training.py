@@ -154,17 +154,6 @@ def _metrics(X, Y, config):
         'fn': fn
       }
 
-    # Count how many losses were non 0 (0 loss means there were none of this class in the batch)
-    class_losses = [m['loss'] for k, m in metrics.items()]
-    active_classes = tf.add_n([tf.count_nonzero(l, dtype=tf.float32) for l in class_losses])
-    metrics['Global'] = {
-      'loss': tf.divide(tf.add_n(class_losses), active_classes),
-      'tp': tf.add_n([m['tp'] for k, m in metrics.items()]),
-      'tn': tf.add_n([m['tn'] for k, m in metrics.items()]),
-      'fp': tf.add_n([m['fp'] for k, m in metrics.items()]),
-      'fn': tf.add_n([m['fn'] for k, m in metrics.items()]),
-    }
-
   return metrics
 
 
@@ -200,6 +189,48 @@ def _merge_ops(device_ops):
       'grads': grads,
       'metrics': metrics,
     }
+
+
+def _accumulate(ops, batches):
+
+  # If a dictionary recurse
+  if type(ops) == dict:
+    accumulate = {}
+    read = {}
+    reset = {}
+    for k, v in ops.items():
+      acc, rx, rs = _accumulate(v, batches)
+      accumulate[k] = acc
+      read[k] = rx
+      reset[k] = rs
+    return accumulate, read, reset
+
+  # If a list recurse
+  elif type(ops) == list:
+    accumulate = []
+    read = []
+    reset = []
+    for i, v in enumerate(ops):
+      acc, rx, rs = _accumulate(v, batches)
+      accumulate.append(acc)
+      read.append(rx)
+      reset.append(rs)
+    return accumulate, read, reset
+
+  # If it's a tuple we assume it's a gradient pair
+  elif type(ops) == tuple:
+    # Recurse down with the gradient tensor to get the ops
+    u, r, z = _accumulate(ops[0], batches)
+    return (u, ops[1]), (r, ops[1]), (z, ops[1])
+
+  # Otherwise we assume it's a tensor
+  else:
+    # Make a variable and ops to zero, update, and reset it
+    v = tf.Variable(tf.zeros_like(ops), trainable=False)
+    u = tf.assign_add(v, ops)
+    r = tf.divide(v, tf.cast(batches, ops.dtype))
+    z = tf.assign(v, tf.zeros_like(ops))
+    return u, r, z
 
 
 def _progress_images(pool, inferences, config):
@@ -280,63 +311,65 @@ def _build_training_graph(gpus, config):
   # If we have multiple GPUs we need to do a merge operation, otherwise just take the element
   ops = _merge_ops(device_ops) if len(device_ops) > 1 else device_ops[0]
 
-  # Accumulate the data over multiple batches
+  # Batch accumulation code for training
   with tf.device('/device:CPU:0'):
-    # Get all trainable variables in the current tower
-    x_tvs = tf.trainable_variables(scope='^Network')
 
-    # Create a list of variables with the same shape as the trainable ones initialized with zeros
-    x_accum_vars = [tf.Variable(tf.zeros_like(tv.initialized_value()), trainable=False) for tv in x_tvs]
-    x_zero_ops = [tv.assign(tf.zeros_like(tv)) for tv in x_accum_vars]
+    # Do accumulation over all variables except for inferences as it does not make sense to sum them
+    batches_accumulated = tf.Variable(tf.zeros(shape=(), dtype=tf.int32), trainable=False)
+    acc_ops, rx_ops, rs_ops = _accumulate({k: v for k, v in ops.items() if k not in ['inference']}, batches_accumulated)
 
-    # Accumulate gradients
-    x_accum_ops = [x_accum_vars[i].assign_add(gv[0]) for i, gv in enumerate(ops['grads'])]
-
-  # Apply the gradients as part of the optimisation
-  with tf.device('/device:CPU:0'):
-    # Average the accumulated gradients over the number of batches that we accumulated
-    x_divide_ops = [
-      (tf.divide(x_accum_vars[i], config.training.batch_accumulation), gv[1]) for i, gv in enumerate(ops['grads'])
-    ]
-
-    # Apply the averaged gradients
-    optimise_mesh_op = network_optimiser.apply_gradients(x_divide_ops, global_step=global_step)
+    # Apply the accumulated gradients
+    apply_gradients = network_optimiser.apply_gradients(rx_ops['grads'], global_step=global_step)
 
   # Create the loss summary op
   with tf.name_scope('Training'):
     loss_summary_op = tf.summary.merge([
-      tf.summary.scalar('Loss', ops['loss']),
+      tf.summary.scalar('Loss', rx_ops['loss']),
       tf.summary.scalar('Learning_Rate', learning_rate),
     ])
 
   # Now use the metrics to calculate interesting validation details
   validation_summary_op = []
-  for k, m in ops['metrics'].items():
+  for k, m in rx_ops['metrics'].items():
     with tf.name_scope(k.title()):
       validation_summary_op.extend([
         tf.summary.scalar('Loss', m['loss']),
         tf.summary.scalar('Precision', m['tp'] / (m['tp'] + m['fp'])),
         tf.summary.scalar('Recall', m['tp'] / (m['tp'] + m['fn']))
       ])
+
+  # Calculate global statistics
+  with tf.name_scope('Global'):
+    # Global loss is average of class losses
+    global_loss = tf.divide(tf.add_n([m['loss'] for k, m in rx_ops['metrics'].items()]), len(rx_ops['metrics']))
+    global_tp = tf.add_n([m['tp'] for k, m in rx_ops['metrics'].items()])
+    global_fp = tf.add_n([m['fp'] for k, m in rx_ops['metrics'].items()])
+    validation_summary_op.extend([
+      tf.summary.scalar('Loss', global_loss),
+      tf.summary.scalar('Accuracy', global_tp / (global_tp + global_fp))
+    ])
   validation_summary_op = tf.summary.merge(validation_summary_op)
 
   # Return the graph operations we will want to run
   return {
     'handle': handle,
     'global_step': global_step,
-    'initialisers': x_zero_ops,
     'learning_rate': learning_rate,
-    'train': x_accum_ops,
-    'update': {
-      'update': optimise_mesh_op,
-      'loss': ops['loss'],
-      'summary': loss_summary_op
+    'train': {
+      'accumulate': [acc_ops['grads'], acc_ops['loss'],
+                     tf.assign_add(batches_accumulated, 1)],
+      'apply': apply_gradients,
+      'reset': [rs_ops['grads'], rs_ops['loss'], tf.assign(batches_accumulated, 0)],
+      'loss': rx_ops['loss'],
+      'summary': loss_summary_op,
     },
     'validate': {
+      'accumulate': [acc_ops['metrics'], tf.assign_add(batches_accumulated, 1)],
+      'reset': [rs_ops['metrics'], tf.assign(batches_accumulated, 0)],
       'summary': validation_summary_op,
       'dist': {
-        'precision': {k: m['dist']['precision'] for k, m in ops['metrics'].items() if k != 'Global'},
-        'recall': {k: m['dist']['recall'] for k, m in ops['metrics'].items() if k != 'Global'}
+        'precision': {k: m['dist']['precision'] for k, m in rx_ops['metrics'].items()},
+        'recall': {k: m['dist']['recall'] for k, m in rx_ops['metrics'].items()}
       },
     },
     'image': {
@@ -379,7 +412,7 @@ def train(config, output_path):
     training_dataset = training_dataset.repeat().make_initializable_iterator()
 
     # Merge in the dataset stats into the training summary
-    ops['update']['summary'] = tf.summary.merge([ops['update']['summary'], training_ds_stats])
+    ops['train']['summary'] = tf.summary.merge([ops['train']['summary'], training_ds_stats])
 
     # Load our training and validation dataset
     validation_dataset = dataset.VisualMeshDataset(
@@ -443,53 +476,52 @@ def train(config, output_path):
       tf.get_default_graph().finalize()
 
       while not rate_policy.finished(tf.train.global_step(sess, global_step)):
-        start = time.perf_counter()
-
-        # Initialise/reset accumulators
-        sess.run(ops['initialisers'])
 
         # Run minibatches and accumulate gradients
+        start = time.perf_counter()
         for _ in range(config.training.batch_accumulation):
           sess.run(
-            ops['train'], feed_dict={
+            ops['train']['accumulate'],
+            feed_dict={
               ops['handle']: training_handle,
               ops['learning_rate']: rate_policy.learning_rate
             }
           )
 
-        # Apply accumulated gradients and calculate loss
-        output = sess.run(
-          ops['update'], feed_dict={
-            ops['handle']: training_handle,
-            ops['learning_rate']: rate_policy.learning_rate
-          }
-        )
-
-        # Add summary for tensorboard
-        summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
-
+        # Apply accumulated gradients loss and then reset the accumulators
+        loss, summary, _ = sess.run([ops['train']['loss'], ops['train']['summary'], ops['train']['apply']],
+                                    feed_dict={ops['learning_rate']: rate_policy.learning_rate})
+        _ = sess.run(ops['train']['reset'])
         end = time.perf_counter()
+
+        # Write out to the summary
+        summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
         # Update the rate policy
         rate_policy.update(tf.train.global_step(sess, global_step))
 
         # Print batch info
-        print(
-          'Batch: {} ({:3g}s avg.) Loss: {:3g}'.format(
-            tf.train.global_step(sess, global_step),
-            (end - start) / config.training.batch_accumulation,
-            output['loss'],
-          )
-        )
+        print('Batch: {} ({:3g}s) Loss: {:3g}'.format(
+          tf.train.global_step(sess, global_step),
+          (end - start),
+          loss,
+        ))
 
         # Every N steps do our validation/summary step
         if tf.train.global_step(sess, global_step) % config.training.validation.frequency == 0:
-          output = sess.run(ops['validate'], feed_dict={ops['handle']: validation_handle})
-          summary_writer.add_summary(output['summary'], tf.train.global_step(sess, global_step))
+
+          # Do batch accumulation
+          for _ in range(config.training.validation.batch_accumulation):
+            sess.run(ops['validate']['accumulate'], feed_dict={ops['handle']: validation_handle})
+
+          # Write out accumulated batches
+          summary, dist = sess.run([ops['validate']['summary'], ops['validate']['dist']])
+          sess.run(ops['validate']['reset'])
+          summary_writer.add_summary(summary, tf.train.global_step(sess, global_step))
 
           # Histogram summary
           histograms = []
-          for name, classes in output['dist'].items():
+          for name, classes in dist.items():
             for k, vs in classes.items():
 
               # Normalise the vector so they sum to 1.0
