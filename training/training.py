@@ -58,98 +58,52 @@ def save_yaml_model(sess, output_path, global_step):
     f.write(yaml.dump(output, width=120))
 
 
-def _build_device_training_graph(data, network_structure, tutor_structure, config, network_optimiser, tutor_optimiser):
-  # Create the network and tutor graph ops for this device
+def _build_device_training_graph(data, network_structure, config, network_optimiser):
+  # Create the network graph ops for this device
   with tf.variable_scope('Network'):
     X = network.build_network(data['X'], data['G'], network_structure, config.network.activation_fn)
-  with tf.variable_scope('Tutor'):
-    T = tf.squeeze(network.build_network(data['X'], data['G'], tutor_structure, config.network.activation_fn), axis=-1)
-    # Apply sigmoid to the tutor network
-    T = tf.nn.sigmoid(T)
 
-  # Capture these before they are filtered
+  # Capture these before they are filtered for drawing images
   X_0 = tf.nn.softmax(X, axis=-1)
-  T_0 = T
 
   # First eliminate points that were masked out with alpha
   with tf.name_scope('AlphaMask'):
     S = tf.where(tf.greater(data['W'], 0))
     X = tf.gather_nd(X, S)
     Y = tf.gather_nd(data['Y'], S)
-    T = tf.gather_nd(T, S)
 
   # Calculate the loss for the batch on this device
-  u_loss, x_loss, t_loss = _loss(X, T, Y, config)
+  loss = _loss(X, Y, config)
 
   # Calculate summary information for validation passes
   metrics = _metrics(X, Y, config)
 
   # Calculate the gradients for this device
-  x_grads = network_optimiser.compute_gradients(x_loss)
-  t_grads = tutor_optimiser.compute_gradients(t_loss)
+  grads = network_optimiser.compute_gradients(loss)
 
   # Store the ops that have been done on this device
   return {
     'inference': {
       'X': X_0,
-      'T': T_0,
       'G': data['G'],
       'n': data['n'],
       'px': data['px'],
       'raw': data['raw']
     },
-    'loss': {
-      'u': u_loss,
-      'x': x_loss,
-      't': t_loss
-    },
-    'grads': {
-      'x': x_grads,
-      't': t_grads
-    },
+    'loss': loss,
+    'grads': grads,
     'metrics': metrics,
   }
 
 
-def _loss(X, T, Y, config):
-  """Calculate the loss for the Network and the Tutor given the provided labels and configuration"""
-  with tf.name_scope("Loss"):
+def _loss(X, Y, config):
+  '''Calculate the loss for the Network given the provided labels and configuration'''
+  with tf.name_scope('Loss'):
 
-    # Unweighted loss, before the tutor network applies
+    # Unweighted loss, before the losses are balanced per class
     unweighted_mesh_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=X, labels=Y, axis=1)
 
-    # Labels for the tutor are the absolute error
-    tutor_labels = tf.reduce_sum(tf.squared_difference(Y, tf.nn.softmax(X, axis=1)), axis=1) / 2.0
-
-    # Only use gradients from areas where the tutor has larger error, this avoids a large number of smaller
-    # gradients overpowering the areas where the network has legitimate error.
-    # This technique means that the tutor network will never converge, but we don't ever want it to
-    tutor_idx = tf.cast(tf.where(tf.greater(tf.abs(tutor_labels - T), config.training.tutor.threshold)), dtype=tf.int32)
-
-    # If we have no values that are inaccurate, we will take all the values as normal
-    tutor_loss = tf.cond(
-      tf.equal(tf.size(tutor_idx), 0),
-      lambda: tf.losses.mean_squared_error(
-        predictions=T,
-        labels=tf.stop_gradient(tutor_labels),
-      ),
-      lambda: tf.losses.mean_squared_error(
-        predictions=tf.gather_nd(T, tutor_idx),
-        labels=tf.stop_gradient(tf.gather_nd(tutor_labels, tutor_idx)),
-      ),
-    )
-
-    # Calculate the loss weights for each of the classes
-    W = tf.multiply(Y, tf.expand_dims(tf.add(T, config.training.tutor.base_weight), axis=-1))
-    class_weights = tf.reduce_sum(W, axis=0)
-    W = tf.divide(W, class_weights)
-    W = tf.reduce_sum(W, axis=-1)
-    W = tf.divide(W, tf.count_nonzero(class_weights, dtype=tf.float32))
-
-    # Weighted mesh loss, sum rather than mean as we have already normalised based on number of points
-    tutored_mesh_loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
-
-    # Untutored balanced mesh loss
+    # Balance the loss per class
     W = Y
     class_weights = tf.reduce_sum(Y, axis=0)
     W = tf.divide(W, class_weights)
@@ -157,9 +111,9 @@ def _loss(X, T, Y, config):
     W = tf.divide(W, tf.count_nonzero(class_weights, dtype=tf.float32))
 
     # Weighted mesh loss, sum rather than mean as we have already normalised based on number of points
-    balanced_mesh_loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
+    loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
 
-  return balanced_mesh_loss, tutored_mesh_loss, tutor_loss
+  return loss
 
 
 def _metrics(X, Y, config):
@@ -219,21 +173,14 @@ def _merge_ops(device_ops):
   # Always merge on the CPU
   with tf.device('/device:CPU:0'):
     # Merge the results of the operations together
-    u_loss = tf.add_n([op['loss']['u'] for op in device_ops]) / len(device_ops)
-    x_loss = tf.add_n([op['loss']['x'] for op in device_ops]) / len(device_ops)
-    t_loss = tf.add_n([op['loss']['t'] for op in device_ops]) / len(device_ops)
+    loss = tf.add_n([op['loss'] for op in device_ops]) / len(device_ops)
 
     # Merge the gradients together
-    x_grads = []
-    for grads in zip(*[op['grads']['x'] for op in device_ops]):
+    grads = []
+    for g in zip(*[op['grads'] for op in device_ops]):
       # None gradients don't matter
-      if not any([v[0] is None for v in grads]):
-        x_grads.append((tf.divide(tf.add_n([v[0] for v in grads]), len(device_ops)), grads[0][1]))
-    t_grads = []
-    for grads in zip(*[op['grads']['t'] for op in device_ops]):
-      # None gradients don't matter
-      if not any([v[0] is None for v in grads]):
-        t_grads.append((tf.divide(tf.add_n([v[0] for v in grads]), len(device_ops)), grads[0][1]))
+      if not any([v[0] is None for v in g]):
+        grads.append((tf.divide(tf.add_n([v[0] for v in g]), len(device_ops)), g[0][1]))
 
     # Merge the metrics together
     def _merge_metrics(metrics):
@@ -249,15 +196,8 @@ def _merge_ops(device_ops):
 
     return {
       'inference': [op['inference'] for op in device_ops],
-      'loss': {
-        'u': u_loss,
-        'x': x_loss,
-        't': t_loss
-      },
-      'grads': {
-        'x': x_grads,
-        't': t_grads
-      },
+      'loss': loss,
+      'grads': grads,
       'metrics': metrics,
     }
 
@@ -278,16 +218,10 @@ def _progress_images(pool, inferences, config):
         inference['raw'][i], inference['px'][r[0]:r[1]], inference['X'][r[0]:r[1]],
         [c[1] for c in config.network.classes]
       ))
-      image_args.append((inference['raw'][i], inference['px'][r[0]:r[1]], inference['T'][r[0]:r[1]]))
 
-  # Process all images and then split the mesh and tutor images
-  processed = pool.starmap(mesh_drawer.draw, image_args)
-  x_imgs = processed[0::2]
-  t_imgs = processed[1::2]
-
-  # Sort by the hash so we have a consistent order
+  # Process all images and sort them so they show up in the same order
+  x_imgs = pool.starmap(mesh_drawer.draw, image_args)
   x_imgs.sort(key=lambda k: k[0])
-  t_imgs.sort(key=lambda k: k[0])
 
   return tf.Summary(
     value=[
@@ -295,11 +229,6 @@ def _progress_images(pool, inferences, config):
         tag='Mesh/Image/{}'.format(i),
         image=tf.Summary.Image(height=data[1], width=data[2], colorspace=3, encoded_image_string=data[3])
       ) for i, data in enumerate(x_imgs)
-    ] + [
-      tf.Summary.Value(
-        tag='Tutor/Image/{}'.format(i),
-        image=tf.Summary.Image(height=data[1], width=data[2], colorspace=3, encoded_image_string=data[3])
-      ) for i, data in enumerate(t_imgs)
     ]
   )
 
@@ -315,7 +244,6 @@ def _build_training_graph(gpus, config):
 
     # Create our optimisers
     network_optimiser = tf.train.AdamOptimizer(learning_rate=learning_rate)
-    tutor_optimiser = tf.train.GradientDescentOptimizer(learning_rate=config.training.tutor.learning_rate)
 
     # This iterator is used so we can swap datasets as we go
     handle = tf.placeholder(tf.string, shape=[])
@@ -339,66 +267,45 @@ def _build_training_graph(gpus, config):
       }
     )
 
-  # Calculate the structure for the network and the tutor
+  # Calculate the structure for the network and add on the number of classes to the final step
   network_structure = copy.deepcopy(config.network.structure)
-  tutor_structure = copy.deepcopy(config.training.tutor.structure
-                                 ) if 'structure' in config.training.tutor else copy.deepcopy(network_structure)
-
-  # Set the final output sizes for the network and tutor network
   network_structure[-1].append(len(config.network.classes))
-  tutor_structure[-1].append(1)
 
-  # For each GPU build a classification network, a tutor network and a gradients calculator
+  # For each GPU build a classification network and a gradients calculator
   device_ops = []
   for i, gpu in enumerate(gpus):
     with tf.device(gpu), tf.name_scope('Tower_{}'.format(i)):
-      device_ops.append(
-        _build_device_training_graph(
-          iterator.get_next(), network_structure, tutor_structure, config, network_optimiser, tutor_optimiser
-        )
-      )
+      device_ops.append(_build_device_training_graph(iterator.get_next(), network_structure, config, network_optimiser))
 
   # If we have multiple GPUs we need to do a merge operation, otherwise just take the element
   ops = _merge_ops(device_ops) if len(device_ops) > 1 else device_ops[0]
 
-  # Set up variables to accumulate gradients over multiple batche
+  # Accumulate the data over multiple batches
   with tf.device('/device:CPU:0'):
     # Get all trainable variables in the current tower
     x_tvs = tf.trainable_variables(scope='^Network')
-    t_tvs = tf.trainable_variables(scope='^Tutor')
 
     # Create a list of variables with the same shape as the trainable ones initialized with zeros
     x_accum_vars = [tf.Variable(tf.zeros_like(tv.initialized_value()), trainable=False) for tv in x_tvs]
-    t_accum_vars = [tf.Variable(tf.zeros_like(tv.initialized_value()), trainable=False) for tv in t_tvs]
     x_zero_ops = [tv.assign(tf.zeros_like(tv)) for tv in x_accum_vars]
-    t_zero_ops = [tv.assign(tf.zeros_like(tv)) for tv in t_accum_vars]
 
     # Accumulate gradients
-    x_accum_ops = [x_accum_vars[i].assign_add(gv[0]) for i, gv in enumerate(ops['grads']['x'])]
-    t_accum_ops = [t_accum_vars[i].assign_add(gv[0]) for i, gv in enumerate(ops['grads']['t'])]
+    x_accum_ops = [x_accum_vars[i].assign_add(gv[0]) for i, gv in enumerate(ops['grads'])]
 
   # Apply the gradients as part of the optimisation
   with tf.device('/device:CPU:0'):
     # Average the accumulated gradients over the number of batches that we accumulated
     x_divide_ops = [
-        (tf.divide(x_accum_vars[i], config.training.batch_accumulation), gv[1])
-        for i, gv in enumerate(ops["grads"]["x"])
-    ]
-    t_divide_ops = [
-        (tf.divide(t_accum_vars[i], config.training.batch_accumulation), gv[1])
-        for i, gv in enumerate(ops["grads"]["t"])
+      (tf.divide(x_accum_vars[i], config.training.batch_accumulation), gv[1]) for i, gv in enumerate(ops['grads'])
     ]
 
     # Apply the averaged gradients
     optimise_mesh_op = network_optimiser.apply_gradients(x_divide_ops, global_step=global_step)
-    optimise_tutor_op = tutor_optimiser.apply_gradients(t_divide_ops)
 
   # Create the loss summary op
   with tf.name_scope('Training'):
     loss_summary_op = tf.summary.merge([
-      tf.summary.scalar('Loss', ops['loss']['u']),
-      tf.summary.scalar('Tutored_Loss', ops['loss']['x']),
-      tf.summary.scalar('Tutor_Loss', ops['loss']['t']),
+      tf.summary.scalar('Loss', ops['loss']),
       tf.summary.scalar('Learning_Rate', learning_rate),
     ])
 
@@ -417,16 +324,12 @@ def _build_training_graph(gpus, config):
   return {
     'handle': handle,
     'global_step': global_step,
-    'initialisers': [x_zero_ops, t_zero_ops],
+    'initialisers': x_zero_ops,
     'learning_rate': learning_rate,
-    'train': [x_accum_ops, t_accum_ops],
+    'train': x_accum_ops,
     'update': {
-      'update': [optimise_mesh_op, optimise_tutor_op],
-      'loss': {
-        'u': ops['loss']['u'],
-        'x': ops['loss']['x'],
-        't': ops['loss']['t'],
-      },
+      'update': optimise_mesh_op,
+      'loss': ops['loss'],
       'summary': loss_summary_op
     },
     'validate': {
@@ -547,12 +450,12 @@ def train(config, output_path):
 
         # Run minibatches and accumulate gradients
         for _ in range(config.training.batch_accumulation):
-            sess.run(
-              ops['train'], feed_dict={
-                ops['handle']: training_handle,
-                ops['learning_rate']: rate_policy.learning_rate
-              }
-            )
+          sess.run(
+            ops['train'], feed_dict={
+              ops['handle']: training_handle,
+              ops['learning_rate']: rate_policy.learning_rate
+            }
+          )
 
         # Apply accumulated gradients and calculate loss
         output = sess.run(
@@ -572,11 +475,10 @@ def train(config, output_path):
 
         # Print batch info
         print(
-          'Batch: {} ({:3g}s avg.) Mesh Loss: {:3g} Tutor Loss: {:3g}'.format(
+          'Batch: {} ({:3g}s avg.) Loss: {:3g}'.format(
             tf.train.global_step(sess, global_step),
             (end - start) / config.training.batch_accumulation,
-            output['loss']['u'],
-            output['loss']['t'],
+            output['loss'],
           )
         )
 
