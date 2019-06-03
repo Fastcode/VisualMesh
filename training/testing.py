@@ -184,7 +184,7 @@ def test(config, output_path):
     batches = []
     with tqdm(total=num_records // max(1, config.testing.batch_size), dynamic_ncols=True, unit='batch') as progress:
       try:
-        while True:
+        while num_batches - len(batches) > 0:
           # Accumulate our individual batches
           batch = sess.run(output_ops[0:min(num_batches - len(batches), len(output_ops))])
           batches.extend(batch)
@@ -198,9 +198,10 @@ def test(config, output_path):
     hist = sess.run(op, feed_dict=feed_dict)
 
     # Process each class into a PR curve and save
+    print('Processing PR curves')
     os.makedirs(os.path.join(output_path, 'test'), exist_ok=True)
     aps = []
-    for k, data in hist.items():
+    for k, data in tqdm(hist.items(), dynamic_ncols=True, unit='class'):
 
       # Concatenate the histogram thresholds into a set
       X = data['X']

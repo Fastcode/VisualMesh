@@ -111,9 +111,7 @@ def _loss(X, Y, config):
     W = tf.divide(W, tf.count_nonzero(class_weights, dtype=tf.float32))
 
     # Weighted mesh loss, sum rather than mean as we have already normalised based on number of points
-    loss = tf.reduce_sum(tf.multiply(unweighted_mesh_loss, tf.stop_gradient(W)))
-
-  return loss
+    return tf.reduce_sum(tf.multiply(unweighted_mesh_loss, W))
 
 
 def _metrics(X, Y, config):
