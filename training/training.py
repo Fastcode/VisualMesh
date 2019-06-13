@@ -489,7 +489,7 @@ def train(config, output_path):
         # Apply accumulated gradients loss and then reset the accumulators
         loss, summary, _ = sess.run([ops['train']['loss'], ops['train']['summary'], ops['train']['apply']],
                                     feed_dict={ops['learning_rate']: rate_policy.learning_rate})
-        _ = sess.run(ops['train']['reset'])
+        sess.run(ops['train']['reset'])
         end = time.perf_counter()
 
         # Write out to the summary
@@ -499,7 +499,7 @@ def train(config, output_path):
         rate_policy.update(tf.train.global_step(sess, global_step))
 
         # Print batch info
-        print('Batch: {} ({:3g}s) Loss: {:3g}'.format(
+        print('Batch: {} ({:.2f}s) Loss: {:3g}'.format(
           tf.train.global_step(sess, global_step),
           (end - start),
           loss,
