@@ -49,6 +49,7 @@ std::vector<std::string> listdir(const std::string& path) {
 int main() {
 
   cv::namedWindow("Image", cv::WINDOW_AUTOSIZE);
+  int NUM_CLASSES = 5;
 
   // Input image path
   std::string image_path = "../example/images";
@@ -56,7 +57,7 @@ int main() {
 
   // Construct our VisualMesh
   Timer t;
-  visualmesh::geometry::Sphere<float> sphere(0.075, 4, 10);
+  visualmesh::geometry::Sphere<float> sphere(0.0949996, 6, 20);
   visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> cl_mesh(sphere, 0.5, 1.5, 100);
   visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine> cpu_mesh(sphere, 0.5, 1.5, 100);
   t.measure("Built Visual Mesh");
@@ -197,9 +198,17 @@ int main() {
         for (int i = 0; i < pixel_coordinates.size(); ++i) {
           cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
 
-          cv::Scalar colour(uint8_t(classifications[i * 2 + 0] * 255), 0, uint8_t(classifications[i * 2 + 1] * 255));
-          // cv::Scalar colour( classifications[i * 2 + 0] > 0.5 ? 255 : 0, 0, classifications[i * 2 + 1] >= 0.5 ? 255 :
-          // 0, 255);
+          // Work out what colour based on mixing
+          const float* cl = classifications.data() + (i * NUM_CLASSES);
+          cv::Scalar colour(0, 0, 0);
+          // Ball
+          colour += cv::Scalar(0, 0, 255 * cl[0]);
+          // Goal
+          colour += cv::Scalar(0, 255 * cl[1], 255 * cl[1]);
+          // Field Line
+          colour += cv::Scalar(255 * cl[2], 255 * cl[2], 255 * cl[2]);
+          // Field
+          colour += cv::Scalar(0, 255 * cl[3], 0);
 
           for (const auto& n : neighbourhood[i]) {
             if (n < pixel_coordinates.size()) {
@@ -232,9 +241,17 @@ int main() {
         for (int i = 0; i < pixel_coordinates.size(); ++i) {
           cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
 
-          cv::Scalar colour(uint8_t(classifications[i * 2 + 0] * 255), 0, uint8_t(classifications[i * 2 + 1] * 255));
-          // cv::Scalar colour( classifications[i * 2 + 0] > 0.5 ? 255 : 0, 0, classifications[i * 2 + 1] >= 0.5 ? 255 :
-          // 0, 255);
+          // Work out what colour based on mixing
+          const float* cl = classifications.data() + (i * NUM_CLASSES);
+          cv::Scalar colour(0, 0, 0);
+          // Ball
+          colour += cv::Scalar(0, 0, 255 * cl[0]);
+          // Goal
+          colour += cv::Scalar(0, 255 * cl[1], 255 * cl[1]);
+          // Field Line
+          colour += cv::Scalar(255 * cl[2], 255 * cl[2], 255 * cl[2]);
+          // Field
+          colour += cv::Scalar(0, 255 * cl[3], 0);
 
           for (const auto& n : neighbourhood[i]) {
             if (n < pixel_coordinates.size()) {

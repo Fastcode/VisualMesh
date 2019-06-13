@@ -13,18 +13,15 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
-PROJECT(VisualMesh)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.1.0)
+PROJECT(VisualMesh VERSION 1.0.0)
 
-SET(VERSION_MAJOR 1)
-SET(VERSION_MINOR 0)
-SET(VERSION_PATCH 0)
-
-# Always use position independant code
-SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-# We use additional modules that cmake needs to know about
-SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
+# Check if we are built as a subproject
+IF(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    SET(TOP_LEVEL_PROJECT ON)
+ELSE()
+    SET(TOP_LEVEL_PROJECT OFF)
+ENDIF()
 
 # All the header files for this library
 FILE(GLOB hdr "src/**.hpp")
@@ -48,43 +45,59 @@ FOREACH(cl IN LISTS cls)
     LIST(APPEND hdr "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp")
 ENDFOREACH(cl ${cls})
 
-# TODO have things for CUDA or vulkan or OpenGL? Put them here!
+ADD_CUSTOM_TARGET(visualmesh_sources DEPENDS ${hdr})
 
-# Build the tensorflow op for training
-OPTION(BUILD_TENSORFLOW_OP "Build the tensorflow op used for training" ON)
-IF(BUILD_TENSORFLOW_OP)
+# Define the VisualMesh library as header only but setup it's links
+ADD_LIBRARY(libvisualmesh INTERFACE)
+TARGET_INCLUDE_DIRECTORIES(libvisualmesh INTERFACE src)
+TARGET_INCLUDE_DIRECTORIES(libvisualmesh INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/src)
+ADD_DEPENDENCIES(libvisualmesh visualmesh_sources)
 
-    FIND_PACKAGE(TensorFlow REQUIRED)
+# Grab OpenCL if it's available
+FIND_PACKAGE(OpenCL)
+IF(OpenCL_FOUND)
+    TARGET_INCLUDE_DIRECTORIES(libvisualmesh INTERFACE ${OpenCL_INCLUDE_DIRS})
+    TARGET_LINK_LIBRARIES(libvisualmesh INTERFACE ${OpenCL_LIBRARIES})
+ENDIF(OpenCL_FOUND)
 
-    ADD_LIBRARY(tf_op SHARED "src/tf_op.cpp" ${hdr})
-    TARGET_COMPILE_OPTIONS(tf_op PRIVATE -march=native -mtune=native)
-    SET_TARGET_PROPERTIES(tf_op PROPERTIES
-        CXX_STANDARD 14
-        LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/training
-        PREFIX ""
-        OUTPUT_NAME visualmesh_op
-        SUFFIX ".so"
-    )
-    TARGET_INCLUDE_DIRECTORIES(tf_op SYSTEM PRIVATE ${TENSORFLOW_INCLUDE_DIRS})
-    TARGET_INCLUDE_DIRECTORIES(tf_op PRIVATE ${PROJECT_SOURCE_DIR}/src)
-    TARGET_LINK_LIBRARIES(tf_op ${TENSORFLOW_LIBRARIES})
+IF(TOP_LEVEL_PROJECT)
+    # Build the tensorflow op for training
+    OPTION(BUILD_TENSORFLOW_OP "Build the tensorflow op used for training" ON)
+    IF(BUILD_TENSORFLOW_OP)
+        # Add this directory so we can find the FindTensorflow.cmake
+        SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
+        FIND_PACKAGE(TensorFlow REQUIRED)
 
-ENDIF(BUILD_TENSORFLOW_OP)
+        ADD_LIBRARY(tf_op SHARED "src/tf_op.cpp" ${hdr})
+        TARGET_COMPILE_OPTIONS(tf_op PRIVATE -march=native -mtune=native)
+        SET_TARGET_PROPERTIES(tf_op PROPERTIES
+            CXX_STANDARD 14
+            LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/training
+            PREFIX ""
+            OUTPUT_NAME visualmesh_op
+            SUFFIX ".so"
+        )
+        TARGET_INCLUDE_DIRECTORIES(tf_op SYSTEM PRIVATE ${TENSORFLOW_INCLUDE_DIRS})
+        TARGET_INCLUDE_DIRECTORIES(tf_op PRIVATE ${PROJECT_SOURCE_DIR}/src)
+        TARGET_LINK_LIBRARIES(tf_op ${TENSORFLOW_LIBRARIES})
 
-# Build an example program that classifies using the visual mesh
-OPTION(BUILD_EXAMPLE "Build the example program that executes the mesh" OFF)
-IF(BUILD_EXAMPLE)
+    ENDIF(BUILD_TENSORFLOW_OP)
 
-    FIND_PACKAGE(OpenCV REQUIRED)
-    FIND_PACKAGE(YAML-CPP REQUIRED)
-    FIND_PACKAGE(OpenCL REQUIRED)
+    # Build an example program that classifies using the visual mesh
+    OPTION(BUILD_EXAMPLE "Build the example program that executes the mesh" OFF)
+    IF(BUILD_EXAMPLE)
 
-    ADD_EXECUTABLE(main "example/main.cpp" ${hdr})
-    TARGET_COMPILE_OPTIONS(main PRIVATE -march=native -mtune=native)
-    SET_TARGET_PROPERTIES(main PROPERTIES CXX_STANDARD 14)
-    TARGET_INCLUDE_DIRECTORIES(main SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
-    TARGET_INCLUDE_DIRECTORIES(main SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
-    TARGET_INCLUDE_DIRECTORIES(main PRIVATE ${PROJECT_SOURCE_DIR}/src)
-    TARGET_INCLUDE_DIRECTORIES(main PRIVATE ${PROJECT_BINARY_DIR}/src)
-    TARGET_LINK_LIBRARIES(main ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES})
-ENDIF(BUILD_EXAMPLE)
+        FIND_PACKAGE(OpenCV REQUIRED)
+        FIND_PACKAGE(YAML-CPP REQUIRED)
+        FIND_PACKAGE(OpenCL REQUIRED)
+
+        ADD_EXECUTABLE(main "example/main.cpp" ${hdr})
+        TARGET_COMPILE_OPTIONS(main PRIVATE -march=native -mtune=native)
+        SET_TARGET_PROPERTIES(main PROPERTIES CXX_STANDARD 14)
+        TARGET_INCLUDE_DIRECTORIES(main SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
+        TARGET_INCLUDE_DIRECTORIES(main SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
+        TARGET_INCLUDE_DIRECTORIES(main PRIVATE ${PROJECT_SOURCE_DIR}/src)
+        TARGET_INCLUDE_DIRECTORIES(main PRIVATE ${PROJECT_BINARY_DIR}/src)
+        TARGET_LINK_LIBRARIES(main ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES})
+    ENDIF(BUILD_EXAMPLE)
+ENDIF(TOP_LEVEL_PROJECT)

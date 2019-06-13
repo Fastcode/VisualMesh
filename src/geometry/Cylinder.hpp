@@ -18,8 +18,8 @@
 #ifndef VISUALMESH_GEOMETRY_CYLINDER_HPP
 #define VISUALMESH_GEOMETRY_CYLINDER_HPP
 
-#include "Sphere.hpp"
 #include <cmath>
+#include "Sphere.hpp"
 
 namespace visualmesh {
 namespace geometry {
@@ -39,7 +39,7 @@ namespace geometry {
              const Scalar& radius,
              const unsigned int& intersections,
              const Scalar& max_distance)
-      : ch(cylinder_height), sphere(radius, intersections, max_distance) {}
+      : sphere(radius, intersections, max_distance), ch(cylinder_height) {}
 
     /**
      * @brief Given a value for phi and a camera height, return the value to the next phi in the sequence.
