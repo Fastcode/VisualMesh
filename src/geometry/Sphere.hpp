@@ -52,16 +52,15 @@ namespace geometry {
         return std::numeric_limits<Scalar>::quiet_NaN();
       }
 
-      // Our effective radius for the number of intersections
-      Scalar er = (h / 2) * (1 - std::pow(1 - 2 * r / h, 1 / k));
-
-      // Valid below the horizon
+      // Below the horizon with positive height
       if (h > 0 && phi_n < M_PI_2) {
+        // Our effective radius for the number of intersections
+        Scalar er = (h / 2) * (1 - std::pow(1 - 2 * r / h, 1 / k));
         return 2 * std::atan(er / (std::cos(phi_n) * (h - er)) + std::tan(phi_n)) - phi_n;
       }
-      // Valid above the horizon
+      // Above the horizon with negative height
       else if (h < 0 && phi_n > M_PI_2) {
-        return 2 * std::atan(er / (std::cos(M_PI - phi_n) * (-h - er)) + std::tan(M_PI - phi_n)) - M_PI - phi_n;
+        return M_PI - phi(M_PI - phi_n, -h);
       }
       // Other situations are invalid so return NaN
       else {
@@ -84,11 +83,11 @@ namespace geometry {
         return std::numeric_limits<Scalar>::quiet_NaN();
       }
 
-      // Valid below the horizon
+      // Below the horizon with positive height
       if (h > 0 && phi < M_PI_2) { return 2 * std::asin(r / ((h - r) * std::tan(phi))) / k; }
-      // Valid above the horizon
+      // Above the horizon with negative height
       else if (h < 0 && phi > M_PI_2) {
-        return 2 * std::asin(r / (-(h - r) * std::tan(M_PI - phi))) / k;
+        return theta(M_PI - phi, -h);
       }
       // Other situations are invalid so return NaN
       else {

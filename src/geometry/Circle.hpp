@@ -52,11 +52,11 @@ namespace geometry {
         return std::numeric_limits<Scalar>::quiet_NaN();
       }
 
-      // Valid below the horizon
+      // Below the horizon with positive height
       if (h > 0 && phi_n < M_PI_2) { return std::atan((2 * r / k + h * std::tan(phi_n)) / h); }
-      // Valid above the horizon
+      // Above the horizon with negative height
       else if (h < 0 && phi_n > M_PI_2) {
-        return M_PI - std::atan((2 * r / k - h * std::tan(M_PI - phi_n)) / -h);
+        return M_PI - phi(phi_n, -h);
       }
       // Other situations are invalid so return NaN
       else {
@@ -77,11 +77,11 @@ namespace geometry {
       // If we are beyond our max distance return nan
       if (std::abs(h) * tan(phi > M_PI_2 ? M_PI - phi : phi) > d) { return std::numeric_limits<Scalar>::quiet_NaN(); }
 
-      // Valid below the horizon
+      // Below the horizon with positive height
       if (h > 0 && phi < M_PI_2) { return 2 * std::asin(r / (h * std::tan(phi) + r)) / k; }
-      // Valid above the horizon
+      // Above the horizon with negative height
       else if (h < 0 && phi > M_PI_2) {
-        return 2 * std::asin(r / (-h * std::tan(M_PI - phi) + r)) / k;
+        return theta(M_PI - phi, -h);
       }
       // Other situations are invalid so return NaN
       else {
