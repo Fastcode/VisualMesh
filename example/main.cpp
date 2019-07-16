@@ -15,6 +15,7 @@
 #include "Timer.hpp"
 #include "engine/opencl/opencl_engine.hpp"
 #include "geometry/Sphere.hpp"
+#include "mesh/test_mesh.hpp"
 #include "util/fourcc.hpp"
 #include "visualmesh.hpp"
 
@@ -57,9 +58,9 @@ int main() {
 
   // Construct our VisualMesh
   Timer t;
-  visualmesh::geometry::Sphere<float> sphere(0.0949996, 6, 20);
-  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> cl_mesh(sphere, 0.5, 1.5, 100);
-  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine> cpu_mesh(sphere, 0.5, 1.5, 100);
+  visualmesh::geometry::Sphere<float> sphere(0.0949996);
+  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> cl_mesh(sphere, 0.5, 1.5, 100, 6, 20);
+  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine> cpu_mesh(sphere, 0.5, 1.5, 100, 6, 20);
   t.measure("Built Visual Mesh");
 
   // Build our classification network

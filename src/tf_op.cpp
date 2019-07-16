@@ -100,18 +100,18 @@ public:
     visualmesh::engine::cpu::Engine<T> engine;
     visualmesh::ProjectedMesh<T> projected;
     if (geometry == "SPHERE") {
-      visualmesh::geometry::Sphere<T> shape(g_params(0), g_params(1), g_params(2));
-      visualmesh::Mesh<T> mesh(shape, height);
+      visualmesh::geometry::Sphere<T> shape(g_params(0));
+      visualmesh::Mesh<T> mesh(shape, height, g_params(1), g_params(2));
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CIRCLE") {
-      visualmesh::geometry::Circle<T> shape(g_params(0), g_params(1), g_params(2));
-      visualmesh::Mesh<T> mesh(shape, height);
+      visualmesh::geometry::Circle<T> shape(g_params(0));
+      visualmesh::Mesh<T> mesh(shape, height, g_params(1), g_params(2));
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CYLINDER") {
-      visualmesh::geometry::Cylinder<T> shape(g_params(0), g_params(1), g_params(2), g_params(3));
-      visualmesh::Mesh<T> mesh(shape, height);
+      visualmesh::geometry::Cylinder<T> shape(g_params(0), g_params(1));
+      visualmesh::Mesh<T> mesh(shape, height, g_params(2), g_params(3));
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else {

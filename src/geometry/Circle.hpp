@@ -34,34 +34,30 @@ namespace geometry {
      * @param intersections the number of intersections to ensure with this object
      * @param max_distance  the maximum distance we want to look for this object
      */
-    Circle(const Scalar& radius, const unsigned int& intersections, const Scalar& max_distance)
-      : r(radius), k(intersections), d(max_distance) {}
+    Circle(const Scalar& radius) : r(radius) {}
 
     /**
-     * @brief Given a value for phi and a camera height, return the value to the next phi in the sequence.
+     * @brief Given a number of radial jumps (n) give the phi angle required
      *
-     * @param phi_n  the current phi value in the series
-     * @param h      the height of the camera above the observation plane
-     *
-     * @return the next phi in the sequence (phi_{n+1})
+     * @param n the number of whole objects to jump from the origin to reach this point (from object centres)
+     * @param h the height of the camera above the observation plane
      */
-    Scalar phi(const Scalar& phi_n, const Scalar& h) const {
+    Scalar phi(const Scalar& n, const Scalar& h) const {
+      return std::atan((2.0 * n * r) / h);
+    }
 
-      // If we are beyond our max distance return nan
-      if (std::abs(h) * std::tan(phi_n > M_PI_2 ? M_PI - phi_n : phi_n) > d) {
-        return std::numeric_limits<Scalar>::quiet_NaN();
-      }
-
-      // Below the horizon with positive height
-      if (h > 0 && phi_n < M_PI_2) { return std::atan((2 * r / k + h * std::tan(phi_n)) / h); }
-      // Above the horizon with negative height
-      else if (h < 0 && phi_n > M_PI_2) {
-        return M_PI - phi(phi_n, -h);
-      }
-      // Other situations are invalid so return NaN
-      else {
-        return std::numeric_limits<Scalar>::quiet_NaN();
-      }
+    /**
+     * @brief Given a phi angle calculate how many object jumps from the origin are required to reach this location
+     *
+     * @details
+     *  This equation can also be used to calculate the n difference between any two objects by calculating the
+     *  augmented height above the ground h' and the two φ' angles and using those in this equation instead of the real
+     *  values
+     *
+     * @param phi the phi angle measured from below the camera
+     */
+    Scalar n(const Scalar& phi, const Scalar& h) const {
+      return (h * std::tan(phi)) / (2.0 * r);
     }
 
     /**
@@ -73,28 +69,11 @@ namespace geometry {
      * @return the angular width of the object around a phi circle
      */
     Scalar theta(const Scalar& phi, const Scalar& h) const {
-
-      // If we are beyond our max distance return nan
-      if (std::abs(h) * tan(phi > M_PI_2 ? M_PI - phi : phi) > d) { return std::numeric_limits<Scalar>::quiet_NaN(); }
-
-      // Below the horizon with positive height
-      if (h > 0 && phi < M_PI_2) { return 2 * std::asin(r / (h * std::tan(phi) + r)) / k; }
-      // Above the horizon with negative height
-      else if (h < 0 && phi > M_PI_2) {
-        return theta(M_PI - phi, -h);
-      }
-      // Other situations are invalid so return NaN
-      else {
-        return std::numeric_limits<Scalar>::quiet_NaN();
-      }
+      return 2.0 * std::asin(r / (h * std::tan(phi)));
     }
 
     // The radius of the circle
     Scalar r;
-    // The number of intersections the mesh should have with this circle
-    unsigned int k;
-    /// The maximum distance we want to see this object
-    Scalar d;
   };
 
 }  // namespace geometry

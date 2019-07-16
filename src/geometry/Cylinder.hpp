@@ -35,11 +35,7 @@ namespace geometry {
      * @param intersections the number of intersections to ensure with a spherical section of the cylinder
      * @param max_distance  the maximum distance we want to look for this object
      */
-    Cylinder(const Scalar& cylinder_height,
-             const Scalar& radius,
-             const unsigned int& intersections,
-             const Scalar& max_distance)
-      : sphere(radius, intersections, max_distance), ch(cylinder_height) {}
+    Cylinder(const Scalar& cylinder_height, const Scalar& radius) : sphere(radius), ch(cylinder_height) {}
 
     /**
      * @brief Given a value for phi and a camera height, return the value to the next phi in the sequence.
@@ -50,19 +46,11 @@ namespace geometry {
      * @return the next phi in the sequence (phi_{n+1})
      */
     Scalar phi(const Scalar& phi_n, const Scalar& h) const {
+      // Calculate if either of our spheres are valid
+
       // Get values from the upper and lower observation planes
       Scalar u = sphere.phi(phi_n, h - ch);
       Scalar l = sphere.phi(phi_n, h);
-
-      // If one is nan return the other one
-      if (std::isnan(u)) {
-        // If both are nan this will return nan here
-        return l;
-      }
-      else {
-        // If l is nan return u, otherwise return the smallest change
-        return std::isnan(l) ? u : std::abs(u - phi_n) < std::abs(l - phi_n) ? u : l;
-      }
     }
 
     /**

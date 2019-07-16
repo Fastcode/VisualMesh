@@ -34,38 +34,47 @@ namespace geometry {
      * @param intersections the number of intersections to ensure with this object
      * @param max_distance  the maximum distance we want to look for this object
      */
-    Sphere(const Scalar& radius, const Scalar& intersections, const Scalar& max_distance)
-      : r(radius), k(intersections), d(max_distance) {}
+    Sphere(const Scalar& radius) : r(radius) {}
 
     /**
-     * @brief Given a value for phi and a camera height, return the value to the next phi in the sequence.
+     * @brief Given a number of radial jumps (n) give the phi angle required
      *
-     * @param phi_n the current phi value in the series
-     * @param h     the height of the camera above the observation plane
+     * @details
+     *  To calculate the angle to the base of the object we can use the following equation
      *
-     * @return the next phi in the sequence (phi_{n+1})
+     *                     ⎛         n⎞
+     *         π        -1 ⎜⎛    2⋅r⎞ ⎟
+     *  φ(n) = ─ - 2⋅tan   ⎜⎜1 - ───⎟ ⎟
+     *         2           ⎝⎝     h ⎠ ⎠
+     *
+     * Then to get the equation for the centre of the sphere, we calculate given the average angle of n ± 0.5
+     *
+     * @param n the number of whole objects to jump from the origin to reach this point (from object centres)
+     * @param h the height of the camera above the observation plane
      */
-    Scalar phi(const Scalar& phi_n, const Scalar& h) const {
+    Scalar phi(const Scalar& n, const Scalar& h) const {
+      Scalar v = 1 - 2 * r / h;
+      return M_PI_2 - std::atan(pow(v, n - 0.5)) - std::atan(std::pow(v, n + 0.5));
+    }
 
-      // If we are beyond our max distance return nan
-      if (std::abs(h) * std::tan(phi_n > M_PI_2 ? M_PI - phi_n : phi_n) > d) {
-        return std::numeric_limits<Scalar>::quiet_NaN();
-      }
-
-      // Below the horizon with positive height
-      if (h > 0 && phi_n < M_PI_2) {
-        // Our effective radius for the number of intersections
-        Scalar er = (h / 2) * (1 - std::pow(1 - 2 * r / h, 1 / k));
-        return 2 * std::atan(er / (std::cos(phi_n) * (h - er)) + std::tan(phi_n)) - phi_n;
-      }
-      // Above the horizon with negative height
-      else if (h < 0 && phi_n > M_PI_2) {
-        return M_PI - phi(M_PI - phi_n, -h);
-      }
-      // Other situations are invalid so return NaN
-      else {
-        return std::numeric_limits<Scalar>::quiet_NaN();
-      }
+    /**
+     * @brief Given a phi angle calculate how many object jumps from the origin are required to reach this location
+     *
+     * @details
+     *  This equation can also be used to calculate the n difference between any two objects by calculating the
+     *  augmented height above the ground h' and the two φ' angles and using those in this equation instead of the real
+     *  values
+     *
+     *       ⎛   ⎛φ   π⎞⎞
+     *    log⎜cot⎜─ + ─⎟⎟
+     *       ⎝   ⎝2   4⎠⎠
+     *  ─────────────────────
+     *  log(h - 2⋅r) - log(h)
+     *
+     * @param phi the phi angle measured from below the camera
+     */
+    Scalar n(const Scalar& phi, const Scalar& h) const {
+      return std::log(1 / std::tan(phi * 0.5 + M_PI_4)) / (std::log(h - 2 * r) - log(h));
     }
 
     /**
@@ -77,30 +86,11 @@ namespace geometry {
      * @return the angular width of the object around a phi circle
      */
     Scalar theta(const Scalar& phi, const Scalar& h) const {
-
-      // If we are beyond our max distance return nan
-      if (std::abs(h) * std::tan(phi > M_PI_2 ? M_PI - phi : phi) > d) {
-        return std::numeric_limits<Scalar>::quiet_NaN();
-      }
-
-      // Below the horizon with positive height
-      if (h > 0 && phi < M_PI_2) { return 2 * std::asin(r / ((h - r) * std::tan(phi))) / k; }
-      // Above the horizon with negative height
-      else if (h < 0 && phi > M_PI_2) {
-        return theta(M_PI - phi, -h);
-      }
-      // Other situations are invalid so return NaN
-      else {
-        return std::numeric_limits<Scalar>::quiet_NaN();
-      }
+      return 2 * std::asin(r / ((h - r) * std::tan(phi)));
     }
 
     // The radius of the sphere
     Scalar r;
-    // The number of intersections the mesh should have with this sphere
-    Scalar k;
-    /// The maximum distance we want to see this object
-    Scalar d;
   };
 
 }  // namespace geometry

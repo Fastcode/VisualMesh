@@ -51,13 +51,18 @@ public:
    * @param n_heights    the number of look up tables to generated (height gradations)
    */
   template <typename Shape>
-  explicit VisualMesh(const Shape& shape, const Scalar& min_height, const Scalar& max_height, const uint& n_heights) {
+  explicit VisualMesh(const Shape& shape,
+                      const Scalar& min_height,
+                      const Scalar& max_height,
+                      const uint& n_heights,
+                      const Scalar& k,
+                      const Scalar& max_distance) {
 
     // Loop through to make a mesh for each of our height possibilities
     for (Scalar h = min_height; h < max_height; h += (max_height - min_height) / n_heights) {
 
       // Insert our constructed mesh into the lookup
-      luts.insert(std::make_pair(h, Mesh<Scalar>(shape, h)));
+      luts.insert(std::make_pair(h, Mesh<Scalar>(shape, h, k, max_distance)));
     }
   }
 
