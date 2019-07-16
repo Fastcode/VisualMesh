@@ -46,9 +46,6 @@ namespace engine {
         operator T() const {
           return this->get();
         }
-
-      private:
-        T ptr = nullptr;
       };
 
       using command_queue = opencl_wrapper<::cl_command_queue>;
