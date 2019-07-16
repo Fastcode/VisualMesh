@@ -36,6 +36,64 @@ template <typename Scalar>
 using mat4 = std::array<vec4<Scalar>, 4>;
 
 /**
+ * Vector casting
+ */
+template <typename OutScalar, typename InScalar, std::size_t L, std::size_t... I>
+inline std::array<OutScalar, L> cast(const std::array<InScalar, L>& a, const std::index_sequence<I...>&) {
+  return {{static_cast<OutScalar>(a[I])...}};
+}
+
+template <typename OutScalar, typename InScalar, std::size_t L>
+inline std::array<OutScalar, L> cast(const std::array<InScalar, L>& a) {
+  return cast<OutScalar>(a, std::make_index_sequence<L>());
+}
+
+/**
+ * Vector subtraction
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a,
+                                      const std::array<Scalar, L>& b,
+                                      const std::index_sequence<I...>&) {
+  return {{(a[I] - b[I])...}};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+  return subtract(a, b, std::make_index_sequence<L>());
+}
+
+/**
+ * Vector addition
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, L> add(const std::array<Scalar, L>& a,
+                                 const std::array<Scalar, L>& b,
+                                 const std::index_sequence<I...>&) {
+  return {{(a[I] + b[I])...}};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+  return add(a, b, std::make_index_sequence<L>());
+}
+
+/**
+ * Vector multiply by scalar
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
+                                      const Scalar& s,
+                                      const std::index_sequence<I...>&) {
+  return {{(a[I] * s)...}};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a, const Scalar& s) {
+  return multiply(a, s, std::make_index_sequence<L>());
+}
+
+/**
  * Dot product
  */
 template <typename T, std::size_t I>
@@ -75,51 +133,6 @@ template <typename Scalar, std::size_t L>
 inline std::array<Scalar, L> normalise(const std::array<Scalar, L>& a) {
   const Scalar len = static_cast<Scalar>(1.0) / norm(a);
   return multiply(a, len);
-}
-
-/**
- * Vector subtraction
- */
-template <typename Scalar, std::size_t L, std::size_t... I>
-inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a,
-                                      const std::array<Scalar, L>& b,
-                                      const std::index_sequence<I...>&) {
-  return {(a[I] - b[I])...};
-}
-
-template <typename Scalar, std::size_t L>
-inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
-  return subtract(a, b, std::make_index_sequence<L>());
-}
-
-/**
- * Vector addition
- */
-template <typename Scalar, std::size_t L, std::size_t... I>
-inline std::array<Scalar, L> add(const std::array<Scalar, L>& a,
-                                 const std::array<Scalar, L>& b,
-                                 const std::index_sequence<I...>&) {
-  return {(a[I] + b[I])...};
-}
-
-template <typename Scalar, std::size_t L>
-inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
-  return add(a, b, std::make_index_sequence<L>());
-}
-
-/**
- * Vector multiply by scalar
- */
-template <typename Scalar, std::size_t L, std::size_t... I>
-inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
-                                      const Scalar& s,
-                                      const std::index_sequence<I...>&) {
-  return {{(a[I] * s)...}};
-}
-
-template <typename Scalar, std::size_t L>
-inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a, const Scalar& s) {
-  return multiply(a, s, std::make_index_sequence<L>());
 }
 
 /**

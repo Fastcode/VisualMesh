@@ -24,6 +24,7 @@
 #include "mesh/network_structure.hpp"
 #include "mesh/projected_mesh.hpp"
 #include "util/math.hpp"
+#include "util/projection.hpp"
 
 namespace visualmesh {
 namespace engine {
@@ -31,51 +32,6 @@ namespace engine {
 
     template <typename Scalar>
     class Engine {
-    private:
-      vec2<Scalar> project_equidistant(const vec4<Scalar>& p, const Lens<Scalar>& lens) const {
-        // Calculate some intermediates
-        Scalar theta      = std::acos(p[0]);
-        Scalar r          = lens.focal_length * theta;
-        Scalar rsin_theta = static_cast<Scalar>(1) / std::sqrt(static_cast<Scalar>(1) - p[0] * p[0]);
-
-        // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
-        vec2<Scalar> screen = p[0] >= 1 ? vec2<Scalar>{{static_cast<Scalar>(0.0), static_cast<Scalar>(0.0)}}
-                                        : vec2<Scalar>{{r * p[1] * rsin_theta, r * p[2] * rsin_theta}};
-
-        // Apply our offset to move into image space (0 at top left, x to the right, y down)
-        // Then apply the offset to the centre of our lens
-        return vec2<Scalar>{
-          {static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0] - lens.centre[0],
-           static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1] - lens.centre[1]}};
-      }
-
-      vec2<Scalar> project_equisolid(const vec4<Scalar>& p, const Lens<Scalar>& lens) const {
-        // Calculate some intermediates
-        Scalar theta      = std::acos(p[0]);
-        Scalar r          = static_cast<Scalar>(2.0) * lens.focal_length * std::sin(theta * static_cast<Scalar>(0.5));
-        Scalar rsin_theta = static_cast<Scalar>(1) / std::sqrt(static_cast<Scalar>(1) - p[0] * p[0]);
-
-        // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
-        vec2<Scalar> screen = p[0] >= 1 ? vec2<Scalar>{{static_cast<Scalar>(0.0), static_cast<Scalar>(0.0)}}
-                                        : vec2<Scalar>{{r * p[1] * rsin_theta, r * p[2] * rsin_theta}};
-
-        // Apply our offset to move into image space (0 at top left, x to the right, y down)
-        // Then apply the offset to the centre of our lens
-        return vec2<Scalar>{
-          {static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0] - lens.centre[0],
-           static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1] - lens.centre[1]}};
-      }
-
-      vec2<Scalar> project_rectilinear(const vec4<Scalar>& p, const Lens<Scalar>& lens) const {
-        // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
-        vec2<Scalar> screen = {{lens.focal_length * p[1] / p[0], lens.focal_length * p[2] / p[0]}};
-
-        // Apply our offset to move into image space (0 at top left, x to the right, y down)
-        // Then apply the offset to the centre of our lens
-        return vec2<Scalar>{
-          {static_cast<Scalar>(lens.dimensions[0] - 1) * static_cast<Scalar>(0.5) - screen[0] - lens.centre[0],
-           static_cast<Scalar>(lens.dimensions[1] - 1) * static_cast<Scalar>(0.5) - screen[1] - lens.centre[1]}};
-      }
 
     public:
       ProjectedMesh<Scalar> project(const Mesh<Scalar>& mesh,
@@ -113,15 +69,8 @@ namespace engine {
           const Node<Scalar>& node = nodes[indices[i]];
 
           // Rotate point by matrix (since we are doing this rowwise, it's like we are transposing at the same time)
-          vec4<Scalar> p = {{dot(node.ray, Hco[0]), dot(node.ray, Hco[1]), dot(node.ray, Hco[2]), 0}};
-          vec2<Scalar> px;
-
-          // Any compiler worth it's salt should move this switch outside the for
-          switch (lens.projection) {
-            case EQUISOLID: px = project_equisolid(p, lens); break;
-            case EQUIDISTANT: px = project_equidistant(p, lens); break;
-            case RECTILINEAR: px = project_rectilinear(p, lens); break;
-          }
+          vec4<Scalar> p  = {{dot(node.ray, Hco[0]), dot(node.ray, Hco[1]), dot(node.ray, Hco[2]), 0}};
+          vec2<Scalar> px = ::visualmesh::project(p, lens);
 
           // Check if the pixel is on the screen, this is needed as the cutoffs for some lenses aren't perfect yet
           if (0 < px[0] && px[0] < lens.dimensions[0] - 1 && 0 < px[1] && px[1] < lens.dimensions[1] - 1) {
