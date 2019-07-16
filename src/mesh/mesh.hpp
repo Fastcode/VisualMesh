@@ -61,54 +61,22 @@ template <typename Scalar>
 struct Mesh {
 
   template <typename Shape>
-  Mesh(const Shape& shape, const Scalar& h) {
+  Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance) : h(h) {
 
     // This is a list of phi values along with the delta theta values associated with them
     std::vector<std::pair<Scalar, int>> phis;
 
-    // Add our 0 point at the bottom if that is a valid location
-    if (shape.phi(Scalar(0.0), h) < Scalar(M_PI_2)) { phis.emplace_back(Scalar(0.0), 1); }
+    const Scalar jump = 1.0 / k;
+    for (Scalar n = 0; phis.empty() || h * std::tan(phis.back().first) < max_distance; n += jump) {
 
-    // Loop from directly down up to the horizon (if phi is nan it will stop)
-    // So we don't have a single point at the base, we move half a jump forward
-    // The final step is when phi is >= M_PI_2 or NaN, both of which compare false here
-    for (Scalar phi = shape.phi(Scalar(0.0), h); phi < Scalar(M_PI_2);) {
-
-      // Calculate our theta
+      // Calculate phi and theta for this shape and calculate how many slices ensures we have at least enough
+      Scalar phi   = shape.phi(n, h);
       Scalar theta = shape.theta(phi, h);
+      int slices   = static_cast<int>(std::ceil(k * 2 * M_PI / theta));
 
-      // We don't add NaN thetas
-      if (!std::isnan(theta)) {
-        // Push back the phi, and the number of whole shapes we can fit
-        phis.emplace_back(phi, static_cast<unsigned int>(std::ceil(Scalar(2.0) * M_PI / theta)));
-      }
-
-      // Calculate our next phi value
-      phi = shape.phi(phi, h);
+      // Push back this new slice
+      if (!std::isnan(theta)) { phis.emplace_back(phi, slices); }
     }
-
-    // Add our 0 point at the bottom if that is a valid location
-    if (Scalar(M_PI) + shape.phi(M_PI, h) > Scalar(M_PI_2)) { phis.emplace_back(Scalar(M_PI), 1); }
-
-    // Loop from directly up down to the horizon
-    // The final step is when phi is <= M_PI_2 or NaN, both of which compare false here
-    for (Scalar phi = shape.phi(M_PI, h); phi > Scalar(M_PI_2);) {
-
-      // Calculate our theta
-      Scalar theta = shape.theta(phi, h);
-
-      // Don't push ban NaN thetas
-      if (!std::isnan(theta)) {
-        // Push back the phi, and the number of whole shapes we can fit
-        phis.emplace_back(phi, static_cast<unsigned int>(std::ceil(Scalar(2.0) * M_PI / theta)));
-      }
-
-      // Calculate our next phi value
-      phi = shape.phi(phi, h);
-    }
-
-    // Sort the list by phi to create a contiguous area
-    std::sort(phis.begin(), phis.end());
 
     // Work out how big our LUT will be
     unsigned int lut_size = 0;
@@ -122,7 +90,6 @@ struct Mesh {
 
     // Loop through our LUT and calculate our left and right neighbours
     for (const auto& v : phis) {
-
       // Get our phi and delta theta values for a clean circle
       const auto& phi      = v.first;
       const Scalar sin_phi = std::sin(phi);
@@ -213,7 +180,6 @@ struct Mesh {
 
     // Now we iterate upwards and downwards to fill in the missing links
     for (unsigned int r = 1; r + 1 < rows.size(); ++r) {
-
       // Alias for convenience
       const auto& prev    = rows[r - 1];
       const auto& current = rows[r];
@@ -652,7 +618,8 @@ struct Mesh {
       default: { throw std::runtime_error("Unknown lens type"); }
     }
   }
-
+  /// The height that this mesh is designed to run at
+  Scalar h;
   /// The lookup table for this mesh
   std::vector<Node<Scalar>> nodes;
   /// A set of individual rows for phi values.

@@ -18,7 +18,6 @@
 #ifndef VISUALMESH_UTILITY_MATH_HPP
 #define VISUALMESH_UTILITY_MATH_HPP
 
-#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -36,30 +35,98 @@ using mat3 = std::array<vec3<Scalar>, 3>;
 template <typename Scalar>
 using mat4 = std::array<vec4<Scalar>, 4>;
 
+/**
+ * Dot product
+ */
 template <typename T, std::size_t I>
 struct Dot;
 
 template <typename Scalar, std::size_t L>
 struct Dot<std::array<Scalar, L>, 0> {
-  static Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+  static inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
     return a[0] * b[0];
   }
 };
 
 template <typename Scalar, std::size_t L, std::size_t I>
 struct Dot<std::array<Scalar, L>, I> {
-  static Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+  static inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
     return a[I] * b[I] + Dot<std::array<Scalar, L>, I - 1>::dot(a, b);
   }
 };
 
 template <typename Scalar, std::size_t L>
-Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
   return Dot<std::array<Scalar, L>, L - 1>::dot(a, b);
 }
 
+/**
+ * Vector norm
+ */
+template <typename Scalar, std::size_t L>
+inline Scalar norm(const std::array<Scalar, L>& a) {
+  return std::sqrt(dot(a, a));
+}
+
+/**
+ * Vector normalise
+ */
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> normalise(const std::array<Scalar, L>& a) {
+  const Scalar len = static_cast<Scalar>(1.0) / norm(a);
+  return multiply(a, len);
+}
+
+/**
+ * Vector subtraction
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a,
+                                      const std::array<Scalar, L>& b,
+                                      const std::index_sequence<I...>&) {
+  return {(a[I] - b[I])...};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+  return subtract(a, b, std::make_index_sequence<L>());
+}
+
+/**
+ * Vector addition
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, L> add(const std::array<Scalar, L>& a,
+                                 const std::array<Scalar, L>& b,
+                                 const std::index_sequence<I...>&) {
+  return {(a[I] + b[I])...};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+  return add(a, b, std::make_index_sequence<L>());
+}
+
+/**
+ * Vector multiply by scalar
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
+                                      const Scalar& s,
+                                      const std::index_sequence<I...>&) {
+  return {{(a[I] * s)...}};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a, const Scalar& s) {
+  return multiply(a, s, std::make_index_sequence<L>());
+}
+
+/**
+ * Vector cross product
+ */
 template <typename Scalar>
-inline constexpr vec3<Scalar> cross(const vec3<Scalar>& a, const vec3<Scalar>& b) {
+inline vec3<Scalar> cross(const vec3<Scalar>& a, const vec3<Scalar>& b) {
   return {{
     a[1] * b[2] - a[2] * b[1],  // x
     a[2] * b[0] - a[0] * b[2],  // y
@@ -67,20 +134,26 @@ inline constexpr vec3<Scalar> cross(const vec3<Scalar>& a, const vec3<Scalar>& b
   }};
 }
 
-template <typename Scalar>
-inline constexpr mat4<Scalar> transpose(const mat4<Scalar> mat) {
-  return mat4<Scalar>{{vec4<Scalar>{{mat[0][0], mat[1][0], mat[2][0], mat[3][0]}},
-                       vec4<Scalar>{{mat[0][1], mat[1][1], mat[2][1], mat[3][1]}},
-                       vec4<Scalar>{{mat[0][2], mat[1][2], mat[2][2], mat[3][2]}},
-                       vec4<Scalar>{{mat[0][3], mat[1][3], mat[2][3], mat[3][3]}}}};
+/**
+ * Matrix transpose
+ */
+template <std::size_t X, typename Scalar, std::size_t L, std::size_t M, std::size_t... Y>
+inline std::array<Scalar, M> transpose_vector(const std::array<std::array<Scalar, L>, M>& mat,
+                                              const std::index_sequence<Y...>&) {
+  return {{mat[Y][X]...}};
 }
 
-template <typename Scalar, std::size_t L>
-inline constexpr std::array<Scalar, L> normalise(std::array<Scalar, L> a) {
-  const Scalar len = static_cast<Scalar>(1.0) / std::sqrt(dot(a, a));
-  std::transform(a.begin(), a.end(), [len](const Scalar& s) { return s * len; });
-  return a;
+template <typename Scalar, std::size_t L, std::size_t M, std::size_t... X>
+inline std::array<std::array<Scalar, L>, L> transpose(const std::array<std::array<Scalar, L>, M>& mat,
+                                                      const std::index_sequence<X...>&) {
+  return {{transpose_vector<X>(mat, std::make_index_sequence<M>())...}};
 }
+
+template <typename Scalar, std::size_t L, std::size_t M>
+inline std::array<std::array<Scalar, M>, L> transpose(const std::array<std::array<Scalar, L>, M>& mat) {
+  return transpose(mat, std::make_index_sequence<L>());
+}
+
 }  // namespace visualmesh
 
 #endif  // VISUALMESH_UTILITY_MATH_HPP
