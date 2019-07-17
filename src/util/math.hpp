@@ -49,6 +49,19 @@ inline std::array<OutScalar, L> cast(const std::array<InScalar, L>& a) {
 }
 
 /**
+ * Get the head of a vector
+ */
+template <std::size_t S, typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, S> head(const std::array<Scalar, L>& a, const std::index_sequence<I...>&) {
+  return {{a[I]...}};
+}
+
+template <std::size_t S, typename Scalar, std::size_t L>
+inline std::enable_if_t<S <= L, std::array<Scalar, S>> head(const std::array<Scalar, L>& a) {
+  return head<S>(a, std::make_index_sequence<S>());
+}
+
+/**
  * Vector subtraction
  */
 template <typename Scalar, std::size_t L, std::size_t... I>
@@ -167,6 +180,28 @@ inline std::array<std::array<Scalar, M>, L> transpose(const std::array<std::arra
   return transpose(mat, std::make_index_sequence<L>());
 }
 
+/**
+ * Matrix inverse
+ */
+template <typename Scalar>
+inline mat3<Scalar> invert(const mat3<Scalar>& m) {
+
+  // computes the inverse of a matrix m
+  Scalar idet = static_cast<Scalar>(1)
+                / (m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2]) -  //
+                   m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +  //
+                   m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]));  //
+
+  return {vec3<Scalar>{(m[1][1] * m[2][2] - m[2][1] * m[1][2]) * idet,
+                       (m[0][2] * m[2][1] - m[0][1] * m[2][2]) * idet,
+                       (m[0][1] * m[1][2] - m[0][2] * m[1][1]) * idet},
+          vec3<Scalar>{(m[1][2] * m[2][0] - m[1][0] * m[2][2]) * idet,
+                       (m[0][0] * m[2][2] - m[0][2] * m[2][0]) * idet,
+                       (m[1][0] * m[0][2] - m[0][0] * m[1][2]) * idet},
+          vec3<Scalar>{(m[1][0] * m[2][1] - m[2][0] * m[1][1]) * idet,
+                       (m[2][0] * m[0][1] - m[0][0] * m[2][1]) * idet,
+                       (m[0][0] * m[1][1] - m[1][0] * m[0][1]) * idet}};
+}
 }  // namespace visualmesh
 
 #endif  // VISUALMESH_UTILITY_MATH_HPP

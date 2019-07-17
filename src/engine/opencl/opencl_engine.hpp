@@ -193,7 +193,7 @@ namespace engine {
       }
 
       ProjectedMesh<Scalar> project(const Mesh<Scalar>& mesh,
-                                    const std::vector<std::pair<unsigned int, unsigned int>>& ranges,
+                                    const std::vector<std::pair<int, int>>& ranges,
                                     const mat4<Scalar>& Hoc,
                                     const Lens<Scalar>& lens) const {
 
@@ -232,7 +232,7 @@ namespace engine {
     private:
       std::tuple<std::vector<std::array<int, 6>>, std::vector<int>, cl::mem, cl::event> do_project(
         const Mesh<Scalar>& mesh,
-        const std::vector<std::pair<unsigned int, unsigned int>>& ranges,
+        const std::vector<std::pair<int, int>>& ranges,
         const mat4<Scalar>& Hoc,
         const Lens<Scalar>& lens) const {
 

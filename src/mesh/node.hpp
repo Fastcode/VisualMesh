@@ -15,30 +15,22 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_LENS_HPP
-#define VISUALMESH_LENS_HPP
+#ifndef VISUALMESH_NODE_HPP
+#define VISUALMESH_NODE_HPP
 
 #include <array>
+#include "util/math.hpp"
 
 namespace visualmesh {
 
-enum LensProjection { RECTILINEAR, EQUISOLID, EQUIDISTANT };
-
 template <typename Scalar>
-struct Lens {
-
-  // The projection that this image is using
-  LensProjection projection;
-  // The dimensions of the image
-  std::array<int, 2> dimensions;
-  /// The field of view of the camera measured in radians
-  Scalar fov;
-  /// The focal length of the camera, normalised to the image width
-  Scalar focal_length;
-  /// The pixel coordinates of the centre of the lens
-  std::array<Scalar, 2> centre;
+struct Node {
+  /// The unit vector in the direction for this node
+  vec4<Scalar> ray;
+  /// Absolute indices to the linked nodes ordered L, TL, TR, R, BR, BL (clockwise)
+  std::array<int, 6> neighbours;
 };
 
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_LENS_HPP
+#endif  // VISUALMESH_NODE_HPP

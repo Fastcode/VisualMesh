@@ -35,7 +35,7 @@ namespace engine {
 
     public:
       ProjectedMesh<Scalar> project(const Mesh<Scalar>& mesh,
-                                    const std::vector<std::pair<unsigned int, unsigned int>>& ranges,
+                                    const std::vector<std::pair<int, int>>& ranges,
                                     const mat4<Scalar>& Hoc,
                                     const Lens<Scalar>& lens) const {
 
