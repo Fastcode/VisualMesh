@@ -98,26 +98,6 @@ public:
   }
 
   /**
-   * Performs a visual mesh lookup, finding the start and end indexes for visual mesh points that are on the screen.
-   * It uses the provided `theta_limits` function to identify the start and end points on the screen for a specific phi.
-   *
-   * @param height       the height to use for looking up the mesh, follows the same rules as `VisualMesh::height`
-   * @param theta_limits the function that is used to calculate the start/end indices for a specific phi
-   *
-   * @return             the mesh that was used for this lookup and a vector of start/end indices that are on the
-   *                     screen.
-   *
-   * @tparam Func        the type of the function that identifies theta ranges given a phi value
-   */
-  template <typename Func>
-  std::pair<const Mesh<Scalar>&, std::vector<std::pair<uint, uint>>> lookup(const Scalar& height,
-                                                                            Func&& theta_limits) const {
-
-    const auto& mesh = this->height(height);
-    return std::make_pair(mesh, mesh->lookup(std::forward<Func>(theta_limits)));
-  }
-
-  /**
    * Performs a visual mesh lookup using the description of the lens provided to find visual mesh points on the image.
    *
    * @param Hoc   A 4x4 homogeneous transformation matrix that transforms from the observation plane to camera space.
