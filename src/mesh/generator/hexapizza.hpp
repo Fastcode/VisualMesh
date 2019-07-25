@@ -36,45 +36,76 @@ namespace generator {
 
       // Loop through until we reach our max distance
       std::vector<Node<Scalar>> nodes;
-      for (Scalar n = 0;; n += 1.0 / k) {
 
-        // Calculate phi and theta for this shape and calculate how many slices ensures we have at least enough
-        Scalar phi    = shape.phi(n, h);
-        Scalar dtheta = shape.theta(phi, h);
-        int slices    = static_cast<int>(std::ceil(k * 2 * M_PI / dtheta));
-        dtheta        = (M_PI * 2) / slices;
+      // Patch in the bottom of the mesh!
 
-        // Push back this new slice
-        std::size_t start = nodes.size();
-        if (!std::isnan(dtheta)) {
+      const Scalar jump = 1.0 / k;
+      for (Scalar n = 0; h * std::tan(shape.phi(n, h)) > max_distance; n += jump) {
+
+        // Calculate phi phi for our ring, the previous ring, and the next ring
+        const Scalar p_phi = shape.phi(n - jump);
+        const Scalar c_phi = shape.phi(n);
+        const Scalar n_phi = shape.phi(n + jump);
+
+        // Calculate delta theta for our ring, the previous ring and the next ring
+        const Scalar p_raw_dtheta = shape.theta(p_phi);
+        const Scalar c_raw_dtheta = shape.theta(c_phi);
+        const Scalar n_raw_dtheta = shape.theta(n_phi);
+
+        // Calculate the number of slices in our ring, the previous ring and the next ring
+        const int p_slices = static_cast<int>(std::ceil(k * 2 * M_PI / p_raw_dtheta));
+        const int c_slices = static_cast<int>(std::ceil(k * 2 * M_PI / c_raw_dtheta));
+        const int n_slices = static_cast<int>(std::ceil(k * 2 * M_PI / n_raw_dtheta));
+
+        // Recalculate delta theta for each of these slices based on a whole number of spheres
+        const Scalar p_dtheta = (M_PI * 2) / p_slices;
+        const Scalar c_dtheta = (M_PI * 2) / c_slices;
+        const Scalar n_dtheta = (M_PI * 2) / n_slices;
+
+        // Optimisation since we use these a lot
+        const Scalar sin_phi = std::sin(c_phi);
+        const Scalar cos_phi = std::sin(cos_phi);
+
+        // Create this node slice, but first get the position the nodes list so we can work out absolute coordinates
+        const std::size_t start = nodes.size();
+
+        // Check for nan theta jumps which happen near the origin where dtheta doesn't make sense
+        if (std::isfinite(c_dtheta) && std::isfinite(n_dtheta)) {
+
+          // Loop through and generate all the slices
           for (int i = 0; i < slices; ++i) {
             Scalar theta = dtheta * i;
 
             Node<Scalar> n;
             //  Calculate our unit vector with x facing forward and z up
-            Scalar sin_phi = std::sin(phi);
-            n.ray          = {{
+            n.ray = {{
               std::cos(theta) * sin_phi,  //
               std::sin(theta) * sin_phi,  //
-              -std::cos(phi),             //
+              -cos_phi,                   //
               Scalar(0.0)                 //
             }};
+
+            // Get how far we are through this ring as a value between 0 and 1
+            const Scalar f = static_cast<Scalar>(i) / static_cast<Scalar>(c_slices);
+
+            // Left and right is just our index += 1 with wraparound
+            const int l = static_cast<int>(i > 0 ? start + i - 1 : start + slices - 1);
+            const int r = static_cast<int>(i + 1 < slices ? start + i + 1 : start);
+
+            // Top left and top right are the next ring around nearest left and right with wraparound
+            const int tl = start + c_slices + (static_cast<int>(f * n_slices) % n_slices);
+            const int tr = start + c_slices + ((static_cast<int>(f * n_slices) + 1) % n_slices);
+
+            // Bottom left and bottom right are the next ring around nearest left and right with wraparound
+            const int bl = start - p_slices + (static_cast<int>(f * p_slices) % p_slices);
+            const int br = start - p_slices + ((static_cast<int>(f * p_slices) + 1) % p_slices);
+
             // Calculate the absolute indices of our 6 neighbours presented in a clockwise fashion
-            n.neighbours = {{
-              static_cast<int>(i > 0 ? start + i - 1 : start + slices - 1),  // l
-              0,                                                             // tl
-              0,                                                             // tr
-              static_cast<int>(i + 1 < slices ? start + i + 1 : start),      // r
-              0,                                                             // br
-              0,                                                             // bl
-            }};
+            n.neighbours = {{l, tl, tr, r, br, bl}};
 
             nodes.push_back(n);
           }
         }
-
-        // End when our distance just went over our max distance
-        if (h * std::tan(phi) > max_distance) break;
       }
 
       // TODO all the neighbours that are out of range need to be clipped back
