@@ -161,6 +161,27 @@ inline vec3<Scalar> cross(const vec3<Scalar>& a, const vec3<Scalar>& b) {
 }
 
 /**
+ * Matrix block (head of matrix)
+ */
+template <std::size_t S, std::size_t T, typename Scalar, std::size_t L, std::size_t M, std::size_t... I>
+inline std::array<std::array<Scalar, T>, S> block(const std::array<std::array<Scalar, M>, L>& a,
+                                                  const std::index_sequence<I...>&) {
+  return {{head<T>(a[I])...}};
+}
+
+template <std::size_t S, std::size_t T, typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<std::array<Scalar, T>, S> block(const std::array<std::array<Scalar, T>, L>& a,
+                                                  const std::index_sequence<I...>&) {
+  return {{a[I]...}};
+}
+
+template <std::size_t S, std::size_t T, typename Scalar, std::size_t L, std::size_t M>
+inline std::enable_if_t<(S <= L && T < M) || (S < L && T <= M), std::array<std::array<Scalar, T>, S>> block(
+  const std::array<std::array<Scalar, M>, L>& a) {
+  return block<S, T>(a, std::make_index_sequence<S>());
+}
+
+/**
  * Matrix transpose
  */
 template <std::size_t X, typename Scalar, std::size_t L, std::size_t M, std::size_t... Y>
@@ -178,6 +199,16 @@ inline std::array<std::array<Scalar, L>, L> transpose(const std::array<std::arra
 template <typename Scalar, std::size_t L, std::size_t M>
 inline std::array<std::array<Scalar, M>, L> transpose(const std::array<std::array<Scalar, L>, M>& mat) {
   return transpose(mat, std::make_index_sequence<L>());
+}
+
+
+/**
+ * Matrix Vector multiplication
+ * (the vector is treated as a column vector for this function)
+ */
+template <typename Scalar>
+inline vec3<Scalar> multiply(const mat3<Scalar>& a, const vec3<Scalar>& b) {
+  return vec3<Scalar>{{dot(a[0], b), dot(a[1], b), dot(a[2], b)}};
 }
 
 /**
