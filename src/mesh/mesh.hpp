@@ -162,21 +162,13 @@ private:
      * <- y
      */
 
-    // Unproject each of the four corners of the screen into camera space
+    // Unproject each of the four corners of the screen and rotate them into world space
     const vec2<Scalar> dimensions          = subtract(cast<Scalar>(lens.dimensions), static_cast<Scalar>(1.0));
-    const std::array<vec3<Scalar>, 4> rNCc = {{
-      visualmesh::unproject(vec2<Scalar>{0, 0}, lens),                          // rTCc
-      visualmesh::unproject(vec2<Scalar>{dimensions[0], 0}, lens),              // rUCc
-      visualmesh::unproject(vec2<Scalar>{dimensions[0], dimensions[1]}, lens),  // rVCc
-      visualmesh::unproject(vec2<Scalar>{0, dimensions[1]}, lens),              // rWCc
-    }};
-
-    // Rotate these vectors into world space
     const std::array<vec3<Scalar>, 4> rNCo = {{
-      multiply(Roc, rNCc[0]),  // rTCo
-      multiply(Roc, rNCc[1]),  // rUCo
-      multiply(Roc, rNCc[2]),  // rVCo
-      multiply(Roc, rNCc[3]),  // rWCo
+      multiply(Roc, visualmesh::unproject(vec2<Scalar>{0, 0}, lens)),                          // rTCo
+      multiply(Roc, visualmesh::unproject(vec2<Scalar>{dimensions[0], 0}, lens)),              // rUCo
+      multiply(Roc, visualmesh::unproject(vec2<Scalar>{dimensions[0], dimensions[1]}, lens)),  // rVCo
+      multiply(Roc, visualmesh::unproject(vec2<Scalar>{0, dimensions[1]}, lens)),              // rWCo
     }};
 
     switch (lens.projection) {
@@ -200,20 +192,12 @@ private:
         // Get the lens axis centre coordinates
         vec2<Scalar> centre = add(multiply(dimensions, static_cast<Scalar>(0.5)), lens.centre);
 
-        // Unproject the centre of each of the edges into cam space using the lens axis as the centre
-        const std::array<vec3<Scalar>, 4> rECc = {{
-          visualmesh::unproject(vec2<Scalar>{centre[0], 0}, lens),              // rDCc
-          visualmesh::unproject(vec2<Scalar>{dimensions[0], centre[1]}, lens),  // rECc
-          visualmesh::unproject(vec2<Scalar>{centre[0], dimensions[1]}, lens),  // rFCc
-          visualmesh::unproject(vec2<Scalar>{0, centre[1]}, lens),              // rGCc
-        }};
-
-        // Rotate these vectors into world space
+        // Unproject the centre of each of the edges using the lens axis as the centre and rotate into world space
         const std::array<vec3<Scalar>, 4> rECo = {{
-          multiply(Roc, rECc[0]),  // rTCo
-          multiply(Roc, rECc[1]),  // rUCo
-          multiply(Roc, rECc[2]),  // rVCo
-          multiply(Roc, rECc[3]),  // rWCo
+          multiply(Roc, visualmesh::unproject(vec2<Scalar>{centre[0], 0}, lens)),              // rTCo
+          multiply(Roc, visualmesh::unproject(vec2<Scalar>{dimensions[0], centre[1]}, lens)),  // rUCo
+          multiply(Roc, visualmesh::unproject(vec2<Scalar>{centre[0], dimensions[1]}, lens)),  // rVCo
+          multiply(Roc, visualmesh::unproject(vec2<Scalar>{0, centre[1]}, lens)),              // rWCo
         }};
 
         // Calculate cones from each of the four screen edges
