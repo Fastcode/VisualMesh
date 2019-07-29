@@ -165,10 +165,10 @@ private:
     // Unproject each of the four corners of the screen and rotate them into world space
     const vec2<Scalar> dimensions          = subtract(cast<Scalar>(lens.dimensions), static_cast<Scalar>(1.0));
     const std::array<vec3<Scalar>, 4> rNCo = {{
-      multiply(Roc, visualmesh::unproject(vec2<Scalar>{0, 0}, lens)),                          // rTCo
-      multiply(Roc, visualmesh::unproject(vec2<Scalar>{dimensions[0], 0}, lens)),              // rUCo
+      multiply(Roc, visualmesh::unproject(vec2<Scalar>{1, 1}, lens)),                          // rTCo
+      multiply(Roc, visualmesh::unproject(vec2<Scalar>{dimensions[0], 1}, lens)),              // rUCo
       multiply(Roc, visualmesh::unproject(vec2<Scalar>{dimensions[0], dimensions[1]}, lens)),  // rVCo
-      multiply(Roc, visualmesh::unproject(vec2<Scalar>{0, dimensions[1]}, lens)),              // rWCo
+      multiply(Roc, visualmesh::unproject(vec2<Scalar>{1, dimensions[1]}, lens)),              // rWCo
     }};
 
     switch (lens.projection) {
@@ -194,10 +194,10 @@ private:
 
         // Unproject the centre of each of the edges using the lens axis as the centre and rotate into world space
         const std::array<vec3<Scalar>, 4> rECo = {{
-          multiply(Roc, visualmesh::unproject(vec2<Scalar>{centre[0], 0}, lens)),              // rTCo
+          multiply(Roc, visualmesh::unproject(vec2<Scalar>{centre[0], 1}, lens)),              // rTCo
           multiply(Roc, visualmesh::unproject(vec2<Scalar>{dimensions[0], centre[1]}, lens)),  // rUCo
           multiply(Roc, visualmesh::unproject(vec2<Scalar>{centre[0], dimensions[1]}, lens)),  // rVCo
-          multiply(Roc, visualmesh::unproject(vec2<Scalar>{0, centre[1]}, lens)),              // rWCo
+          multiply(Roc, visualmesh::unproject(vec2<Scalar>{1, centre[1]}, lens)),              // rWCo
         }};
 
         // Calculate cones from each of the four screen edges
