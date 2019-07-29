@@ -373,7 +373,7 @@ namespace engine {
 
         // This can happen on the CPU while the OpenCL device is busy
         // Build the reverse lookup map where the offscreen point is one past the end
-        std::vector<int> r_indices(nodes.size(), points);
+        std::vector<int> r_indices(nodes.size() + 1, points);
         for (uint i = 0; i < indices.size(); ++i) {
           r_indices[indices[i]] = i;
         }

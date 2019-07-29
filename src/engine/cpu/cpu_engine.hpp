@@ -81,7 +81,7 @@ namespace engine {
         n_points = pixels.size();
 
         // Build our reverse lookup, the default point goes to the null point
-        std::vector<int> r_lookup(nodes.size(), n_points);
+        std::vector<int> r_lookup(nodes.size() + 1, n_points);
         for (unsigned int i = 0; i < n_points; ++i) {
           r_lookup[global_indices[i]] = i;
         }
