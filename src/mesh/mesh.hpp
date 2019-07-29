@@ -27,6 +27,7 @@
 #include "generator/hexapizza.hpp"
 #include "lens.hpp"
 #include "node.hpp"
+#include "util/cone.hpp"
 #include "util/math.hpp"
 #include "util/projection.hpp"
 
@@ -44,40 +45,6 @@ private:
     std::pair<vec3<Scalar>, vec2<Scalar>> cone;
   };
 
-  static std::pair<vec3<Scalar>, vec2<Scalar>> cone_from_points() {
-    return std::make_pair(vec3<Scalar>{0, 0, 0}, vec2<Scalar>{1, 0});
-  }
-
-  static std::pair<vec3<Scalar>, vec2<Scalar>> cone_from_points(const vec3<Scalar>& p1) {
-    return std::make_pair(p1, vec2<Scalar>{1, 0});
-  }
-
-  static std::pair<vec3<Scalar>, vec2<Scalar>> cone_from_points(const vec3<Scalar>& p1, const vec3<Scalar>& p2) {
-    //  Get the axis and gradient by averaging the unit vectors and dotting with an edge point
-    vec3<Scalar> axis = normalise(add(p1, p2));
-    Scalar cos_theta  = dot(axis, p1);
-    return std::make_pair(axis, vec2<Scalar>{cos_theta, std::sqrt(1 - cos_theta * cos_theta)});
-  }
-
-  static std::pair<vec3<Scalar>, vec2<Scalar>> cone_from_points(const vec3<Scalar>& p1,
-                                                                const vec3<Scalar>& p2,
-                                                                const vec3<Scalar>& p3) {
-    // Put the rays into a matrix so we can solve it
-    mat3<Scalar> mat{{p1, p2, p3}};
-    mat3<Scalar> imat = invert(mat);
-
-    // Transpose and multiply by 1 1 1 to get the axis
-    vec3<Scalar> axis = normalise(vec3<Scalar>{
-      dot(imat[0], vec3<Scalar>{1, 1, 1}),
-      dot(imat[1], vec3<Scalar>{1, 1, 1}),
-      dot(imat[2], vec3<Scalar>{1, 1, 1}),
-    });
-
-    Scalar cos_theta = dot(axis, p1);
-
-    return std::make_pair(axis, vec2<Scalar>{cos_theta, std::sqrt(1 - cos_theta * cos_theta)});
-  }
-
   /**
    * @brief Given a set of points, find the smallest cone that contains all points
    *
@@ -89,8 +56,7 @@ private:
    */
   template <typename Iterator>
   std::pair<vec3<Scalar>, vec2<Scalar>> bounding_cone(Iterator start, Iterator end) {
-    std::iter_swap(std::next(start), std::prev(end));
-    std::pair<vec3<Scalar>, vec2<Scalar>> cone = cone_from_points();
+    std::pair<vec3<Scalar>, vec2<Scalar>> cone(cone_from_points<Scalar>());
     for (auto i = start; i < end; ++i) {
       if (dot(cone.first, nodes[*i].ray) < cone.second[0]) {
         cone = cone_from_points(nodes[*i].ray);
