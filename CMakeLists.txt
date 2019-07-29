@@ -2,8 +2,8 @@
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
-# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to the following conditions:
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit
+# persons to whom the Software is furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
 # Software.
@@ -28,18 +28,29 @@ FILE(GLOB hdr "src/**.hpp")
 
 # Convert our opencl files into header files with their contents and put them in the build folder
 FILE(GLOB cls "src/engine/opencl/kernels/**.cl")
-FOREACH(cl IN LISTS cls)
+FOREACH(
+    cl
+    IN
+    LISTS
+    cls
+)
 
-    FILE(RELATIVE_PATH cl_path ${CMAKE_CURRENT_SOURCE_DIR} ${cl})
+    FILE(
+        RELATIVE_PATH
+        cl_path
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${cl}
+    )
 
     ADD_CUSTOM_COMMAND(
         OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp"
-        COMMAND ${PYTHON_EXECUTABLE}
-        ARGS "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py"
+        COMMAND
+            ${PYTHON_EXECUTABLE}
+            ARGS
+            "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py"
             "${cl}"
             "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp"
-        DEPENDS "${cl}"
-                "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py"
+        DEPENDS "${cl}" "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py"
         COMMENT "Wrapping OpenCL file ${cl_path} in a header"
     )
     LIST(APPEND hdr "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp")
@@ -70,12 +81,19 @@ IF(TOP_LEVEL_PROJECT)
 
         ADD_LIBRARY(tf_op SHARED "src/tf_op.cpp" ${hdr})
         TARGET_COMPILE_OPTIONS(tf_op PRIVATE -march=native -mtune=native)
-        SET_TARGET_PROPERTIES(tf_op PROPERTIES
-            CXX_STANDARD 14
-            LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/training
-            PREFIX ""
-            OUTPUT_NAME visualmesh_op
-            SUFFIX ".so"
+        SET_TARGET_PROPERTIES(
+            tf_op
+            PROPERTIES
+                CXX_STANDARD
+                14
+                LIBRARY_OUTPUT_DIRECTORY
+                ${PROJECT_SOURCE_DIR}/training
+                PREFIX
+                ""
+                OUTPUT_NAME
+                visualmesh_op
+                SUFFIX
+                ".so"
         )
         TARGET_INCLUDE_DIRECTORIES(tf_op SYSTEM PRIVATE ${TENSORFLOW_INCLUDE_DIRS})
         TARGET_INCLUDE_DIRECTORIES(tf_op PRIVATE ${PROJECT_SOURCE_DIR}/src)
@@ -98,6 +116,12 @@ IF(TOP_LEVEL_PROJECT)
         TARGET_INCLUDE_DIRECTORIES(main SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
         TARGET_INCLUDE_DIRECTORIES(main PRIVATE ${PROJECT_SOURCE_DIR}/src)
         TARGET_INCLUDE_DIRECTORIES(main PRIVATE ${PROJECT_BINARY_DIR}/src)
-        TARGET_LINK_LIBRARIES(main ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES})
+        TARGET_LINK_LIBRARIES(
+            main
+            ${OpenCL_LIBRARIES}
+            ${OpenCV_LIBS}
+            ${fmt_LIBRARIES}
+            ${YAML_CPP_LIBRARIES}
+        )
     ENDIF(BUILD_EXAMPLE)
 ENDIF(TOP_LEVEL_PROJECT)
