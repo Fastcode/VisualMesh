@@ -265,12 +265,10 @@ private:
    * Check if a point is on the screen, given a description of the edges of the screen as cones, and the axis
    */
   static inline std::pair<bool, bool> check_on_screen(
-    const mat4<Scalar>& Hoc,
+    const mat3<Scalar>& Rco,
     const std::pair<vec3<Scalar>, vec2<Scalar>>& cone,
     const Lens<Scalar>& lens,
     const std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>& edges) {
-
-    const mat3<Scalar> Rco(block<3, 3>(transpose(Hoc)));
 
     // Firstly check if the cone axis is on the screen
     vec2<Scalar> px = ::visualmesh::project(multiply(Rco, cone.first), lens);
@@ -369,6 +367,7 @@ public:
     const Scalar sin_fov = std::sin(lens.fov);
 
     // Get the x axis of the camera in world space and the cone equations that describe the edges of the screen
+    const mat3<Scalar> Rco(block<3, 3>(transpose(Hoc)));
     const vec3<Scalar> cam_x{Hoc[0][0], Hoc[1][0], Hoc[2][0]};
     const auto edges = screen_edges(Hoc, lens);
 
@@ -400,7 +399,7 @@ public:
       bool inside  = false;
 
       // If we are not ruled as outside by the field of view we might be on the screen
-      if (!outside) { std::tie(inside, outside) = check_on_screen(Hoc, cone, lens, edges); }
+      if (!outside) { std::tie(inside, outside) = check_on_screen(Rco, cone, lens, edges); }
 
       if (inside) {
         std::cout << "FOUND" << std::endl;
@@ -424,6 +423,14 @@ public:
       }
       // We have reached the end of a tree, from here we need to check each point on screen individually
       else if (elem.children[0] < 0) {
+        for (int i = elem.range.first; i < elem.range.second; ++i) {
+          auto px = visualmesh::project(multiply(Rco, nodes[i].ray), lens);
+          std::cout << "GOTTA TEST " << i << " " << px << std::endl;
+          if (0 <= px[0] && px[0] + 1 <= lens.dimensions[0] && 0 <= px[1] && px[1] + 1 <= lens.dimensions[1]) {
+            // TODO the whole if building end thing
+            std::cout << "\tON SCREEN!" << std::endl;
+          }
+        }
         // TODO go through the range and project each individual ray to the screen to see if it's on the screen
         std::cout << "LEAF_NODE!" << std::endl;
       }
@@ -438,6 +445,7 @@ public:
     // If we finished while building add the last point
     if (building) { ranges.emplace_back(std::make_pair(range_start, range_end)); }
 
+    std::cout << ranges.size() << std::endl;
     exit(0);
     return ranges;
   }
