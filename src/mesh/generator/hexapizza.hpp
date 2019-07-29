@@ -37,21 +37,21 @@ namespace generator {
       // Loop through until we reach our max distance
       std::vector<Node<Scalar>> nodes;
 
+      nodes.push_back(Node<Scalar>{{{0, 0, -1}}, {{0, 0, 0, 0, 0, 0}}});
+
       // TODO Patch in the bottom of the mesh!
 
       // We store the start out here, that way we can use it later to work out what the last ring was
       std::size_t start = nodes.size();
 
+      // Loop through our n values until we exceed the max distance
       const Scalar jump = 1.0 / k;
-      for (int i = 0; h * std::tan(shape.phi(i*jump, h)) < max_distance; ++i) {
-
-        // Calculate our n value given our n jump
-        const Scalar n = i * jump;
+      for (int i = 0; h * std::tan(shape.phi(i * jump, h)) < max_distance; ++i) {
 
         // Calculate phi phi for our ring, the previous ring, and the next ring
-        const Scalar p_phi = shape.phi(n - jump, h);
-        const Scalar c_phi = shape.phi(n, h);
-        const Scalar n_phi = shape.phi(n + jump, h);
+        const Scalar p_phi = shape.phi((i - 1) * jump, h);
+        const Scalar c_phi = shape.phi(i * jump, h);
+        const Scalar n_phi = shape.phi((i + 1) * jump, h);
 
         // Calculate delta theta for our ring, the previous ring and the next ring
         const Scalar p_raw_dtheta = shape.theta(p_phi, h);
@@ -59,7 +59,9 @@ namespace generator {
         const Scalar n_raw_dtheta = shape.theta(n_phi, h);
 
         // Calculate the number of slices in our ring, the previous ring and the next ring
-        const int p_slices = static_cast<int>(std::ceil(k * 2 * M_PI / p_raw_dtheta));
+        // TODO once the centre patch is done replace the 1 here with the correct size
+        const int p_slices =
+          !std::isfinite(p_raw_dtheta) ? 1 : static_cast<int>(std::ceil(k * 2 * M_PI / p_raw_dtheta));
         const int c_slices = static_cast<int>(std::ceil(k * 2 * M_PI / c_raw_dtheta));
         const int n_slices = static_cast<int>(std::ceil(k * 2 * M_PI / n_raw_dtheta));
 
@@ -106,7 +108,7 @@ namespace generator {
             const int bl = start - p_slices + (static_cast<int>(f * p_slices) % p_slices);
             const int br = start - p_slices + ((static_cast<int>(f * p_slices) + 1) % p_slices);
 
-            // Calculate the absolute indices of our 6 neighbours presented in a clockwise fashion
+            // The absolute indices of our neighbours presented in a clockwise arrangement
             n.neighbours = {{l, tl, tr, r, br, bl}};
 
             nodes.push_back(n);
@@ -115,9 +117,9 @@ namespace generator {
       }
 
       // Clip all neighbours that are past the end to one past the end
-      for(int i = start; i < nodes.size(); ++i) {
-        for(auto& n : nodes[i].neighbours) {
-          n = n > nodes.size() ? nodes.size() : n;
+      for (int i = start; i < nodes.size(); ++i) {
+        for (auto& n : nodes[i].neighbours) {
+          n = std::min(n, static_cast<int>(nodes.size()));
         }
       }
 

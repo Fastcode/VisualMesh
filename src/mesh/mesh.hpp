@@ -18,6 +18,7 @@
 #ifndef VISUALMESH_MESH_HPP
 #define VISUALMESH_MESH_HPP
 
+#include <algorithm>
 #include <array>
 #include <numeric>
 #include <utility>
@@ -312,13 +313,21 @@ public:
     build_bsp(sorting.begin(), sorting.end());
     t.measure("Built BSP");
 
+    // Make our reverse lookup so we can correct the neighbourhood indices
+    std::vector<int> r_sorting(nodes.size() + 1);
+    r_sorting[nodes.size()] = nodes.size();
+    for (int i = 0; i < nodes.size(); ++i) {
+      r_sorting[sorting[i]] = i;
+    }
+    t.measure("Built reverse map");
+
     // Sort the nodes and correct the neighbourhood graph based on our BSP sorting
     std::vector<Node<Scalar>> sorted_nodes;
     sorted_nodes.reserve(nodes.size());
     for (const auto& i : sorting) {
       sorted_nodes.push_back(nodes[i]);
       for (int& n : sorted_nodes.back().neighbours) {
-        n = sorting[n];
+        n = r_sorting[n];
       }
     }
     t.measure("Sorting");
@@ -393,10 +402,6 @@ public:
         stack.push_back(elem.children[0]);
       }
     }
-
-    std::cout << "BYE BYE" << std::endl;
-
-    exit(1);
     return ranges;
   }
   /// The height that this mesh is designed to run at
