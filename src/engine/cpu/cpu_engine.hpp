@@ -50,14 +50,12 @@ namespace engine {
         }
 
         // Output variables
-        std::vector<int> indices(n_points);
-        std::vector<int> global_indices;
-        global_indices.reserve(n_points);
+        std::vector<int> global_indices(n_points);
         std::vector<vec2<Scalar>> pixels;
         pixels.reserve(n_points);
 
         // Get the indices for each point in the mesh on screen
-        auto it = indices.begin();
+        auto it = global_indices.begin();
         for (const auto& range : ranges) {
           auto n = std::next(it, range.second - range.first);
           std::iota(it, n, range.first);
@@ -65,16 +63,9 @@ namespace engine {
         }
 
         // Project each of the nodes into pixel space
-        for (unsigned int i = 0; i < indices.size(); ++i) {
-          const Node<Scalar>& node = nodes[indices[i]];
+        for (const auto& i : global_indices) {
           // Rotate the ray by the rotation matrix and project to pixel coordinates
-          vec2<Scalar> px = ::visualmesh::project(multiply(Rco, node.ray), lens);
-
-          // Check if the pixel is on the screen, this is needed as the cutoffs for some lenses aren't perfect yet
-          if (0 < px[0] && px[0] + 1 < lens.dimensions[0] && 0 < px[1] && px[1] + 1 < lens.dimensions[1]) {
-            pixels.emplace_back(px);
-            global_indices.emplace_back(indices[i]);
-          }
+          pixels.emplace_back(::visualmesh::project(multiply(Rco, nodes[i].ray), lens));
         }
 
         // Update the number of points to account for how many pixels we removed
@@ -85,7 +76,6 @@ namespace engine {
         for (unsigned int i = 0; i < n_points; ++i) {
           r_lookup[global_indices[i]] = i;
         }
-
 
         // Build our local neighbourhood map
         std::vector<std::array<int, 6>> neighbourhood(n_points + 1);  // +1 for the null point
