@@ -263,10 +263,10 @@ namespace engine {
             ::clReleaseMemObject);
 
           // Flatten our rays
-          std::vector<std::array<Scalar, 4>> rays;
+          std::vector<vec4<Scalar>> rays;
           rays.reserve(mesh.nodes.size());
           for (const auto& n : mesh.nodes) {
-            rays.push_back(n.ray);
+            rays.emplace_back(vec4<Scalar>{n.ray[0], n.ray[1], n.ray[2], 0});
           }
 
           // Write the points buffer to the device and cache it

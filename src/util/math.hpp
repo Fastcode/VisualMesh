@@ -57,7 +57,7 @@ inline std::array<Scalar, S> head(const std::array<Scalar, L>& a, const std::ind
 }
 
 template <std::size_t S, typename Scalar, std::size_t L>
-inline std::enable_if_t<S <= L, std::array<Scalar, S>> head(const std::array<Scalar, L>& a) {
+inline std::enable_if_t<(S < L), std::array<Scalar, S>> head(const std::array<Scalar, L>& a) {
   return head<S>(a, std::make_index_sequence<S>());
 }
 

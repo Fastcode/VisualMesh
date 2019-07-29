@@ -88,16 +88,17 @@ private:
    */
   template <typename Iterator>
   std::pair<vec3<Scalar>, vec2<Scalar>> bounding_cone(Iterator start, Iterator end) {
+    std::iter_swap(std::next(start), std::prev(end));
     std::pair<vec3<Scalar>, vec2<Scalar>> cone = cone_from_points();
     for (auto i = start; i < end; ++i) {
-      if (dot(cone.first, head<3>(nodes[*i].ray)) < cone.second[0]) {
-        cone = cone_from_points(head<3>(nodes[*i].ray));
+      if (dot(cone.first, nodes[*i].ray) < cone.second[0]) {
+        cone = cone_from_points(nodes[*i].ray);
         for (auto j = start; j < i; ++j) {
-          if (dot(cone.first, head<3>(nodes[*j].ray)) < cone.second[0]) {
-            cone = cone_from_points(head<3>(nodes[*i].ray), head<3>(nodes[*j].ray));
+          if (dot(cone.first, nodes[*j].ray) < cone.second[0]) {
+            cone = cone_from_points(nodes[*i].ray, nodes[*j].ray);
             for (auto k = start; k < j; ++k) {
-              if (dot(cone.first, head<3>(nodes[*k].ray)) < cone.second[0]) {
-                cone = cone_from_points(head<3>(nodes[*i].ray), head<3>(nodes[*j].ray), head<3>(nodes[*k].ray));
+              if (dot(cone.first, nodes[*k].ray) < cone.second[0]) {
+                cone = cone_from_points(nodes[*i].ray, nodes[*j].ray, nodes[*k].ray);
               }
             }
           }
@@ -196,18 +197,18 @@ private:
     // Unproject each of the four corners of the screen into camera space
     const vec2<Scalar> dimensions          = cast<Scalar>(lens.dimensions);
     const std::array<vec3<Scalar>, 4> rNCc = {{
-      head<3>(visualmesh::unproject(vec2<Scalar>{0, 0}, lens)),                          // rTCc
-      head<3>(visualmesh::unproject(vec2<Scalar>{dimensions[0], 0}, lens)),              // rUCc
-      head<3>(visualmesh::unproject(vec2<Scalar>{dimensions[0], dimensions[1]}, lens)),  // rVCc
-      head<3>(visualmesh::unproject(vec2<Scalar>{0, dimensions[1]}, lens)),              // rWCc
+      visualmesh::unproject(vec2<Scalar>{0, 0}, lens),                          // rTCc
+      visualmesh::unproject(vec2<Scalar>{dimensions[0], 0}, lens),              // rUCc
+      visualmesh::unproject(vec2<Scalar>{dimensions[0], dimensions[1]}, lens),  // rVCc
+      visualmesh::unproject(vec2<Scalar>{0, dimensions[1]}, lens),              // rWCc
     }};
 
     // Rotate these vectors into world space
     const std::array<vec3<Scalar>, 4> rNCo = {{
-      {{dot(rNCc[0], Roc[0]), dot(rNCc[0], Roc[1]), dot(rNCc[0], Roc[2])}},  // rTCo
-      {{dot(rNCc[1], Roc[0]), dot(rNCc[1], Roc[1]), dot(rNCc[1], Roc[2])}},  // rUCo
-      {{dot(rNCc[2], Roc[0]), dot(rNCc[2], Roc[1]), dot(rNCc[2], Roc[2])}},  // rVCo
-      {{dot(rNCc[3], Roc[0]), dot(rNCc[3], Roc[1]), dot(rNCc[3], Roc[2])}},  // rWCo
+      multiply(Roc, rNCc[0]),  // rTCo
+      multiply(Roc, rNCc[1]),  // rUCo
+      multiply(Roc, rNCc[2]),  // rVCo
+      multiply(Roc, rNCc[3]),  // rWCo
     }};
 
     switch (lens.projection) {
@@ -233,18 +234,18 @@ private:
 
         // Unproject the centre of each of the edges into cam space using the lens axis as the centre
         const std::array<vec3<Scalar>, 4> rECc = {{
-          head<3>(visualmesh::unproject(vec2<Scalar>{centre[0], 0}, lens)),              // rDCc
-          head<3>(visualmesh::unproject(vec2<Scalar>{dimensions[0], centre[1]}, lens)),  // rECc
-          head<3>(visualmesh::unproject(vec2<Scalar>{centre[0], dimensions[1]}, lens)),  // rFCc
-          head<3>(visualmesh::unproject(vec2<Scalar>{0, centre[1]}, lens)),              // rGCc
+          visualmesh::unproject(vec2<Scalar>{centre[0], 0}, lens),              // rDCc
+          visualmesh::unproject(vec2<Scalar>{dimensions[0], centre[1]}, lens),  // rECc
+          visualmesh::unproject(vec2<Scalar>{centre[0], dimensions[1]}, lens),  // rFCc
+          visualmesh::unproject(vec2<Scalar>{0, centre[1]}, lens),              // rGCc
         }};
 
         // Rotate these vectors into world space
         const std::array<vec3<Scalar>, 4> rECo = {{
-          {{dot(rECc[0], Roc[0]), dot(rECc[0], Roc[1]), dot(rECc[0], Roc[2])}},  // rTCo
-          {{dot(rECc[1], Roc[0]), dot(rECc[1], Roc[1]), dot(rECc[1], Roc[2])}},  // rUCo
-          {{dot(rECc[2], Roc[0]), dot(rECc[2], Roc[1]), dot(rECc[2], Roc[2])}},  // rVCo
-          {{dot(rECc[3], Roc[0]), dot(rECc[3], Roc[1]), dot(rECc[3], Roc[2])}},  // rWCo
+          multiply(Roc, rECc[0]),  // rTCo
+          multiply(Roc, rECc[1]),  // rUCo
+          multiply(Roc, rECc[2]),  // rVCo
+          multiply(Roc, rECc[3]),  // rWCo
         }};
 
         // Calculate cones from each of the four screen edges

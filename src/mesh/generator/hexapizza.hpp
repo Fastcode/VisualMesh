@@ -90,7 +90,6 @@ namespace generator {
               std::cos(theta) * sin_phi,  //
               std::sin(theta) * sin_phi,  //
               -cos_phi,                   //
-              Scalar(0.0)                 //
             }};
 
             // Get how far we are through this ring as a value between 0 and 1

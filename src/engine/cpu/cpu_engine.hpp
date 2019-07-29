@@ -41,7 +41,7 @@ namespace engine {
 
         // Convenience variables
         const auto& nodes = mesh.nodes;
-        const auto Hco    = transpose(Hoc);
+        const mat3<Scalar> Rco(block<3, 3>(transpose(Hoc)));
 
         // Work out how many points total there are
         int n_points = 0;
@@ -67,10 +67,8 @@ namespace engine {
         // Project each of the nodes into pixel space
         for (unsigned int i = 0; i < indices.size(); ++i) {
           const Node<Scalar>& node = nodes[indices[i]];
-
-          // Rotate point by matrix (since we are doing this rowwise, it's like we are transposing at the same time)
-          vec4<Scalar> p  = {{dot(node.ray, Hco[0]), dot(node.ray, Hco[1]), dot(node.ray, Hco[2]), 0}};
-          vec2<Scalar> px = ::visualmesh::project(p, lens);
+          // Rotate the ray by the rotation matrix and project to pixel coordinates
+          vec2<Scalar> px = ::visualmesh::project(multiply(Rco, node.ray), lens);
 
           // Check if the pixel is on the screen, this is needed as the cutoffs for some lenses aren't perfect yet
           if (0 < px[0] && px[0] < lens.dimensions[0] - 1 && 0 < px[1] && px[1] < lens.dimensions[1] - 1) {
