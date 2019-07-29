@@ -163,7 +163,7 @@ private:
      */
 
     // Unproject each of the four corners of the screen into camera space
-    const vec2<Scalar> dimensions          = cast<Scalar>(lens.dimensions);
+    const vec2<Scalar> dimensions          = subtract(cast<Scalar>(lens.dimensions), static_cast<Scalar>(1.0));
     const std::array<vec3<Scalar>, 4> rNCc = {{
       visualmesh::unproject(vec2<Scalar>{0, 0}, lens),                          // rTCc
       visualmesh::unproject(vec2<Scalar>{dimensions[0], 0}, lens),              // rUCc
@@ -368,7 +368,6 @@ public:
       if (!outside) { std::tie(inside, outside) = check_on_screen(Rco, cone, lens, edges); }
 
       if (inside) {
-        std::cout << "FOUND" << std::endl;
         // If we are building just update our end point
         if (building) {
           range_end = elem.range.second;  //
@@ -380,7 +379,6 @@ public:
         }
       }
       else if (outside) {
-        std::cout << "SKIPPING" << std::endl;
         // If we found an outside point we have finished building our range
         if (building) {
           ranges.emplace_back(std::make_pair(range_start, range_end));
@@ -391,17 +389,27 @@ public:
       else if (elem.children[0] < 0) {
         for (int i = elem.range.first; i < elem.range.second; ++i) {
           auto px = visualmesh::project(multiply(Rco, nodes[i].ray), lens);
-          std::cout << "GOTTA TEST " << i << " " << px << std::endl;
-          if (0 <= px[0] && px[0] + 1 <= lens.dimensions[0] && 0 <= px[1] && px[1] + 1 <= lens.dimensions[1]) {
-            // TODO the whole if building end thing
-            std::cout << "\tON SCREEN!" << std::endl;
+          const bool on_screen =
+            0 <= px[0] && px[0] + 1 <= lens.dimensions[0] && 0 <= px[1] && px[1] + 1 <= lens.dimensions[1];
+          if (on_screen && building) {
+            // Extend the end
+            range_end = i + 1;
+          }
+          else if (!on_screen && building) {
+            // Add the range we just closed
+            ranges.emplace_back(std::make_pair(range_start, range_end));
+            building = false;
+          }
+          else if (on_screen && !building) {
+            // Start a new range
+            range_start = i;
+            range_end   = i + 1;
+            building    = true;
           }
         }
-        // TODO go through the range and project each individual ray to the screen to see if it's on the screen
-        std::cout << "LEAF_NODE!" << std::endl;
       }
+
       else {
-        std::cout << "SPLITTING" << std::endl;
         // Add the children of this to the search in order 1,0 so we pop 0 first (contiguous indices)
         stack.push_back(elem.children[1]);
         stack.push_back(elem.children[0]);
@@ -411,8 +419,6 @@ public:
     // If we finished while building add the last point
     if (building) { ranges.emplace_back(std::make_pair(range_start, range_end)); }
 
-    std::cout << ranges.size() << std::endl;
-    exit(0);
     return ranges;
   }
   /// The height that this mesh is designed to run at

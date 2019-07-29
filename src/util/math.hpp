@@ -62,7 +62,22 @@ inline std::enable_if_t<(S < L), std::array<Scalar, S>> head(const std::array<Sc
 }
 
 /**
- * Vector subtraction
+ * Vector Scalar subtraction
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a,
+                                      const Scalar& b,
+                                      const std::index_sequence<I...>&) {
+  return {{(a[I] - b)...}};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const Scalar& b) {
+  return subtract(a, b, std::make_index_sequence<L>());
+}
+
+/**
+ * Vector Vector subtraction
  */
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a,
@@ -77,7 +92,22 @@ inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const std:
 }
 
 /**
- * Vector addition
+ * Vector Scalar addition
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, L> add(const std::array<Scalar, L>& a,
+                                 const Scalar& b,
+                                 const std::index_sequence<I...>&) {
+  return {{(a[I] + b)...}};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const Scalar& b) {
+  return add(a, b, std::make_index_sequence<L>());
+}
+
+/**
+ * Vector Vector addition
  */
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> add(const std::array<Scalar, L>& a,
