@@ -1,6 +1,5 @@
 #include <dirent.h>
 #include <fcntl.h>
-#include <fmt/format.h>
 #include <sys/stat.h>
 #include <yaml-cpp/yaml.h>
 #include <algorithm>
