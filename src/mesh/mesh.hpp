@@ -163,6 +163,7 @@ private:
      */
 
     // Unproject each of the four corners of the screen and rotate them into world space
+    // Add a 1 pixel offset from the edge so that we don't go over the edge from rounding errors
     const vec2<Scalar> dimensions          = subtract(cast<Scalar>(lens.dimensions), static_cast<Scalar>(1.0));
     const std::array<vec3<Scalar>, 4> rNCo = {{
       multiply(Roc, visualmesh::unproject(vec2<Scalar>{1, 1}, lens)),                          // rTCo
@@ -313,13 +314,14 @@ public:
   std::vector<std::pair<int, int>> lookup(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
 
     // Our FOV is an easy check to exclude things outside our view
-    const Scalar cos_fov = std::cos(lens.fov);
-    const Scalar sin_fov = std::sin(lens.fov);
+    // Multiply by 0.5 to get the cone angle
+    const Scalar cos_fov = std::cos(lens.fov * static_cast<Scalar>(0.5));
+    const Scalar sin_fov = std::sin(lens.fov * static_cast<Scalar>(0.5));
 
     // Get the x axis of the camera in world space and the cone equations that describe the edges of the screen
     const mat3<Scalar> Rco(block<3, 3>(transpose(Hoc)));
-    const vec3<Scalar> cam_x{Hoc[0][0], Hoc[1][0], Hoc[2][0]};
-    const auto edges = screen_edges(Hoc, lens);
+    const vec3<Scalar>& rXCo = Rco[0];  // Camera x in world space
+    const auto edges         = screen_edges(Hoc, lens);
 
     // Go through our BSP tree to work out which segments of the mesh are on screen
     // The first element of the tree is the root element of the bsp
@@ -337,19 +339,18 @@ public:
       const auto& elem = bsp[i];
       const auto& cone = elem.cone;
 
-      // Dot the camera x axis in world with the cone
-      Scalar delta = dot(cam_x, cone.first);
-
       // Check if we are outside the field of view of the lens using an easy check
       // To check if we are inside or outside the cone we need to check how angle between the cones compares
       // outside == dot(cam, axis) < cos(fov + acos(gradient))
       // However given that the thetas don't change and we have gradient naturally from the dot product it's easier
       // to calculate it using the compound angle formula
-      bool outside = delta < cos_fov * cone.second[0] - sin_fov * cone.second[1];
-      bool inside  = false;
+      const Scalar delta = dot(rXCo, cone.first);
+      bool outside       = delta < cos_fov * cone.second[0] - sin_fov * cone.second[1];
+      bool inside        = delta > cos_fov * cone.second[0] + sin_fov * cone.second[1];
 
-      // If we are not ruled as outside by the field of view we might be on the screen
-      if (!outside) { std::tie(inside, outside) = check_on_screen(Rco, cone, lens, edges); }
+      // The FOV can either entirely exclude our points, or split based on intersection. If it can't do either of these
+      // (entirely inside) we need to use the screen edges to do a proper check.
+      if (!outside && inside) { std::tie(inside, outside) = check_on_screen(Rco, cone, lens, edges); }
 
       if (inside) {
         // If we are building just update our end point
@@ -372,9 +373,11 @@ public:
       // We have reached the end of a tree, from here we need to check each point on screen individually
       else if (elem.children[0] < 0) {
         for (int i = elem.range.first; i < elem.range.second; ++i) {
-          auto px = visualmesh::project(multiply(Rco, nodes[i].ray), lens);
-          const bool on_screen =
-            0 <= px[0] && px[0] + 1 <= lens.dimensions[0] && 0 <= px[1] && px[1] + 1 <= lens.dimensions[1];
+          // Check if the pixel is on the screen
+          auto px              = visualmesh::project(multiply(Rco, nodes[i].ray), lens);
+          const bool on_screen = dot(rXCo, nodes[i].ray) > cos_fov && 0 <= px[0] && px[0] + 1 <= lens.dimensions[0]
+                                 && 0 <= px[1] && px[1] + 1 <= lens.dimensions[1];
+
           if (on_screen && building) {
             // Extend the end
             range_end = i + 1;
