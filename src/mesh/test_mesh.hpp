@@ -72,7 +72,7 @@ void test_mesh(const Mesh<Scalar>& mesh, const Shape& shape) {
       vec3<Scalar> diff_12 = phi_difference<Scalar>(mesh.h, {ray1[0], ray1[1], ray1[2]}, {ray2[0], ray2[1], ray2[2]});
       Scalar n_12          = std::abs(shape.n(diff_12[1], diff_12[0]) - shape.n(diff_12[2], diff_12[0]));
 
-      std::cout << "n: " << n_01 << " c: " << n_12 << std::endl;
+      std::cout << "*: " << n_01 << " o: " << n_12 << std::endl;
     }
     std::cout << std::endl;
   }

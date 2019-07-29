@@ -19,6 +19,13 @@ PROJECT(VisualMesh VERSION 1.0.0)
 # Check if we are built as a subproject
 IF(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     SET(TOP_LEVEL_PROJECT ON)
+
+    # Force enable diagnostic colours for clang and gcc
+    IF(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+        ADD_COMPILE_OPTIONS(-fdiagnostics-color=always)
+    ELSEIF(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+        ADD_COMPILE_OPTIONS(-fcolor-diagnostics)
+    ENDIF()
 ELSE()
     SET(TOP_LEVEL_PROJECT OFF)
 ENDIF()
@@ -123,5 +130,11 @@ IF(TOP_LEVEL_PROJECT)
             ${fmt_LIBRARIES}
             ${YAML_CPP_LIBRARIES}
         )
+
+        ADD_EXECUTABLE(mesh_quality "example/mesh_quality.cpp" ${hdr})
+        TARGET_COMPILE_OPTIONS(mesh_quality PRIVATE -march=native -mtune=native)
+        SET_TARGET_PROPERTIES(mesh_quality PROPERTIES CXX_STANDARD 14)
+        TARGET_INCLUDE_DIRECTORIES(mesh_quality PRIVATE ${PROJECT_SOURCE_DIR}/src)
+        TARGET_INCLUDE_DIRECTORIES(mesh_quality PRIVATE ${PROJECT_BINARY_DIR}/src)
     ENDIF(BUILD_EXAMPLE)
 ENDIF(TOP_LEVEL_PROJECT)
