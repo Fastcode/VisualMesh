@@ -162,9 +162,13 @@ int main() {
         // Horizontal field of view
         float h_fov = meta["camera"]["lens"]["fov"].as<float>();
 
+        // Calculate diagonal field of view
+        float aspect = static_cast<float>(lens.dimensions[1]) / static_cast<float>(lens.dimensions[0]);
+        float fov    = 2.0 * std::atan(std::sqrt((aspect * aspect + 1) * std::tan(h_fov * 0.5)));
+
         // Construct rectilinear projection
         lens.projection   = visualmesh::RECTILINEAR;
-        lens.fov          = h_fov;
+        lens.fov          = fov;
         lens.focal_length = (lens.dimensions[0] * 0.5) / std::tan(h_fov * 0.5);
       }
       else if (meta["camera"]["lens"]["type"].as<std::string>() == "FISHEYE") {
