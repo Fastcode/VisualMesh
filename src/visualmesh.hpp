@@ -59,9 +59,10 @@ public:
                       const Scalar& max_distance) {
 
     // Loop through to make a mesh for each of our height possibilities
-    for (Scalar h = min_height; h < max_height; h += (max_height - min_height) / n_heights) {
-
+    const Scalar jump = (max_height - min_height) / n_heights;
+    for (int i = 0; i < n_heights; ++i) {
       // Insert our constructed mesh into the lookup
+      const Scalar h = min_height + i * jump;
       luts.insert(std::make_pair(h, Mesh<Scalar>(shape, h, k, max_distance)));
     }
   }
