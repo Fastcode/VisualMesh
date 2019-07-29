@@ -35,7 +35,7 @@ struct Lens {
   Scalar fov;
   /// The focal length of the camera, normalised to the image width
   Scalar focal_length;
-  /// The pixel coordinates of the centre of the lens
+  /// The offset required to move the centre of the lens to the centre of the image
   std::array<Scalar, 2> centre;
 };
 

@@ -37,20 +37,26 @@ namespace generator {
       // Loop through until we reach our max distance
       std::vector<Node<Scalar>> nodes;
 
-      // Patch in the bottom of the mesh!
+      // TODO Patch in the bottom of the mesh!
+
+      // We store the start out here, that way we can use it later to work out what the last ring was
+      std::size_t start = nodes.size();
 
       const Scalar jump = 1.0 / k;
-      for (Scalar n = 0; h * std::tan(shape.phi(n, h)) > max_distance; n += jump) {
+      for (int i = 0; h * std::tan(shape.phi(i*jump, h)) < max_distance; ++i) {
+
+        // Calculate our n value given our n jump
+        const Scalar n = i * jump;
 
         // Calculate phi phi for our ring, the previous ring, and the next ring
-        const Scalar p_phi = shape.phi(n - jump);
-        const Scalar c_phi = shape.phi(n);
-        const Scalar n_phi = shape.phi(n + jump);
+        const Scalar p_phi = shape.phi(n - jump, h);
+        const Scalar c_phi = shape.phi(n, h);
+        const Scalar n_phi = shape.phi(n + jump, h);
 
         // Calculate delta theta for our ring, the previous ring and the next ring
-        const Scalar p_raw_dtheta = shape.theta(p_phi);
-        const Scalar c_raw_dtheta = shape.theta(c_phi);
-        const Scalar n_raw_dtheta = shape.theta(n_phi);
+        const Scalar p_raw_dtheta = shape.theta(p_phi, h);
+        const Scalar c_raw_dtheta = shape.theta(c_phi, h);
+        const Scalar n_raw_dtheta = shape.theta(n_phi, h);
 
         // Calculate the number of slices in our ring, the previous ring and the next ring
         const int p_slices = static_cast<int>(std::ceil(k * 2 * M_PI / p_raw_dtheta));
@@ -64,17 +70,17 @@ namespace generator {
 
         // Optimisation since we use these a lot
         const Scalar sin_phi = std::sin(c_phi);
-        const Scalar cos_phi = std::sin(cos_phi);
+        const Scalar cos_phi = std::cos(c_phi);
 
         // Create this node slice, but first get the position the nodes list so we can work out absolute coordinates
-        const std::size_t start = nodes.size();
+        start = nodes.size();
 
         // Check for nan theta jumps which happen near the origin where dtheta doesn't make sense
-        if (std::isfinite(c_dtheta) && std::isfinite(n_dtheta)) {
+        if (std::isfinite(c_raw_dtheta) && std::isfinite(n_raw_dtheta)) {
 
           // Loop through and generate all the slices
-          for (int i = 0; i < slices; ++i) {
-            Scalar theta = dtheta * i;
+          for (int j = 0; j < c_slices; ++j) {
+            Scalar theta = c_dtheta * j;
 
             Node<Scalar> n;
             //  Calculate our unit vector with x facing forward and z up
@@ -86,11 +92,11 @@ namespace generator {
             }};
 
             // Get how far we are through this ring as a value between 0 and 1
-            const Scalar f = static_cast<Scalar>(i) / static_cast<Scalar>(c_slices);
+            const Scalar f = static_cast<Scalar>(j) / static_cast<Scalar>(c_slices);
 
             // Left and right is just our index += 1 with wraparound
-            const int l = static_cast<int>(i > 0 ? start + i - 1 : start + slices - 1);
-            const int r = static_cast<int>(i + 1 < slices ? start + i + 1 : start);
+            const int l = static_cast<int>(j > 0 ? start + j - 1 : start + c_slices - 1);
+            const int r = static_cast<int>(j + 1 < c_slices ? start + j + 1 : start);
 
             // Top left and top right are the next ring around nearest left and right with wraparound
             const int tl = start + c_slices + (static_cast<int>(f * n_slices) % n_slices);
@@ -108,7 +114,12 @@ namespace generator {
         }
       }
 
-      // TODO all the neighbours that are out of range need to be clipped back
+      // Clip all neighbours that are past the end to one past the end
+      for(int i = start; i < nodes.size(); ++i) {
+        for(auto& n : nodes[i].neighbours) {
+          n = n > nodes.size() ? nodes.size() : n;
+        }
+      }
 
       return nodes;
     }

@@ -34,14 +34,12 @@ template <typename Scalar>
 struct Mesh {
 private:
   struct BSP {
-    // The bounds of the range that this BSP element represents
-    int start;
-    int end;
-
+    // The bounds of the range that this BSP element represents (start to one past the end)
+    std::pair<int, int> range;
+    // The indicies of the two children in this BSP
     std::array<int, 2> children;
-    vec3<Scalar> axis;
-    Scalar cos_theta;
-    Scalar sin_theta;
+    // The paramters of the cone that describe this part of the BSP
+    std::pair<vec3<Scalar>, vec2<Scalar>> cone;
   };
 
   static std::pair<vec3<Scalar>, vec2<Scalar>> cone_from_points() {
@@ -109,15 +107,23 @@ private:
   }
 
   template <typename Iterator>
-  int build_bsp(Iterator start, Iterator end, int offset = 0) {
+  int build_bsp(Iterator start, Iterator end, int min_points = 8, int offset = 0) {
     // No points in this partition, this should never happen
     if (std::distance(start, end) == 0) { throw std::runtime_error("We tried to make a tree with no nodes"); }
 
-    // Single point
-    if (std::distance(start, end) == 1) {
+    // If we have few enough points, terminate the search here and return what we have. It can be cheaper to project a
+    // list of pixels than to do more BSP steps. This also makes it cheaper to build the BSP and less memory to store.
+    if (std::distance(start, end) <= min_points) {
       int elem = bsp.size();
-      bsp.push_back(
-        BSP{offset, static_cast<int>(offset + std::distance(start, end)), {{-1, -1}}, head<3>(nodes[*start].ray), 0});
+
+      // Add this element with children -1,-1 to signify it has no children
+      bsp.push_back(BSP{std::make_pair(offset, static_cast<int>(offset + std::distance(start, end))),
+                        {{-1, -1}},
+                        bounding_cone(start, end)});
+
+      // By default, sort by index that they were generated with to remove the remaining randomness
+      std::sort(start, end);
+
       return elem;
     }
     // We have some points
@@ -125,8 +131,6 @@ private:
       // Calculate our bounding cone for this cluster. We have to do a random sort of our segment here so that the
       // performance of the bounding cone algorithm is expected to be linear
       auto cone = bounding_cone(start, end);
-
-      std::cout << cone.second[0] << std::endl;
 
       // Split the larger angle range so we have as close to cone shapes as we can
       auto minmax_phi   = std::minmax_element(start, end, [this](const int& a, const int& b) {
@@ -152,43 +156,158 @@ private:
               return std::atan2(nodes[a].ray[1], nodes[a].ray[0]) < split_theta;
             });
 
-      // std::cout << "Split: " << (max_phi - min_phi > max_theta - min_theta ? "p" : "t")
-      //           << " len: " << std::distance(start, end) << " p1: " << std::distance(start, mid)
-      //           << " p2: " << std::distance(mid, end) << std::endl;
-
-
       int elem = bsp.size();
       bsp.push_back(BSP{
-        offset,
-        static_cast<int>(offset + std::distance(start, end)),
+        std::make_pair(offset, static_cast<int>(offset + std::distance(start, end))),
         {{
-          build_bsp(start, mid, offset),
-          build_bsp(mid, end, offset + std::distance(start, mid)),
+          build_bsp(start, mid, min_points, offset),
+          build_bsp(mid, end, min_points, offset + std::distance(start, mid)),
         }},
-        cone.first,
-        cone.second[0],
-        cone.second[1],
+        cone,
       });
       return elem;
     }
   }
 
+  /**
+   * Given the lens, get the cone objects that best fit each edge of the screen (or planes for the rectilinear case)
+   * This is arranged as the axis (or normal) and the cos and sin of the angle for each of the edges.
+   *
+   * @return The cones that best describe the edges of the camera
+   */
+  static std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4> screen_edges(const mat4<Scalar> Hoc,
+                                                                           const Lens<Scalar>& lens) {
+
+    // Extract our rotation matrix
+    const mat3<Scalar> Roc = {{
+      {{Hoc[0][0], Hoc[0][1], Hoc[0][2]}},
+      {{Hoc[1][0], Hoc[1][1], Hoc[1][2]}},
+      {{Hoc[2][0], Hoc[2][1], Hoc[2][2]}},
+    }};
+
+    /* The labels for each of the corners of the screen in cam space are is shown below.
+     * ^    T       U
+     * |        C
+     * z    W       V
+     * <- y
+     */
+
+    // Unproject each of the four corners of the screen into camera space
+    const vec2<Scalar> dimensions          = cast<Scalar>(lens.dimensions);
+    const std::array<vec3<Scalar>, 4> rNCc = {{
+      head<3>(visualmesh::unproject(vec2<Scalar>{0, 0}, lens)),                          // rTCc
+      head<3>(visualmesh::unproject(vec2<Scalar>{dimensions[0], 0}, lens)),              // rUCc
+      head<3>(visualmesh::unproject(vec2<Scalar>{dimensions[0], dimensions[1]}, lens)),  // rVCc
+      head<3>(visualmesh::unproject(vec2<Scalar>{0, dimensions[1]}, lens)),              // rWCc
+    }};
+
+    // Rotate these vectors into world space
+    const std::array<vec3<Scalar>, 4> rNCo = {{
+      {{dot(rNCc[0], Roc[0]), dot(rNCc[0], Roc[1]), dot(rNCc[0], Roc[2])}},  // rTCo
+      {{dot(rNCc[1], Roc[0]), dot(rNCc[1], Roc[1]), dot(rNCc[1], Roc[2])}},  // rUCo
+      {{dot(rNCc[2], Roc[0]), dot(rNCc[2], Roc[1]), dot(rNCc[2], Roc[2])}},  // rVCo
+      {{dot(rNCc[3], Roc[0]), dot(rNCc[3], Roc[1]), dot(rNCc[3], Roc[2])}},  // rWCo
+    }};
+
+    switch (lens.projection) {
+      case LensProjection::RECTILINEAR: {
+        // For the case of a plane, we have a cone with a 90 degrees which means cos(theta) = 0 and sin(theta) = 1
+        return std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>{{
+          std::make_pair(normalise(cross(rNCo[0], rNCo[1])), vec2<Scalar>{0, 1}),
+          std::make_pair(normalise(cross(rNCo[1], rNCo[2])), vec2<Scalar>{0, 1}),
+          std::make_pair(normalise(cross(rNCo[2], rNCo[3])), vec2<Scalar>{0, 1}),
+          std::make_pair(normalise(cross(rNCo[3], rNCo[0])), vec2<Scalar>{0, 1}),
+        }};
+      }
+      case LensProjection::EQUIDISTANT:
+      case LensProjection::EQUISOLID: {
+        /* The labels for each of the corners of the screen in cam space are is shown below.
+         * ^        D
+         * |    G   C   E
+         * z        F
+         * <- y
+         */
+        // Get the lens axis centre coordinates
+        vec2<Scalar> centre = add(multiply(dimensions, static_cast<Scalar>(0.5)), lens.centre);
+
+        // Unproject the centre of each of the edges into cam space using the lens axis as the centre
+        const std::array<vec3<Scalar>, 4> rECc = {{
+          head<3>(visualmesh::unproject(vec2<Scalar>{centre[0], 0}, lens)),              // rDCc
+          head<3>(visualmesh::unproject(vec2<Scalar>{dimensions[0], centre[1]}, lens)),  // rECc
+          head<3>(visualmesh::unproject(vec2<Scalar>{centre[0], dimensions[1]}, lens)),  // rFCc
+          head<3>(visualmesh::unproject(vec2<Scalar>{0, centre[1]}, lens)),              // rGCc
+        }};
+
+        // Rotate these vectors into world space
+        const std::array<vec3<Scalar>, 4> rECo = {{
+          {{dot(rECc[0], Roc[0]), dot(rECc[0], Roc[1]), dot(rECc[0], Roc[2])}},  // rTCo
+          {{dot(rECc[1], Roc[0]), dot(rECc[1], Roc[1]), dot(rECc[1], Roc[2])}},  // rUCo
+          {{dot(rECc[2], Roc[0]), dot(rECc[2], Roc[1]), dot(rECc[2], Roc[2])}},  // rVCo
+          {{dot(rECc[3], Roc[0]), dot(rECc[3], Roc[1]), dot(rECc[3], Roc[2])}},  // rWCo
+        }};
+
+        // Calculate cones from each of the four screen edges
+        return std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>{{
+          cone_from_points(rNCo[0], rECo[0], rNCo[1]),
+          cone_from_points(rNCo[1], rECo[1], rNCo[2]),
+          cone_from_points(rNCo[2], rECo[2], rNCo[3]),
+          cone_from_points(rNCo[3], rECo[3], rNCo[0]),
+        }};
+      }
+    }
+  }
+
+  /**
+   * Check if a point is on the screen, given a description of the edges of the screen as cones, and the axis
+   */
+  static inline std::pair<bool, bool> check_on_screen(
+    const mat4<Scalar>& Hoc,
+    const vec3<Scalar>& axis,
+    const Lens<Scalar>& lens,
+    const std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>& edges) {
+
+    // TODO check if the axis projects to the screen
+
+    // TODO check against FOV
+
+    // TODO check aginst screen edges
+
+    // Firstly check if the cone axis is on the screen
+    vec2<Scalar> px = ::visualmesh::project(vec4<Scalar>{axis[0], axis[1], axis[2], 0}, lens);
+    bool axis_on_screen =
+      0 <= px[0] && px[0] + 1 <= lens.dimensions[0] && 0 <= px[1] && px[1] + 1 <= lens.dimensions[1];
+
+
+    // Find the angular equation
+
+    // Project through the lens equation
+
+    // Polar to cartesian
+
+    // Check for intersection with edges of the screen
+
+
+    return std::make_pair(false, false);
+  }
+
 public:
   template <template <typename T> class Generator = generator::HexaPizza, typename Shape>
-  Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance)
-    : h(h), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
-
+  Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance) : h(h) {
+    Timer t;
+    nodes = Generator<Scalar>::generate(shape, h, k, max_distance);
+    t.measure("Generate Mesh");
     // To ensure that later we can fix the graph we need to perform our sorting on an index list
     std::vector<int> sorting(nodes.size());
     std::iota(sorting.begin(), sorting.end(), 0);
+    t.measure("Init");
 
     // A random shuffle here before we build the BSP means that partitions will be in general randomish
     // This is required for the linear performance of the bounding cone algorithm to work
     std::random_shuffle(sorting.begin(), sorting.end());
+    t.measure("Shuffle");
 
     // Build our bsp tree
     // Reserve enough memory for the bsp as we know how many nodes it will need
-    Timer t;
     bsp.reserve(nodes.size() * 2);
     build_bsp(sorting.begin(), sorting.end());
     t.measure("Built BSP");
@@ -202,46 +321,21 @@ public:
         n = sorting[n];
       }
     }
+    t.measure("Sorting");
 
     nodes = std::move(sorted_nodes);
+    t.measure("Updating");
   }
 
   std::vector<std::pair<int, int>> lookup(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
 
-    // Centre of the lens projection so we can look at edges relative to this rather than the centre of the sensor
-    vec2<Scalar> proj_centre(add(multiply(cast<Scalar>(lens.dimensions), static_cast<Scalar>(0.5)), lens.centre));
+    // Our FOV is an easy check to exclude things outside our view
+    const Scalar cos_fov = std::cos(lens.fov);
+    const Scalar sin_fov = std::sin(lens.fov);
 
-    // Get the four inner edges measured from the lens axis and then dot with the x axis (take the 0th element)
-    // The smallest angle from these is the minimum cone we can 100% see
-    vec4<Scalar> inner_options = {
-      unproject({proj_centre[0], 0}, lens)[0],
-      unproject({proj_centre[0], static_cast<Scalar>(lens.dimensions[1])}, lens)[0],
-      unproject({0, proj_centre[1]}, lens)[0],
-      unproject({static_cast<Scalar>(lens.dimensions[0]), proj_centre[1]}, lens)[0],
-    };
-
-    // The four outer corners that define our "Absolutely out" region
-    // If a value is outside of this region, there is no way that any point on it intersects with our view
-    vec4<Scalar> outer_options = {
-      unproject({0, 0}, lens)[0],
-      unproject({static_cast<Scalar>(lens.dimensions[0]), static_cast<Scalar>(lens.dimensions[1])}, lens)[0],
-      unproject({0, static_cast<Scalar>(lens.dimensions[1])}, lens)[0],
-      unproject({static_cast<Scalar>(lens.dimensions[0]), 0}, lens)[0],
-    };
-
-    // Get the inner and outer cone gradients
-    Scalar cos_inner = *std::max_element(inner_options.begin(), inner_options.end());
-    Scalar cos_outer = *std::min_element(outer_options.begin(), outer_options.end());
-
-    // Our FOV may be a more harsh inner cutoff, or a better outer cutoff
-    Scalar cos_fov   = std::cos(lens.fov);
-    cos_inner        = cos_inner > cos_fov ? cos_inner : cos_fov;
-    cos_outer        = cos_outer > cos_fov ? cos_outer : cos_fov;
-    Scalar sin_inner = std::sqrt(1 - cos_inner * cos_inner);
-    Scalar sin_outer = std::sqrt(1 - cos_outer * cos_outer);
-
-    // Get the x axis of the camera in world space
-    vec3<Scalar> cam_x = head<3>(Hoc[0]);
+    // Get the x axis of the camera in world space and the cone equations that describe the edges of the screen
+    const vec3<Scalar> cam_x{Hoc[0][0], Hoc[1][0], Hoc[2][0]};
+    const auto edges = screen_edges(Hoc, lens);
 
     // Go through our BSP tree to work out which segments of the mesh are on screen
     std::vector<int> stack(1, 0);
@@ -255,40 +349,34 @@ public:
       stack.pop_back();
 
       // Get the data from our bsp element
-      const auto& elem      = bsp[i];
-      const auto& axis      = elem.axis;
-      const auto& cos_theta = elem.cos_theta;
-      const auto& sin_theta = elem.sin_theta;
+      const auto& elem = bsp[i];
+      const auto& cone = elem.cone;
 
-      // Dot the camera x axis with the cone
-      Scalar delta = dot(cam_x, elem.axis);
+      // Dot the camera x axis in world with the cone
+      Scalar delta = dot(cam_x, cone.first);
 
-      // Do our checks for inside and outside
+      // Check if we are outside the field of view of the lens using an easy check
       // To check if we are inside or outside the cone we need to check how angle between the cones compares
-      // Inside == cam * axis > cos(acos(inner) + acos(gradient))
-      // However given that the thetas don't change and  we have cos(theta) naturally from the dot productit's easier
+      // outside == dot(cam, axis) < cos(fov + acos(gradient))
+      // However given that the thetas don't change and we have gradient naturally from the dot product it's easier
       // to calculate it using the compound angle formula
       // Inside == cam * axis >  cos(theta_1)cos(theta_2) - sin(theta_1)sin(theta_2)
-      bool inside  = delta > cos_inner * cos_theta - sin_inner * sin_theta;
-      bool outside = delta < cos_outer * cos_theta - sin_outer * sin_theta;
+      bool outside = delta < cos_fov * cone.second[0] - sin_fov * cone.second[1];
+      bool inside  = false;
 
-      // If we have a single point and we were not ruled out as outside, we need to check if we are on screen directly
-      if (!inside && !outside && elem.children[0] == -1) {
-        auto px = ::visualmesh::project(nodes[elem.start].ray, lens);
-        inside  = 0 <= px[0] && px[0] + 1 <= lens.dimensions[0] && 0 <= px[1] && px[1] + 1 <= lens.dimensions[1];
-        outside = !inside;
+      // If we are not ruled as outside by the field of view we might be on the screen
+      if (!outside) {
+        // TODO construct
       }
-
-      std::cout << inside << " " << outside << std::endl;
 
       if (inside) {
         // If we are building just update our end point
         if (building) {
-          range_end = elem.end;  //
+          range_end = elem.range.second;  //
         }
         else {
-          range_start = elem.start;
-          range_end   = elem.end;
+          range_start = elem.range.first;
+          range_end   = elem.range.second;
           building    = true;
         }
       }
