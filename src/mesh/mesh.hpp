@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <numeric>
+#include <tuple>
 #include <utility>
 #include <vector>
 #include "generator/hexapizza.hpp"
@@ -161,12 +162,13 @@ private:
       int elem = bsp.size();
       bsp.push_back(BSP{
         std::make_pair(offset, static_cast<int>(offset + std::distance(start, end))),
-        {{
-          build_bsp(start, mid, min_points, offset),
-          build_bsp(mid, end, min_points, offset + std::distance(start, mid)),
-        }},
+        {{-2, -2}},
         cone,
       });
+      bsp[elem].children = {{
+        build_bsp(start, mid, min_points, offset),
+        build_bsp(mid, end, min_points, offset + std::distance(start, mid)),
+      }};
       return elem;
     }
   }
@@ -215,10 +217,10 @@ private:
       case LensProjection::RECTILINEAR: {
         // For the case of a plane, we have a cone with a 90 degrees which means cos(theta) = 0 and sin(theta) = 1
         return std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>{{
-          std::make_pair(normalise(cross(rNCo[0], rNCo[1])), vec2<Scalar>{0, 1}),
-          std::make_pair(normalise(cross(rNCo[1], rNCo[2])), vec2<Scalar>{0, 1}),
-          std::make_pair(normalise(cross(rNCo[2], rNCo[3])), vec2<Scalar>{0, 1}),
-          std::make_pair(normalise(cross(rNCo[3], rNCo[0])), vec2<Scalar>{0, 1}),
+          std::make_pair(normalise(cross(rNCo[1], rNCo[0])), vec2<Scalar>{0, 1}),
+          std::make_pair(normalise(cross(rNCo[2], rNCo[1])), vec2<Scalar>{0, 1}),
+          std::make_pair(normalise(cross(rNCo[3], rNCo[2])), vec2<Scalar>{0, 1}),
+          std::make_pair(normalise(cross(rNCo[0], rNCo[3])), vec2<Scalar>{0, 1}),
         }};
       }
       case LensProjection::EQUIDISTANT:
@@ -250,10 +252,10 @@ private:
 
         // Calculate cones from each of the four screen edges
         return std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>{{
-          cone_from_points(rNCo[0], rECo[0], rNCo[1]),
-          cone_from_points(rNCo[1], rECo[1], rNCo[2]),
-          cone_from_points(rNCo[2], rECo[2], rNCo[3]),
-          cone_from_points(rNCo[3], rECo[3], rNCo[0]),
+          cone_from_points(rNCo[1], rECo[0], rNCo[0]),
+          cone_from_points(rNCo[2], rECo[1], rNCo[1]),
+          cone_from_points(rNCo[3], rECo[2], rNCo[2]),
+          cone_from_points(rNCo[0], rECo[3], rNCo[3]),
         }};
       }
     }
@@ -264,33 +266,52 @@ private:
    */
   static inline std::pair<bool, bool> check_on_screen(
     const mat4<Scalar>& Hoc,
-    const vec3<Scalar>& axis,
+    const std::pair<vec3<Scalar>, vec2<Scalar>>& cone,
     const Lens<Scalar>& lens,
     const std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>& edges) {
 
-    // TODO check if the axis projects to the screen
-
-    // TODO check against FOV
-
-    // TODO check aginst screen edges
+    const mat3<Scalar> Rco(block<3, 3>(transpose(Hoc)));
 
     // Firstly check if the cone axis is on the screen
-    vec2<Scalar> px = ::visualmesh::project(vec4<Scalar>{axis[0], axis[1], axis[2], 0}, lens);
+    vec2<Scalar> px = ::visualmesh::project(multiply(Rco, cone.first), lens);
     bool axis_on_screen =
       0 <= px[0] && px[0] + 1 <= lens.dimensions[0] && 0 <= px[1] && px[1] + 1 <= lens.dimensions[1];
 
+    std::array<Scalar, 4> angles{{
+      dot(cone.first, edges[0].first),
+      dot(cone.first, edges[1].first),
+      dot(cone.first, edges[2].first),
+      dot(cone.first, edges[3].first),
+    }};
 
-    // Find the angular equation
+    // Check if our cone is entirely contained within a screen edge
+    // acos(dot(cone_axis, edge_axis)) < edge_angle - cone_angle
+    std::array<bool, 4> contains{{
+      angles[0] > edges[0].second[0] * cone.second[0] + edges[0].second[1] * cone.second[1],
+      angles[1] > edges[1].second[0] * cone.second[0] + edges[1].second[1] * cone.second[1],
+      angles[2] > edges[2].second[0] * cone.second[0] + edges[2].second[1] * cone.second[1],
+      angles[3] > edges[3].second[0] * cone.second[0] + edges[3].second[1] * cone.second[1],
+    }};
 
-    // Project through the lens equation
+    // If we are off the screen, we are not on it?
+    const bool outside = !axis_on_screen && (contains[0] || contains[1] || contains[2] || contains[3]);
+    if (outside) { return std::make_pair(false, true); }
 
-    // Polar to cartesian
+    // Check if we intersect with any of the edges of the screen
+    // acos(dot(cone_axis, edge_axis) > edge_angle + cone_angle
+    std::array<bool, 4> intersects{{
+      angles[0] < edges[0].second[0] * cone.second[0] - edges[0].second[1] * cone.second[1],
+      angles[1] < edges[1].second[0] * cone.second[0] - edges[1].second[1] * cone.second[1],
+      angles[2] < edges[2].second[0] * cone.second[0] - edges[2].second[1] * cone.second[1],
+      dot(cone.first, edges[3].first) < edges[3].second[0] * cone.second[0] - edges[3].second[1] * cone.second[1],
+    }};
 
-    // Check for intersection with edges of the screen
+    // Inside if the axis is on the screen and we don't intersect with any of the edges
+    const bool inside = axis_on_screen && intersects[0] && intersects[1] && intersects[2] && intersects[3];
 
-
-    return std::make_pair(false, false);
+    return std::make_pair(inside, outside);
   }
+
 
 public:
   template <template <typename T> class Generator = generator::HexaPizza, typename Shape>
@@ -303,9 +324,13 @@ public:
     std::iota(sorting.begin(), sorting.end(), 0);
     t.measure("Init");
 
-    // A random shuffle here before we build the BSP means that partitions will be in general randomish
-    // This is required for the linear performance of the bounding cone algorithm to work
-    std::random_shuffle(sorting.begin(), sorting.end());
+    // We need to shuffle our list to ensure that the bounding cone algorithm has roughly linear performance.
+    // We could use std::random_shuffle here but since we only need the list to be "kinda shuffled" so that it's
+    // unlikely that we hit the worst case of the bounding cone algorithm. We can actually just shuffle every nth
+    // element and use a fairly bad random number generator algorithm
+    for (int i = sorting.size() - 1; i > 0; i -= 5) {
+      std::swap(sorting[i], sorting[rand() % i]);
+    }
     t.measure("Shuffle");
 
     // Build our bsp tree
@@ -348,6 +373,7 @@ public:
     const auto edges = screen_edges(Hoc, lens);
 
     // Go through our BSP tree to work out which segments of the mesh are on screen
+    // The first element of the tree is the root element of the bsp
     std::vector<int> stack(1, 0);
     std::vector<std::pair<int, int>> ranges;
     bool building   = false;
@@ -370,16 +396,14 @@ public:
       // outside == dot(cam, axis) < cos(fov + acos(gradient))
       // However given that the thetas don't change and we have gradient naturally from the dot product it's easier
       // to calculate it using the compound angle formula
-      // Inside == cam * axis >  cos(theta_1)cos(theta_2) - sin(theta_1)sin(theta_2)
       bool outside = delta < cos_fov * cone.second[0] - sin_fov * cone.second[1];
       bool inside  = false;
 
       // If we are not ruled as outside by the field of view we might be on the screen
-      if (!outside) {
-        // TODO construct
-      }
+      if (!outside) { std::tie(inside, outside) = check_on_screen(Hoc, cone, lens, edges); }
 
       if (inside) {
+        std::cout << "FOUND" << std::endl;
         // If we are building just update our end point
         if (building) {
           range_end = elem.range.second;  //
@@ -391,18 +415,30 @@ public:
         }
       }
       else if (outside) {
+        std::cout << "SKIPPING" << std::endl;
         // If we found an outside point we have finished building our range
         if (building) {
           ranges.emplace_back(std::make_pair(range_start, range_end));
           building = false;
         }
       }
+      // We have reached the end of a tree, from here we need to check each point on screen individually
+      else if (elem.children[0] < 0) {
+        // TODO go through the range and project each individual ray to the screen to see if it's on the screen
+        std::cout << "LEAF_NODE!" << std::endl;
+      }
       else {
+        std::cout << "SPLITTING" << std::endl;
         // Add the children of this to the search in order 1,0 so we pop 0 first (contiguous indices)
         stack.push_back(elem.children[1]);
         stack.push_back(elem.children[0]);
+        for (const auto& s : stack) {}
       }
     }
+    // If we finished while building add the last point
+    if (building) { ranges.emplace_back(std::make_pair(range_start, range_end)); }
+
+    exit(0);
     return ranges;
   }
   /// The height that this mesh is designed to run at
