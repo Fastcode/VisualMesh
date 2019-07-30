@@ -101,16 +101,19 @@ public:
     visualmesh::ProjectedMesh<T> projected;
     if (geometry == "SPHERE") {
       visualmesh::geometry::Sphere<T> shape(g_params(0));
+      // TODO cache this, building a BSP is no joke
       visualmesh::Mesh<T> mesh(shape, height, g_params(1), g_params(2));
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CIRCLE") {
       visualmesh::geometry::Circle<T> shape(g_params(0));
+      // TODO cache this, building a BSP is no joke
       visualmesh::Mesh<T> mesh(shape, height, g_params(1), g_params(2));
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CYLINDER") {
       visualmesh::geometry::Cylinder<T> shape(g_params(0), g_params(1));
+      // TODO cache this, building a BSP is no joke
       visualmesh::Mesh<T> mesh(shape, height, g_params(2), g_params(3));
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
