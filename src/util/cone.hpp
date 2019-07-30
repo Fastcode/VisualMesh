@@ -23,27 +23,27 @@
 namespace visualmesh {
 
 template <typename Scalar>
-inline std::pair<vec3<Scalar>, vec2<Scalar>> cone_from_points() {
-  return std::make_pair(vec3<Scalar>{0, 0, 0}, vec2<Scalar>{1, 0});
+inline std::pair<vec3<Scalar>, Scalar> cone_from_points() {
+  return std::make_pair(vec3<Scalar>{0, 0, 0}, 1);
 }
 
 template <typename Scalar>
-inline std::pair<vec3<Scalar>, vec2<Scalar>> cone_from_points(const vec3<Scalar>& p1) {
-  return std::make_pair(p1, vec2<Scalar>{1, 0});
+inline std::pair<vec3<Scalar>, Scalar> cone_from_points(const vec3<Scalar>& p1) {
+  return std::make_pair(p1, 1);
 }
 
 template <typename Scalar>
-inline std::pair<vec3<Scalar>, vec2<Scalar>> cone_from_points(const vec3<Scalar>& p1, const vec3<Scalar>& p2) {
+inline std::pair<vec3<Scalar>, Scalar> cone_from_points(const vec3<Scalar>& p1, const vec3<Scalar>& p2) {
   //  Get the axis and gradient by averaging the unit vectors and dotting with an edge point
   vec3<Scalar> axis = normalise(add(p1, p2));
   Scalar cos_theta  = dot(axis, p1);
-  return std::make_pair(axis, vec2<Scalar>{cos_theta, std::sqrt(1 - cos_theta * cos_theta)});
+  return std::make_pair(axis, cos_theta);
 }
 
 template <typename Scalar>
-inline std::pair<vec3<Scalar>, vec2<Scalar>> cone_from_points(const vec3<Scalar>& p1,
-                                                              const vec3<Scalar>& p2,
-                                                              const vec3<Scalar>& p3) {
+inline std::pair<vec3<Scalar>, Scalar> cone_from_points(const vec3<Scalar>& p1,
+                                                        const vec3<Scalar>& p2,
+                                                        const vec3<Scalar>& p3) {
   // Put the rays into a matrix so we can solve it
   mat3<Scalar> mat{{p1, p2, p3}};
   mat3<Scalar> imat = invert(mat);
@@ -57,7 +57,7 @@ inline std::pair<vec3<Scalar>, vec2<Scalar>> cone_from_points(const vec3<Scalar>
 
   Scalar cos_theta = dot(axis, p1);
 
-  return std::make_pair(axis, vec2<Scalar>{cos_theta, std::sqrt(1 - cos_theta * cos_theta)});
+  return std::make_pair(axis, cos_theta);
 }
 
 }  // namespace visualmesh

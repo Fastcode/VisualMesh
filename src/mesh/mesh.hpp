@@ -64,15 +64,15 @@ private:
    */
   template <typename Iterator>
   std::pair<vec3<Scalar>, vec2<Scalar>> bounding_cone(Iterator start, Iterator end) {
-    std::pair<vec3<Scalar>, vec2<Scalar>> cone(cone_from_points<Scalar>());
+    std::pair<vec3<Scalar>, Scalar> cone(cone_from_points<Scalar>());
     for (auto i = start; i < end; ++i) {
-      if (dot(cone.first, nodes[*i].ray) < cone.second[0]) {
+      if (dot(cone.first, nodes[*i].ray) < cone.second) {
         cone = cone_from_points(nodes[*i].ray);
         for (auto j = start; j < i; ++j) {
-          if (dot(cone.first, nodes[*j].ray) < cone.second[0]) {
+          if (dot(cone.first, nodes[*j].ray) < cone.second) {
             cone = cone_from_points(nodes[*i].ray, nodes[*j].ray);
             for (auto k = start; k < j; ++k) {
-              if (dot(cone.first, nodes[*k].ray) < cone.second[0]) {
+              if (dot(cone.first, nodes[*k].ray) < cone.second) {
                 cone = cone_from_points(nodes[*i].ray, nodes[*j].ray, nodes[*k].ray);
               }
             }
@@ -80,7 +80,10 @@ private:
         }
       }
     }
-    return cone;
+
+    // Add in sin_theta when we return the final cone
+    return std::make_pair(cone.first,
+                          vec2<Scalar>{cone.second, std::sqrt(static_cast<Scalar>(1.0) - cone.second * cone.second)});
   }
 
   template <typename Iterator>
@@ -250,11 +253,27 @@ private:
         }};
 
         // Calculate cones from each of the four screen edges
-        return std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>{{
+        const std::array<std::pair<vec3<Scalar>, Scalar>, 4> cones{{
           cone_from_points(rNCo[1], rECo[0], rNCo[0]),
           cone_from_points(rNCo[2], rECo[1], rNCo[1]),
           cone_from_points(rNCo[3], rECo[2], rNCo[2]),
           cone_from_points(rNCo[0], rECo[3], rNCo[3]),
+        }};
+
+        // Add in sin_theta
+        return std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>{{
+          std::make_pair(
+            cones[0].first,
+            vec2<Scalar>{cones[0].second, std::sqrt(static_cast<Scalar>(1.0) - cones[0].second * cones[0].second)}),
+          std::make_pair(
+            cones[1].first,
+            vec2<Scalar>{cones[1].second, std::sqrt(static_cast<Scalar>(1.0) - cones[1].second * cones[1].second)}),
+          std::make_pair(
+            cones[2].first,
+            vec2<Scalar>{cones[2].second, std::sqrt(static_cast<Scalar>(1.0) - cones[2].second * cones[2].second)}),
+          std::make_pair(
+            cones[3].first,
+            vec2<Scalar>{cones[3].second, std::sqrt(static_cast<Scalar>(1.0) - cones[3].second * cones[3].second)}),
         }};
       }
     }
