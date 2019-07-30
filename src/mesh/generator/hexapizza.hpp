@@ -27,7 +27,12 @@ namespace generator {
 
   template <typename Scalar>
   struct HexaPizza {
+  private:
+    static inline vec3<Scalar> unit_vector(const Scalar& sin_phi, const Scalar& cos_phi, const Scalar& theta) {
+      return vec3<Scalar>{{std::cos(theta) * sin_phi, std::sin(theta) * sin_phi, -cos_phi}};
+    }
 
+  public:
     template <typename Shape>
     static std::vector<Node<Scalar>> generate(const Shape& shape,
                                               const Scalar& h,
@@ -37,21 +42,47 @@ namespace generator {
       // Loop through until we reach our max distance
       std::vector<Node<Scalar>> nodes;
 
-      nodes.push_back(Node<Scalar>{{{0, 0, -1}}, {{0, 0, 0, 0, 0, 0}}});
+      // Create our first interconnected ring of 6 values that exist in a ring
+      const Scalar start_n      = static_cast<Scalar>(1.0) / (2.0 * k);
+      const Scalar phi_0        = shape.phi(start_n, h);
+      const Scalar cos_phi_0    = std::cos(phi_0);
+      const Scalar sin_phi_0    = std::sin(phi_0);
+      const int first_ring_size = 6;
 
-      // TODO Patch in the bottom of the mesh!
+      // Around the origin are 6 equally spaced points
+      for (int j = 0; j < first_ring_size; ++j) {
+        Node<Scalar> n;
+        n.ray = unit_vector(sin_phi_0, cos_phi_0, j * M_PI * 2.0 / 6.0);
+
+        // Left and right is just our index += 1 with wraparound
+        const int l = ((j - 1) + first_ring_size) % first_ring_size;
+        const int r = (j + 1) % first_ring_size;
+
+        // Top left and top right are the next ring which we don't know about yet
+        const int tl = l;  // start + c_slices + (static_cast<int>(f * n_slices) % n_slices);
+        const int tr = r;  // start + c_slices + ((static_cast<int>(f * n_slices) + 1) % n_slices);
+
+        // Bottom left and bottom right map to our diametrically opposed points
+        const int bl = ((j - 2) + first_ring_size) % first_ring_size;
+        const int br = (j + 2) % first_ring_size;
+
+        // The absolute indices of our neighbours presented in a clockwise arrangement
+        n.neighbours = {{l, tl, tr, r, br, bl}};
+
+        nodes.push_back(n);
+      }
 
       // We store the start out here, that way we can use it later to work out what the last ring was
       std::size_t start = nodes.size();
 
       // Loop through our n values until we exceed the max distance
       const Scalar jump = 1.0 / k;
-      for (int i = 0; h * std::tan(shape.phi(i * jump, h)) < max_distance; ++i) {
+      for (int i = 0; h * std::tan(shape.phi(i * jump + start_n, h)) < max_distance; ++i) {
 
         // Calculate phi phi for our ring, the previous ring, and the next ring
-        const Scalar p_phi = shape.phi((i - 1) * jump, h);
-        const Scalar c_phi = shape.phi(i * jump, h);
-        const Scalar n_phi = shape.phi((i + 1) * jump, h);
+        const Scalar p_phi = shape.phi((i - 1) * jump + start_n, h);
+        const Scalar c_phi = shape.phi(i * jump + start_n, h);
+        const Scalar n_phi = shape.phi((i + 1) * jump + start_n, h);
 
         // Calculate delta theta for our ring, the previous ring and the next ring
         const Scalar p_raw_dtheta = shape.theta(p_phi, h);
@@ -59,9 +90,8 @@ namespace generator {
         const Scalar n_raw_dtheta = shape.theta(n_phi, h);
 
         // Calculate the number of slices in our ring, the previous ring and the next ring
-        // TODO once the centre patch is done replace the 1 here with the correct size
         const int p_slices =
-          !std::isfinite(p_raw_dtheta) ? 1 : static_cast<int>(std::ceil(k * 2 * M_PI / p_raw_dtheta));
+          !std::isfinite(p_raw_dtheta) ? first_ring_size : static_cast<int>(std::ceil(k * 2 * M_PI / p_raw_dtheta));
         const int c_slices = static_cast<int>(std::ceil(k * 2 * M_PI / c_raw_dtheta));
         const int n_slices = static_cast<int>(std::ceil(k * 2 * M_PI / n_raw_dtheta));
 
@@ -86,11 +116,7 @@ namespace generator {
 
             Node<Scalar> n;
             //  Calculate our unit vector with x facing forward and z up
-            n.ray = {{
-              std::cos(theta) * sin_phi,  //
-              std::sin(theta) * sin_phi,  //
-              -cos_phi,                   //
-            }};
+            n.ray = unit_vector(sin_phi, cos_phi, theta);
 
             // Get how far we are through this ring as a value between 0 and 1
             const Scalar f = static_cast<Scalar>(j) / static_cast<Scalar>(c_slices);

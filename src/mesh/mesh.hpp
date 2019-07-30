@@ -42,6 +42,14 @@ private:
     // The indicies of the two children in this BSP
     std::array<int, 2> children;
     // The paramters of the cone that describe this part of the BSP
+    // These include the unit axis in world space, and the cos and sin of the cone angle (θ)
+    //
+    //  \    a    /
+    //   \   |   /
+    //    \  |--/
+    //     \ |θ/
+    //      \|/
+    //       V
     std::pair<vec3<Scalar>, vec2<Scalar>> cone;
   };
 
@@ -95,7 +103,38 @@ private:
 
       return elem;
     }
-    // We have some points
+    // We treat the first element specially
+    else if (bsp.empty()) {
+      // The first tree is always a split in the theta angle, and it is the split that will split +y from -y so that
+      // future loops can sort purely based on x value making for a faster algorithm
+
+      // Find the largest phi value for making the cone
+      auto max_phi_element = std::max_element(start, end, [this](const int& a, const int& b) {
+        return nodes[a].ray[2] < nodes[b].ray[2];  // comparing z is the same as comparing phi
+      });
+
+      // Negate as we would be dotting with the -z axis to get the angle
+      const Scalar cone_cos = -nodes[*max_phi_element].ray[2];
+      const Scalar cone_sin = std::sqrt(1 - cone_cos * cone_cos);
+
+      // The cone will have a known axis (the -z axis) and our cos and sin theta come from the most positive z value
+      std::pair<vec3<Scalar>, vec2<Scalar>> cone =
+        std::make_pair(vec3<Scalar>{0, 0, -1}, vec2<Scalar>{cone_cos, cone_sin});
+
+      // Partition based on the sign of the y component
+      Iterator mid = std::partition(start, end, [this](const int& a) { return nodes[a].ray[1] > 0; });
+
+      bsp.push_back(BSP{
+        std::make_pair(offset, static_cast<int>(std::distance(start, end))),
+        {{-2, -2}},
+        cone,
+      });
+      bsp.front().children = {{
+        build_bsp(start, mid, min_points, 0),
+        build_bsp(mid, end, min_points, std::distance(start, mid)),
+      }};
+      return 0;
+    }
     else {
       // Calculate our bounding cone for this cluster. We have to do a random sort of our segment here so that the
       // performance of the bounding cone algorithm is expected to be linear
@@ -103,26 +142,35 @@ private:
 
       // Split the larger angle range so we have as close to cone shapes as we can
       auto minmax_phi   = std::minmax_element(start, end, [this](const int& a, const int& b) {
-        return nodes[a].ray[2] < nodes[b].ray[2];  //
+        return nodes[a].ray[2] < nodes[b].ray[2];  // comparing z is the same as comparing phi
       });
       auto minmax_theta = std::minmax_element(start, end, [this](const int& a, const int& b) {
-        return std::atan2(nodes[a].ray[1], nodes[a].ray[0]) < std::atan2(nodes[b].ray[1], nodes[b].ray[0]);
+        // Since we have already sorted such that our y value is either positive or negative, we can now just sort by
+        // the x component once we normalise it to a 2d unit vector.
+        return nodes[a].ray[0] / std::sqrt(1 - nodes[a].ray[2] * nodes[a].ray[2])
+               < nodes[b].ray[0] / std::sqrt(1 - nodes[b].ray[2] * nodes[b].ray[2]);
       });
 
       // Get our min and max phi and theta
-      Scalar min_phi     = nodes[*minmax_phi.first].ray[2];
-      Scalar max_phi     = nodes[*minmax_phi.second].ray[2];
-      Scalar min_theta   = std::atan2(nodes[*minmax_theta.first].ray[1], nodes[*minmax_theta.first].ray[0]);
-      Scalar max_theta   = std::atan2(nodes[*minmax_theta.second].ray[1], nodes[*minmax_theta.second].ray[0]);
+      Scalar min_phi   = nodes[*minmax_phi.first].ray[2];
+      Scalar max_phi   = nodes[*minmax_phi.second].ray[2];
+      Scalar min_theta = nodes[*minmax_theta.first].ray[0]
+                         / std::sqrt(1 - nodes[*minmax_theta.first].ray[2] * nodes[*minmax_theta.first].ray[2]);
+      Scalar max_theta = nodes[*minmax_theta.second].ray[0]
+                         / std::sqrt(1 - nodes[*minmax_theta.second].ray[2] * nodes[*minmax_theta.second].ray[2]);
+
+      // Work out the z and x values we need to split on
       Scalar split_phi   = std::cos((std::acos(min_phi) + std::acos(max_phi)) * 0.5);
-      Scalar split_theta = (min_theta + max_theta) * 0.5;
+      Scalar split_theta = std::cos((std::acos(std::max(min_theta, static_cast<Scalar>(-1)))
+                                     + std::acos(std::min(max_theta, static_cast<Scalar>(1))))
+                                    * 0.5);
 
       // Partition based on either phi or theta
       Iterator mid =
         max_phi - min_phi > max_theta - min_theta
-          ? std::partition(start, end, [this, split_phi](const int& a) { return nodes[a].ray[2] > split_phi; })
-          : std::partition(start, end, [this, split_theta](const int& a) {
-              return std::atan2(nodes[a].ray[1], nodes[a].ray[0]) < split_theta;
+          ? std::partition(start, end, [this, &split_phi](const int& a) { return nodes[a].ray[2] > split_phi; })
+          : std::partition(start, end, [this, &split_theta](const int& a) {
+              return nodes[a].ray[0] / std::sqrt(1 - nodes[a].ray[2] * nodes[a].ray[2]) < split_theta;
             });
 
       int elem = bsp.size();
@@ -264,14 +312,15 @@ private:
 
 public:
   template <template <typename T> class Generator = generator::HexaPizza, typename Shape>
-  Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance) : h(h) {
+  Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance)
+    : h(h), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
+
     Timer t;
-    nodes = Generator<Scalar>::generate(shape, h, k, max_distance);
-    t.measure("Generate Mesh");
+
     // To ensure that later we can fix the graph we need to perform our sorting on an index list
     std::vector<int> sorting(nodes.size());
     std::iota(sorting.begin(), sorting.end(), 0);
-    t.measure("Init");
+    t.measure("Generate Indicies");
 
     // We need to shuffle our list to ensure that the bounding cone algorithm has roughly linear performance.
     // We could use std::random_shuffle here but since we only need the list to be "kinda shuffled" so that it's
@@ -280,13 +329,13 @@ public:
     for (int i = sorting.size() - 1; i > 0; i -= 5) {
       std::swap(sorting[i], sorting[rand() % i]);
     }
-    t.measure("Shuffle");
+    t.measure("Kinda shuffle");
 
     // Build our bsp tree
     // Reserve enough memory for the bsp as we know how many nodes it will need
     bsp.reserve(nodes.size() * 2);
     build_bsp(sorting.begin(), sorting.end());
-    t.measure("Built BSP");
+    t.measure("Build BSP");
 
     // Make our reverse lookup so we can correct the neighbourhood indices
     std::vector<int> r_sorting(nodes.size() + 1);
@@ -294,7 +343,7 @@ public:
     for (int i = 0; i < nodes.size(); ++i) {
       r_sorting[sorting[i]] = i;
     }
-    t.measure("Built reverse map");
+    t.measure("Build Reverse lookup");
 
     // Sort the nodes and correct the neighbourhood graph based on our BSP sorting
     std::vector<Node<Scalar>> sorted_nodes;
@@ -305,10 +354,10 @@ public:
         n = r_sorting[n];
       }
     }
-    t.measure("Sorting");
+    t.measure("Sort neighbourhood");
 
     nodes = std::move(sorted_nodes);
-    t.measure("Updating");
+    t.measure("Update Nodes");
   }
 
   std::vector<std::pair<int, int>> lookup(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
