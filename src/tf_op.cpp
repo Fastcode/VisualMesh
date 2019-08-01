@@ -144,25 +144,32 @@ public:
     visualmesh::engine::cpu::Engine<T> engine;
     visualmesh::ProjectedMesh<T> projected;
     if (geometry == "SPHERE") {
+      // TODO cache based on r,h and k values as they can form a single ratio number
+      // TODO Single number is (1-(2r/h))^k as this is the number that is manipulated in the equation
+
       visualmesh::geometry::Sphere<T> shape(g_params(0));
       // TODO cache this, building a BSP is no joke
       visualmesh::Mesh<T> mesh(shape, height, g_params(1), g_params(2));
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CIRCLE") {
+      // TODO cache based on r,h and k values as they form a single ratio number
+      // TODO single number is 2r/(h*k)
+
       visualmesh::geometry::Circle<T> shape(g_params(0));
       // TODO cache this, building a BSP is no joke
       visualmesh::Mesh<T> mesh(shape, height, g_params(1), g_params(2));
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CYLINDER") {
+      // TODO we need to cache based on two numbers, the cylinder height ratio and the height ratio as for spheres
+      // TODO (1-(2r/h))^k as per normal for a sphere and
+      // TODO (1-(2r/(c_h - h))^k for the opposing sphere
+
       visualmesh::geometry::Cylinder<T> shape(g_params(0), g_params(1));
       // TODO cache this, building a BSP is no joke
       visualmesh::Mesh<T> mesh(shape, height, g_params(2), g_params(3));
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
-    }
-    else {
-      // TODO work out how to throw an error
     }
 
     // Get the interesting things out of the projected mesh
