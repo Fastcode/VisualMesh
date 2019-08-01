@@ -139,9 +139,6 @@ public:
     else if (projection == "RECTILINEAR") {
       lens.projection = visualmesh::RECTILINEAR;
     }
-    else {
-      // TODO work out how to throw an error
-    }
 
     // Project the mesh using our engine and shape
     visualmesh::engine::cpu::Engine<T> engine;
