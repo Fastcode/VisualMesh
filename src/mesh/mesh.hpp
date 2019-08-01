@@ -334,12 +334,9 @@ public:
   Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance)
     : h(h), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
 
-    Timer t;
-
     // To ensure that later we can fix the graph we need to perform our sorting on an index list
     std::vector<int> sorting(nodes.size());
     std::iota(sorting.begin(), sorting.end(), 0);
-    t.measure("Generate Indicies");
 
     // We need to shuffle our list to ensure that the bounding cone algorithm has roughly linear performance.
     // We could use std::random_shuffle here but since we only need the list to be "kinda shuffled" so that it's
@@ -348,13 +345,11 @@ public:
     for (int i = sorting.size() - 1; i > 0; i -= 5) {
       std::swap(sorting[i], sorting[rand() % i]);
     }
-    t.measure("Kinda shuffle");
 
     // Build our bsp tree
     // Reserve enough memory for the bsp as we know how many nodes it will need
     bsp.reserve(nodes.size() * 2);
     build_bsp(sorting.begin(), sorting.end());
-    t.measure("Build BSP");
 
     // Make our reverse lookup so we can correct the neighbourhood indices
     std::vector<int> r_sorting(nodes.size() + 1);
@@ -362,7 +357,6 @@ public:
     for (int i = 0; i < nodes.size(); ++i) {
       r_sorting[sorting[i]] = i;
     }
-    t.measure("Build Reverse lookup");
 
     // Sort the nodes and correct the neighbourhood graph based on our BSP sorting
     std::vector<Node<Scalar>> sorted_nodes;
@@ -373,10 +367,8 @@ public:
         n = r_sorting[n];
       }
     }
-    t.measure("Sort neighbourhood");
 
     nodes = std::move(sorted_nodes);
-    t.measure("Update Nodes");
   }
 
   std::vector<std::pair<int, int>> lookup(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {

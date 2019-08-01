@@ -48,6 +48,18 @@ REGISTER_OP("VisualMesh")
     return tensorflow::Status::OK();
   });
 
+enum Args {
+  DIMENSIONS      = 0,
+  PROJECTION      = 1,
+  FOCAL_LENGTH    = 2,
+  FIELD_OF_VIEW   = 3,
+  LENS_CENTRE     = 4,
+  ROC             = 5,
+  HEIGHT          = 6,
+  GEOMETRY        = 7,
+  GEOMETRY_PARAMS = 8
+};
+
 template <typename T, typename U>
 class VisualMeshOp : public tensorflow::OpKernel {
 public:
@@ -55,19 +67,54 @@ public:
 
   void Compute(tensorflow::OpKernelContext* context) override {
 
-    // Extract information from our input tensors, flip x and y as tensorflow has them reversed compared to us
-    auto image_dimensions                = context->input(0).vec<U>();
-    visualmesh::vec2<int32_t> dimensions = {{int32_t(image_dimensions(1)), int32_t(image_dimensions(0))}};
-    std::string projection               = *context->input(1).flat<tensorflow::string>().data();
-    T focal_length                       = context->input(2).scalar<T>()(0);
-    T fov                                = context->input(3).scalar<T>()(0);
-    auto lens_centre                     = context->input(4).flat<T>();
-    auto tRoc                            = context->input(5).matrix<T>();
-    T height                             = context->input(6).scalar<T>()(0);
-    std::string geometry                 = *context->input(7).flat<tensorflow::string>().data();
-    auto g_params                        = context->input(8).vec<T>();
+    // Check that the shape of each of the inputs is valid
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsVector(context->input(Args::DIMENSIONS).shape())
+                  && context->input(Args::DIMENSIONS).shape().dim_size(0) == 2,
+                tensorflow::errors::InvalidArgument("The image dimensions must be a 2d vector of [y_size, x_size]"));
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::FOCAL_LENGTH).shape()),
+                tensorflow::errors::InvalidArgument("The focal length must be a scalar"));
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::FIELD_OF_VIEW).shape()),
+                tensorflow::errors::InvalidArgument("The field of view must be a scalar"));
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsVector(context->input(Args::LENS_CENTRE).shape())
+                  && context->input(Args::LENS_CENTRE).shape().dim_size(0) == 2,
+                tensorflow::errors::InvalidArgument("The lens centre must be a 2d vector of [y_size, x_size]"));
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsSquareMatrix(context->input(Args::ROC).shape())
+                  && context->input(Args::LENS_CENTRE).shape().dim_size(0) == 3,
+                tensorflow::errors::InvalidArgument("Roc must be a 3x3 matrix"));
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::HEIGHT).shape()),
+                tensorflow::errors::InvalidArgument("The height value must be a scalar"));
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
+                tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsVector(context->input(Args::GEOMETRY_PARAMS).shape())
+                  tensorflow::errors::InvalidArgument("The geometry params must be a vector of the required parts"));
 
-    // TODO validate all the inputs to make sure they are correct
+    // Extract information from our input tensors, flip x and y as tensorflow has them reversed compared to us
+    auto image_dimensions                = context->input(Args::DIMENSIONS).vec<U>();
+    visualmesh::vec2<int32_t> dimensions = {{int32_t(image_dimensions(1)), int32_t(image_dimensions(0))}};
+    std::string projection               = *context->input(Args::PROJECTION).flat<tensorflow::string>().data();
+    T focal_length                       = context->input(Args::FOCAL_LENGTH).scalar<T>()(0);
+    T fov                                = context->input(Args::FIELD_OF_VIEW).scalar<T>()(0);
+    auto lens_centre                     = context->input(Args::LENS_CENTRE).flat<T>();
+    auto tRoc                            = context->input(Args::ROC).matrix<T>();
+    T height                             = context->input(Args::HEIGHT).scalar<T>()(0);
+    std::string geometry                 = *context->input(Args::GEOMETRY).flat<tensorflow::string>().data();
+    auto g_params                        = context->input(Args::GEOMETRY_PARAMS).vec<T>();
+
+    // Perform some runtime checks on the actual values to make sure they make sense
+    OP_REQUIRES(context,
+                !(projection == "EQUISOLID" || projection == "EQUIDISTANT" || projection == "RECTILINEAR"),
+                tensorflow::errors::InvalidArgument("Projection must be one of EQUISOLID, EQUIDISTANT or RECTILINEAR"));
+    OP_REQUIRES(context,
+                !(geometry == "SPHERE" || geometry == "CIRCLE" || geometry == "CYLINDER"),
+                tensorflow::errors::InvalidArgument("Geometry must be one of SPHERE, CIRCLE or CYLINDER"));
 
     // Create our transformation matrix
     visualmesh::mat4<T> Hoc = {{
