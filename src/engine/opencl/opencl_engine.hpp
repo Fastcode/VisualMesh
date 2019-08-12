@@ -114,7 +114,10 @@ namespace engine {
         }
 
         // Print information about our selected device
-        {
+        if (!best_device) {
+          throw std::system_error(CL_INVALID_DEVICE, opencl_error_category(), "Error selectong an OpenCL device");
+        }
+        else {
           // Length of data for strings
           size_t len;
           std::vector<char> data;
