@@ -63,54 +63,54 @@ namespace engine {
         int best_compute_units       = 0;
 
         // Go through our platforms
-        // for (const auto& platform : platforms) {
-        const auto& platform = platforms.front();
+        for (const auto& platform : platforms) {
 
-        cl_uint device_count = 0;
-        ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, nullptr, &device_count);
-        std::vector<cl_device_id> devices(device_count);
-        ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, device_count, devices.data(), nullptr);
+          cl_uint device_count = 0;
+          ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, nullptr, &device_count);
+          std::vector<cl_device_id> devices(device_count);
+          ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, device_count, devices.data(), nullptr);
 
-        // Go through our devices on the platform
-        for (const auto& device : devices) {
+          // Go through our devices on the platform
+          for (const auto& device : devices) {
 
-          // Length of data for strings
-          size_t len;
-          std::vector<char> data;
+            // Length of data for strings
+            size_t len;
+            std::vector<char> data;
 
-          // Print device details
-          ::clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &len);
-          data.resize(len);
-          ::clGetDeviceInfo(device, CL_DEVICE_NAME, len, data.data(), nullptr);
-          std::cout << "\tDevice: " << std::string(data.begin(), data.end()) << std::endl;
+            // Print device details
+            ::clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &len);
+            data.resize(len);
+            ::clGetDeviceInfo(device, CL_DEVICE_NAME, len, data.data(), nullptr);
+            std::cout << "\tDevice: " << std::string(data.begin(), data.end()) << std::endl;
 
-          ::clGetDeviceInfo(device, CL_DEVICE_VERSION, 0, nullptr, &len);
-          data.resize(len);
-          ::clGetDeviceInfo(device, CL_DEVICE_VERSION, len, data.data(), nullptr);
-          std::cout << "\tHardware version: " << std::string(data.begin(), data.end()) << std::endl;
+            ::clGetDeviceInfo(device, CL_DEVICE_VERSION, 0, nullptr, &len);
+            data.resize(len);
+            ::clGetDeviceInfo(device, CL_DEVICE_VERSION, len, data.data(), nullptr);
+            std::cout << "\tHardware version: " << std::string(data.begin(), data.end()) << std::endl;
 
-          ::clGetDeviceInfo(device, CL_DRIVER_VERSION, 0, nullptr, &len);
-          data.resize(len);
-          ::clGetDeviceInfo(device, CL_DRIVER_VERSION, len, data.data(), nullptr);
-          std::cout << "\tSoftware version: " << std::string(data.begin(), data.end()) << std::endl;
+            ::clGetDeviceInfo(device, CL_DRIVER_VERSION, 0, nullptr, &len);
+            data.resize(len);
+            ::clGetDeviceInfo(device, CL_DRIVER_VERSION, len, data.data(), nullptr);
+            std::cout << "\tSoftware version: " << std::string(data.begin(), data.end()) << std::endl;
 
-          ::clGetDeviceInfo(device, CL_DEVICE_OPENCL_C_VERSION, 0, nullptr, &len);
-          data.resize(len);
-          ::clGetDeviceInfo(device, CL_DEVICE_OPENCL_C_VERSION, len, data.data(), nullptr);
-          std::cout << "\tOpenCL C version: " << std::string(data.begin(), data.end()) << std::endl;
+            ::clGetDeviceInfo(device, CL_DEVICE_OPENCL_C_VERSION, 0, nullptr, &len);
+            data.resize(len);
+            ::clGetDeviceInfo(device, CL_DEVICE_OPENCL_C_VERSION, len, data.data(), nullptr);
+            std::cout << "\tOpenCL C version: " << std::string(data.begin(), data.end()) << std::endl;
 
-          cl_uint max_compute_units = 0;
-          ::clGetDeviceInfo(
-            device, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(max_compute_units), &max_compute_units, nullptr);
-          std::cout << "\tParallel compute units: " << max_compute_units << std::endl;
+            cl_uint max_compute_units = 0;
+            ::clGetDeviceInfo(
+              device, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(max_compute_units), &max_compute_units, nullptr);
+            std::cout << "\tParallel compute units: " << max_compute_units << std::endl;
 
-          if (max_compute_units > best_compute_units) {
-            best_compute_units = max_compute_units;
-            best_platform      = platform;
-            best_device        = device;
+            if (max_compute_units > best_compute_units) {
+              best_compute_units = max_compute_units;
+              best_platform      = platform;
+              best_device        = device;
+            }
+
+            std::cout << std::endl;
           }
-
-          std::cout << std::endl;
         }
 
         // Print information about our selected device
