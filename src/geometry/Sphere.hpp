@@ -54,7 +54,8 @@ namespace geometry {
      */
     Scalar phi(const Scalar& n, const Scalar& h) const {
       Scalar v = 1 - 2 * r / h;
-      return M_PI_2 - std::atan(pow(v, n - 0.5)) - std::atan(std::pow(v, n + 0.5));
+      // M_PI_2 - std::atan(pow(v, n - 0.5)) - std::atan(std::pow(v, n + 0.5));
+      return M_PI_2 - 2 * std::atan(pow(v, n - 0.5));
     }
 
     /**

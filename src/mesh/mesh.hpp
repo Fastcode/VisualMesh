@@ -25,6 +25,7 @@
 #include <utility>
 #include <vector>
 #include "generator/hexapizza.hpp"
+#include "generator/quadpizza.hpp"
 #include "lens.hpp"
 #include "node.hpp"
 #include "util/cone.hpp"
@@ -330,7 +331,7 @@ private:
 
 
 public:
-  template <template <typename T> class Generator = generator::HexaPizza, typename Shape>
+  template <template <typename T> class Generator = generator::QuadPizza, typename Shape>
   Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance)
     : h(h), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
 

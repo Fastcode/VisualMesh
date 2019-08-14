@@ -67,9 +67,9 @@ namespace engine {
         const auto& platform = platforms.front();
 
         cl_uint device_count = 0;
-        ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, nullptr, &device_count);
+        ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &device_count);
         std::vector<cl_device_id> devices(device_count);
-        ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, device_count, devices.data(), nullptr);
+        ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, device_count, devices.data(), nullptr);
 
         // Go through our devices on the platform
         for (const auto& device : devices) {
