@@ -277,6 +277,7 @@ private:
             vec2<Scalar>{cones[3].second, std::sqrt(static_cast<Scalar>(1.0) - cones[3].second * cones[3].second)}),
         }};
       }
+      default: { throw std::runtime_error("Unknown lens type"); }
     }
   }
 
@@ -331,7 +332,7 @@ private:
 
 
 public:
-  template <template <typename T> class Generator = generator::QuadPizza, typename Shape>
+  template <template <typename T> class Generator = generator::HexaPizza, typename Shape>
   Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance)
     : h(h), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
 

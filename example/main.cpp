@@ -213,6 +213,7 @@ int main() {
           colour += cv::Scalar(255 * cl[2], 255 * cl[2], 255 * cl[2]);
           // Field
           colour += cv::Scalar(0, 255 * cl[3], 0);
+          colour = cv::Scalar(255, 255, 255);
 
           for (const auto& n : neighbourhood[i]) {
             if (n < pixel_coordinates.size()) {
@@ -224,6 +225,7 @@ int main() {
         }
 
         cv::imshow("Image", scratch);
+        cv::imwrite("OutGPU.png", scratch);
         // Wait for esc key
         if (char(cv::waitKey(0)) == 27) break;
       }
@@ -256,6 +258,7 @@ int main() {
           colour += cv::Scalar(255 * cl[2], 255 * cl[2], 255 * cl[2]);
           // Field
           colour += cv::Scalar(0, 255 * cl[3], 0);
+          colour = cv::Scalar(255, 255, 255);
 
           for (const auto& n : neighbourhood[i]) {
             if (n < pixel_coordinates.size()) {
@@ -267,6 +270,7 @@ int main() {
         }
 
         cv::imshow("Image", scratch);
+        cv::imwrite("OutCPU.png", scratch);
         // Wait for esc key
         if (char(cv::waitKey(0)) == 27) break;
       }
