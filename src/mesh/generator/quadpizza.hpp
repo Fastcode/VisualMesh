@@ -133,145 +133,6 @@ namespace generator {
         }
       };
 
-      auto generate_meshpoint = [&](Meshpoint<Scalar>& new_meshpoint,
-                                    const Scalar phi_next,
-                                    const Scalar theta_next,
-                                    const int phi_number,
-                                    const int index_now,
-                                    const int index_next,
-                                    const int number_points_next,
-                                    const int factor,
-                                    Scalar theta_offset,
-                                    const int LEFT,
-                                    const int RIGHT,
-                                    const int BELOW,
-                                    const bool clockwise) {
-        new_meshpoint.phi_number   = phi_number;
-        new_meshpoint.theta_number = index_next;
-        new_meshpoint.current[0]   = phi_next;
-        // fix these weird equations for negatives, ask Trent, also construct meshpoint using brackets?
-        new_meshpoint.current[1] = theta_offset + factor * theta_next;
-        join_row_neighbours(new_meshpoint, index_next, LEFT, RIGHT, number_points_next, clockwise);
-
-        new_meshpoint.neighbours[BELOW] = index_now;
-      };
-
-      auto generate_row = [&](std::vector<Meshpoint<Scalar>>& ring,
-                              std::vector<int> vector_of_indices,
-                              std::vector<Meshpoint<Scalar>>& meshpoints,
-                              const int number_points_now,
-                              const int number_points_next,
-                              const int number_difference,
-                              const Scalar theta_next,
-                              const Scalar phi_next,
-                              const int row_number,
-                              int distribution,
-                              const int TOP_LEFT,
-                              const int TOP_RIGHT,
-                              const int LEFT,
-                              const int RIGHT,
-                              const int BELOW,
-                              const bool clockwise,
-                              const bool growing,
-                              const bool every_one) {
-        int relative_index_now  = 0;
-        int relative_index_next = 0;
-        int number_splits       = 0;
-
-        Scalar theta_offset;
-        theta_offset = meshpoints[vector_of_indices[0]].current[1];
-        // std::cout << "theta_offset: " << theta_offset << std::endl;
-
-        for (auto it = vector_of_indices.begin(); it != vector_of_indices.end(); ++it) {
-
-          Meshpoint<Scalar> new_meshpoint;
-
-          int factor;
-          if (clockwise == false) { factor = 0 - relative_index_next; }
-          else {
-            factor = relative_index_next;
-          }
-
-          generate_meshpoint(new_meshpoint,
-                             phi_next,
-                             theta_next,
-                             row_number,
-                             *it,
-                             relative_index_next,
-                             number_points_next,
-                             factor,
-                             theta_offset,
-                             LEFT,
-                             RIGHT,
-                             BELOW,
-                             clockwise);
-
-          join_above_neighbours(
-            meshpoints[*it], relative_index_next, TOP_LEFT, TOP_RIGHT, number_points_next, clockwise);
-
-          ring.push_back(std::move(new_meshpoint));
-          relative_index_next += 1;
-
-          // *************** Generate Second Node ***********************
-          if (growing) {
-
-            if (every_one == true) {
-              if (number_splits <= number_points_now - number_difference) { distribution = 2; }
-              else {
-                distribution = 1;
-              }
-            }
-
-            // split every point of according to the distribution until difference is reached, or split every point to
-            // exactly double the points
-            bool distribute = false;
-            distribute      = relative_index_now % distribution == 0;
-            bool splits     = false;
-            splits          = number_splits < number_difference;
-
-            if ((distribute || distribution == 1) && splits) {
-              // std::cout << "Graph is growing!" << std::endl;
-              // std::cout << "count: " << count << std::endl;
-              Meshpoint<Scalar> second_new_meshpoint;
-
-              int second_factor;
-              if (clockwise == false) { second_factor = 0 - relative_index_next; }
-              else {
-                second_factor = relative_index_next;
-              }
-
-              generate_meshpoint(second_new_meshpoint,
-                                 phi_next,
-                                 theta_next,
-                                 row_number,
-                                 *it,
-                                 relative_index_next,
-                                 number_points_next,
-                                 second_factor,
-                                 theta_offset,
-                                 LEFT,
-                                 RIGHT,
-                                 BELOW,
-                                 clockwise);
-
-              meshpoints[*it].split = true;
-
-              ring.push_back(std::move(second_new_meshpoint));
-
-              number_splits += 1;
-              relative_index_next += 1;
-            }
-          }
-          // *********************************************************************************
-
-          relative_index_now += 1;
-          // std::cout << "MESHPOINTS" << meshpoints.size() << std::endl;
-          // std::cout << "relative_index_now: " << relative_index_now << std::endl;
-          // std::cout << "relative_index_next: " << relative_index_next << std::endl;
-        }
-      };
-
-
       std::array<int, 4> first_neighbours;
       first_neighbours[0] = 2;
       first_neighbours[1] = 3;
@@ -390,7 +251,8 @@ namespace generator {
           else {
             // number_difference >= number_points_now
             distribution = 1;
-            // std::cout << "Difference is greater than generating ring: " << number_difference << " ring number: " << v
+            // std::cout << "Difference is greater than generating ring: " << number_difference << " ring number: " <<
+            // v
             //<< std::endl;
             number_points_next = 2 * number_points_now;
             number_points.emplace_back(2 * number_points_now);
@@ -408,14 +270,14 @@ namespace generator {
           //           << " distribution: " << distribution << std::endl;
         }
 
-        if (phi_next > 1.4) {
+        if (phi_next > 1.55) {
           std::cout << "v: " << v << std::endl;
           std::cout << "phi_next: " << std::endl;
           printf("%f \n", phi_next);
           std::cout << "h: " << std::endl;
           printf("%f \n", h);
         }
-        if (theta_next < 0.005) {
+        if (theta_next < 0.00005) {
           std::cout << "v: " << v << std::endl;
           std::cout << "theta: " << std::endl;
           printf("%f \n", theta_next);
@@ -448,24 +310,94 @@ namespace generator {
         }
 
         std::vector<Meshpoint<Scalar>> ring;
-        generate_row(ring,
-                     vector_of_indices,
-                     meshpoints,
-                     number_points_now,
-                     number_points_next,
-                     number_difference,
-                     theta_next,
-                     phi_next,
-                     v,
-                     distribution,
-                     TOP_LEFT,
-                     TOP_RIGHT,
-                     LEFT,
-                     RIGHT,
-                     BELOW,
-                     clockwise,
-                     growing,
-                     every_one);
+
+        int relative_index_now  = 0;
+        int relative_index_next = 0;
+        int number_splits       = 0;
+
+        Scalar theta_offset;
+        theta_offset = meshpoints[vector_of_indices[0]].current[1];
+        // std::cout << "theta_offset: " << theta_offset << std::endl;
+
+        for (auto it = vector_of_indices.begin(); it != vector_of_indices.end(); ++it) {
+
+          Meshpoint<Scalar> new_meshpoint;
+
+          int factor;
+          if (clockwise == false) { factor = 0 - relative_index_next; }
+          else {
+            factor = relative_index_next;
+          }
+
+          new_meshpoint.phi_number   = v;
+          new_meshpoint.theta_number = relative_index_next;
+          new_meshpoint.current[0]   = phi_next;
+          // fix these weird equations for negatives, ask Trent, also construct meshpoint using brackets?
+          new_meshpoint.current[1] = theta_offset + factor * theta_next;
+          join_row_neighbours(new_meshpoint, relative_index_next, LEFT, RIGHT, number_points_next, clockwise);
+
+          new_meshpoint.neighbours[BELOW] = *it;
+
+          join_above_neighbours(
+            meshpoints[*it], relative_index_next, TOP_LEFT, TOP_RIGHT, number_points_next, clockwise);
+
+          ring.push_back(std::move(new_meshpoint));
+          relative_index_next += 1;
+
+          // *************** Generate Second Node ***********************
+          if (growing) {
+
+            if (every_one == true) {
+              if (number_splits <= number_points_now - number_difference) { distribution = 2; }
+              else {
+                distribution = 1;
+              }
+            }
+
+            // split every point of according to the distribution until difference is reached, or split every point
+            // to exactly double the points
+            bool distribute = false;
+            distribute      = relative_index_now % distribution == 0;
+            bool splits     = false;
+            splits          = number_splits < number_difference;
+
+            if ((distribute || distribution == 1) && splits) {
+              // std::cout << "Graph is growing!" << std::endl;
+              // std::cout << "count: " << count << std::endl;
+              Meshpoint<Scalar> second_new_meshpoint;
+
+              int second_factor;
+              if (clockwise == false) { second_factor = 0 - relative_index_next; }
+              else {
+                second_factor = relative_index_next;
+              }
+
+              second_new_meshpoint.phi_number   = v;
+              second_new_meshpoint.theta_number = relative_index_next;
+              second_new_meshpoint.current[0]   = phi_next;
+              // fix these weird equations for negatives, ask Trent, also construct meshpoint using brackets?
+              second_new_meshpoint.current[1] = theta_offset + second_factor * theta_next;
+              join_row_neighbours(
+                second_new_meshpoint, relative_index_next, LEFT, RIGHT, number_points_next, clockwise);
+
+              second_new_meshpoint.neighbours[BELOW] = *it;
+
+              meshpoints[*it].split = true;
+
+              ring.push_back(std::move(second_new_meshpoint));
+
+              number_splits += 1;
+              relative_index_next += 1;
+            }
+          }
+          // *********************************************************************************
+
+          relative_index_now += 1;
+          // std::cout << "MESHPOINTS" << meshpoints.size() << std::endl;
+          // std::cout << "relative_index_now: " << relative_index_now << std::endl;
+          // std::cout << "relative_index_next: " << relative_index_next << std::endl;
+        }
+
 
         // merge
 
