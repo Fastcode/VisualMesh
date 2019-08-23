@@ -308,8 +308,9 @@ namespace generator {
       // std::vector<size_t> number_by_phi;
       // number_by_phi.push_back(4);
 
-      for (int v = 1; v < 70; ++v) {
+      for (int v = 1; h * std::tan(shape.phi((v + k / 2) / k, h)) < max_distance; ++v) {
         Scalar phi_next = shape.phi((v + k / 2) / k, h);
+
 
         // number_by_phi.push_back(std::ceil((2 * M_PI * k) / shape.theta(shape.phi((v + k / 2) / k, h), h)));
 
@@ -407,7 +408,21 @@ namespace generator {
           //           << " distribution: " << distribution << std::endl;
         }
 
-        if (!std::isfinite(theta_next)) { std::cout << "HELP" << std::endl; }
+        if (phi_next > 1.4) {
+          std::cout << "v: " << v << std::endl;
+          std::cout << "phi_next: " << std::endl;
+          printf("%f \n", phi_next);
+          std::cout << "h: " << std::endl;
+          printf("%f \n", h);
+        }
+        if (theta_next < 0.005) {
+          std::cout << "v: " << v << std::endl;
+          std::cout << "theta: " << std::endl;
+          printf("%f \n", theta_next);
+          std::cout << "h: " << std::endl;
+          printf("%f \n", h);
+        }
+
 
         std::vector<int> indices;
         // std::cout << "begin" << begin << std ::endl;
@@ -575,25 +590,26 @@ namespace generator {
             || !std::isfinite(meshpoints[i].current[1])) {
           std::cout << "HELP" << std::endl;
         }
-        // new_node.neighbours[0] = meshpoints[i].neighbours[LEFT];
-        // if (meshpoints[i].split == true) {
-        //   new_node.neighbours[1] = meshpoints[i].neighbours[TOP_LEFT];
-        //   new_node.neighbours[2] = meshpoints[i].neighbours[TOP_RIGHT];
-        // }
-        // else {
-        //   // To draw only the main line for the non-splitting points
-        //   if (meshpoints[i].phi_number % 2 == 1 && meshpoints[i].phi_number != 0) {
-        //     new_node.neighbours[1] = meshpoints[i].neighbours[TOP_RIGHT];
-        //     new_node.neighbours[2] = meshpoints[i].neighbours[TOP_RIGHT];
-        //   }
-        //   else {
-        //     new_node.neighbours[1] = meshpoints[i].neighbours[TOP_LEFT];
-        //     new_node.neighbours[2] = meshpoints[i].neighbours[TOP_LEFT];
-        //   }
-        // }
-        // new_node.neighbours[3] = meshpoints[i].neighbours[RIGHT];
-        // new_node.neighbours[4] = meshpoints[i].neighbours[BELOW];
-        // new_node.neighbours[5] = meshpoints[i].neighbours[BELOW];
+
+        new_node.neighbours[0] = meshpoints[i].neighbours[LEFT];
+        if (meshpoints[i].split == true) {
+          new_node.neighbours[1] = meshpoints[i].neighbours[TOP_LEFT];
+          new_node.neighbours[2] = meshpoints[i].neighbours[TOP_RIGHT];
+        }
+        else {
+          // To draw only the main line for the non-splitting points
+          if (meshpoints[i].phi_number % 2 == 1 && meshpoints[i].phi_number != 0) {
+            new_node.neighbours[1] = meshpoints[i].neighbours[TOP_RIGHT];
+            new_node.neighbours[2] = meshpoints[i].neighbours[TOP_RIGHT];
+          }
+          else {
+            new_node.neighbours[1] = meshpoints[i].neighbours[TOP_LEFT];
+            new_node.neighbours[2] = meshpoints[i].neighbours[TOP_LEFT];
+          }
+        }
+        new_node.neighbours[3] = meshpoints[i].neighbours[RIGHT];
+        new_node.neighbours[4] = meshpoints[i].neighbours[BELOW];
+        new_node.neighbours[5] = meshpoints[i].neighbours[BELOW];
 
 
         // new_node.neighbours[0] = meshpoints[i].neighbours[RIGHT];
@@ -604,12 +620,12 @@ namespace generator {
         // new_node.neighbours[5] = meshpoints[i].neighbours[RIGHT];
 
 
-        new_node.neighbours = {{meshpoints[i].neighbours[RIGHT],
-                                meshpoints[i].neighbours[RIGHT],
-                                meshpoints[i].neighbours[RIGHT],
-                                meshpoints[i].neighbours[RIGHT],
-                                meshpoints[i].neighbours[RIGHT],
-                                meshpoints[i].neighbours[RIGHT]}};
+        // new_node.neighbours = {{meshpoints[i].neighbours[RIGHT],
+        //                         meshpoints[i].neighbours[RIGHT],
+        //                         meshpoints[i].neighbours[RIGHT],
+        //                         meshpoints[i].neighbours[RIGHT],
+        //                         meshpoints[i].neighbours[RIGHT],
+        //                         meshpoints[i].neighbours[RIGHT]}};
 
         nodes.push_back(std::move(new_node));
       }
@@ -617,7 +633,7 @@ namespace generator {
 
       return nodes;
     }  // namespace generator
-  };   // namespace visualmesh
+  };   // namespace generator
 
 }  // namespace generator
 }  // namespace visualmesh
