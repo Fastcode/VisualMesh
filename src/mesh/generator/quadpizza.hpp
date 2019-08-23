@@ -323,17 +323,15 @@ namespace generator {
 
           Meshpoint<Scalar> new_meshpoint;
 
-          int factor;
-          if (clockwise == false) { factor = 0 - relative_index_next; }
+
+          if (clockwise == false) { new_meshpoint.current[1] = theta_offset - relative_index_next * theta_next; }
           else {
-            factor = relative_index_next;
+            new_meshpoint.current[1] = theta_offset + relative_index_next * theta_next;
           }
 
           new_meshpoint.phi_number   = v;
           new_meshpoint.theta_number = relative_index_next;
           new_meshpoint.current[0]   = phi_next;
-          // fix these weird equations for negatives, ask Trent, also construct meshpoint using brackets?
-          new_meshpoint.current[1] = theta_offset + factor * theta_next;
           join_row_neighbours(new_meshpoint, relative_index_next, LEFT, RIGHT, number_points_next, clockwise);
 
           new_meshpoint.neighbours[BELOW] = *it;
@@ -366,17 +364,17 @@ namespace generator {
               // std::cout << "count: " << count << std::endl;
               Meshpoint<Scalar> second_new_meshpoint;
 
-              int second_factor;
-              if (clockwise == false) { second_factor = 0 - relative_index_next; }
+
+              if (clockwise == false) {
+                second_new_meshpoint.current[1] = theta_offset - relative_index_next * theta_next;
+              }
               else {
-                second_factor = relative_index_next;
+                second_new_meshpoint.current[1] = theta_offset + relative_index_next * theta_next;
               }
 
               second_new_meshpoint.phi_number   = v;
               second_new_meshpoint.theta_number = relative_index_next;
               second_new_meshpoint.current[0]   = phi_next;
-              // fix these weird equations for negatives, ask Trent, also construct meshpoint using brackets?
-              second_new_meshpoint.current[1] = theta_offset + second_factor * theta_next;
               join_row_neighbours(
                 second_new_meshpoint, relative_index_next, LEFT, RIGHT, number_points_next, clockwise);
 
