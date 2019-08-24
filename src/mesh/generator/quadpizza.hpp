@@ -16,34 +16,14 @@
  */
 
 #ifndef VISUALMESH_GENERATOR_QUADPIZZA_HPP
-#define VISUALMESH_GENERATOR_QUADPIZZA_HPP
+#  define VISUALMESH_GENERATOR_QUADPIZZA_HPP
 
-#include <array>
-#include <vector>
-#include "mesh/node.hpp"
+#  include <array>
+#  include <vector>
+#  include "mesh/node.hpp"
 
 namespace visualmesh {
 namespace generator {
-  template <typename Scalar>
-  struct Meshpoint {
-    /// stores phi ring number
-    int phi_number;
-    int theta_number;
-
-    /// tells you if a node split to the next phi ring
-    bool split = false;
-
-    /// stores the phi, theta values for each node in this order
-    std::array<Scalar, 2> current;
-
-    /// indices of the neighbouring node WITHIN their respective phi rings. 5 neighbours ordered in the LUT as TL, TR,
-    /// L, R, B
-    std::array<int, 5> neighbours;
-
-    /// The unit vector in the direction for this node
-    vec4<Scalar> ray;
-  };
-
 
   template <typename Scalar>
   struct QuadPizza {
@@ -62,101 +42,70 @@ namespace generator {
       // Loop through until we reach our max distance
       std::vector<Node<Scalar>> nodes;
 
-      std::vector<Meshpoint<Scalar>> meshpoints;
+      // L, T, R, B
+      int LEFT  = 0;
+      int TOP   = 1;
+      int RIGHT = 2;
+      int BELOW = 3;
 
-      // L, TL, TR, R, B
-      int LEFT = 0;
-      // int TOP_MAIN  = 1;
-      // int TOP_SUB = 2;
-      int TOP_LEFT  = 1;
-      int TOP_RIGHT = 2;
-      int RIGHT     = 3;
-      int BELOW     = 4;
+      // auto join_row_neighbours = [&](Node<Scalar>& node,
+      //                                const int index,
+      //                                const in end,
+      //                                const int LEFT,
+      //                                const int RIGHT,
+      //                                const int number_of_points,
+      //                                const bool clockwise) {
+      //   int left;
+      //   int right;
 
-      auto join_row_neighbours = [&](Meshpoint<Scalar>& meshpoint,
-                                     const int index,
-                                     const int LEFT,
-                                     const int RIGHT,
-                                     const int number_of_points,
-                                     const bool clockwise) {
-        int left;
-        int right;
+      //   if (clockwise == false) {
+      //     left  = RIGHT;
+      //     right = LEFT;
+      //   }
+      //   else {
+      //     left  = LEFT;
+      //     right = RIGHT;
+      //   }
 
-        if (clockwise == false) {
-          left  = RIGHT;
-          right = LEFT;
-        }
-        else {
-          left  = LEFT;
-          right = RIGHT;
-        }
+      //   if (index == 0) {
+      //     node.neighbours[right] = end + number_of_points - 1;
+      //     node.neighbours[left]  = end + 1;
+      //   }
+      //   else if (index == number_of_points - 1) {
+      //     node.neighbours[right] = end + number_of_points - 2;
+      //     node.neighbours[left]  = end + 0;
+      //   }
+      //   else {
+      //     node.neighbours[right] = end + index - 1;
+      //     node.neighbours[left]  = end + index + 1;
+      //   }
+      // };
 
-        if (index == 0) {
-          meshpoint.neighbours[right] = number_of_points - 1;
-          meshpoint.neighbours[left]  = 1;
-        }
-        else if (index == number_of_points - 1) {
-          meshpoint.neighbours[right] = number_of_points - 2;
-          meshpoint.neighbours[left]  = 0;
-        }
-        else {
-          meshpoint.neighbours[right] = index - 1;
-          meshpoint.neighbours[left]  = index + 1;
-        }
-      };
-
-      auto join_above_neighbours = [&](Meshpoint<Scalar>& meshpoint,
-                                       const int index,
-                                       const int TOP_LEFT,
-                                       const int TOP_RIGHT,
-                                       const int number_of_points,
-                                       const bool clockwise) {
-        int top_left;
-        int top_right;
-
-        if (clockwise == false) {
-          top_left  = TOP_RIGHT;
-          top_right = TOP_LEFT;
-        }
-        else {
-          top_left  = TOP_LEFT;
-          top_right = TOP_RIGHT;
-        }
-
-        if (index == number_of_points - 1) {
-          meshpoint.neighbours[top_right] = index;
-          meshpoint.neighbours[top_left]  = 0;
-        }
-        else {
-          meshpoint.neighbours[top_right] = index;
-          meshpoint.neighbours[top_left]  = index + 1;
-        }
-      };
-
+      std::vector<Scalar> dtheta;
       std::array<int, 4> first_neighbours;
       first_neighbours[0] = 2;
       first_neighbours[1] = 3;
       first_neighbours[2] = 0;
       first_neighbours[3] = 1;
 
-      Scalar phi_first = shape.phi(4 / k, h);
-      bool clock       = true;
+      Scalar phi_first = shape.phi(1 / k, h) / 2;
+      dtheta.push_back(2 * M_PI / 4);
+      bool clock = true;
 
       for (int j = 0; j < 4; ++j) {
-        Meshpoint<Scalar> first;
-        first.phi_number        = 0;
-        first.theta_number      = j;
-        first.current[0]        = phi_first / 2;
-        first.current[1]        = j * (2 * M_PI / 4);
+        Node<Scalar> first;
+        first.ray               = unit_vector(std::sin(phi_first / 2), std::cos(phi_first / 2), j * (2 * M_PI / 4));
         first.neighbours[BELOW] = first_neighbours[j];
-        join_row_neighbours(first, j, LEFT, RIGHT, 4, clock);
-        meshpoints.push_back(std::move(first));
+        // join_row_neighbours(first, j, 0, LEFT, RIGHT, 4, clock);
+        first.neighbours[LEFT]  = (j + 1) % 4;
+        first.neighbours[RIGHT] = (j - 1) % 4;
+        nodes.push_back(std::move(first));
       }
 
       std::vector<int> number_points;
       number_points.emplace_back(4);
       int running_index;
-      running_index = meshpoints.size();
+      running_index = nodes.size();
 
       std::vector<int> origin_number_points;
       origin_number_points.emplace_back(0);
@@ -165,19 +114,16 @@ namespace generator {
         origin_number_points.emplace_back(12 + 8 * i);
       }
 
-      // std::vector<double> distribution_vec;
-      // std::vector<size_t> number_by_phi;
-      // number_by_phi.push_back(4);
 
-      for (int v = 1; h * std::tan(shape.phi((v + k / 2) / k, h)) < max_distance; ++v) {
-        Scalar phi_next = shape.phi((v + k / 2) / k, h);
+      for (int v = 1; h * std::tan(shape.phi(v / k, h)) < max_distance; ++v) {
+        Scalar phi_next = shape.phi(v / k, h);
 
 
-        // number_by_phi.push_back(std::ceil((2 * M_PI * k) / shape.theta(shape.phi((v + k / 2) / k, h), h)));
-
-        int begin      = running_index - number_points.back();
-        int end        = running_index;
-        bool clockwise = v % 2 == 0;
+        int begin = running_index - number_points.back();
+        int end   = running_index;
+        // hack
+        int one = std::round(std::pow(-1, v));
+        // bool clockwise = v % 2 == 0;
 
         Scalar theta_next;
         int number_points_now;
@@ -189,7 +135,7 @@ namespace generator {
         // precalculate the number of points vector according to distribution and origin fix
 
         // if (v < k + 1) {
-        if (v < (k / 2) + 1) {
+        if (v < k - 1) {
 
           number_points_now  = number_points[v - 1];
           number_points_next = origin_number_points[v];
@@ -270,22 +216,7 @@ namespace generator {
           //           << " distribution: " << distribution << std::endl;
         }
 
-        if (phi_next > 1.55) {
-          std::cout << "v: " << v << std::endl;
-          std::cout << "phi_next: " << std::endl;
-          printf("%f \n", phi_next);
-          std::cout << "h: " << std::endl;
-          printf("%f \n", h);
-        }
-        if (theta_next < 0.00005) {
-          std::cout << "v: " << v << std::endl;
-          std::cout << "theta: " << std::endl;
-          printf("%f \n", theta_next);
-          std::cout << "h: " << std::endl;
-          printf("%f \n", h);
-        }
-
-
+        dtheta.push_back(theta_next);
         std::vector<int> indices;
         // std::cout << "begin" << begin << std ::endl;
         // std::cout << "end" << end << std ::endl;
@@ -293,6 +224,7 @@ namespace generator {
           indices.push_back(i);
         }
 
+        // condense this
         std::vector<int> vector_of_indices;
         if (v == 1) {
 
@@ -309,42 +241,38 @@ namespace generator {
           }
         }
 
-        std::vector<Meshpoint<Scalar>> ring;
 
         int relative_index_now  = 0;
         int relative_index_next = 0;
         int number_splits       = 0;
 
+
         Scalar theta_offset;
-        theta_offset = meshpoints[vector_of_indices[0]].current[1];
-        // std::cout << "theta_offset: " << theta_offset << std::endl;
+        theta_offset = -1 * one * dtheta.back();
 
         for (auto it = vector_of_indices.begin(); it != vector_of_indices.end(); ++it) {
 
-          Meshpoint<Scalar> new_meshpoint;
+          Node<Scalar> new_node;
+
+          new_node.ray =
+            unit_vector(std::sin(phi_next), std::cos(phi_next), theta_offset + one * relative_index_next * theta_next);
+
+          // join_row_neighbours(new_node, relative_index_next, end, LEFT, RIGHT, number_points_next, clockwise);
+          // odd v generates clockwise, even v generates anti-clockwise.
+          new_node.neighbours[LEFT]  = end + ((relative_index_next + one) % number_points_next);
+          new_node.neighbours[RIGHT] = end + ((relative_index_next - one) % number_points_next);
 
 
-          if (clockwise == false) { new_meshpoint.current[1] = theta_offset - relative_index_next * theta_next; }
-          else {
-            new_meshpoint.current[1] = theta_offset + relative_index_next * theta_next;
-          }
+          new_node.neighbours[BELOW] = *it;
+          // nodes[*it].neighbours[TOP] = end + relative_index_next % number_points_next;
 
-          new_meshpoint.phi_number   = v;
-          new_meshpoint.theta_number = relative_index_next;
-          new_meshpoint.current[0]   = phi_next;
-          join_row_neighbours(new_meshpoint, relative_index_next, LEFT, RIGHT, number_points_next, clockwise);
+          nodes[*it].neighbours[TOP] = end + relative_index_next;
 
-          new_meshpoint.neighbours[BELOW] = *it;
-
-          join_above_neighbours(
-            meshpoints[*it], relative_index_next, TOP_LEFT, TOP_RIGHT, number_points_next, clockwise);
-
-          ring.push_back(std::move(new_meshpoint));
+          nodes.push_back(std::move(new_node));
           relative_index_next += 1;
 
           // *************** Generate Second Node ***********************
           if (growing) {
-
             if (every_one == true) {
               if (number_splits <= number_points_now - number_difference) { distribution = 2; }
               else {
@@ -362,27 +290,18 @@ namespace generator {
             if ((distribute || distribution == 1) && splits) {
               // std::cout << "Graph is growing!" << std::endl;
               // std::cout << "count: " << count << std::endl;
-              Meshpoint<Scalar> second_new_meshpoint;
+              Node<Scalar> second_new_node;
 
+              second_new_node.ray = unit_vector(
+                std::sin(phi_next), std::cos(phi_next), theta_offset + one * relative_index_next * theta_next);
 
-              if (clockwise == false) {
-                second_new_meshpoint.current[1] = theta_offset - relative_index_next * theta_next;
-              }
-              else {
-                second_new_meshpoint.current[1] = theta_offset + relative_index_next * theta_next;
-              }
+              // join_row_neighbours(
+              //  second_new_node, relative_index_next, end, LEFT, RIGHT, number_points_next, clockwise);
+              second_new_node.neighbours[LEFT]  = end + ((relative_index_next + one) % number_points_next);
+              second_new_node.neighbours[RIGHT] = end + ((relative_index_next - one) % number_points_next);
+              second_new_node.neighbours[BELOW] = *it;
 
-              second_new_meshpoint.phi_number   = v;
-              second_new_meshpoint.theta_number = relative_index_next;
-              second_new_meshpoint.current[0]   = phi_next;
-              join_row_neighbours(
-                second_new_meshpoint, relative_index_next, LEFT, RIGHT, number_points_next, clockwise);
-
-              second_new_meshpoint.neighbours[BELOW] = *it;
-
-              meshpoints[*it].split = true;
-
-              ring.push_back(std::move(second_new_meshpoint));
+              nodes.push_back(std::move(second_new_node));
 
               number_splits += 1;
               relative_index_next += 1;
@@ -397,167 +316,54 @@ namespace generator {
         }
 
 
-        // merge
-
-        for (int it = 0; it < ring.size(); ++it) {
-          meshpoints.push_back(std::move(ring[it]));
-        }
-
-
-        running_index = meshpoints.size();
+        running_index = nodes.size();
         // std::cout << "meshpoints: " << meshpoints.size() << std::endl;
       }
 
       // specify the neighbours of the last ring of points
-      for (int i = (meshpoints.size() - number_points.back()); i < meshpoints.size(); ++i) {
-
-        meshpoints[i].neighbours[TOP_LEFT]  = i;
-        meshpoints[i].neighbours[TOP_RIGHT] = i;
-        int sum_now =
-          std::accumulate(number_points.begin(), std::next(number_points.begin(), meshpoints[i].phi_number), 0);
-
-        int sum_below =
-          std::accumulate(number_points.begin(), std::next(number_points.begin(), meshpoints[i].phi_number - 1), 0);
-        meshpoints[i].neighbours[LEFT]  = sum_now + meshpoints[i].neighbours[LEFT];
-        meshpoints[i].neighbours[RIGHT] = sum_now + meshpoints[i].neighbours[RIGHT];
+      for (int i = (nodes.size() - number_points.back()); i < nodes.size(); ++i) {
+        nodes[i].neighbours[TOP] = i;
       }
 
-      // separate conversion for first ring
-      for (int i = 0; i < number_points[0]; ++i) {
-        // size_t sum_top = number_points_temp[1] + 1;
-        int sum_top = number_points[0];
+      // // separate conversion for first ring
+      // for (int i = 0; i < number_points[0]; ++i) {
+      //   // size_t sum_top = number_points_temp[1] + 1;
+      //   int sum_top = number_points[0];
 
-        meshpoints[i].neighbours[TOP_LEFT]  = sum_top + meshpoints[i].neighbours[TOP_LEFT];
-        meshpoints[i].neighbours[TOP_RIGHT] = sum_top + meshpoints[i].neighbours[TOP_RIGHT];
-        meshpoints[i].neighbours[LEFT]      = meshpoints[i].neighbours[LEFT];
-        meshpoints[i].neighbours[RIGHT]     = meshpoints[i].neighbours[RIGHT];
-      }
-
-
-      // convert local neighbour indices to global
-      for (int i = number_points[0]; i < (meshpoints.size() - number_points.back()); ++i) {
-        int sum_top =
-          std::accumulate(number_points.begin(), std::next(number_points.begin(), meshpoints[i].phi_number + 1), 0);
-        int sum_now =
-          std::accumulate(number_points.begin(), std::next(number_points.begin(), meshpoints[i].phi_number), 0);
-
-        meshpoints[i].neighbours[TOP_LEFT]  = sum_top + meshpoints[i].neighbours[TOP_LEFT];
-        meshpoints[i].neighbours[TOP_RIGHT] = sum_top + meshpoints[i].neighbours[TOP_RIGHT];
-        meshpoints[i].neighbours[LEFT]      = sum_now + meshpoints[i].neighbours[LEFT];
-        meshpoints[i].neighbours[RIGHT]     = sum_now + meshpoints[i].neighbours[RIGHT];
-      }
-
-      // for (size_t i = 0; i < distribution_vec.size(); ++i) {
-      //   printf("%2f \n", distribution_vec[i]);
-      // }
-
-      for (int i = 0; i < meshpoints.size(); ++i) {
-        // std::cout << "i: " << i << std::endl;
-        int neighbour = meshpoints[i].neighbours[BELOW];
-        double theta1 = meshpoints[i].current[1];
-
-        if (!std::isfinite(theta1)) { printf("%f \n", theta1); }
-
-        double theta2 = meshpoints[neighbour].current[1];
-
-        double abs_theta1 = std::abs(meshpoints[i].current[1]);
-        double abs_theta2 = std::abs(meshpoints[neighbour].current[1]);
-
-        // normalise
-        double norm_theta1 = abs_theta1 - (2 * M_PI * (std::floor(abs_theta1 / (2 * M_PI))));
-        double norm_theta2 = abs_theta2 - (2 * M_PI * (std::floor(abs_theta2 / (2 * M_PI))));
-
-        // correct the direction
-
-        if (theta1 < 0) { norm_theta1 = 2 * M_PI - norm_theta1; }
-        if (theta2 < 0) { norm_theta2 = 2 * M_PI - norm_theta2; }
-
-        meshpoints[i].current[1] = norm_theta1;
-
-        // if (i == 53) {
-        //   std::cout << "*********************************************" << std::endl;
-        //   printf("This: %f and %f and %f and %f \n", theta1, theta2, norm_theta1, norm_theta2);
-        // }
-        double error;
-
-        error = std::min(2 * M_PI - std::abs(norm_theta1 - norm_theta2), std::abs(norm_theta1 - norm_theta2));
-
-        // printf("%f \n", norm_theta1);
-        // std::cout << i << ": " << neighbour << std::endl;
-      }
-
-      // print out mesh points
-      // for (int i = 0; i < meshpoints.size(); ++i) {
-      //   std::cout << "meshpoint: " << i << ": " << meshpoints[i].neighbours[LEFT] << ", "
-      //             << meshpoints[i].neighbours[RIGHT] << ", " << meshpoints[i].neighbours[TOP_LEFT] << ", "
-      //             << meshpoints[i].neighbours[TOP_RIGHT] << ", " << meshpoints[i].neighbours[BELOW]
-      //             << " : phi_number: " << meshpoints[i].phi_number << std::endl;
-      //   std::cout << "meshpoint: " << i << ": "
-      //             << "phi = " << meshpoints[i].current[0] << ", theta = " << meshpoints[i].current[1]
-      //             << ", split = " << meshpoints[i].split << std::endl;
+      //   nodes[i].neighbours[TOP]   = sum_top + nodes[i].neighbours[TOP];
+      //   nodes[i].neighbours[LEFT]  = nodes[i].neighbours[LEFT];
+      //   nodes[i].neighbours[RIGHT] = nodes[i].neighbours[RIGHT];
       // }
 
 
-      // Calculate our unit vectors for all our mesh points with x facing forward and z up
-      for (int n = 0; n < meshpoints.size(); ++n) {
-        meshpoints[n].ray = {{
-          std::cos(meshpoints[n].current[1]) * std::sin(meshpoints[n].current[0]),  //
-          std::sin(meshpoints[n].current[1]) * std::sin(meshpoints[n].current[0]),  //
-          -std::cos(meshpoints[n].current[0]),                                      //
-          Scalar(0.0)                                                               //
-        }};
-        //   std::cout << "meshpoint: " << n << ": " << meshpoints[n].ray[0] << ", " << meshpoints[n].ray[1] << ", "
-        //             << meshpoints[n].ray[2] << std::endl;
-      }
-      // LINE DO NOT MEET UP EXACTLY NOW, AFTER CONVERSION
-      for (int i = 0; i < meshpoints.size(); ++i) {
-        Node<Scalar> new_node;
+      // // convert local neighbour indices to global
+      // for (int i = number_points[0]; i < (nodes.size() - number_points.back()); ++i) {
+      //   int sum_top =
+      //     std::accumulate(number_points.begin(), std::next(number_points.begin(), nodes[i].phi_number + 1), 0);
+      //   int sum_now = std::accumulate(number_points.begin(), std::next(number_points.begin(), nodes[i].phi_number),
+      //   0);
 
-        new_node.ray =
-          unit_vector(std::sin(meshpoints[i].current[0]), std::cos(meshpoints[i].current[0]), meshpoints[i].current[1]);
-
-        if (!std::isfinite(std::sin(meshpoints[i].current[0])) || !std::isfinite(std::cos(meshpoints[i].current[0]))
-            || !std::isfinite(meshpoints[i].current[1])) {
-          std::cout << "HELP" << std::endl;
-        }
-
-        new_node.neighbours[0] = meshpoints[i].neighbours[LEFT];
-        if (meshpoints[i].split == true) {
-          new_node.neighbours[1] = meshpoints[i].neighbours[TOP_LEFT];
-          new_node.neighbours[2] = meshpoints[i].neighbours[TOP_RIGHT];
-        }
-        else {
-          // To draw only the main line for the non-splitting points
-          if (meshpoints[i].phi_number % 2 == 1 && meshpoints[i].phi_number != 0) {
-            new_node.neighbours[1] = meshpoints[i].neighbours[TOP_RIGHT];
-            new_node.neighbours[2] = meshpoints[i].neighbours[TOP_RIGHT];
-          }
-          else {
-            new_node.neighbours[1] = meshpoints[i].neighbours[TOP_LEFT];
-            new_node.neighbours[2] = meshpoints[i].neighbours[TOP_LEFT];
-          }
-        }
-        new_node.neighbours[3] = meshpoints[i].neighbours[RIGHT];
-        new_node.neighbours[4] = meshpoints[i].neighbours[BELOW];
-        new_node.neighbours[5] = meshpoints[i].neighbours[BELOW];
+      //   nodes[i].neighbours[TOP]   = sum_top + nodes[i].neighbours[TOP];
+      //   nodes[i].neighbours[LEFT]  = sum_now + nodes[i].neighbours[LEFT];
+      //   nodes[i].neighbours[RIGHT] = sum_now + nodes[i].neighbours[RIGHT];
+      // }
 
 
-        // new_node.neighbours[0] = meshpoints[i].neighbours[RIGHT];
-        // new_node.neighbours[1] = meshpoints[i].neighbours[RIGHT];
-        // new_node.neighbours[2] = meshpoints[i].neighbours[RIGHT];
-        // new_node.neighbours[3] = meshpoints[i].neighbours[RIGHT];
-        // new_node.neighbours[4] = meshpoints[i].neighbours[RIGHT];
-        // new_node.neighbours[5] = meshpoints[i].neighbours[RIGHT];
+      // // Calculate our unit vectors for all our mesh points with x facing forward and z up
+      // for (int n = 0; n < meshpoints.size(); ++n) {
+      //   meshpoints[n].ray = {{
+      //     std::cos(meshpoints[n].current[1]) * std::sin(meshpoints[n].current[0]),  //
+      //     std::sin(meshpoints[n].current[1]) * std::sin(meshpoints[n].current[0]),  //
+      //     -std::cos(meshpoints[n].current[0]),                                      //
+      //     Scalar(0.0)                                                               //
+      //   }};
+      //   //   std::cout << "meshpoint: " << n << ": " << meshpoints[n].ray[0] << ", " << meshpoints[n].ray[1] << ", "
+      //   //             << meshpoints[n].ray[2] << std::endl;
+      // }
 
-
-        // new_node.neighbours = {{meshpoints[i].neighbours[RIGHT],
-        //                         meshpoints[i].neighbours[RIGHT],
-        //                         meshpoints[i].neighbours[RIGHT],
-        //                         meshpoints[i].neighbours[RIGHT],
-        //                         meshpoints[i].neighbours[RIGHT],
-        //                         meshpoints[i].neighbours[RIGHT]}};
-
-        nodes.push_back(std::move(new_node));
+      for (int i = 0; i < nodes.size(); ++i) {
+        nodes[i].neighbours[4] = nodes[i].neighbours[BELOW];
+        nodes[i].neighbours[5] = nodes[i].neighbours[BELOW];
       }
 
 
@@ -569,3 +375,109 @@ namespace generator {
 }  // namespace visualmesh
 
 #endif  // VISUALMESH_GENERATOR_QUADPIZZA_HPP
+
+
+// auto join_above_neighbours = [&](Meshpoint<Scalar>& meshpoint,
+//                                  const int index,
+//                                  const int TOP_LEFT,
+//                                  const int TOP_RIGHT,
+//                                  const int number_of_points,
+//                                  const bool clockwise) {
+//   int top_left;
+//   int top_right;
+
+//   if (clockwise == false) {
+//     top_left  = TOP_RIGHT;
+//     top_right = TOP_LEFT;
+//   }
+//   else {
+//     top_left  = TOP_LEFT;
+//     top_right = TOP_RIGHT;
+//   }
+
+//   if (index == number_of_points - 1) {
+//     meshpoint.neighbours[top_right] = index;
+//     meshpoint.neighbours[top_left]  = 0;
+//   }
+//   else {
+//     meshpoint.neighbours[top_right] = index;
+//     meshpoint.neighbours[top_left]  = index + 1;
+//   }
+// };
+
+
+// // merge
+
+// for (int it = 0; it < ring.size(); ++it) {
+//   nodes.push_back(std::move(ring[it]));
+// }
+
+
+// std::vector<double> distribution_vec;
+// std::vector<size_t> number_by_phi;
+// number_by_phi.push_back(4);
+// number_by_phi.push_back(std::ceil((2 * M_PI * k) / shape.theta(shape.phi((v + k / 2) / k, h), h)));
+
+
+// if (phi_next > 1.55) {
+//   std::cout << "v: " << v << std::endl;
+//   std::cout << "phi_next: " << std::endl;
+//   printf("%f \n", phi_next);
+//   std::cout << "h: " << std::endl;
+//   printf("%f \n", h);
+// }
+// if (theta_next < 0.00005) {
+//   std::cout << "v: " << v << std::endl;
+//   std::cout << "theta: " << std::endl;
+//   printf("%f \n", theta_next);
+//   std::cout << "h: " << std::endl;
+//   printf("%f \n", h);
+// }
+
+
+// for (size_t i = 0; i < distribution_vec.size(); ++i) {
+//   printf("%2f \n", distribution_vec[i]);
+// }
+
+// for (int i = 0; i < meshpoints.size(); ++i) {
+//   // std::cout << "i: " << i << std::endl;
+//   int neighbour = meshpoints[i].neighbours[BELOW];
+//   double theta1 = meshpoints[i].current[1];
+
+//   if (!std::isfinite(theta1)) { printf("%f \n", theta1); }
+
+//   double theta2 = meshpoints[neighbour].current[1];
+
+//   double abs_theta1 = std::abs(meshpoints[i].current[1]);
+//   double abs_theta2 = std::abs(meshpoints[neighbour].current[1]);
+
+//   // normalise
+//   double norm_theta1 = abs_theta1 - (2 * M_PI * (std::floor(abs_theta1 / (2 * M_PI))));
+//   double norm_theta2 = abs_theta2 - (2 * M_PI * (std::floor(abs_theta2 / (2 * M_PI))));
+
+//   // correct the direction
+
+//   if (theta1 < 0) { norm_theta1 = 2 * M_PI - norm_theta1; }
+//   if (theta2 < 0) { norm_theta2 = 2 * M_PI - norm_theta2; }
+
+//   meshpoints[i].current[1] = norm_theta1;
+
+//   // if (i == 53) {
+//   //   std::cout << "*********************************************" << std::endl;
+//   //   printf("This: %f and %f and %f and %f \n", theta1, theta2, norm_theta1, norm_theta2);
+//   // }
+//   double error;
+
+//   error = std::min(2 * M_PI - std::abs(norm_theta1 - norm_theta2), std::abs(norm_theta1 - norm_theta2));
+
+//   // printf("%f \n", norm_theta1);
+//   // std::cout << i << ": " << neighbour << std::endl;
+// }
+
+// print out mesh points
+// for (int i = 0; i < nodes.size(); ++i) {
+//   std::cout << "meshpoint: " << i << ": " << nodes[i].neighbours[LEFT] << ", "
+//             << nodes[i].neighbours[RIGHT] << ", " << nodes[i].neighbours[TOP] << ", " <<
+//             nodes[i].neighbours[BELOW] << std::endl;
+
+// }
