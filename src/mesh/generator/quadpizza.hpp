@@ -81,7 +81,7 @@ namespace generator {
       //   }
       // };
 
-      std::vector<Scalar> dtheta;
+      std::vector<Scalar> Theta_Offset;
       std::array<int, 4> first_neighbours;
       first_neighbours[0] = 2;
       first_neighbours[1] = 3;
@@ -89,7 +89,7 @@ namespace generator {
       first_neighbours[3] = 1;
 
       Scalar phi_first = shape.phi(1 / k, h) / 2;
-      dtheta.push_back(2 * M_PI / 4);
+      Theta_Offset.push_back(0);
       bool clock = true;
 
       for (int j = 0; j < 4; ++j) {
@@ -97,8 +97,8 @@ namespace generator {
         first.ray               = unit_vector(std::sin(phi_first / 2), std::cos(phi_first / 2), j * (2 * M_PI / 4));
         first.neighbours[BELOW] = first_neighbours[j];
         // join_row_neighbours(first, j, 0, LEFT, RIGHT, 4, clock);
-        first.neighbours[LEFT]  = (j + 1) % 4;
-        first.neighbours[RIGHT] = (j - 1) % 4;
+        first.neighbours[LEFT]  = ((j + 1) % 4 + 4) % 4;
+        first.neighbours[RIGHT] = ((j - 1) % 4 + 4) % 4;
         nodes.push_back(std::move(first));
       }
 
@@ -121,9 +121,13 @@ namespace generator {
 
         int begin = running_index - number_points.back();
         int end   = running_index;
+
         // hack
         int one = std::round(std::pow(-1, v));
         // bool clockwise = v % 2 == 0;
+
+        Scalar theta_offset;
+        theta_offset = Theta_Offset.back();
 
         Scalar theta_next;
         int number_points_now;
@@ -135,7 +139,7 @@ namespace generator {
         // precalculate the number of points vector according to distribution and origin fix
 
         // if (v < k + 1) {
-        if (v < k - 1) {
+        if (v < 3) {
 
           number_points_now  = number_points[v - 1];
           number_points_next = origin_number_points[v];
@@ -145,7 +149,7 @@ namespace generator {
           // std::cout << "number_difference: " << number_difference << " "
           //           << "v: " << v << std::endl;
 
-          theta_next = 2 * M_PI / number_points_next;
+          // theta_next = 2 * M_PI / number_points_next;
           // std::cout << "theta_next: " << theta_next << std::endl;
         }
         else {
@@ -155,11 +159,12 @@ namespace generator {
           number_points_next = std::ceil((2 * M_PI * k) / shape.theta(phi_next, h));
           // std::cout << "No: " << number_points_next << std::endl;
           number_difference = number_points_next - number_points_now;
-          theta_next        = 2 * M_PI / number_points_next;
+
           // std::cout << "theta_next: " << theta_next << std::endl;
           // std::cout << "number_difference: " << number_difference << " "
           // << "v: " << v << std::endl;
         }
+        theta_next = 2 * M_PI / number_points_next;
 
         int distribution;
 
@@ -216,7 +221,8 @@ namespace generator {
           //           << " distribution: " << distribution << std::endl;
         }
 
-        dtheta.push_back(theta_next);
+        // Theta_Offset.push_back(theta_next);
+        std::cout << "theta: " << theta_next << std::endl;
         std::vector<int> indices;
         // std::cout << "begin" << begin << std ::endl;
         // std::cout << "end" << end << std ::endl;
@@ -240,15 +246,12 @@ namespace generator {
             vector_of_indices.push_back(indices[m]);
           }
         }
-
+        std::cout << "number_points_next: " << number_points_next << std::endl;
 
         int relative_index_now  = 0;
         int relative_index_next = 0;
         int number_splits       = 0;
 
-
-        Scalar theta_offset;
-        theta_offset = -1 * one * dtheta.back();
 
         for (auto it = vector_of_indices.begin(); it != vector_of_indices.end(); ++it) {
 
@@ -257,19 +260,31 @@ namespace generator {
           new_node.ray =
             unit_vector(std::sin(phi_next), std::cos(phi_next), theta_offset + one * relative_index_next * theta_next);
 
+
           // join_row_neighbours(new_node, relative_index_next, end, LEFT, RIGHT, number_points_next, clockwise);
           // odd v generates clockwise, even v generates anti-clockwise.
-          new_node.neighbours[LEFT]  = end + ((relative_index_next + one) % number_points_next);
-          new_node.neighbours[RIGHT] = end + ((relative_index_next - one) % number_points_next);
+          new_node.neighbours[LEFT] =
+            end + (((relative_index_next + one) % number_points_next + number_points_next) % number_points_next);
+          new_node.neighbours[RIGHT] =
+            end + (((relative_index_next - one) % number_points_next + number_points_next) % number_points_next);
 
 
           new_node.neighbours[BELOW] = *it;
-          // nodes[*it].neighbours[TOP] = end + relative_index_next % number_points_next;
 
+          // nodes[*it].neighbours[TOP] = end + relative_index_next % number_points_next;
           nodes[*it].neighbours[TOP] = end + relative_index_next;
+
 
           nodes.push_back(std::move(new_node));
           relative_index_next += 1;
+
+
+          if (relative_index_next == 1) {
+            Theta_Offset.push_back(theta_offset + one * relative_index_next * theta_next);
+            // std::cout << theta_offset << ", " << one << ", " << relative_index_next << ", " <<
+            // theta_next
+            //           << std::endl;
+          }
 
           // *************** Generate Second Node ***********************
           if (growing) {
@@ -297,8 +312,10 @@ namespace generator {
 
               // join_row_neighbours(
               //  second_new_node, relative_index_next, end, LEFT, RIGHT, number_points_next, clockwise);
-              second_new_node.neighbours[LEFT]  = end + ((relative_index_next + one) % number_points_next);
-              second_new_node.neighbours[RIGHT] = end + ((relative_index_next - one) % number_points_next);
+              second_new_node.neighbours[LEFT] =
+                end + (((relative_index_next + one) % number_points_next + number_points_next) % number_points_next);
+              second_new_node.neighbours[RIGHT] =
+                end + (((relative_index_next - one) % number_points_next + number_points_next) % number_points_next);
               second_new_node.neighbours[BELOW] = *it;
 
               nodes.push_back(std::move(second_new_node));
@@ -308,8 +325,8 @@ namespace generator {
             }
           }
           // *********************************************************************************
-
           relative_index_now += 1;
+
           // std::cout << "MESHPOINTS" << meshpoints.size() << std::endl;
           // std::cout << "relative_index_now: " << relative_index_now << std::endl;
           // std::cout << "relative_index_next: " << relative_index_next << std::endl;
@@ -324,6 +341,17 @@ namespace generator {
       for (int i = (nodes.size() - number_points.back()); i < nodes.size(); ++i) {
         nodes[i].neighbours[TOP] = i;
       }
+
+      // std::cout << "Theta_Offset" << std::endl;
+      // for (size_t i = 0; i < Theta_Offset.size(); ++i) {
+      //   std::cout << Theta_Offset[i] << std::endl;
+      // }
+
+      // // print out mesh points
+      // for (int i = 0; i < nodes.size(); ++i) {
+      //   std::cout << "meshpoint: " << i << ": " << nodes[i].neighbours[LEFT] << ", " << nodes[i].neighbours[RIGHT]
+      //             << ", " << nodes[i].neighbours[TOP] << ", " << nodes[i].neighbours[BELOW] << std::endl;
+      // }
 
       // // separate conversion for first ring
       // for (int i = 0; i < number_points[0]; ++i) {
@@ -357,7 +385,8 @@ namespace generator {
       //     -std::cos(meshpoints[n].current[0]),                                      //
       //     Scalar(0.0)                                                               //
       //   }};
-      //   //   std::cout << "meshpoint: " << n << ": " << meshpoints[n].ray[0] << ", " << meshpoints[n].ray[1] << ", "
+      //   //   std::cout << "meshpoint: " << n << ": " << meshpoints[n].ray[0] << ", " << meshpoints[n].ray[1] << ",
+      //   "
       //   //             << meshpoints[n].ray[2] << std::endl;
       // }
 
