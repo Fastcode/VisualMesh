@@ -23,11 +23,11 @@
 
 namespace visualmesh {
 
-template <typename Scalar>
+template <typename Scalar, size_t Neighbours>
 struct ClassifiedMesh {
 
   std::vector<std::array<Scalar, 2>> pixel_coordinates;
-  std::vector<std::array<int, 6>> neighbourhood;
+  std::vector<std::array<int, Neighbours>> neighbourhood;
   std::vector<int> global_indices;
   std::vector<Scalar> classifications;
 };

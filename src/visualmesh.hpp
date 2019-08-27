@@ -34,7 +34,9 @@ namespace visualmesh {
  *
  * @tparam Scalar the type that will hold the vectors <float, double>
  */
-template <typename Scalar = float, template <typename> class Engine = engine::cpu::Engine>
+template <typename Scalar                     = float,
+          template <typename> class Engine    = engine::cpu::Engine,
+          template <typename> class Generator = generator::HexaPizza>
 class VisualMesh {
 public:
   /**
@@ -63,7 +65,7 @@ public:
     for (int i = 0; i < n_heights; ++i) {
       // Insert our constructed mesh into the lookup
       const Scalar h = min_height + i * jump;
-      luts.insert(std::make_pair(h, Mesh<Scalar>(shape, h, k, max_distance)));
+      luts.insert(std::make_pair(h, Mesh<Scalar, Generator>(shape, h, k, max_distance)));
     }
   }
 
@@ -76,7 +78,7 @@ public:
    *
    * @return        the closest generated visual mesh to the provided height
    */
-  const Mesh<Scalar>& height(const Scalar& height) const {
+  const Mesh<Scalar, Generator>& height(const Scalar& height) const {
     // Find the bounding height values
     auto range = luts.equal_range(height);
 
@@ -106,8 +108,8 @@ public:
    *
    * @return      the mesh that was used for this lookup and a vector of start/end indices that are on the screen.
    */
-  std::pair<const Mesh<Scalar>&, std::vector<std::pair<uint, uint>>> lookup(const mat4<Scalar>& Hoc,
-                                                                            const Lens<Scalar>& lens) const {
+  std::pair<const Mesh<Scalar, Generator>&, std::vector<std::pair<uint, uint>>> lookup(const mat4<Scalar>& Hoc,
+                                                                                       const Lens<Scalar>& lens) const {
 
     // z height from the transformation matrix
     const Scalar& h = Hoc[2][3];
@@ -123,7 +125,10 @@ public:
    *
    * @return     the pixel coordinates that the visual mesh projects to, and the neighbourhood graph for those points.
    */
-  ProjectedMesh<Scalar> project(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
+
+
+  ProjectedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS> project(const mat4<Scalar>& Hoc,
+                                                                 const Lens<Scalar>& lens) const {
 
     // z height from the transformation matrix
     const Scalar& h  = Hoc[2][3];
@@ -133,12 +138,12 @@ public:
   }
 
   auto make_classifier(const network_structure_t<Scalar>& structure) {
-    return engine.make_classifier(structure);
+    return engine.template make_classifier<Generator>(structure);
   }
 
 private:
   /// A map from heights to visual mesh tables
-  std::map<Scalar, const Mesh<Scalar>> luts;
+  std::map<Scalar, const Mesh<Scalar, Generator>> luts;
   /// The engine used to do projection and classification
   Engine<Scalar> engine;
 };

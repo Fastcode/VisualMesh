@@ -34,7 +34,7 @@
 
 namespace visualmesh {
 
-template <typename Scalar>
+template <typename Scalar, template <typename> class Generator>
 struct Mesh {
 private:
   struct BSP {
@@ -332,7 +332,7 @@ private:
 
 
 public:
-  template <template <typename T> class Generator = generator::HexaPizza, typename Shape>
+  template <typename Shape>
   Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance)
     : h(h), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
 
@@ -361,7 +361,7 @@ public:
     }
 
     // Sort the nodes and correct the neighbourhood graph based on our BSP sorting
-    std::vector<Node<Scalar>> sorted_nodes;
+    std::vector<Node<Scalar, Generator<Scalar>::N_NEIGHBOURS>> sorted_nodes;
     sorted_nodes.reserve(nodes.size());
     for (const auto& i : sorting) {
       sorted_nodes.push_back(nodes[i]);
@@ -473,7 +473,7 @@ public:
   /// The height that this mesh is designed to run at
   Scalar h;
   /// The lookup table for this mesh
-  std::vector<Node<Scalar>> nodes;
+  std::vector<Node<Scalar, Generator<Scalar>::N_NEIGHBOURS>> nodes;
 
 private:
   std::vector<BSP> bsp;

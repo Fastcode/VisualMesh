@@ -44,7 +44,7 @@ REGISTER_OP("VisualMesh")
 
     // nx2 points on image, and n+1x7 neighbours (including off screen point)
     c->set_output(0, c->MakeShape({c->kUnknownDim, 2}));
-    c->set_output(1, c->MakeShape({c->kUnknownDim, 7}));
+    c->set_output(1, c->MakeShape({c->kUnknownDim, c->kUnknownDim}));
     return tensorflow::Status::OK();
   });
 
@@ -189,7 +189,8 @@ public:
     tensorflow::Tensor* neighbours = nullptr;
     tensorflow::TensorShape neighbours_shape;
     neighbours_shape.AddDim(neighbourhood.size());
-    neighbours_shape.AddDim(7);
+    neighbours_shape.AddDim(
+      neighbourhood.front().size());  // TODO THIS WILL EXPLODE WHEN THERE ARE NO ELEMENTS ON SCREEN
     OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
 
     // Copy across our neighbourhood graph, adding in a point for itself
@@ -197,13 +198,11 @@ public:
     for (int i = 0; i < neighbourhood.size(); ++i) {
       // Get our old neighbours from original output
       const auto& m = neighbourhood[i];
-      n(i, 0)       = i;
-      n(i, 1)       = m[0];
-      n(i, 2)       = m[1];
-      n(i, 3)       = m[2];
-      n(i, 4)       = m[3];
-      n(i, 5)       = m[4];
-      n(i, 6)       = m[5];
+      // First point is ourself
+      n(i, 0) = i;
+      for (int j = 0; j < neighbourhood[i].size(); ++j) {
+        n(i, j + 1) = m[j];
+      }
     }
   }
 };

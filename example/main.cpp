@@ -58,8 +58,10 @@ int main() {
   // Construct our VisualMesh
   Timer t;
   visualmesh::geometry::Sphere<float> sphere(0.0949996);
-  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> cl_mesh(sphere, 0.5, 1.5, 100, 6, 20);
-  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine> cpu_mesh(sphere, 0.5, 1.5, 100, 6, 20);
+  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine, visualmesh::generator::HexaPizza> cl_mesh(
+    sphere, 0.5, 1.5, 100, 6, 20);
+  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine, visualmesh::generator::HexaPizza> cpu_mesh(
+    sphere, 0.5, 1.5, 100, 6, 20);
   t.measure("Built Visual Mesh");
 
   // Build our classification network
@@ -109,6 +111,7 @@ int main() {
     if (p.substr(0, 4) == "meta") {
 
       // Extract the number so we can find the other files
+
       auto number = p.substr(4, 7);
 
       std::cerr << "Processing file " << number << std::endl;

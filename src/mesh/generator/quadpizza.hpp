@@ -16,11 +16,11 @@
  */
 
 #ifndef VISUALMESH_GENERATOR_QUADPIZZA_HPP
-#  define VISUALMESH_GENERATOR_QUADPIZZA_HPP
+#define VISUALMESH_GENERATOR_QUADPIZZA_HPP
 
-#  include <array>
-#  include <vector>
-#  include "mesh/node.hpp"
+#include <array>
+#include <vector>
+#include "mesh/node.hpp"
 
 namespace visualmesh {
 namespace generator {
@@ -33,12 +33,14 @@ namespace generator {
     }
 
   public:
+    static constexpr size_t N_NEIGHBOURS = 4;
+
     template <typename Shape>
-    static std::vector<Node<Scalar>> generate(const Shape& shape,
-                                              const Scalar& h,
-                                              const Scalar& k,
-                                              const Scalar& max_distance) {
-      std::vector<Node<Scalar>> nodes;
+    static std::vector<Node<Scalar, N_NEIGHBOURS>> generate(const Shape& shape,
+                                                            const Scalar& h,
+                                                            const Scalar& k,
+                                                            const Scalar& max_distance) {
+      std::vector<Node<Scalar, N_NEIGHBOURS>> nodes;
       std::vector<Scalar> Theta_Offset;
       std::vector<int> number_points;
 
@@ -54,7 +56,7 @@ namespace generator {
       Theta_Offset.push_back(0);
 
       for (int j = 0; j < 4; ++j) {
-        Node<Scalar> first;
+        Node<Scalar, N_NEIGHBOURS> first;
         first.ray               = unit_vector(std::sin(phi_first / 2), std::cos(phi_first / 2), j * (2 * M_PI / 4));
         first.neighbours[BELOW] = first_neighbours[j];
         first.neighbours[LEFT]  = ((j + 1) % 4 + 4) % 4;
@@ -167,7 +169,7 @@ namespace generator {
 
         for (auto it = vector_of_indices.begin(); it != vector_of_indices.end(); ++it) {
 
-          Node<Scalar> new_node;
+          Node<Scalar, N_NEIGHBOURS> new_node;
           new_node.ray =
             unit_vector(std::sin(phi_next), std::cos(phi_next), theta_offset + one * relative_index_next * theta_next);
 
@@ -199,7 +201,7 @@ namespace generator {
             // split every point of according to the distribution until difference is reached, or split every point.
             if ((relative_index_now % distribution == 0 || distribution == 1) && number_splits < number_difference) {
               // std::cout << "Graph is growing!" << std::endl;
-              Node<Scalar> second_new_node;
+              Node<Scalar, N_NEIGHBOURS> second_new_node;
               second_new_node.ray = unit_vector(
                 std::sin(phi_next), std::cos(phi_next), theta_offset + one * relative_index_next * theta_next);
 
@@ -232,10 +234,11 @@ namespace generator {
       //             << ", " << nodes[i].neighbours[TOP] << ", " << nodes[i].neighbours[BELOW] << std::endl;
       // }
 
-      for (int i = 0; i < nodes.size(); ++i) {
-        nodes[i].neighbours[4] = nodes[i].neighbours[BELOW];
-        nodes[i].neighbours[5] = nodes[i].neighbours[BELOW];
-      }
+      // for (int i = 0; i < nodes.size(); ++i) {
+      //   nodes[i].neighbours[4] = nodes[i].neighbours[BELOW];
+      //   nodes[i].neighbours[5] = nodes[i].neighbours[BELOW];
+      // }
+      std::cout << "I ran!" << std::endl;
       return nodes;
     }  // namespace generator
   };   // namespace generator
@@ -244,142 +247,3 @@ namespace generator {
 }  // namespace visualmesh
 
 #endif  // VISUALMESH_GENERATOR_QUADPIZZA_HPP
-
-
-// auto join_row_neighbours = [&](Node<Scalar>& node,
-//                                const int index,
-//                                const in end,
-//                                const int LEFT,
-//                                const int RIGHT,
-//                                const int number_of_points,
-//                                const bool clockwise) {
-//   int left;
-//   int right;
-
-//   if (clockwise == false) {
-//     left  = RIGHT;
-//     right = LEFT;
-//   }
-//   else {
-//     left  = LEFT;
-//     right = RIGHT;
-//   }
-
-//   if (index == 0) {
-//     node.neighbours[right] = end + number_of_points - 1;
-//     node.neighbours[left]  = end + 1;
-//   }
-//   else if (index == number_of_points - 1) {
-//     node.neighbours[right] = end + number_of_points - 2;
-//     node.neighbours[left]  = end + 0;
-//   }
-//   else {
-//     node.neighbours[right] = end + index - 1;
-//     node.neighbours[left]  = end + index + 1;
-//   }
-// };
-
-// auto join_above_neighbours = [&](Meshpoint<Scalar>& meshpoint,
-//                                  const int index,
-//                                  const int TOP_LEFT,
-//                                  const int TOP_RIGHT,
-//                                  const int number_of_points,
-//                                  const bool clockwise) {
-//   int top_left;
-//   int top_right;
-
-//   if (clockwise == false) {
-//     top_left  = TOP_RIGHT;
-//     top_right = TOP_LEFT;
-//   }
-//   else {
-//     top_left  = TOP_LEFT;
-//     top_right = TOP_RIGHT;
-//   }
-
-//   if (index == number_of_points - 1) {
-//     meshpoint.neighbours[top_right] = index;
-//     meshpoint.neighbours[top_left]  = 0;
-//   }
-//   else {
-//     meshpoint.neighbours[top_right] = index;
-//     meshpoint.neighbours[top_left]  = index + 1;
-//   }
-// };
-
-
-// // merge
-
-// for (int it = 0; it < ring.size(); ++it) {
-//   nodes.push_back(std::move(ring[it]));
-// }
-
-
-// std::vector<double> distribution_vec;
-// std::vector<size_t> number_by_phi;
-// number_by_phi.push_back(4);
-// number_by_phi.push_back(std::ceil((2 * M_PI * k) / shape.theta(shape.phi((v + k / 2) / k, h), h)));
-
-
-// if (phi_next > 1.55) {
-//   std::cout << "v: " << v << std::endl;
-//   std::cout << "phi_next: " << std::endl;
-//   printf("%f \n", phi_next);
-//   std::cout << "h: " << std::endl;
-//   printf("%f \n", h);
-// }
-// if (theta_next < 0.00005) {
-//   std::cout << "v: " << v << std::endl;
-//   std::cout << "theta: " << std::endl;
-//   printf("%f \n", theta_next);
-//   std::cout << "h: " << std::endl;
-//   printf("%f \n", h);
-// }
-
-
-// for (size_t i = 0; i < distribution_vec.size(); ++i) {
-//   printf("%2f \n", distribution_vec[i]);
-// }
-
-// for (int i = 0; i < meshpoints.size(); ++i) {
-//   // std::cout << "i: " << i << std::endl;
-//   int neighbour = meshpoints[i].neighbours[BELOW];
-//   double theta1 = meshpoints[i].current[1];
-
-//   if (!std::isfinite(theta1)) { printf("%f \n", theta1); }
-
-//   double theta2 = meshpoints[neighbour].current[1];
-
-//   double abs_theta1 = std::abs(meshpoints[i].current[1]);
-//   double abs_theta2 = std::abs(meshpoints[neighbour].current[1]);
-
-//   // normalise
-//   double norm_theta1 = abs_theta1 - (2 * M_PI * (std::floor(abs_theta1 / (2 * M_PI))));
-//   double norm_theta2 = abs_theta2 - (2 * M_PI * (std::floor(abs_theta2 / (2 * M_PI))));
-
-//   // correct the direction
-
-//   if (theta1 < 0) { norm_theta1 = 2 * M_PI - norm_theta1; }
-//   if (theta2 < 0) { norm_theta2 = 2 * M_PI - norm_theta2; }
-
-//   meshpoints[i].current[1] = norm_theta1;
-
-//   // if (i == 53) {
-//   //   std::cout << "*********************************************" << std::endl;
-//   //   printf("This: %f and %f and %f and %f \n", theta1, theta2, norm_theta1, norm_theta2);
-//   // }
-//   double error;
-
-//   error = std::min(2 * M_PI - std::abs(norm_theta1 - norm_theta2), std::abs(norm_theta1 - norm_theta2));
-
-//   // printf("%f \n", norm_theta1);
-//   // std::cout << i << ": " << neighbour << std::endl;
-// }
-
-// print out mesh points
-// for (int i = 0; i < nodes.size(); ++i) {
-//   std::cout << "meshpoint: " << i << ": " << nodes[i].neighbours[LEFT] << ", "
-//             << nodes[i].neighbours[RIGHT] << ", " << nodes[i].neighbours[TOP] << ", " <<
-//             nodes[i].neighbours[BELOW] << std::endl;
-
-// }

@@ -9,7 +9,7 @@
 int main() {
 
   visualmesh::geometry::Sphere<float> sphere(0.0949996);
-  visualmesh::Mesh<float> mesh(sphere, 1.0, 6, 20);
+  visualmesh::Mesh<float, visualmesh::generator::QuadPizza> mesh(sphere, 1.0, 1, 20);
 
   visualmesh::test_mesh(mesh, sphere);
 }

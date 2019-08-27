@@ -33,7 +33,7 @@ namespace engine {
     template <typename Scalar>
     class Engine;
 
-    template <typename Scalar>
+    template <typename Scalar, template <typename> class Generator>
     class Classifier {
     public:
       Classifier(Engine<Scalar>* engine, const network_structure_t<Scalar>& structure)
@@ -57,11 +57,12 @@ namespace engine {
       /**
        * Classify using the visual mesh network architecture provided.
        */
-      ClassifiedMesh<Scalar> operator()(const Mesh<Scalar>& mesh,
-                                        const void* image,
-                                        const uint32_t& format,
-                                        const mat4<Scalar>& Hoc,
-                                        const Lens<Scalar>& lens) const {
+
+      ClassifiedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS> operator()(const Mesh<Scalar, Generator>& mesh,
+                                                                         const void* image,
+                                                                         const uint32_t& format,
+                                                                         const mat4<Scalar>& Hoc,
+                                                                         const Lens<Scalar>& lens) const {
         // Two buffers we can ping pong between
         std::vector<Scalar> input;
         std::vector<Scalar> output;
@@ -70,9 +71,9 @@ namespace engine {
         auto ranges = mesh.lookup(Hoc, lens);
 
         // Project the pixels to the display
-        ProjectedMesh<Scalar> projected = engine->project(mesh, ranges, Hoc, lens);
-        auto& neighbourhood             = projected.neighbourhood;
-        int n_points                    = neighbourhood.size();
+        ProjectedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS> projected = engine->project(mesh, ranges, Hoc, lens);
+        auto& neighbourhood                                              = projected.neighbourhood;
+        int n_points                                                     = neighbourhood.size();
 
         // Based on the fourcc code, load the data from the image into input
         input.reserve(n_points * 4);
@@ -124,8 +125,8 @@ namespace engine {
 
           // Ensure enough space for the convolutional gather
           output.resize(0);
-          output.reserve(input.size() * 7);
-          outd = ind * 7;
+          output.reserve(input.size() * (Generator<Scalar>::N_NEIGHBOURS + 1));
+          outd = ind * (Generator<Scalar>::N_NEIGHBOURS + 1);
 
           // Gather over each of the neighbours
           for (int i = 0; i < neighbourhood.size(); ++i) {
@@ -181,10 +182,10 @@ namespace engine {
           std::transform(it, end, it, [total](const Scalar& s) { return s / total; });
         }
 
-        return ClassifiedMesh<Scalar>{std::move(projected.pixel_coordinates),
-                                      std::move(projected.neighbourhood),
-                                      std::move(projected.global_indices),
-                                      std::move(input)};
+        return ClassifiedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS>{std::move(projected.pixel_coordinates),
+                                                                       std::move(projected.neighbourhood),
+                                                                       std::move(projected.global_indices),
+                                                                       std::move(input)};
       }
 
     private:

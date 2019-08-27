@@ -44,8 +44,8 @@ constexpr vec3<Scalar> phi_difference(const Scalar& h, const vec3<Scalar>& a_u, 
   return {h_prime, phi0, std::abs(phi0 - phi1 - theta) < std::abs(phi0 + phi1 - theta) ? phi1 : -phi1};
 }
 
-template <typename Scalar, typename Shape>
-void test_mesh(const Mesh<Scalar>& mesh, const Shape& shape) {
+template <typename Scalar, template <typename> class Generator, typename Shape>
+void test_mesh(const Mesh<Scalar, Generator>& mesh, const Shape& shape) {
 
   // Loop through all the nodes in the mesh
   for (const auto& node : mesh.nodes) {

@@ -45,8 +45,7 @@ namespace engine {
     template <typename Scalar>
     class Engine;
 
-
-    template <typename Scalar>
+    template <typename Scalar, template <typename> class Generator>
     class Classifier {
 
     public:
@@ -110,18 +109,18 @@ namespace engine {
 
           code << "  // Gather from our neighbourhood " << std::endl;
           if (vector_type(conv_in_size)) {
-            code << "  " << in_type << " in0[7] = {" << std::endl;
+            code << "  " << in_type << " in0[" << (Generator<Scalar>::N_NEIGHBOURS + 1) << "] = {" << std::endl;
             code << "    input[idx]," << std::endl;
-            for (int i = 0; i < 6; ++i) {
-              code << "    input[neighbourhood[idx * 6 + " << i << "]]";
-              if (i != 5) { code << ","; }
+            for (int i = 0; i < Generator<Scalar>::N_NEIGHBOURS; ++i) {
+              code << "    input[neighbourhood[idx * " << Generator<Scalar>::N_NEIGHBOURS << " + " << i << "]]";
+              if (i != Generator<Scalar>::N_NEIGHBOURS - 1) { code << ","; }
               code << std::endl;
             }
             code << "  };";
           }
           // Perform our gather step for non vectorized data
           else {
-            code << "  float in0[" << (conv_in_size * 7) << "] = {" << std::endl;
+            code << "  float in0[" << (conv_in_size * (Generator<Scalar>::N_NEIGHBOURS + 1)) << "] = {" << std::endl;
 
             // Read the ones for our own index
             for (int j = 0; j < conv_in_size; ++j) {
@@ -129,11 +128,12 @@ namespace engine {
             }
 
             // Read our neighbourhood
-            for (int i = 0; i < 6; ++i) {
+            for (int i = 0; i < Generator<Scalar>::N_NEIGHBOURS; ++i) {
               for (int j = 0; j < conv_in_size; ++j) {
-                code << "    input[neighbourhood[idx * 6 + " << i << "] * " << conv_in_size << " + " << j << "]";
+                code << "    input[neighbourhood[idx * " << Generator<Scalar>::N_NEIGHBOURS << " + " << i << "] * "
+                     << conv_in_size << " + " << j << "]";
 
-                if (i < 6 || j + 1 < conv_in_size) { code << ","; }
+                if (i < Generator<Scalar>::N_NEIGHBOURS || j + 1 < conv_in_size) { code << ","; }
                 code << std::endl;
               }
             }
@@ -351,11 +351,11 @@ namespace engine {
         }
       }
 
-      ClassifiedMesh<Scalar> operator()(const Mesh<Scalar>& mesh,
-                                        const void* image,
-                                        const uint32_t& format,
-                                        const mat4<Scalar>& Hoc,
-                                        const Lens<Scalar>& lens) const {
+      ClassifiedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS> operator()(const Mesh<Scalar, Generator>& mesh,
+                                                                         const void* image,
+                                                                         const uint32_t& format,
+                                                                         const mat4<Scalar>& Hoc,
+                                                                         const Lens<Scalar>& lens) const {
 
         cl_image_format fmt;
 
@@ -407,7 +407,7 @@ namespace engine {
         throw_cl_error(error, "Error mapping image onto device");
 
         // Project our visual mesh
-        std::vector<std::array<int, 6>> neighbourhood;
+        std::vector<std::array<int, Generator<Scalar>::N_NEIGHBOURS>> neighbourhood;
         std::vector<int> indices;
         cl::mem cl_pixels;
         cl::event cl_pixels_loaded;
@@ -430,7 +430,7 @@ namespace engine {
                                        cl_neighbourhood,
                                        false,
                                        0,
-                                       n_points * sizeof(std::array<int, 6>),
+                                       n_points * sizeof(std::array<int, Generator<Scalar>::N_NEIGHBOURS>),
                                        neighbourhood.data(),
                                        0,
                                        nullptr,
@@ -560,7 +560,7 @@ namespace engine {
         cl_event end_events[2] = {pixels_read, classes_read};
         ::clWaitForEvents(2, end_events);
 
-        return ClassifiedMesh<Scalar>{
+        return ClassifiedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS>{
           std::move(pixels), std::move(neighbourhood), std::move(indices), std::move(classifications)};
       }
 
