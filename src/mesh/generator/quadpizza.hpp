@@ -104,31 +104,27 @@ namespace generator {
         }
 
         int number_difference = number_points_next - number_points_now;
-        Scalar theta_next     = 2 * M_PI / number_points_next;
+        Scalar theta_next;
 
+        // *************** Calculate Split Distribution ***********************
         int distribution;
         if (number_difference == 0) {
           // std::cout << "Difference is zero: " << std::endl;
           distribution       = 0;
-          theta_next         = 2 * M_PI / number_points_now;
           number_points_next = number_points_now;
-          number_points.emplace_back(number_points_now);
         }
         else if (number_difference == 1) {
           // std::cout << "Difference is 1: " << std::endl;
-          growing            = true;
-          distribution       = 1;
+          growing      = true;
+          distribution = 1;
+          // number_difference = 1;
           number_points_next = 1 + number_points_now;
-          number_points.emplace_back(1 + number_points_now);
-          theta_next        = 2 * M_PI / (1 + number_points_now);
-          number_difference = 1;
         }
         else if (number_difference > 1) {
           growing = true;
           if (number_difference < number_points_now) {
             // std::cout << "Difference is reasonable: " << std::endl;
             distribution = number_points_now / number_difference;
-            number_points.emplace_back(number_points_next);
             if (distribution == 1) { every_one = true; }
           }
           else {
@@ -137,18 +133,18 @@ namespace generator {
             // std::cout << "Difference is greater than generating ring: " << std::endl;
             distribution       = 1;
             number_points_next = 2 * number_points_now;
-            number_points.emplace_back(2 * number_points_now);
-            theta_next        = M_PI / number_points_now;
-            number_difference = number_points_now;
+            number_difference  = number_points_now;
           }
         }
         else {
           // std::cout << "Difference is negative: " << std::endl;
           distribution       = 0;
-          theta_next         = 2 * M_PI / number_points_now;
           number_points_next = number_points_now;
-          number_points.emplace_back(number_points_now);
         }
+        // *********************************************************************************
+
+        theta_next = 2 * M_PI / number_points_next;
+        number_points.emplace_back(number_points_next);
 
         std::vector<int> indices;
         for (int i = begin; i < end; ++i) {
@@ -176,7 +172,6 @@ namespace generator {
         int number_splits       = 0;
 
         for (auto it = vector_of_indices.begin(); it != vector_of_indices.end(); ++it) {
-
           Node<Scalar, N_NEIGHBOURS> new_node;
           new_node.ray =
             unit_vector(std::sin(phi_next), std::cos(phi_next), theta_offset + one * relative_index_next * theta_next);
