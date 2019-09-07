@@ -345,6 +345,7 @@ namespace engine {
         throw_cl_error(error, "Failed to create kernel read_image_to_network");
 
         // Work out what the widest network layer is
+        // CHECK THIS WITH TRENT
         max_width = 4;
         for (const auto& k : conv_layers) {
           max_width = std::max(max_width, k.second);
@@ -418,9 +419,13 @@ namespace engine {
         int n_points = neighbourhood.size();
 
         // Allocate the neighbourhood buffer
-        cl::mem cl_neighbourhood(
-          ::clCreateBuffer(engine->context, CL_MEM_READ_WRITE, n_points * sizeof(std::array<int, 6>), nullptr, &error),
-          ::clReleaseMemObject);
+        // CHECK THIS WITH TRENT
+        cl::mem cl_neighbourhood(::clCreateBuffer(engine->context,
+                                                  CL_MEM_READ_WRITE,
+                                                  n_points * sizeof(std::array<int, Generator<Scalar>::N_NEIGHBOURS>),
+                                                  nullptr,
+                                                  &error),
+                                 ::clReleaseMemObject);
         throw_cl_error(error, "Error allocating neighbourhood buffer on device");
 
         // Upload the neighbourhood buffer
@@ -452,7 +457,8 @@ namespace engine {
         cl::event offscreen_fill_event;
         ev               = nullptr;
         Scalar minus_one = static_cast<Scalar>(-1.0);
-        error            = ::clEnqueueFillBuffer(write_queue,
+        // CHECK THIS WITH TRENT
+        error = ::clEnqueueFillBuffer(write_queue,
                                       cl_conv_input,
                                       &minus_one,
                                       sizeof(Scalar),
