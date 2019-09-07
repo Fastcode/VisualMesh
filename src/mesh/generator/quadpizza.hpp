@@ -69,28 +69,17 @@ namespace generator {
 
       std::vector<int> origin_number_points;
       origin_number_points.emplace_back(0);
-      if (k == 8) {
-        origin_number_points.emplace_back(8);
-        // for (int i = 4; i < 7; ++i) {
-        //   // origin_number_points.emplace_back(12 + 8 * i);
-        //   //origin_number_points.emplace_back(std::pow(2, i));
+      origin_number_points.emplace_back(4);
 
-        // }
-        origin_number_points.emplace_back(16);
-        origin_number_points.emplace_back(24);
-        origin_number_points.emplace_back(32);
-      }
+      int stop;
+      if (k < 9) { stop = 5; }
       else {
-        origin_number_points.emplace_back(4);
-        for (int i = 0; i < k; ++i) {
-          // origin_number_points.emplace_back(12 + 8 * i);
-          origin_number_points.emplace_back(8 + 8 * i);
-        }
+        stop = 7;
       }
 
-      // for (size_t i = 0; i < origin_number_points.size(); ++i) {
-      //   std::cout << origin_number_points[i] << std::endl;
-      // }
+      for (int i = 0; i < stop; ++i) {
+        origin_number_points.emplace_back(8 + 8 * i);
+      }
 
       for (int v = 1; h * std::tan(shape.phi(v / k, h)) < max_distance; ++v) {
         Scalar phi_next = shape.phi(v / k, h);
@@ -108,21 +97,11 @@ namespace generator {
 
         // precalculate the number of points vector according to distribution and origin patch
         // fix this limit
-        int stop;
-        if (k == 8) { stop = 5; }
-        else if (k == 6) {
-          stop = 4;
-        }
-        else {
-          stop = k / 2;
-        }
-
         if (v < stop) { number_points_next = origin_number_points[v]; }
         else {
           // floor vs ceil
           number_points_next = std::ceil((2 * M_PI * k) / shape.theta(phi_next, h));
         }
-
 
         int number_difference = number_points_next - number_points_now;
         Scalar theta_next     = 2 * M_PI / number_points_next;
