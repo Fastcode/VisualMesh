@@ -19,6 +19,8 @@
 #define VISUALMESH_GENERATOR_QUADPIZZA_HPP
 
 #include <array>
+#include <fstream>
+#include <iostream>
 #include <vector>
 #include "mesh/node.hpp"
 
@@ -82,6 +84,7 @@ namespace generator {
       }
 
       for (int v = 1; h * std::tan(shape.phi(v / k, h)) < max_distance; ++v) {
+        // check this int to Scalar conversion
         Scalar phi_next = shape.phi(v / k, h);
         int begin       = running_index - number_points.back();
         int end         = running_index;
@@ -230,6 +233,35 @@ namespace generator {
       for (int i = (nodes.size() - number_points.back()); i < nodes.size(); ++i) {
         nodes[i].neighbours[TOP] = i;
       }
+
+      //***********************************Data Collector***************************************
+      std::vector<Scalar> PHI;
+      std::vector<Scalar> THETA;
+      std::vector<int> NUMBER;
+
+
+      for (int j = 0; h * std::tan(shape.phi(j / k, h)) < max_distance; ++j) {
+        PHI.push_back(shape.phi(j / k, h));
+        THETA.push_back(shape.theta(shape.phi(j / k, h), h));
+        NUMBER.push_back(std::ceil((2 * M_PI * k) / shape.theta(shape.phi(j / k, h), h)));
+      }
+
+      int last;
+      last = std::max({PHI.size(), THETA.size(), NUMBER.size(), number_points.size()});
+
+      if (h >= 0.94 - 0.001 && h <= 0.94 + 0.001) {
+        std::ofstream outfile;
+        outfile.open("Numbers.csv");
+        if (outfile.fail()) { std::cout << "Couldn't open the file!" << std::endl; }
+        outfile << "k number," << k << ",Height," << h << ",Stop," << stop << ",Last Ring," << last << ",Distance,"
+                << max_distance << ",\n";
+        outfile << "Phi Number,Phi,Theta,Number of Points,Points by Graph,\n";
+        for (size_t j = 0; j < last; ++j) {
+          outfile << j << "," << PHI[j] << "," << THETA[j] << "," << NUMBER[j] << "," << number_points[j] << ",\n";
+        }
+        outfile.close();
+      }
+      //****************************************************************************************
 
       // // print out mesh points
       // for (int i = 0; i < nodes.size(); ++i) {
