@@ -52,6 +52,13 @@ namespace generator {
       int RIGHT = 2;
       int BELOW = 3;
 
+
+      // **********************************DATA*******************************
+
+      std::vector<int> DISTRIBUTION;
+      std::vector<Scalar> THETA_NEXT;
+      // **********************************************************************
+
       std::array<int, 4> first_neighbours = {2, 3, 0, 1};
 
       Scalar phi_first = shape.phi(1 / k, h) / 2;
@@ -66,6 +73,8 @@ namespace generator {
         nodes.push_back(std::move(first));
       }
       number_points.emplace_back(4);
+      THETA_NEXT.push_back(2 * M_PI / 4);
+      DISTRIBUTION.push_back(1);
 
       int running_index = nodes.size();
 
@@ -94,7 +103,8 @@ namespace generator {
         // hack // odd v generates clockwise, even v generates anti-clockwise.
         int one = std::round(std::pow(-1, v));
 
-        Scalar theta_offset   = Theta_Offset.back();
+        // Scalar theta_offset   = Theta_Offset.back();
+
         int number_points_now = number_points[v - 1];
         int number_points_next;
 
@@ -102,7 +112,6 @@ namespace generator {
         // fix this limit
         if (v < stop) { number_points_next = origin_number_points[v]; }
         else {
-          // floor vs ceil
           number_points_next = std::ceil((2 * M_PI * k) / shape.theta(phi_next, h));
         }
 
@@ -149,32 +158,77 @@ namespace generator {
         theta_next = 2 * M_PI / number_points_next;
         number_points.emplace_back(number_points_next);
 
+        THETA_NEXT.push_back(theta_next);
+        DISTRIBUTION.push_back(distribution);
+
+        bool half_offset = false;
+        if (distribution >= 20) { half_offset = true; };
+
         std::vector<int> indices;
         for (int i = begin; i < end; ++i) {
           indices.push_back(i);
         }
 
-        // condense this
-        std::vector<int> vector_of_indices;
-        if (v == 1) {
-          vector_of_indices.push_back(indices[0]);
-          for (int m = indices.size() - 1; m > 0; --m) {
-            vector_of_indices.push_back(indices[m]);
-          }
+        // condense this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        int new_offset = 1;
+        if (v == 1) { new_offset = 0; }
+        else if (half_offset) {
+          new_offset = 1;
         }
         else {
-          vector_of_indices.push_back(indices[1]);
-          vector_of_indices.push_back(indices[0]);
-          for (int m = indices.size() - 1; m > 1; --m) {
-            vector_of_indices.push_back(indices[m]);
-          }
+          new_offset = 1;
         }
+
+
+        std::vector<int> vector_of_indices;
+
+        for (int m = new_offset; m >= 0; --m) {
+          vector_of_indices.push_back(indices[m]);
+        }
+        for (int p = indices.size() - 1; p > new_offset; --p) {
+          vector_of_indices.push_back(indices[p]);
+        }
+
+        // std::vector<int> vector_of_indices;
+        // if (v == 1) {
+        //   vector_of_indices.push_back(indices[0]);
+        //   for (int m = indices.size() - 1; m > 0; --m) {
+        //     vector_of_indices.push_back(indices[m]);
+        //   }
+        // }
+        // else {
+        //   if (half_offset) {
+        //     // this is not exact
+        //     for (int m = new_offset; m >= 0; --m) {
+        //       vector_of_indices.push_back(indices[m]);
+        //     }
+        //     for (int p = indices.size() - 1; p > new_offset; --p) {
+        //       vector_of_indices.push_back(indices[p]);
+        //     }
+        //   }
+        //   else {
+        //     vector_of_indices.push_back(indices[1]);
+        //     vector_of_indices.push_back(indices[0]);
+        //     for (int m = indices.size() - 1; m > 1; --m) {
+        //       vector_of_indices.push_back(indices[m]);
+        //     }
+        //   }
+        // }
+
+        // if (half_offset) { Theta_Offset.push_back(theta_offset + one * new_offset * theta_next); }
+        // else {
+        //   Theta_Offset.push_back(theta_offset + one * 1 * theta_next);
+        // }
 
         int relative_index_now  = 0;
         int relative_index_next = 0;
         int number_splits       = 0;
+        Scalar theta_offset =
+          std::atan2(nodes[*vector_of_indices.begin()].ray[1], nodes[*vector_of_indices.begin()].ray[0]);
 
         for (auto it = vector_of_indices.begin(); it != vector_of_indices.end(); ++it) {
+
+
           Node<Scalar, N_NEIGHBOURS> new_node;
           new_node.ray =
             unit_vector(std::sin(phi_next), std::cos(phi_next), theta_offset + one * relative_index_next * theta_next);
@@ -191,9 +245,13 @@ namespace generator {
           nodes.push_back(std::move(new_node));
           relative_index_next += 1;
 
-          if (relative_index_next == 1) {
-            Theta_Offset.push_back(theta_offset + one * relative_index_next * theta_next);
-          }
+          // Needs to be here to incorporate the splits!!!!!!!!!!!!!!!!!!!!!!!!
+          // if (half_offset && (relative_index_next == new_offset)) {
+          //   Theta_Offset.push_back(theta_offset + one * relative_index_next * theta_next);
+          // }
+          // else if (relative_index_next == 1) {
+          //   Theta_Offset.push_back(theta_offset + one * relative_index_next * theta_next);
+          // }
 
           // *************** Generate Second Node ***********************
           if (growing) {
@@ -221,6 +279,11 @@ namespace generator {
 
               number_splits += 1;
               relative_index_next += 1;
+
+              // Needs to be here to incorporate the splits!!!!!!!!!!!!!!!!!!!!!!!!
+              // if (half_offset && (relative_index_next == new_offset)) {
+              //   Theta_Offset.push_back(theta_offset + one * relative_index_next * theta_next);
+              // }
             }
           }
           // *********************************************************************************
@@ -236,28 +299,41 @@ namespace generator {
 
       //***********************************Data Collector***************************************
       std::vector<Scalar> PHI;
-      std::vector<Scalar> THETA;
+      std::vector<Scalar> THETA_RAW;
       std::vector<int> NUMBER;
 
 
       for (int j = 0; h * std::tan(shape.phi(j / k, h)) < max_distance; ++j) {
         PHI.push_back(shape.phi(j / k, h));
-        THETA.push_back(shape.theta(shape.phi(j / k, h), h));
+        THETA_RAW.push_back(shape.theta(shape.phi(j / k, h), h));
         NUMBER.push_back(std::ceil((2 * M_PI * k) / shape.theta(shape.phi(j / k, h), h)));
       }
 
       int last;
-      last = std::max({PHI.size(), THETA.size(), NUMBER.size(), number_points.size()});
+      last = std::max(
+        {PHI.size(), THETA_RAW.size(), NUMBER.size(), number_points.size(), THETA_NEXT.size(), DISTRIBUTION.size()});
 
       if (h >= 0.94 - 0.001 && h <= 0.94 + 0.001) {
         std::ofstream outfile;
-        outfile.open("Numbers.csv");
+        outfile.open("/home/asugo/LatexPlotData/Error/Robot6.csv");
         if (outfile.fail()) { std::cout << "Couldn't open the file!" << std::endl; }
-        outfile << "k number," << k << ",Height," << h << ",Stop," << stop << ",Last Ring," << last << ",Distance,"
-                << max_distance << ",\n";
-        outfile << "Phi Number,Phi,Theta,Number of Points,Points by Graph,\n";
-        for (size_t j = 0; j < last; ++j) {
-          outfile << j << "," << PHI[j] << "," << THETA[j] << "," << NUMBER[j] << "," << number_points[j] << ",\n";
+        // outfile << "#,"
+        // << "kNumber," << k << ",Height," << h << ",Stop," << stop << ",LastRing," << last << ",Distance,"
+        // << max_distance << "\n";
+        // outfile << "PhiNumber,Phi,THETA_RAW,NumberOfPoints,PointsByGraph,Difference,\n";
+        outfile << "PhiNumber,Phi,Distance,Theta_Raw,NumberOfPoints,PointsByGraph,Difference,Distribution,Ratio\n";
+        int diff;
+        for (size_t j = 5; j < last; ++j) {
+          if (std::isfinite(THETA_RAW[j]) && std::isfinite(THETA_RAW[j - 1])) { diff = NUMBER[j] - NUMBER[j - 1]; }
+          else {
+            diff = 0;
+          }
+          Scalar distance = h * std::tan(PHI[j]);
+          Scalar T        = std::isfinite(THETA_RAW[j]) ? THETA_RAW[j] : 10000;
+          Scalar N        = std::isfinite(THETA_RAW[j]) ? NUMBER[j] : 0;
+          int Ratio       = std::floor(THETA_NEXT[j] / (THETA_NEXT[j - 1] - THETA_NEXT[j]));
+          outfile << j << "," << PHI[j] << "," << distance << "," << T << "," << N << "," << number_points[j] << ","
+                  << diff << "," << DISTRIBUTION[j] << "," << Ratio << "\n";
         }
         outfile.close();
       }
