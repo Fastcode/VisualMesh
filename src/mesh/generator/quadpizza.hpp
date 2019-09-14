@@ -102,10 +102,7 @@ namespace generator {
         bool growing    = false;
 
         // hack // odd v generates clockwise, even v generates anti-clockwise.
-        int one = std::round(std::pow(-1, v));
-
-        // Scalar theta_offset   = Theta_Offset.back();
-
+        int one               = std::round(std::pow(-1, v));
         int number_points_now = number_points[v - 1];
         int number_points_next;
 
