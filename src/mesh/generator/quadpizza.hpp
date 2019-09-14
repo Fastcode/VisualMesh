@@ -92,6 +92,7 @@ namespace generator {
         origin_number_points.emplace_back(8 + 8 * i);
       }
 
+      bool half_offset = false;
       for (int v = 1; h * std::tan(shape.phi(v / k, h)) < max_distance; ++v) {
         // check this int to Scalar conversion
         Scalar phi_next = shape.phi(v / k, h);
@@ -161,24 +162,23 @@ namespace generator {
         THETA_NEXT.push_back(theta_next);
         DISTRIBUTION.push_back(distribution);
 
-        bool half_offset = false;
-        if (distribution >= 20) { half_offset = true; };
+
+        if (distribution >= 2 * k + 2) { half_offset = true; };
 
         std::vector<int> indices;
         for (int i = begin; i < end; ++i) {
           indices.push_back(i);
         }
 
-        // condense this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // Chooses starting node
         int new_offset = 1;
         if (v == 1) { new_offset = 0; }
         else if (half_offset) {
-          new_offset = 1;
+          new_offset = std::floor(distribution / 2);
         }
         else {
           new_offset = 1;
         }
-
 
         std::vector<int> vector_of_indices;
 
@@ -189,37 +189,6 @@ namespace generator {
           vector_of_indices.push_back(indices[p]);
         }
 
-        // std::vector<int> vector_of_indices;
-        // if (v == 1) {
-        //   vector_of_indices.push_back(indices[0]);
-        //   for (int m = indices.size() - 1; m > 0; --m) {
-        //     vector_of_indices.push_back(indices[m]);
-        //   }
-        // }
-        // else {
-        //   if (half_offset) {
-        //     // this is not exact
-        //     for (int m = new_offset; m >= 0; --m) {
-        //       vector_of_indices.push_back(indices[m]);
-        //     }
-        //     for (int p = indices.size() - 1; p > new_offset; --p) {
-        //       vector_of_indices.push_back(indices[p]);
-        //     }
-        //   }
-        //   else {
-        //     vector_of_indices.push_back(indices[1]);
-        //     vector_of_indices.push_back(indices[0]);
-        //     for (int m = indices.size() - 1; m > 1; --m) {
-        //       vector_of_indices.push_back(indices[m]);
-        //     }
-        //   }
-        // }
-
-        // if (half_offset) { Theta_Offset.push_back(theta_offset + one * new_offset * theta_next); }
-        // else {
-        //   Theta_Offset.push_back(theta_offset + one * 1 * theta_next);
-        // }
-
         int relative_index_now  = 0;
         int relative_index_next = 0;
         int number_splits       = 0;
@@ -227,8 +196,6 @@ namespace generator {
           std::atan2(nodes[*vector_of_indices.begin()].ray[1], nodes[*vector_of_indices.begin()].ray[0]);
 
         for (auto it = vector_of_indices.begin(); it != vector_of_indices.end(); ++it) {
-
-
           Node<Scalar, N_NEIGHBOURS> new_node;
           new_node.ray =
             unit_vector(std::sin(phi_next), std::cos(phi_next), theta_offset + one * relative_index_next * theta_next);
@@ -244,14 +211,6 @@ namespace generator {
 
           nodes.push_back(std::move(new_node));
           relative_index_next += 1;
-
-          // Needs to be here to incorporate the splits!!!!!!!!!!!!!!!!!!!!!!!!
-          // if (half_offset && (relative_index_next == new_offset)) {
-          //   Theta_Offset.push_back(theta_offset + one * relative_index_next * theta_next);
-          // }
-          // else if (relative_index_next == 1) {
-          //   Theta_Offset.push_back(theta_offset + one * relative_index_next * theta_next);
-          // }
 
           // *************** Generate Second Node ***********************
           if (growing) {
@@ -279,11 +238,6 @@ namespace generator {
 
               number_splits += 1;
               relative_index_next += 1;
-
-              // Needs to be here to incorporate the splits!!!!!!!!!!!!!!!!!!!!!!!!
-              // if (half_offset && (relative_index_next == new_offset)) {
-              //   Theta_Offset.push_back(theta_offset + one * relative_index_next * theta_next);
-              // }
             }
           }
           // *********************************************************************************
