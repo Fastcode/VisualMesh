@@ -264,8 +264,9 @@ class VisualMeshDataset:
       ns.append(n)
 
     # Add on the null point for X and G
+    # This is a hack 5 is number of neighbours + 1
     Xs.append(tf.constant([[-1.0, -1.0, -1.0]], dtype=tf.float32))
-    Gs.append(tf.fill([1, 7], n_elems))
+    Gs.append(tf.fill([1, 5], n_elems))
 
     X = tf.concat(Xs, axis=0)
     Y = tf.concat(Ys, axis=0)

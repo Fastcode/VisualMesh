@@ -63,6 +63,9 @@ enum Args {
 template <typename T, typename U>
 class VisualMeshOp : public tensorflow::OpKernel {
 public:
+  template <typename V>
+  using Generator = visualmesh::generator::QuadPizza<V>;
+
   explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
 
   void Compute(tensorflow::OpKernelContext* context) override {
@@ -93,8 +96,8 @@ public:
                 tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
                 tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
     OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsVector(context->input(Args::GEOMETRY_PARAMS).shape())
-                  tensorflow::errors::InvalidArgument("The geometry params must be a vector of the required parts"));
+                tensorflow::TensorShapeUtils::IsVector(context->input(Args::GEOMETRY_PARAMS).shape()),
+                tensorflow::errors::InvalidArgument("The geometry params must be a vector of the required parts"));
 
     // Extract information from our input tensors, flip x and y as tensorflow has them reversed compared to us
     auto image_dimensions                = context->input(Args::DIMENSIONS).vec<U>();
@@ -142,23 +145,25 @@ public:
 
     // Project the mesh using our engine and shape
     visualmesh::engine::cpu::Engine<T> engine;
-    visualmesh::ProjectedMesh<T> projected;
+
+
+    visualmesh::ProjectedMesh<T, Generator<T>::N_NEIGHBOURS> projected;
     if (geometry == "SPHERE") {
       visualmesh::geometry::Sphere<T> shape(g_params(0));
       // TODO cache this, building a BSP is no joke
-      visualmesh::Mesh<T> mesh(shape, height, g_params(1), g_params(2));
+      visualmesh::Mesh<T, Generator> mesh(shape, height, g_params(1), g_params(2));
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CIRCLE") {
       visualmesh::geometry::Circle<T> shape(g_params(0));
       // TODO cache this, building a BSP is no joke
-      visualmesh::Mesh<T> mesh(shape, height, g_params(1), g_params(2));
+      visualmesh::Mesh<T, Generator> mesh(shape, height, g_params(1), g_params(2));
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CYLINDER") {
       visualmesh::geometry::Cylinder<T> shape(g_params(0), g_params(1));
       // TODO cache this, building a BSP is no joke
-      visualmesh::Mesh<T> mesh(shape, height, g_params(2), g_params(3));
+      visualmesh::Mesh<T, Generator> mesh(shape, height, g_params(2), g_params(3));
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else {
