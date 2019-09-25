@@ -296,10 +296,11 @@ namespace generator {
         std::vector<std::vector<Scalar>> Variation;
 
         for (int i = 1; i < 4; ++i) {
-          Scalar counter = nodes.size() - 1 - (1000 * i);
+          // Scalar counter = nodes.size() - 1 - (1000 * i);
+          Scalar counter = nodes.size() - 1 - 4000 + (900 * i);
           std::cout << counter << std::endl;
           std::vector<Scalar> variation;
-          for (int t = last - 1; t > 1; --t) {
+          for (int t = last - 1; t > 2; --t) {
             variation.push_back(std::atan2(nodes[counter].ray[1], nodes[counter].ray[0]));
             counter = nodes[counter].neighbours[BELOW];
           }
@@ -308,7 +309,7 @@ namespace generator {
 
 
         std::ofstream outfile2;
-        outfile2.open("/home/asugo/LatexPlotData/ThetaVariation8.csv");
+        outfile2.open("/home/asugo/LatexPlotData/ThetaVariationQuadAlt8.csv");
         outfile2 << "Phi_Number,Distance,Theta0,Theta1,Theta2\n";
 
         for (int t = 0; t < Variation[0].size(); ++t) {
