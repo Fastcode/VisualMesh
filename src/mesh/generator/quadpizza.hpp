@@ -85,7 +85,7 @@ namespace generator {
       int stop;
       if (k < 9) { stop = 5; }
       else {
-        stop = 7;
+        stop = 8;
       }
 
       for (int i = 0; i < stop; ++i) {
@@ -158,7 +158,6 @@ namespace generator {
 
         THETA_NEXT.push_back(theta_next);
         DISTRIBUTION.push_back(distribution);
-
 
         if (distribution >= 2 * k + 2) { half_offset = true; };
 
@@ -264,30 +263,60 @@ namespace generator {
       last = std::max(
         {PHI.size(), THETA_RAW.size(), NUMBER.size(), number_points.size(), THETA_NEXT.size(), DISTRIBUTION.size()});
 
+      // if (h >= 0.94 - 0.001 && h <= 0.94 + 0.001) {
+      //   std::ofstream outfile;
+      //   outfile.open("/home/asugo/LatexPlotData/Error/Robot6.csv");
+      //   if (outfile.fail()) { std::cout << "Couldn't open the file!" << std::endl; }
+      //   // outfile << "#,"
+      //   // << "kNumber," << k << ",Height," << h << ",Stop," << stop << ",LastRing," << last << ",Distance,"
+      //   // << max_distance << "\n";
+      //   // outfile << "PhiNumber,Phi,THETA_RAW,NumberOfPoints,PointsByGraph,Difference,\n";
+      //   outfile
+      //     <<
+      //     "PhiNumber,Phi,Distance,Theta_Raw,NumberOfPoints,PointsByGraph,Difference,Distribution,Theta_next,Ratio\n";
+      //   int diff;
+      //   for (size_t j = 5; j < last; ++j) {
+      //     if (std::isfinite(THETA_RAW[j]) && std::isfinite(THETA_RAW[j - 1])) { diff = NUMBER[j] - NUMBER[j - 1]; }
+      //     else {
+      //       diff = 0;
+      //     }
+      //     Scalar distance = h * std::tan(PHI[j]);
+      //     Scalar T        = std::isfinite(THETA_RAW[j]) ? THETA_RAW[j] : 10000;
+      //     Scalar N        = std::isfinite(THETA_RAW[j]) ? NUMBER[j] : 0;
+      //     int Ratio       = std::floor(THETA_NEXT[j] / (THETA_NEXT[j - 1] - THETA_NEXT[j]));
+      //     outfile << j << "," << PHI[j] << "," << distance << "," << T << "," << N << "," << number_points[j] << ","
+      //             << diff << "," << DISTRIBUTION[j] << "," << THETA_NEXT[j] << "," << Ratio << "\n";
+      //   }
+      //   outfile.close();
+      // }
+
+
       if (h >= 0.94 - 0.001 && h <= 0.94 + 0.001) {
-        std::ofstream outfile;
-        outfile.open("/home/asugo/LatexPlotData/Error/Robot6.csv");
-        if (outfile.fail()) { std::cout << "Couldn't open the file!" << std::endl; }
-        // outfile << "#,"
-        // << "kNumber," << k << ",Height," << h << ",Stop," << stop << ",LastRing," << last << ",Distance,"
-        // << max_distance << "\n";
-        // outfile << "PhiNumber,Phi,THETA_RAW,NumberOfPoints,PointsByGraph,Difference,\n";
-        outfile << "PhiNumber,Phi,Distance,Theta_Raw,NumberOfPoints,PointsByGraph,Difference,Distribution,Ratio\n";
-        int diff;
-        for (size_t j = 5; j < last; ++j) {
-          if (std::isfinite(THETA_RAW[j]) && std::isfinite(THETA_RAW[j - 1])) { diff = NUMBER[j] - NUMBER[j - 1]; }
-          else {
-            diff = 0;
+
+        std::vector<std::vector<Scalar>> Variation;
+
+        for (int i = 1; i < 4; ++i) {
+          Scalar counter = nodes.size() - 1 - (1000 * i);
+          std::cout << counter << std::endl;
+          std::vector<Scalar> variation;
+          for (int t = last - 1; t > 1; --t) {
+            variation.push_back(std::atan2(nodes[counter].ray[1], nodes[counter].ray[0]));
+            counter = nodes[counter].neighbours[BELOW];
           }
-          Scalar distance = h * std::tan(PHI[j]);
-          Scalar T        = std::isfinite(THETA_RAW[j]) ? THETA_RAW[j] : 10000;
-          Scalar N        = std::isfinite(THETA_RAW[j]) ? NUMBER[j] : 0;
-          int Ratio       = std::floor(THETA_NEXT[j] / (THETA_NEXT[j - 1] - THETA_NEXT[j]));
-          outfile << j << "," << PHI[j] << "," << distance << "," << T << "," << N << "," << number_points[j] << ","
-                  << diff << "," << DISTRIBUTION[j] << "," << Ratio << "\n";
+          Variation.push_back(variation);
         }
-        outfile.close();
+
+
+        std::ofstream outfile2;
+        outfile2.open("/home/asugo/LatexPlotData/ThetaVariation8.csv");
+        outfile2 << "Phi_Number,Distance,Theta0,Theta1,Theta2\n";
+
+        for (int t = 0; t < Variation[0].size(); ++t) {
+          outfile2 << last - 1 - t << "," << h * std::tan(PHI[last - 1 - t]) << "," << Variation[0][t] << ","
+                   << Variation[1][t] << "," << Variation[2][t] << "\n";
+        }
       }
+
       //****************************************************************************************
 
       // // print out mesh points
