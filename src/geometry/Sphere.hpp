@@ -40,7 +40,8 @@ namespace geometry {
      * @brief Given a number of radial jumps (n) give the phi angle required
      *
      * @details
-     *  To calculate the angle to the base of the object we can use the following equation
+     *  To calculate the angle to the base of the object we can use the following equation to find the next tangential
+     *  sphere. However for the visual mesh we would rather work in the sphere centres
      *
      *                     ⎛         n⎞
      *         π        -1 ⎜⎛    2⋅r⎞ ⎟
@@ -48,6 +49,11 @@ namespace geometry {
      *         2           ⎝⎝     h ⎠ ⎠
      *
      * Then to get the equation for the centre of the sphere, we calculate given the average angle of n ± 0.5
+     *
+     *
+     *          φ(n - 0.5) + φ(n + 0.5)
+     *  φ (n) = ───────────────────────
+     *   c                 2
      *
      * @param n the number of whole objects to jump from the origin to reach this point (from object centres)
      * @param h the height of the camera above the observation plane
@@ -63,7 +69,7 @@ namespace geometry {
      * @details
      *  This equation can also be used to calculate the n difference between any two objects by calculating the
      *  augmented height above the ground h' and the two φ' angles and using those in this equation instead of the real
-     *  values
+     *  values. The following equation is for the tangent form of the equation found by inverting it
      *
      *       ⎛   ⎛φ   π⎞⎞
      *    log⎜cot⎜─ + ─⎟⎟
@@ -71,10 +77,25 @@ namespace geometry {
      *  ─────────────────────
      *  log(h - 2⋅r) - log(h)
      *
+     *  However for inverting the centre form of the equation we must use its inversion
+     *
+     *     ⎛                         _________________________⎞
+     *     ⎜                        ╱  2            2    2    ⎟
+     *     ⎜r⋅sin(φ) - h⋅sin(φ) + ╲╱  h  - 2⋅h⋅r + r ⋅sin (φ) ⎟
+     *  log⎜──────────────────────────────────────────────────⎟
+     *     ⎝                     h⋅cos(φ)                     ⎠    1
+     *  ───────────────────────────────────────────────────────  - ─
+     *                  log(h - 2⋅r) -log(h)                       2
+     *
      * @param phi the phi angle measured from below the camera
      */
     Scalar n(const Scalar& phi, const Scalar& h) const {
-      return std::log(1 / std::tan(phi * 0.5 + M_PI_4)) / (std::log(h - 2 * r) - log(h));
+      const Scalar sp = std::sin(phi);
+      const Scalar cp = std::cos(phi);
+
+      return std::log((r * sp - h * sp + std::sqrt(h * h - 2 * h * r + r * r * sp * sp)) / (h * cp))
+               / (log(h - 2 * r) - log(h))
+             - 0.5;
     }
 
     /**
