@@ -93,8 +93,8 @@ public:
                 tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
                 tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
     OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsVector(context->input(Args::GEOMETRY_PARAMS).shape())
-                  tensorflow::errors::InvalidArgument("The geometry params must be a vector of the required parts"));
+                tensorflow::TensorShapeUtils::IsVector(context->input(Args::GEOMETRY_PARAMS).shape()),
+                tensorflow::errors::InvalidArgument("The geometry params must be a vector of the required parts"));
 
     // Extract information from our input tensors, flip x and y as tensorflow has them reversed compared to us
     auto image_dimensions                = context->input(Args::DIMENSIONS).vec<U>();
