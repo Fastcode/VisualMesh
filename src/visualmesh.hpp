@@ -48,22 +48,41 @@ public:
    * @param shape        the shape we are generating a visual mesh for
    * @param min_height   the minimum height that our camera will be at
    * @param max_height   the maximum height our camera will be at
-   * @param n_heights    the number of look up tables to generated (height gradations)
+   * @param k            the number of intersections with the object
+   * @param max_error    the maximum amount of error in terms of k that a mesh can have
+   * @param max_distance the maximum distance that this mesh will project for
    */
   template <typename Shape>
   explicit VisualMesh(const Shape& shape,
                       const Scalar& min_height,
                       const Scalar& max_height,
-                      const unsigned int& n_heights,
                       const Scalar& k,
+                      const Scalar& max_error,
                       const Scalar& max_distance) {
 
-    // Loop through to make a mesh for each of our height possibilities
-    const Scalar jump = (max_height - min_height) / n_heights;
-    for (unsigned int i = 0; i < n_heights; ++i) {
-      // Insert our constructed mesh into the lookup
-      const Scalar h = min_height + i * jump;
-      luts.insert(std::make_pair(h, Mesh<Scalar>(shape, h, k, max_distance)));
+    // Add an element for the min and max height
+    luts.insert(std::make_pair(min_height, Mesh<Scalar>(shape, min_height, k, max_distance)));
+    luts.insert(std::make_pair(max_height, Mesh<Scalar>(shape, max_height, k, max_distance)));
+
+    // Run through a stack splitting the range in two until the region is filled appropriately
+    std::vector<vec2<Scalar>> stack;
+    stack.emplace_back(vec2<Scalar>{min_height, max_height});
+
+    while (!stack.empty()) {
+      // Get the next element for consideration
+      vec2<Scalar> range = stack.back();
+      Scalar h           = (range[0] + range[1]) / 2;
+      stack.pop_back();
+
+      Scalar lower_err = std::abs(k - k * shape.k(range[0], h));
+      Scalar upper_err = std::abs(k - k * shape.k(range[1], h));
+
+      // If we aren't close enough to both elements
+      if (lower_err > max_error || upper_err > max_error) {
+        luts.insert(std::make_pair(h, Mesh<Scalar>(shape, h, k, max_distance)));
+        stack.emplace_back(vec2<Scalar>{range[0], h});
+        stack.emplace_back(vec2<Scalar>{h, range[1]});
+      }
     }
   }
 
