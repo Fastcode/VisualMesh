@@ -44,8 +44,8 @@ namespace engine {
           for (auto& layer : conv) {
             auto& w = layer.first;
             weights_t<Scalar> new_weights(w.front().size(), std::vector<Scalar>(w.size()));
-            for (int i = 0; i < w.size(); ++i) {
-              for (int j = 0; j < w[i].size(); ++j) {
+            for (unsigned int i = 0; i < w.size(); ++i) {
+              for (unsigned int j = 0; j < w[i].size(); ++j) {
                 new_weights[j][i] = w[i][j];
               }
             }
@@ -72,7 +72,7 @@ namespace engine {
         // Project the pixels to the display
         ProjectedMesh<Scalar> projected = engine->project(mesh, ranges, Hoc, lens);
         auto& neighbourhood             = projected.neighbourhood;
-        int n_points                    = neighbourhood.size();
+        unsigned int n_points           = neighbourhood.size();
 
         // Based on the fourcc code, load the data from the image into input
         input.reserve(n_points * 4);
@@ -119,7 +119,7 @@ namespace engine {
         int outd = 0;
 
         // For each convolutional layer
-        for (int conv_no = 0; conv_no < structure.size(); ++conv_no) {
+        for (unsigned int conv_no = 0; conv_no < structure.size(); ++conv_no) {
           const auto& conv = structure[conv_no];
 
           // Ensure enough space for the convolutional gather
@@ -128,7 +128,7 @@ namespace engine {
           outd = ind * 7;
 
           // Gather over each of the neighbours
-          for (int i = 0; i < neighbourhood.size(); ++i) {
+          for (unsigned int i = 0; i < neighbourhood.size(); ++i) {
             output.insert(output.end(), std::next(input.begin(), i * ind), std::next(input.begin(), (i + 1) * ind));
             for (const auto& n : neighbourhood[i]) {
               output.insert(output.end(), std::next(input.begin(), n * ind), std::next(input.begin(), (n + 1) * ind));
@@ -140,7 +140,7 @@ namespace engine {
           ind = outd;
 
           // For each network layer
-          for (int layer_no = 0; layer_no < conv.size(); ++layer_no) {
+          for (unsigned int layer_no = 0; layer_no < conv.size(); ++layer_no) {
             const auto& weights = conv[layer_no].first;
             const auto& biases  = conv[layer_no].second;
 
@@ -151,8 +151,8 @@ namespace engine {
 
             // Apply the weights and bias
             auto in_point = input.begin();
-            for (int i = 0; i < n_points; ++i) {
-              for (int j = 0; j < biases.size(); ++j) {
+            for (unsigned int i = 0; i < n_points; ++i) {
+              for (unsigned int j = 0; j < biases.size(); ++j) {
                 output.emplace_back(std::inner_product(weights[j].begin(), weights[j].end(), in_point, biases[j]));
               }
               in_point += ind;

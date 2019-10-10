@@ -54,25 +54,34 @@ void test_mesh(const Mesh<Scalar>& mesh, const Shape& shape) {
     const auto& ray0 = node.ray;
 
     // We look through each of our neighbours to see how good we are
-    for (int i = 0; i < node.neighbours.size(); ++i) {
+    for (unsigned int i = 0; i < node.neighbours.size(); ++i) {
 
       // We get our next two neighbours in a clockwise direction
       int n0 = node.neighbours[i];
       int n1 = node.neighbours[(i + 1) % node.neighbours.size()];
 
-      // The neighbours ray
-      const auto& ray1 = mesh.nodes[n0].ray;
-      const auto& ray2 = mesh.nodes[n1].ray;
+      // Ignore points that go off the screen
+      std::cout << "n" << i << " d: " << mesh.h * std::sqrt(1 - ray0[2] * ray0[2]) / -ray0[2];
+      if (n0 < int(mesh.nodes.size())) {
+        // The neighbours ray
+        const auto& ray1 = mesh.nodes[n0].ray;
+        // Difference between us and our neighbour ray
+        vec3<Scalar> diff_01 = phi_difference<Scalar>(mesh.h, {ray0[0], ray0[1], ray0[2]}, {ray1[0], ray1[1], ray1[2]});
+        Scalar n_01          = std::abs(shape.n(diff_01[1], diff_01[0]) - shape.n(diff_01[2], diff_01[0]));
+        std::cout << " *: " << n_01;
 
-      // Difference between us and our neighbour ray
-      vec3<Scalar> diff_01 = phi_difference<Scalar>(mesh.h, {ray0[0], ray0[1], ray0[2]}, {ray1[0], ray1[1], ray1[2]});
-      Scalar n_01          = std::abs(shape.n(diff_01[1], diff_01[0]) - shape.n(diff_01[2], diff_01[0]));
+        if (n1 < int(mesh.nodes.size())) {
+          const auto& ray2 = mesh.nodes[n1].ray;
 
-      // The difference between the two neighbour rays
-      vec3<Scalar> diff_12 = phi_difference<Scalar>(mesh.h, {ray1[0], ray1[1], ray1[2]}, {ray2[0], ray2[1], ray2[2]});
-      Scalar n_12          = std::abs(shape.n(diff_12[1], diff_12[0]) - shape.n(diff_12[2], diff_12[0]));
+          // The difference between the two neighbour rays
+          vec3<Scalar> diff_12 =
+            phi_difference<Scalar>(mesh.h, {ray1[0], ray1[1], ray1[2]}, {ray2[0], ray2[1], ray2[2]});
+          Scalar n_12 = std::abs(shape.n(diff_12[1], diff_12[0]) - shape.n(diff_12[2], diff_12[0]));
 
-      std::cout << "*: " << n_01 << " o: " << n_12 << std::endl;
+          std::cout << " o: " << n_12;
+        }
+      }
+      std::cout << std::endl;
     }
     std::cout << std::endl;
   }

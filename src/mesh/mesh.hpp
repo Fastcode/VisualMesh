@@ -276,6 +276,7 @@ private:
             vec2<Scalar>{cones[3].second, std::sqrt(static_cast<Scalar>(1.0) - cones[3].second * cones[3].second)}),
         }};
       }
+      default: throw std::runtime_error("Unknown lens type");
     }
   }
 
@@ -354,7 +355,7 @@ public:
     // Make our reverse lookup so we can correct the neighbourhood indices
     std::vector<int> r_sorting(nodes.size() + 1);
     r_sorting[nodes.size()] = nodes.size();
-    for (int i = 0; i < nodes.size(); ++i) {
+    for (unsigned int i = 0; i < nodes.size(); ++i) {
       r_sorting[sorting[i]] = i;
     }
 
@@ -460,7 +461,6 @@ public:
         // Add the children of this to the search in order 1,0 so we pop 0 first (contiguous indices)
         stack.push_back(elem.children[1]);
         stack.push_back(elem.children[0]);
-        for (const auto& s : stack) {}
       }
     }
     // If we finished while building add the last point

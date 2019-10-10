@@ -96,9 +96,7 @@ namespace generator {
         const int n_slices = static_cast<int>(std::ceil(k * 2 * M_PI / n_raw_dtheta));
 
         // Recalculate delta theta for each of these slices based on a whole number of spheres
-        const Scalar p_dtheta = (M_PI * 2) / p_slices;
         const Scalar c_dtheta = (M_PI * 2) / c_slices;
-        const Scalar n_dtheta = (M_PI * 2) / n_slices;
 
         // Optimisation since we use these a lot
         const Scalar sin_phi = std::sin(c_phi);
@@ -142,7 +140,7 @@ namespace generator {
       }
 
       // Clip all neighbours that are past the end to one past the end
-      for (int i = start; i < nodes.size(); ++i) {
+      for (unsigned int i = start; i < nodes.size(); ++i) {
         for (auto& n : nodes[i].neighbours) {
           n = std::min(n, static_cast<int>(nodes.size()));
         }

@@ -44,7 +44,7 @@ namespace engine {
         const mat3<Scalar> Rco(block<3, 3>(transpose(Hoc)));
 
         // Work out how many points total there are
-        int n_points = 0;
+        unsigned int n_points = 0;
         for (auto& r : ranges) {
           n_points += r.second - r.first;
         }

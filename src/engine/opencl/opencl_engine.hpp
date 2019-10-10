@@ -58,9 +58,8 @@ namespace engine {
         ::clGetPlatformIDs(platforms.size(), platforms.data(), nullptr);
 
         // Which device/platform we are going to use
-        cl_platform_id best_platform = nullptr;
-        cl_device_id best_device     = nullptr;
-        int best_compute_units       = 0;
+        cl_device_id best_device   = nullptr;
+        cl_uint best_compute_units = 0;
 
         // Go through our platforms
         // for (const auto& platform : platforms) {
@@ -106,7 +105,6 @@ namespace engine {
 
           if (max_compute_units > best_compute_units) {
             best_compute_units = max_compute_units;
-            best_platform      = platform;
             best_device        = device;
           }
 
@@ -374,15 +372,15 @@ namespace engine {
         // This can happen on the CPU while the OpenCL device is busy
         // Build the reverse lookup map where the offscreen point is one past the end
         std::vector<int> r_indices(nodes.size() + 1, points);
-        for (uint i = 0; i < indices.size(); ++i) {
+        for (unsigned int i = 0; i < indices.size(); ++i) {
           r_indices[indices[i]] = i;
         }
 
         // Build the packed neighbourhood map with an extra offscreen point at the end
         std::vector<std::array<int, 6>> local_neighbourhood(points + 1);
-        for (uint i = 0; i < indices.size(); ++i) {
+        for (unsigned int i = 0; i < indices.size(); ++i) {
           const auto& node = nodes[indices[i]];
-          for (uint j = 0; j < 6; ++j) {
+          for (unsigned int j = 0; j < 6; ++j) {
             const auto& n             = node.neighbours[j];
             local_neighbourhood[i][j] = r_indices[n];
           }

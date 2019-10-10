@@ -54,13 +54,13 @@ public:
   explicit VisualMesh(const Shape& shape,
                       const Scalar& min_height,
                       const Scalar& max_height,
-                      const uint& n_heights,
+                      const unsigned int& n_heights,
                       const Scalar& k,
                       const Scalar& max_distance) {
 
     // Loop through to make a mesh for each of our height possibilities
     const Scalar jump = (max_height - min_height) / n_heights;
-    for (int i = 0; i < n_heights; ++i) {
+    for (unsigned int i = 0; i < n_heights; ++i) {
       // Insert our constructed mesh into the lookup
       const Scalar h = min_height + i * jump;
       luts.insert(std::make_pair(h, Mesh<Scalar>(shape, h, k, max_distance)));

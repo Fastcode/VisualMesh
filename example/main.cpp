@@ -173,7 +173,6 @@ int main() {
       }
       else if (meta["camera"]["lens"]["type"].as<std::string>() == "FISHEYE") {
         float fov             = meta["camera"]["lens"]["fov"].as<float>();
-        float height_mm       = meta["camera"]["lens"]["sensor_height"].as<float>();
         float width_mm        = meta["camera"]["lens"]["sensor_width"].as<float>();
         float focal_length_mm = meta["camera"]["lens"]["focal_length"].as<float>();
 
@@ -199,7 +198,7 @@ int main() {
 
         cv::Mat scratch = img.clone();
 
-        for (int i = 0; i < pixel_coordinates.size(); ++i) {
+        for (unsigned int i = 0; i < pixel_coordinates.size(); ++i) {
           cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
 
           // Work out what colour based on mixing
@@ -215,7 +214,7 @@ int main() {
           colour += cv::Scalar(0, 255 * cl[3], 0);
 
           for (const auto& n : neighbourhood[i]) {
-            if (n < pixel_coordinates.size()) {
+            if (n < static_cast<int>(pixel_coordinates.size())) {
               cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
               cv::Point p2x = p1 + ((p2 - p1) * 0.5);
               cv::line(scratch, p1, p2x, colour, 1);
@@ -242,7 +241,7 @@ int main() {
 
         cv::Mat scratch = img.clone();
 
-        for (int i = 0; i < pixel_coordinates.size(); ++i) {
+        for (int i = 0; i < static_cast<int>(pixel_coordinates.size()); ++i) {
           cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
 
           // Work out what colour based on mixing
@@ -258,7 +257,7 @@ int main() {
           colour += cv::Scalar(0, 255 * cl[3], 0);
 
           for (const auto& n : neighbourhood[i]) {
-            if (n < pixel_coordinates.size()) {
+            if (n < static_cast<int>(pixel_coordinates.size())) {
               cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
               cv::Point p2x = p1 + ((p2 - p1) * 0.5);
               cv::line(scratch, p1, p2x, colour, 1);

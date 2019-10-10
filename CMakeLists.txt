@@ -30,6 +30,13 @@ ELSE()
     SET(TOP_LEVEL_PROJECT OFF)
 ENDIF()
 
+# Turn on warnings
+IF(MSVC)
+    ADD_COMPILE_OPTIONS(/W4 /WX)
+ELSE()
+    ADD_COMPILE_OPTIONS(-Wall -Wextra -Werror)
+ENDIF()
+
 # All the header files for this library
 FILE(GLOB hdr "src/**.hpp")
 
@@ -115,10 +122,11 @@ IF(TOP_LEVEL_PROJECT)
         FIND_PACKAGE(OpenCV REQUIRED)
         FIND_PACKAGE(YAML-CPP REQUIRED)
         FIND_PACKAGE(OpenCL REQUIRED)
+        FIND_PACKAGE(Threads REQUIRED)
 
         ADD_EXECUTABLE(main "example/main.cpp" ${hdr})
         TARGET_COMPILE_OPTIONS(main PRIVATE -march=native -mtune=native)
-        SET_TARGET_PROPERTIES(main PROPERTIES CXX_STANDARD 14)
+        SET_TARGET_PROPERTIES(main PROPERTIES CXX_STANDARD 17)
         TARGET_INCLUDE_DIRECTORIES(main SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
         TARGET_INCLUDE_DIRECTORIES(main SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
         TARGET_INCLUDE_DIRECTORIES(main PRIVATE ${PROJECT_SOURCE_DIR}/src)
@@ -129,11 +137,12 @@ IF(TOP_LEVEL_PROJECT)
             ${OpenCV_LIBS}
             ${fmt_LIBRARIES}
             ${YAML_CPP_LIBRARIES}
+            Threads::Threads
         )
 
         ADD_EXECUTABLE(mesh_quality "example/mesh_quality.cpp" ${hdr})
         TARGET_COMPILE_OPTIONS(mesh_quality PRIVATE -march=native -mtune=native)
-        SET_TARGET_PROPERTIES(mesh_quality PROPERTIES CXX_STANDARD 14)
+        SET_TARGET_PROPERTIES(mesh_quality PROPERTIES CXX_STANDARD 17)
         TARGET_INCLUDE_DIRECTORIES(mesh_quality PRIVATE ${PROJECT_SOURCE_DIR}/src)
         TARGET_INCLUDE_DIRECTORIES(mesh_quality PRIVATE ${PROJECT_BINARY_DIR}/src)
     ENDIF(BUILD_EXAMPLE)

@@ -67,7 +67,14 @@ enum Args {
 };
 
 template <typename T, template <typename> class Shape>
-visualmesh::Mesh<T>& get_mesh(const Shape<T>& shape, const T& n_intersections, const T& intersection_tolerance) {}
+visualmesh::Mesh<T>& get_mesh(const Shape<T>& /*shape*/,
+                              const T& /*n_intersections*/,
+                              const T& /*intersection_tolerance*/,
+                              const T& /*max_distance*/) {
+  static std::map<int, visualmesh::Mesh<T>> map;
+
+  return map.begin()->second;
+}
 
 template <typename T, typename U>
 class VisualMeshOp : public tensorflow::OpKernel {
@@ -168,19 +175,19 @@ public:
     if (geometry == "SPHERE") {
       visualmesh::geometry::Sphere<T> shape(g_params(0));
       visualmesh::Mesh<T>& mesh =
-        get_mesh<T, visualmesh::geometry::Sphere>(shape, n_intersections, intersection_tolerance);
+        get_mesh<T, visualmesh::geometry::Sphere>(shape, n_intersections, intersection_tolerance, max_distance);
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CIRCLE") {
       visualmesh::geometry::Circle<T> shape(g_params(0));
       visualmesh::Mesh<T>& mesh =
-        get_mesh<T, visualmesh::geometry::Circle>(shape, n_intersections, intersection_tolerance);
+        get_mesh<T, visualmesh::geometry::Circle>(shape, n_intersections, intersection_tolerance, max_distance);
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CYLINDER") {
       visualmesh::geometry::Cylinder<T> shape(g_params(0), g_params(1));
       visualmesh::Mesh<T>& mesh =
-        get_mesh<T, visualmesh::geometry::Cylinder>(shape, n_intersections, intersection_tolerance);
+        get_mesh<T, visualmesh::geometry::Cylinder>(shape, n_intersections, intersection_tolerance, max_distance);
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
 
@@ -213,7 +220,7 @@ public:
 
     // Copy across our neighbourhood graph, adding in a point for itself
     auto n = neighbours->matrix<U>();
-    for (int i = 0; i < neighbourhood.size(); ++i) {
+    for (unsigned int i = 0; i < neighbourhood.size(); ++i) {
       // Get our old neighbours from original output
       const auto& m = neighbourhood[i];
       n(i, 0)       = i;
