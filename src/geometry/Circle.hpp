@@ -39,6 +39,15 @@ namespace geometry {
     /**
      * @brief Given a number of radial jumps (n) give the phi angle required
      *
+     * @details
+     *  This equation gives the phi angle that results from a number of radial jumps of circles on the observation
+     *  plane. It measures from the centre of the circle on the ground, although this gives identical results to
+     *  measuring to the tangents.
+     *
+     *             -1 ⎛2⋅n⋅r⎞
+     *  φ(n) =  tan   ⎜─────⎟
+     *                ⎝  h  ⎠
+     *
      * @param n the number of whole objects to jump from the origin to reach this point (from object centres)
      * @param h the height of the camera above the observation plane
      */
@@ -54,10 +63,35 @@ namespace geometry {
      *  augmented height above the ground h' and the two φ' angles and using those in this equation instead of the real
      *  values
      *
+     *
+     *         h⋅tan(φ)
+     *  n(φ) = ────────
+     *           2⋅r
+     *
      * @param phi the phi angle measured from below the camera
      */
     Scalar n(const Scalar& phi, const Scalar& h) const {
       return (h * std::tan(phi)) / (2.0 * r);
+    }
+
+
+    /**
+     * @brief Gets the ratio of intersections using a Visual Mesh that was produced with a different height.
+     *
+     * @details
+     *  This equation can be used to work out how many intersections will happen when you take a Visual Mesh that was
+     *  created for one height and use it for another height. This can be used to check if an existing Visual Mesh will
+     *  be appropriate for use when the height of the camera changes. The result of this function is a ratio which gives
+     *  the number of intersections that will result from changing the height. We can use the tangent form of the
+     *  equation here as it is simpler and does not change the result.
+     *
+     *              h₀
+     *  k(h₀, h₁) = ──
+     *              h₁
+     *
+     */
+    Scalar k(const Scalar& h_0, const Scalar& h_1) {
+      return h_0 / h_1;
     }
 
     /**
