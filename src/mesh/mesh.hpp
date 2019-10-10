@@ -333,7 +333,7 @@ private:
 public:
   template <template <typename T> class Generator = generator::HexaPizza, typename Shape>
   Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance)
-    : h(h), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
+    : h(h), max_distance(max_distance), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
 
     // To ensure that later we can fix the graph we need to perform our sorting on an index list
     std::vector<int> sorting(nodes.size());
@@ -470,6 +470,8 @@ public:
   }
   /// The height that this mesh is designed to run at
   Scalar h;
+  /// The maximum distance this mesh is setup for
+  Scalar max_distance;
   /// The lookup table for this mesh
   std::vector<Node<Scalar>> nodes;
 

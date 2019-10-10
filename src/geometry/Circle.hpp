@@ -90,7 +90,7 @@ namespace geometry {
      *              h₁
      *
      */
-    Scalar k(const Scalar& h_0, const Scalar& h_1) {
+    Scalar k(const Scalar& h_0, const Scalar& h_1) const {
       return h_0 / h_1;
     }
 

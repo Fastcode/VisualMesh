@@ -19,20 +19,13 @@ class VisualMeshDataset:
     self.classes = classes
     self.batch_size = batch_size
     self.geometry = tf.constant(geometry.shape, dtype=tf.string, name='GeometryType')
+    self.radius = geometry.radius
     self.n_intersections = geometry.intersections
     self.intersection_tolerance = geometry.intersection_tolerance
+    self.cached_meshes = geometry.cached_meshes
     self.max_distance = geometry.max_distance
     self.prefetch = prefetch
-
     self._variants = variants
-
-    # Convert our geometry into a set of numbers
-    if geometry.shape in ['CIRCLE', 'SPHERE']:
-      self.geometry_params = tf.constant([geometry.radius], dtype=tf.float32, name='GeometryParams')
-    elif geometry.shape in ['CYLINDER']:
-      self.geometry_params = tf.constant([geometry.height, geometry.radius], dtype=tf.float32, name='GeometryParams')
-    else:
-      raise Exception('Unknown geometry type {}'.format(self.geometry))
 
   def _load_example(self, proto):
     example = tf.parse_single_example(
@@ -107,10 +100,11 @@ class VisualMeshDataset:
       args['lens_centre'],
       orientation,
       height,
-      self.n_intersection,
+      self.n_intersections,
+      self.cached_meshes,
       self.max_distance,
       self.geometry,
-      self.geometry_params,
+      self.radius,
       name='ProjectVisualMesh',
     )
 

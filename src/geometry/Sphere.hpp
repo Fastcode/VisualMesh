@@ -111,7 +111,7 @@ namespace geometry {
      *              log(h₀ - 2⋅r) - log(h₀)
      *
      */
-    Scalar k(const Scalar& h_0, const Scalar& h_1) {
+    Scalar k(const Scalar& h_0, const Scalar& h_1) const {
       return (std::log(h_1 - 2 * r) - std::log(h_1)) / (std::log(h_0 - 2 * r) - std::log(h_0));
     }
 

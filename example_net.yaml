@@ -12,15 +12,17 @@ dataset:
 geometry:
   # How many intersections with the target object we should have.
   intersections: 6
+  # How many intersections the mesh can vary by before it will generate a new mesh
+  intersection_tolerance: 0.5
+  # How many distinct meshes to cache before dropping old ones
+  cached_meshes: 100
   # The maximum distance the visual mesh will be projected for. This should be slightly further than the most distant
   # object that you wish to detect to account for noises in the projection.
   max_distance: 20
   # The radius of the object to be detected.
   radius: 0.0949996
-  # The shape to project, either CYLINDER, CIRCLE or SPHERE.
+  # The shape to project, either CIRCLE or SPHERE.
   shape: SPHERE
-  # The height of the cylinder, only used for the cylinder geometry.
-  # height: 1
 
 # Configuration for the convolutional neural network.
 network:
@@ -31,7 +33,8 @@ network:
   # Having an empty list (e.g.) [[], [2]] would correspond to two stacked convolutions.
   # The final layer of the network is always equal to the number of classes and should be omitted, typically by an
   # empty list.
-  structure: [[16], [16], [16], [16], [16], [16], [16], [8], [8], [8], [8], [8], []]
+  structure:
+    [[16], [16], [16], [16], [16], [16], [16], [8], [8], [8], [8], [8], []]
   # Activation Function
   activation_fn: selu
   # This is a mapping of the classes to the colours that represent them in the mask images.
@@ -109,7 +112,7 @@ training:
   variants:
     mesh:
       # Adjustments to the height of the mesh above the observation plane.
-      height: { 'mean': 0, 'stddev': 0.05 }
+      height: { "mean": 0, "stddev": 0.05 }
       # Adjustments to the orientation of the observation plane.
       # This value is used as three componentwise euler rotations added to the initial rotation in radians.
-      rotation: { 'mean': 0, 'stddev': 0.0872665 }
+      rotation: { "mean": 0, "stddev": 0.0872665 }

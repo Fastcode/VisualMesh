@@ -18,9 +18,10 @@
 #include <tensorflow/core/framework/op.h>
 #include <tensorflow/core/framework/op_kernel.h>
 #include <tensorflow/core/framework/shape_inference.h>
+#include <memory>
+#include <mutex>
 #include "engine/cpu/cpu_engine.hpp"
 #include "geometry/Circle.hpp"
-#include "geometry/Cylinder.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/mesh.hpp"
 
@@ -35,16 +36,14 @@ REGISTER_OP("VisualMesh")
   .Input("cam_to_observation_plane: T")
   .Input("height: T")
   .Input("n_intersections: T")
+  .Input("cached_meshes: int32")
   .Input("intersection_tolerance: T")
   .Input("max_distance: T")
   .Input("geometry: string")
-  .Input("geometry_params: T")
+  .Input("radius: T")
   .Output("pixels: T")
   .Output("neighbours: int32")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-    // Lots of these for checking the various things
-
-
     // nx2 points on image, and n+1x7 neighbours (including off screen point)
     c->set_output(0, c->MakeShape({c->kUnknownDim, 2}));
     c->set_output(1, c->MakeShape({c->kUnknownDim, 7}));
@@ -60,20 +59,90 @@ enum Args {
   ROC                    = 5,
   HEIGHT                 = 6,
   N_INTERSECTIONS        = 7,
-  INTERSECTION_TOLERANCE = 8,
-  MAX_DISTANCE           = 9,
-  GEOMETRY               = 10,
-  GEOMETRY_PARAMS        = 11
+  CACHED_MESHES          = 8,
+  INTERSECTION_TOLERANCE = 9,
+  MAX_DISTANCE           = 10,
+  GEOMETRY               = 11,
+  RADIUS                 = 12
 };
 
-template <typename T, template <typename> class Shape>
-visualmesh::Mesh<T>& get_mesh(const Shape<T>& /*shape*/,
-                              const T& /*n_intersections*/,
-                              const T& /*intersection_tolerance*/,
-                              const T& /*max_distance*/) {
-  static std::map<int, visualmesh::Mesh<T>> map;
+template <typename Scalar, template <typename> class Shape>
+Scalar mesh_k_error(const Shape<Scalar>& shape, const Scalar& h_0, const Scalar& h_1, const Scalar& k) {
+  return std::abs(k - k * shape.k(h_0, h_1));
+}
 
-  return map.begin()->second;
+template <typename Scalar, template <typename> class Shape>
+std::shared_ptr<visualmesh::Mesh<Scalar>> find_mesh(std::vector<std::shared_ptr<visualmesh::Mesh<Scalar>>>& meshes,
+                                                    const Shape<Scalar>& shape,
+                                                    const Scalar& h,
+                                                    const Scalar& k,
+                                                    const Scalar& t,
+                                                    const Scalar& d) {
+
+  // Nothing in the map!
+  if (meshes.empty()) { return nullptr; }
+
+  // Find the best mesh we have available
+  auto best_it      = meshes.begin();
+  Scalar best_error = std::numeric_limits<Scalar>::max();
+  for (auto it = meshes.begin(); it != meshes.end(); ++it) {
+    auto error = mesh_k_error(shape, (*it)->h, h, k);
+    if (d == (*it)->max_distance && error < best_error) {
+      best_error = error;
+      best_it    = it;
+    }
+  }
+
+  // Swap it to the top of the list so we can keep somewhat of which items are most used
+  std::iter_swap(meshes.begin(), best_it);
+
+  // If it was good enough return it, otherwise return null
+  return best_error <= t ? *best_it : nullptr;
+};
+
+template <typename Scalar, template <typename> class Shape>
+std::shared_ptr<visualmesh::Mesh<Scalar>> get_mesh(const Shape<Scalar>& shape,
+                                                   const Scalar& height,
+                                                   const Scalar& n_intersections,
+                                                   const Scalar& intersection_tolerance,
+                                                   const int32_t& cached_meshes,
+                                                   const Scalar& max_distance) {
+
+  // Static map of heights to meshes
+  static std::vector<std::shared_ptr<visualmesh::Mesh<Scalar>>> meshes;
+  static std::mutex mesh_mutex;
+
+  // Find and return an element if one is appropriate
+  /* mutex scope */ {
+    std::lock_guard<std::mutex> lock(mesh_mutex);
+
+    // If we found an acceptable mesh return it
+    auto mesh = find_mesh(meshes, shape, height, n_intersections, intersection_tolerance, max_distance);
+    if (mesh != nullptr) { return mesh; }
+  }
+
+  // We couldn't find an appropriate mesh, make a new one but don't hold the mutex while we do so others can still query
+  auto new_mesh = std::make_shared<visualmesh::Mesh<Scalar>>(shape, height, n_intersections, max_distance);
+
+  /* mutex scope */ {
+    std::lock_guard<std::mutex> lock(mesh_mutex);
+
+    // Check again for an acceptable mesh in case someone else made one too
+    auto mesh = find_mesh(meshes, shape, height, n_intersections, intersection_tolerance, max_distance);
+    if (mesh != nullptr) { return mesh; }
+    // Otherwise add the one we made to the list
+    else {
+
+      // Only cache a fixed number of meshes so remove the old ones
+      while (static_cast<int32_t>(meshes.size()) > cached_meshes) {
+        meshes.pop_back();
+      }
+
+      // Add our new mesh to the cache and return
+      meshes.push_back(new_mesh);
+      return new_mesh;
+    }
+  }
 }
 
 template <typename T, typename U>
@@ -104,22 +173,25 @@ public:
                 tensorflow::errors::InvalidArgument("Roc must be a 3x3 matrix"));
     OP_REQUIRES(context,
                 tensorflow::TensorShapeUtils::IsScalar(context->input(Args::HEIGHT).shape()),
-                tensorflow::errors::InvalidArgument("The height value must be a scalar"));
+                tensorflow::errors::InvalidArgument("The height must be a scalar"));
     OP_REQUIRES(context,
                 tensorflow::TensorShapeUtils::IsScalar(context->input(Args::N_INTERSECTIONS).shape()),
-                tensorflow::errors::InvalidArgument("The number of intersections value must be a scalar"));
+                tensorflow::errors::InvalidArgument("The number of intersections must be a scalar"));
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::CACHED_MESHES).shape()),
+                tensorflow::errors::InvalidArgument("The number cached meshes must be a scalar"));
     OP_REQUIRES(context,
                 tensorflow::TensorShapeUtils::IsScalar(context->input(Args::INTERSECTION_TOLERANCE).shape()),
-                tensorflow::errors::InvalidArgument("The intersection tolerance value must be a scalar"));
+                tensorflow::errors::InvalidArgument("The intersection tolerance must be a scalar"));
     OP_REQUIRES(context,
                 tensorflow::TensorShapeUtils::IsScalar(context->input(Args::MAX_DISTANCE).shape()),
-                tensorflow::errors::InvalidArgument("The maximum distance value must be a scalar"));
+                tensorflow::errors::InvalidArgument("The maximum distance must be a scalar"));
     OP_REQUIRES(context,
                 tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
                 tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
     OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsVector(context->input(Args::GEOMETRY_PARAMS).shape()),
-                tensorflow::errors::InvalidArgument("The geometry params must be a vector of the required parts"));
+                tensorflow::TensorShapeUtils::IsVector(context->input(Args::RADIUS).shape()),
+                tensorflow::errors::InvalidArgument("The radius must be a scalar"));
 
     // Extract information from our input tensors, flip x and y as tensorflow has them reversed compared to us
     auto image_dimensions                = context->input(Args::DIMENSIONS).vec<U>();
@@ -132,17 +204,18 @@ public:
     T height                             = context->input(Args::HEIGHT).scalar<T>()(0);
     T max_distance                       = context->input(Args::MAX_DISTANCE).scalar<T>()(0);
     T n_intersections                    = context->input(Args::N_INTERSECTIONS).scalar<T>()(0);
+    tensorflow::int32 cached_meshes      = context->input(Args::N_INTERSECTIONS).scalar<tensorflow::int32>()(0);
     T intersection_tolerance             = context->input(Args::INTERSECTION_TOLERANCE).scalar<T>()(0);
     std::string geometry                 = *context->input(Args::GEOMETRY).flat<tensorflow::string>().data();
-    auto g_params                        = context->input(Args::GEOMETRY_PARAMS).vec<T>();
+    T radius                             = context->input(Args::RADIUS).scalar<T>()(0);
 
     // Perform some runtime checks on the actual values to make sure they make sense
     OP_REQUIRES(context,
                 !(projection == "EQUISOLID" || projection == "EQUIDISTANT" || projection == "RECTILINEAR"),
                 tensorflow::errors::InvalidArgument("Projection must be one of EQUISOLID, EQUIDISTANT or RECTILINEAR"));
     OP_REQUIRES(context,
-                !(geometry == "SPHERE" || geometry == "CIRCLE" || geometry == "CYLINDER"),
-                tensorflow::errors::InvalidArgument("Geometry must be one of SPHERE, CIRCLE or CYLINDER"));
+                !(geometry == "SPHERE" || geometry == "CIRCLE"),
+                tensorflow::errors::InvalidArgument("Geometry must be one of SPHERE or CIRCLE"));
 
     // Create our transformation matrix
     visualmesh::mat4<T> Hoc = {{
@@ -173,22 +246,16 @@ public:
     visualmesh::ProjectedMesh<T> projected;
 
     if (geometry == "SPHERE") {
-      visualmesh::geometry::Sphere<T> shape(g_params(0));
-      visualmesh::Mesh<T>& mesh =
-        get_mesh<T, visualmesh::geometry::Sphere>(shape, n_intersections, intersection_tolerance, max_distance);
-      projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
+      visualmesh::geometry::Sphere<T> shape(radius);
+      std::shared_ptr<visualmesh::Mesh<T>> mesh = get_mesh<T, visualmesh::geometry::Sphere>(
+        shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
+      projected = engine.project(*mesh, mesh->lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CIRCLE") {
-      visualmesh::geometry::Circle<T> shape(g_params(0));
-      visualmesh::Mesh<T>& mesh =
-        get_mesh<T, visualmesh::geometry::Circle>(shape, n_intersections, intersection_tolerance, max_distance);
-      projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
-    }
-    else if (geometry == "CYLINDER") {
-      visualmesh::geometry::Cylinder<T> shape(g_params(0), g_params(1));
-      visualmesh::Mesh<T>& mesh =
-        get_mesh<T, visualmesh::geometry::Cylinder>(shape, n_intersections, intersection_tolerance, max_distance);
-      projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
+      visualmesh::geometry::Circle<T> shape(radius);
+      std::shared_ptr<visualmesh::Mesh<T>> mesh = get_mesh<T, visualmesh::geometry::Circle>(
+        shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
+      projected = engine.project(*mesh, mesh->lookup(Hoc, lens), Hoc, lens);
     }
 
     // Get the interesting things out of the projected mesh
