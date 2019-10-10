@@ -34,6 +34,9 @@ REGISTER_OP("VisualMesh")
   .Input("lens_centre: T")
   .Input("cam_to_observation_plane: T")
   .Input("height: T")
+  .Input("n_intersections: T")
+  .Input("intersection_tolerance: T")
+  .Input("max_distance: T")
   .Input("geometry: string")
   .Input("geometry_params: T")
   .Output("pixels: T")
@@ -49,16 +52,22 @@ REGISTER_OP("VisualMesh")
   });
 
 enum Args {
-  DIMENSIONS      = 0,
-  PROJECTION      = 1,
-  FOCAL_LENGTH    = 2,
-  FIELD_OF_VIEW   = 3,
-  LENS_CENTRE     = 4,
-  ROC             = 5,
-  HEIGHT          = 6,
-  GEOMETRY        = 7,
-  GEOMETRY_PARAMS = 8
+  DIMENSIONS             = 0,
+  PROJECTION             = 1,
+  FOCAL_LENGTH           = 2,
+  FIELD_OF_VIEW          = 3,
+  LENS_CENTRE            = 4,
+  ROC                    = 5,
+  HEIGHT                 = 6,
+  N_INTERSECTIONS        = 7,
+  INTERSECTION_TOLERANCE = 8,
+  MAX_DISTANCE           = 9,
+  GEOMETRY               = 10,
+  GEOMETRY_PARAMS        = 11
 };
+
+template <typename T, template <typename> class Shape>
+visualmesh::Mesh<T>& get_mesh(const Shape<T>& shape, const T& n_intersections, const T& intersection_tolerance) {}
 
 template <typename T, typename U>
 class VisualMeshOp : public tensorflow::OpKernel {
@@ -90,6 +99,15 @@ public:
                 tensorflow::TensorShapeUtils::IsScalar(context->input(Args::HEIGHT).shape()),
                 tensorflow::errors::InvalidArgument("The height value must be a scalar"));
     OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::N_INTERSECTIONS).shape()),
+                tensorflow::errors::InvalidArgument("The number of intersections value must be a scalar"));
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::INTERSECTION_TOLERANCE).shape()),
+                tensorflow::errors::InvalidArgument("The intersection tolerance value must be a scalar"));
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::MAX_DISTANCE).shape()),
+                tensorflow::errors::InvalidArgument("The maximum distance value must be a scalar"));
+    OP_REQUIRES(context,
                 tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
                 tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
     OP_REQUIRES(context,
@@ -105,6 +123,9 @@ public:
     auto lens_centre                     = context->input(Args::LENS_CENTRE).flat<T>();
     auto tRoc                            = context->input(Args::ROC).matrix<T>();
     T height                             = context->input(Args::HEIGHT).scalar<T>()(0);
+    T max_distance                       = context->input(Args::MAX_DISTANCE).scalar<T>()(0);
+    T n_intersections                    = context->input(Args::N_INTERSECTIONS).scalar<T>()(0);
+    T intersection_tolerance             = context->input(Args::INTERSECTION_TOLERANCE).scalar<T>()(0);
     std::string geometry                 = *context->input(Args::GEOMETRY).flat<tensorflow::string>().data();
     auto g_params                        = context->input(Args::GEOMETRY_PARAMS).vec<T>();
 
@@ -143,32 +164,23 @@ public:
     // Project the mesh using our engine and shape
     visualmesh::engine::cpu::Engine<T> engine;
     visualmesh::ProjectedMesh<T> projected;
-    if (geometry == "SPHERE") {
-      // TODO cache based on r,h and k values as they can form a single ratio number
-      // TODO Single number is (1-(2r/h))^k as this is the number that is manipulated in the equation
 
+    if (geometry == "SPHERE") {
       visualmesh::geometry::Sphere<T> shape(g_params(0));
-      // TODO cache this, building a BSP is no joke
-      visualmesh::Mesh<T> mesh(shape, height, g_params(1), g_params(2));
+      visualmesh::Mesh<T>& mesh =
+        get_mesh<T, visualmesh::geometry::Sphere>(shape, n_intersections, intersection_tolerance);
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CIRCLE") {
-      // TODO cache based on r,h and k values as they form a single ratio number
-      // TODO single number is 2r/(h*k)
-
       visualmesh::geometry::Circle<T> shape(g_params(0));
-      // TODO cache this, building a BSP is no joke
-      visualmesh::Mesh<T> mesh(shape, height, g_params(1), g_params(2));
+      visualmesh::Mesh<T>& mesh =
+        get_mesh<T, visualmesh::geometry::Circle>(shape, n_intersections, intersection_tolerance);
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CYLINDER") {
-      // TODO we need to cache based on two numbers, the cylinder height ratio and the height ratio as for spheres
-      // TODO (1-(2r/h))^k as per normal for a sphere and
-      // TODO (1-(2r/(c_h - h))^k for the opposing sphere
-
       visualmesh::geometry::Cylinder<T> shape(g_params(0), g_params(1));
-      // TODO cache this, building a BSP is no joke
-      visualmesh::Mesh<T> mesh(shape, height, g_params(2), g_params(3));
+      visualmesh::Mesh<T>& mesh =
+        get_mesh<T, visualmesh::geometry::Cylinder>(shape, n_intersections, intersection_tolerance);
       projected = engine.project(mesh, mesh.lookup(Hoc, lens), Hoc, lens);
     }
 

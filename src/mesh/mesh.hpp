@@ -235,7 +235,7 @@ private:
       }
       case LensProjection::EQUIDISTANT:
       case LensProjection::EQUISOLID: {
-        /* The labels for each of the corners of the screen in cam space are is shown below.
+        /* The labels for each of the edge centres of the screen in cam space are is shown below.
          * ^        D
          * |    G   C   E
          * z        F

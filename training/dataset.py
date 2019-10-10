@@ -19,22 +19,18 @@ class VisualMeshDataset:
     self.classes = classes
     self.batch_size = batch_size
     self.geometry = tf.constant(geometry.shape, dtype=tf.string, name='GeometryType')
+    self.n_intersections = geometry.intersections
+    self.intersection_tolerance = geometry.intersection_tolerance
+    self.max_distance = geometry.max_distance
     self.prefetch = prefetch
 
     self._variants = variants
 
     # Convert our geometry into a set of numbers
     if geometry.shape in ['CIRCLE', 'SPHERE']:
-      self.geometry_params = tf.constant([geometry.radius, geometry.intersections, geometry.max_distance],
-                                         dtype=tf.float32,
-                                         name='GeometryParams')
-
+      self.geometry_params = tf.constant([geometry.radius], dtype=tf.float32, name='GeometryParams')
     elif geometry.shape in ['CYLINDER']:
-      self.geometry_params = tf.constant([
-        geometry.height, geometry.radius, geometry.intersections, geometry.max_distance
-      ],
-                                         dtype=tf.float32,
-                                         name='GeometryParams')
+      self.geometry_params = tf.constant([geometry.height, geometry.radius], dtype=tf.float32, name='GeometryParams')
     else:
       raise Exception('Unknown geometry type {}'.format(self.geometry))
 
@@ -111,6 +107,8 @@ class VisualMeshDataset:
       args['lens_centre'],
       orientation,
       height,
+      self.n_intersection,
+      self.max_distance,
       self.geometry,
       self.geometry_params,
       name='ProjectVisualMesh',
@@ -207,13 +205,11 @@ class VisualMeshDataset:
         )
       )
     if 'gamma' in var and var.gamma.stddev > 0:
-      X = tf.image.adjust_gamma(
-        X, tf.truncated_normal(
-          shape=(),
-          mean=var.gamma.mean,
-          stddev=var.gamma.stddev,
-        )
-      )
+      X = tf.image.adjust_gamma(X, tf.truncated_normal(
+        shape=(),
+        mean=var.gamma.mean,
+        stddev=var.gamma.stddev,
+      ))
 
     # Remove the extra dimension we added
     return tf.squeeze(X, axis=0)
