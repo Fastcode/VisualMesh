@@ -33,11 +33,11 @@ class VisualMeshDataset:
         'image': tf.FixedLenFeature([], tf.string),
         'mask': tf.FixedLenFeature([], tf.string),
         'lens/projection': tf.FixedLenFeature([], tf.string),
-        'lens/focal_length': tf.FixedLenFeature([1], tf.float32),
-        'lens/fov': tf.FixedLenFeature([1], tf.float32),
+        'lens/focal_length': tf.FixedLenFeature([], tf.float32),
+        'lens/fov': tf.FixedLenFeature([], tf.float32),
         'lens/centre': tf.FixedLenFeature([2], tf.float32),
         'mesh/orientation': tf.FixedLenFeature([3, 3], tf.float32),
-        'mesh/height': tf.FixedLenFeature([1], tf.float32),
+        'mesh/height': tf.FixedLenFeature([], tf.float32),
       }
     )
 
@@ -93,7 +93,7 @@ class VisualMeshDataset:
 
     # Run the visual mesh to get our values
     pixels, neighbours = VisualMesh(
-      tf.shape(args['image']),
+      tf.shape(args['image'])[:2],
       args['projection'],
       args['focal_length'],
       args['fov'],
@@ -102,6 +102,7 @@ class VisualMeshDataset:
       height,
       self.n_intersections,
       self.cached_meshes,
+      self.intersection_tolerance,
       self.max_distance,
       self.geometry,
       self.radius,

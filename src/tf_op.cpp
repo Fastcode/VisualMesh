@@ -169,7 +169,7 @@ public:
                 tensorflow::errors::InvalidArgument("The lens centre must be a 2d vector of [y_size, x_size]"));
     OP_REQUIRES(context,
                 tensorflow::TensorShapeUtils::IsSquareMatrix(context->input(Args::ROC).shape())
-                  && context->input(Args::LENS_CENTRE).shape().dim_size(0) == 3,
+                  && context->input(Args::ROC).shape().dim_size(0) == 3,
                 tensorflow::errors::InvalidArgument("Roc must be a 3x3 matrix"));
     OP_REQUIRES(context,
                 tensorflow::TensorShapeUtils::IsScalar(context->input(Args::HEIGHT).shape()),
@@ -190,7 +190,7 @@ public:
                 tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
                 tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
     OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsVector(context->input(Args::RADIUS).shape()),
+                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::RADIUS).shape()),
                 tensorflow::errors::InvalidArgument("The radius must be a scalar"));
 
     // Extract information from our input tensors, flip x and y as tensorflow has them reversed compared to us
@@ -211,10 +211,10 @@ public:
 
     // Perform some runtime checks on the actual values to make sure they make sense
     OP_REQUIRES(context,
-                !(projection == "EQUISOLID" || projection == "EQUIDISTANT" || projection == "RECTILINEAR"),
+                projection == "EQUISOLID" || projection == "EQUIDISTANT" || projection == "RECTILINEAR",
                 tensorflow::errors::InvalidArgument("Projection must be one of EQUISOLID, EQUIDISTANT or RECTILINEAR"));
     OP_REQUIRES(context,
-                !(geometry == "SPHERE" || geometry == "CIRCLE"),
+                geometry == "SPHERE" || geometry == "CIRCLE",
                 tensorflow::errors::InvalidArgument("Geometry must be one of SPHERE or CIRCLE"));
 
     // Create our transformation matrix

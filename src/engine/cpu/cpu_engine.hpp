@@ -43,29 +43,30 @@ namespace engine {
         const auto& nodes = mesh.nodes;
         const mat3<Scalar> Rco(block<3, 3>(transpose(Hoc)));
 
-        // Work out how many points total there are
+        // Work out how many points total there are in the ranges
         unsigned int n_points = 0;
         for (auto& r : ranges) {
           n_points += r.second - r.first;
         }
 
         // Output variables
-        std::vector<int> global_indices(n_points);
+        std::vector<int> global_indices;
+        global_indices.reserve(n_points);
         std::vector<vec2<Scalar>> pixels;
         pixels.reserve(n_points);
 
-        // Get the indices for each point in the mesh on screen
-        auto it = global_indices.begin();
+        // Loop through adding global indices and pixel coordinates
         for (const auto& range : ranges) {
-          auto n = std::next(it, range.second - range.first);
-          std::iota(it, n, range.first);
-          it = n;
-        }
-
-        // Project each of the nodes into pixel space
-        for (const auto& i : global_indices) {
-          // Rotate the ray by the rotation matrix and project to pixel coordinates
-          pixels.emplace_back(::visualmesh::project(multiply(Rco, nodes[i].ray), lens));
+          for (int i = range.first; i < range.second; ++i) {
+            // Even though we have already gone through a bsp to remove out of range points, sometimes it's not perfect
+            // and misses by a few pixels. So as we are projecting the points here we also need to check that they are
+            // on screen
+            auto px = ::visualmesh::project(multiply(Rco, nodes[i].ray), lens);
+            if (0 < px[0] && px[0] + 1 < lens.dimensions[0] && 0 < px[1] && px[1] + 1 < lens.dimensions[1]) {
+              global_indices.emplace_back(i);
+              pixels.emplace_back(px);
+            }
+          }
         }
 
         // Update the number of points to account for how many pixels we removed

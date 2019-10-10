@@ -56,11 +56,14 @@ private:
   /**
    * @brief Given a set of points, find the smallest cone that contains all points
    *
-   * @details implements welzls algorithm for circles, but instead for cones
+   * @details
+   *  Implements welzls algorithm for circles, but instead for cones. You should randomize the iterator before running
+   *  this algorithm, otherwise you can suffer from very poor performance
    *
    * @tparam Iterator the type of the iterator passed in
    *
-   * @param
+   * @param start the start iterator of points to consider for the circle
+   * @param end   the end iterator of points to consider for the circle
    */
   template <typename Iterator>
   std::pair<vec3<Scalar>, vec2<Scalar>> bounding_cone(Iterator start, Iterator end) {
@@ -86,6 +89,21 @@ private:
                           vec2<Scalar>{cone.second, std::sqrt(static_cast<Scalar>(1.0) - cone.second * cone.second)});
   }
 
+  /**
+   * @brief Given an iterator to a set of Visual Mesh nodes, calculate a binary search partition for it
+   *
+   * @details
+   *  This algorithm takes in iterators to a set of Visual Mesh nodes and sorts them such that they conform to a binary
+   *  search partitioning scheme. These partitions are described using bounding cones which can then be used to include
+   *  or throw out points on mass
+   *
+   * @tparam Iterator the type of the iterator passed in, must evalute to an object of type Node
+   *
+   * @param start       the start iterator of points to sort into the bsp
+   * @param end         the end iterator of points to sort into the bsp
+   * @param min_points  the number of points that the algorithm terminates at
+   * @param offset      the offset from the start of the nodes list to the region this BSP node represents
+   */
   template <typename Iterator>
   int build_bsp(Iterator start, Iterator end, int min_points = 8, int offset = 0) {
     // No points in this partition, this should never happen
@@ -320,7 +338,7 @@ private:
       angles[0] < edges[0].second[0] * cone.second[0] - edges[0].second[1] * cone.second[1],
       angles[1] < edges[1].second[0] * cone.second[0] - edges[1].second[1] * cone.second[1],
       angles[2] < edges[2].second[0] * cone.second[0] - edges[2].second[1] * cone.second[1],
-      dot(cone.first, edges[3].first) < edges[3].second[0] * cone.second[0] - edges[3].second[1] * cone.second[1],
+      angles[3] < edges[3].second[0] * cone.second[0] - edges[3].second[1] * cone.second[1],
     }};
 
     // Inside if the axis is on the screen and we don't intersect with any of the edges
