@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -20,10 +20,23 @@
 
 namespace visualmesh {
 
+/**
+ * @brief Given a fourcc (four character code), in string form convert it into it's uint32_t representation
+ *
+ * @param code the four characters to convert
+ *
+ * @return the uint32_t representing this four character code
+ */
 inline constexpr uint32_t fourcc(const char (&code)[5]) {
   return uint32_t(code[0] | (code[1] << 8) | (code[2] << 16) | (code[3] << 24));
 }
 
+/**
+ * @brief Given a fourcc (four character code), in uint32_t form convert it into it's four character representation
+ *
+ * @param code
+ * @return std::string
+ */
 inline std::string fourcc_text(const uint32_t& code) {
   return std::string({char(code & 0xFF), char(code >> 8 & 0xFF), char(code >> 16 & 0xFF), char(code >> 24 & 0xFF)});
 }

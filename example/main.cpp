@@ -14,7 +14,6 @@
 #include "Timer.hpp"
 #include "engine/opencl/opencl_engine.hpp"
 #include "geometry/Sphere.hpp"
-#include "mesh/test_mesh.hpp"
 #include "util/fourcc.hpp"
 #include "visualmesh.hpp"
 

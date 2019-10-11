@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -28,11 +28,14 @@
 namespace visualmesh {
 
 /**
- * An aggregate of many Visual Meshs at different heights that can be looked up
- * Provides convenience functions for accessing projection and classification of the mesh using different engines.
- * The available engines are currently limited to OpenCL and CPU, however CUDA and Vulkan can be added later.
+ * @brief An aggregate of many Visual Meshs at different heights that can be looked up for performance.
+ *
+ * @details
+ *  Provides convenience functions for accessing projection and classification of the mesh using different engines.
+ *  The available engines are currently limited to OpenCL and CPU, however CUDA and Vulkan can be added later.
  *
  * @tparam Scalar the type that will hold the vectors <float, double>
+ * @tparam Engine the computational engine that will be used when creating classifiers
  */
 template <typename Scalar = float, template <typename> class Engine = engine::cpu::Engine>
 class VisualMesh {
@@ -44,6 +47,8 @@ public:
 
   /**
    * @brief Generate a new visual mesh for the given shape.
+   *
+   * @tparam Shape the shape type that this mesh will generate using
    *
    * @param shape        the shape we are generating a visual mesh for
    * @param min_height   the minimum height that our camera will be at
@@ -93,7 +98,7 @@ public:
    *
    * @param  height the height above the observation plane for the mesh we are trying to find
    *
-   * @return        the closest generated visual mesh to the provided height
+   * @return the closest generated visual mesh to the provided height
    */
   const Mesh<Scalar>& height(const Scalar& height) const {
     // Find the bounding height values
@@ -108,7 +113,7 @@ public:
         return luts.begin()->second;
       }
     }
-    // Otherwise see which is closer
+    // Otherwise see which has less error
     else if (std::abs(range.first->first - height) < std::abs(range.second->first - height)) {
       return range.first->second;
     }
@@ -123,7 +128,7 @@ public:
    * @param Hoc   A 4x4 homogeneous transformation matrix that transforms from the observation plane to camera space.
    * @param lens  A description of the lens used to project the mesh.
    *
-   * @return      the mesh that was used for this lookup and a vector of start/end indices that are on the screen.
+   * @return the mesh that was used for this lookup and a vector of start/end indices that are on the screen.
    */
   std::pair<const Mesh<Scalar>&, std::vector<std::pair<uint, uint>>> lookup(const mat4<Scalar>& Hoc,
                                                                             const Lens<Scalar>& lens) const {
@@ -140,7 +145,7 @@ public:
    * @param Hoc  A 4x4 homogeneous transformation matrix that transforms from the camera space to the observation plane.
    * @param lens A description of the lens used to project the mesh.
    *
-   * @return     the pixel coordinates that the visual mesh projects to, and the neighbourhood graph for those points.
+   * @return the pixel coordinates that the visual mesh projects to, and the neighbourhood graph for those points.
    */
   ProjectedMesh<Scalar> project(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
 

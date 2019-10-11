@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -396,7 +396,7 @@ public:
    * @param k             the number of cross section intersections that are needed for the object
    * @param max_distance  the maximum distance to generate the Visual Mesh for
    */
-  template <template <typename T> class Generator = generator::HexaPizza, typename Shape>
+  template <template <typename T> class Generator = generator::Hexapizza, typename Shape>
   Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance)
     : h(h), max_distance(max_distance), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
 

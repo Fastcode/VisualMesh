@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -40,6 +40,9 @@ struct Lens {
   /// The dimensions of the image
   std::array<int, 2> dimensions;
   /// The field of view of the camera measured in radians
+  /// This field of view is used to cut off sections of the image that the lens does not project for (think the black
+  /// sections on a fisheye camera). If there are no black sections on the image this should be set to the diagonal
+  /// field of view of the lens.
   Scalar fov;
   /// The focal length of the camera, normalised to the image width
   Scalar focal_length;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -66,11 +66,41 @@ enum Args {
   RADIUS                 = 12
 };
 
+/**
+ * @brief Given a shape, two heights and a k value, calculate the absolute number of intersections difference given the
+ *        new height.
+ *
+ * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ * @tparam Shape  the type of shape to use when calculating the error
+ *
+ * @param shape the instance of the shape that will be used to calculate the k error
+ * @param h_0   the height of the camera in the mesh we are comparing to
+ * @param h_1   the current height of the camera we want to get an error for
+ * @param k     the k value that the original mesh was designed to use
+ *
+ * @return what the k value would be if we used this mesh at this height
+ */
 template <typename Scalar, template <typename> class Shape>
 Scalar mesh_k_error(const Shape<Scalar>& shape, const Scalar& h_0, const Scalar& h_1, const Scalar& k) {
   return std::abs(k - k * shape.k(h_0, h_1));
 }
 
+/**
+ * @brief Lookup an appropriate Visual Mesh to use for this lens and height given the provided tolerances
+ *
+ * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ * @tparam Shape  the type of shape to use when calculating the error
+ *
+ * @param meshes  the list of meshes that we will be looking for the target in
+ * @param shape   the shape that we will be using for the lookup
+ * @param h       the current height of the camera above the ground
+ * @param k       the number of cross sectional intersections that we want with the object
+ * @param t       the tolerance for the number of cross sectional intersections before we need a new mesh
+ * @param d       the maximum distance that the mesh should be generated for
+ *
+ * @return either returns a shared_ptr to the mesh that would best fit within our tolerance, or if none could be found a
+ *         nullptr
+ */
 template <typename Scalar, template <typename> class Shape>
 std::shared_ptr<visualmesh::Mesh<Scalar>> find_mesh(std::vector<std::shared_ptr<visualmesh::Mesh<Scalar>>>& meshes,
                                                     const Shape<Scalar>& shape,
@@ -100,6 +130,28 @@ std::shared_ptr<visualmesh::Mesh<Scalar>> find_mesh(std::vector<std::shared_ptr<
   return best_error <= t ? *best_it : nullptr;
 };
 
+/**
+ * @brief Lookup or create an appropriate Visual Mesh to use for this lens and height given the provided tolerances
+ *
+ * @details
+ *  This function gets the best fitting mesh that it can find that is within the number of intersections tolerance. If
+ *  it cannot find a mesh that matches the tolerance it will create a new one for the provided details. The mesh will
+ *  not match if the maximum distance has changed, only if the k difference is small enough. Additionally it will only
+ *  cache `cached_meshes` number of meshes. Each time a mesh is used again it will move it to the top of the list, and
+ *  if a new mesh must be added and this would exceed this limit the least recently used mesh will be dropped.
+ *
+ * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ * @tparam Shape  the type of shape to use when calculating the error
+ *
+ * @param shape                   the shape that we will be using for the lookup
+ * @param height                  the current height of the camera above the ground
+ * @param n_intersections         the number of cross sectional intersections that we want with the object
+ * @param intersection_tolerance  tolerance for the number of cross sectional intersections before we need a new mesh
+ * @param cached_meshes           the number of meshes to cache at any one time before we delete one
+ * @param max_distance            the maximum distance that the mesh should be generated for
+ *
+ * @return std::shared_ptr<visualmesh::Mesh<Scalar>>
+ */
 template <typename Scalar, template <typename> class Shape>
 std::shared_ptr<visualmesh::Mesh<Scalar>> get_mesh(const Shape<Scalar>& shape,
                                                    const Scalar& height,
@@ -145,6 +197,16 @@ std::shared_ptr<visualmesh::Mesh<Scalar>> get_mesh(const Shape<Scalar>& shape,
   }
 }
 
+/**
+ * @brief The Visual Mesh tensorflow op
+ *
+ * @details
+ *  This op will perform a projection using the visual mesh and will return the neighbourhood graph and the pixel
+ * coordinates for the points that would be on screen for the lens paramters provided.
+ *
+ * @tparam T The scalar type used for floating point numbers
+ * @tparam U The scalar type used for integer numbers
+ */
 template <typename T, typename U>
 class VisualMeshOp : public tensorflow::OpKernel {
 public:
@@ -301,6 +363,7 @@ public:
   }
 };
 
+// Register a version for all the combinations of float/double and int32/int64
 REGISTER_KERNEL_BUILDER(
   Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<tensorflow::int32>("U"),
   VisualMeshOp<float, tensorflow::int32>);

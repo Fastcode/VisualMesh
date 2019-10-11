@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -22,16 +22,43 @@
 
 namespace visualmesh {
 
+/**
+ * @brief Create a cone from 0 points
+ *
+ * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ *
+ * @return the cone with axis (0,0,0) and cos_theta 1 (an invalid cone)
+ */
 template <typename Scalar>
 inline std::pair<vec3<Scalar>, Scalar> cone_from_points() {
   return std::make_pair(vec3<Scalar>{0, 0, 0}, 1);
 }
 
+/**
+ * @brief Create a cone from 1 point (a cone with no radius in the direction of the vector)
+ *
+ * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ *
+ * @param p1 the point to create the cone from
+ *
+ * @return the cone with no radius, and a single axis (a vector basically)
+ */
 template <typename Scalar>
 inline std::pair<vec3<Scalar>, Scalar> cone_from_points(const vec3<Scalar>& p1) {
   return std::make_pair(p1, 1);
 }
 
+/**
+ * @brief Create a cone from two points (a cone with axis between the two points and passing through both)
+ *
+ *
+ * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ *
+ * @param p1 the first point to create the cone from
+ * @param p2 the second point to create the cone from
+ *
+ * @return the cone with axis halfway between the two points and cos_theta equal to the centre dotted with either point
+ */
 template <typename Scalar>
 inline std::pair<vec3<Scalar>, Scalar> cone_from_points(const vec3<Scalar>& p1, const vec3<Scalar>& p2) {
   //  Get the axis and gradient by averaging the unit vectors and dotting with an edge point
@@ -40,6 +67,17 @@ inline std::pair<vec3<Scalar>, Scalar> cone_from_points(const vec3<Scalar>& p1, 
   return std::make_pair(axis, cos_theta);
 }
 
+/**
+ * @brief Create a cone from three points (the cone passing through all three points)
+ *
+ * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ *
+ * @param p1 the first point to create the cone from
+ * @param p2 the second point to create the cone from
+ * @param p3 the thrid point to create the cone from
+ *
+ * @return the cone passing through all three points provided
+ */
 template <typename Scalar>
 inline std::pair<vec3<Scalar>, Scalar> cone_from_points(const vec3<Scalar>& p1,
                                                         const vec3<Scalar>& p2,
