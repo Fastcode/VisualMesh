@@ -9,11 +9,5 @@
     "files.eol": "\n",
     "editor.rulers": [
         120
-    ],
-    "cSpell.words": [
-        "EQUISOLID",
-        "convolutional"
-    ],
-    "python.pythonPath": "/usr/bin/python3",
-    "opencl.formatting.name": "clang-format",
+    ]
 }
