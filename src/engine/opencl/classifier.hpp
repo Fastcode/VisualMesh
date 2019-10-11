@@ -45,7 +45,6 @@ namespace engine {
     template <typename Scalar>
     class Engine;
 
-
     template <typename Scalar>
     class Classifier {
 

@@ -24,7 +24,7 @@
 template <typename T>
 struct Printer;
 
-// Print a matrix
+// Prints matrices
 template <typename Scalar, std::size_t n, std::size_t m>
 struct Printer<std::array<std::array<Scalar, n>, m>> {
   static inline void print(std::ostream& out, const std::array<std::array<Scalar, n>, m>& s) {
@@ -41,7 +41,7 @@ struct Printer<std::array<std::array<Scalar, n>, m>> {
   }
 };
 
-// Print a vector
+// Prints vectors
 template <typename Scalar, std::size_t n>
 struct Printer<std::array<Scalar, n>> {
   static inline void print(std::ostream& out, const std::array<Scalar, n>& s) {
@@ -54,6 +54,17 @@ struct Printer<std::array<Scalar, n>> {
   }
 };
 
+/**
+ * @brief Provides an operator that prints out a matrix or vector to a stream
+ *
+ * @tparam T  the type of the data in the array
+ * @tparam n  the size of the array
+ *
+ * @param out the stream to output the data to
+ * @param s   the array to print
+ *
+ * @return std::ostream& the ostream out that was put in
+ */
 template <typename T, std::size_t n>
 std::ostream& operator<<(std::ostream& out, const std::array<T, n>& s) {
   Printer<std::array<T, n>>::print(out, s);

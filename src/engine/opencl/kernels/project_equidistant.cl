@@ -18,10 +18,11 @@
 /**
  * Projects visual mesh points to a Fisheye camera with equidistant projection
  *
- * @param points        VisualMesh unit vectors
+ * @param points        VisualMesh unit vectors as 4d vectors [x, y, z, 0]
  * @param indices       map from local indices to global indices
  * @param Rco           rotation from the observation space to camera space
  *                      note that while this is a 4x4, that is for memory alignment, no translation should exist
+ *                      (or would be applied anyway)
  * @param f             the focal length of the lens measured in pixels
  * @param dimensions    the dimensions of the input image
  * @param centre        the offset from the centre of the lens axis to the centre of the image in pixels
@@ -47,13 +48,13 @@ kernel void project_equidistant(global const Scalar4* points,
   ray = (Scalar4)(dot(Rco.s0123, ray), dot(Rco.s4567, ray), dot(Rco.s89ab, ray), 0);
 
   // Calculate some intermediates
-  const Scalar theta     = acos(ray.x);
-  const Scalar r         = f * theta;
+  const Scalar theta      = acos(ray.x);
+  const Scalar r          = f * theta;
   const Scalar rsin_theta = rsqrt((Scalar)(1.0) - ray.x * ray.x);
 
   // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
   Scalar2 screen = (Scalar2)(r * ray.y * rsin_theta, r * ray.z * rsin_theta);
-  screen = ray.x >= 1 ? (Scalar2)(0.0, 0.0) : screen; // When the pixel is at (1,0,0) lots of NaNs show up
+  screen         = ray.x >= 1 ? (Scalar2)(0.0, 0.0) : screen;  // When the pixel is at (1,0,0) lots of NaNs show up
 
   // Apply our offset to move into image space (0 at top left, x to the right, y down)
   // Then apply the offset to the centre of our lens

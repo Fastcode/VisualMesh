@@ -42,8 +42,8 @@ namespace geometry {
      *  sphere. However for the visual mesh we would rather work in the sphere centres
      *
      *                      ⎛         n⎞
-     *          π        -1 ⎜⎛    2⋅r⎞ ⎟
-     *  φₜ(n) = ─ - 2⋅tan   ⎜⎜1 - ───⎟ ⎟
+     *          π        -1 ⎜⎛    2 r⎞ ⎟
+     *  φₜ(n) = ─ - 2 tan   ⎜⎜1 - ───⎟ ⎟
      *          2           ⎝⎝     h ⎠ ⎠
      *
      * Then to get the equation for the centre of the sphere, we calculate given the average angle of n ± 0.5
@@ -55,6 +55,9 @@ namespace geometry {
      *
      * @param n the number of whole objects to jump from the origin to reach this point (from object centres)
      * @param h the height of the camera above the observation plane
+     *
+     * @return the phi angle to the centre of the object that would result if n stacked objects were placed end on end
+     *         visually
      */
     Scalar phi(const Scalar& n, const Scalar& h) const {
       const Scalar v = 1 - 2 * r / h;
@@ -73,20 +76,22 @@ namespace geometry {
      *            log⎜cot⎜─ + ─⎟⎟
      *               ⎝   ⎝2   4⎠⎠
      *  n(φₜ) = ─────────────────────
-     *          log(h - 2⋅r) - log(h)
+     *          log(h - 2 r) - log(h)
      *
      *  However for inverting the centre form of the equation we must use its inversion
      *
      *            ⎛                         _________________________⎞
      *            ⎜                        ╱  2            2    2    ⎟
-     *            ⎜r⋅sin(φ) - h⋅sin(φ) + ╲╱  h  - 2⋅h⋅r + r ⋅sin (φ) ⎟
+     *            ⎜r sin(φ) - h sin(φ) + ╲╱  h  - 2 h r + r  sin (φ) ⎟
      *         log⎜──────────────────────────────────────────────────⎟
-     *            ⎝                     h⋅cos(φ)                     ⎠    1
+     *            ⎝                     h cos(φ)                     ⎠    1
      *  n(φ) = ───────────────────────────────────────────────────────  - ─
-     *                         log(h - 2⋅r) -log(h)                       2
+     *                         log(h - 2 r) -log(h)                       2
      *
      * @param phi the phi angle measured from below the camera
      * @param h   the height that the camera is above the observation plane
+     *
+     * @return the number of object jumps that would be required to reach the angle to the centre of the object
      */
     Scalar n(const Scalar& phi, const Scalar& h) const {
       const Scalar sp = std::sin(phi);
@@ -106,10 +111,15 @@ namespace geometry {
      *  be appropriate for use when the height of the camera changes. The result of this function is a ratio which gives
      *  the number of intersections that will result from changing the height.
      *
-     *              log(h₁ - 2⋅r) - log(h₁)
+     *              log(h₁ - 2 r) - log(h₁)
      *  k(h₀, h₁) = ───────────────────────
-     *              log(h₀ - 2⋅r) - log(h₀)
+     *              log(h₀ - 2 r) - log(h₀)
      *
+     * @param h_0 the height above the observation plane that the original mesh was generated for
+     * @param h_1 the height above the observation plane that we want to check to see how much k varies by
+     *
+     * @return the ratio of intersections between the mesh with h_0 and h_1. To get the actual difference in
+     *         intersections multiply the output of this by k
      */
     Scalar k(const Scalar& h_0, const Scalar& h_1) const {
       return (std::log(h_1 - 2 * r) - std::log(h_1)) / (std::log(h_0 - 2 * r) - std::log(h_0));
@@ -117,6 +127,10 @@ namespace geometry {
 
     /**
      * @brief Given a value for phi and a camera height, return the angular width for an object
+     *
+     * @details
+     *  Calculates the angle in theta that an object would have if projected on the ground. This can be used for radial
+     *  slicing of objects so they fit around a circle.
      *
      * @param phi the phi value to calculate our theta value for
      * @param h the height of the camera above the observation plane

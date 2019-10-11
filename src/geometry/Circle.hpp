@@ -44,12 +44,15 @@ namespace geometry {
      *  plane. It measures from the centre of the circle on the ground, although this gives identical results to
      *  measuring to the tangents.
      *
-     *             -1 ⎛2⋅n⋅r⎞
+     *             -1 ⎛2 n r⎞
      *  φ(n) =  tan   ⎜─────⎟
      *                ⎝  h  ⎠
      *
      * @param n the number of whole objects to jump from the origin to reach this point (from object centres)
      * @param h the height of the camera above the observation plane
+     *
+     * @return the phi angle to the centre of the object that would result if n stacked objects were placed end on end
+     *         visually
      */
     Scalar phi(const Scalar& n, const Scalar& h) const {
       return std::atan((2.0 * n * r) / h);
@@ -64,16 +67,17 @@ namespace geometry {
      *  values
      *
      *
-     *         h⋅tan(φ)
+     *         h tan(φ)
      *  n(φ) = ────────
-     *           2⋅r
+     *           2 r
      *
      * @param phi the phi angle measured from below the camera
+     *
+     * @return the number of object jumps that would be required to reach the angle to the centre of the object
      */
     Scalar n(const Scalar& phi, const Scalar& h) const {
       return (h * std::tan(phi)) / (2.0 * r);
     }
-
 
     /**
      * @brief Gets the ratio of intersections using a Visual Mesh that was produced with a different height.
@@ -89,6 +93,11 @@ namespace geometry {
      *  k(h₀, h₁) = ──
      *              h₁
      *
+     * @param h_0 the height above the observation plane that the original mesh was generated for
+     * @param h_1 the height above the observation plane that we want to check to see how much k varies by
+     *
+     * @return the ratio of intersections between the mesh with h_0 and h_1. To get the actual difference in
+     *         intersections multiply the output of this by k
      */
     Scalar k(const Scalar& h_0, const Scalar& h_1) const {
       return h_0 / h_1;
@@ -96,6 +105,10 @@ namespace geometry {
 
     /**
      * @brief Given a value for phi and a camera height, return the angular width for an object
+     *
+     * @details
+     *  Calculates the angle in theta that an object would have if projected on the ground. This can be used for radial
+     *  slicing of objects so they fit around a circle.
      *
      * @param phi  the phi value to calculate our theta value for
      * @param h    the height of the camera above the observation plane

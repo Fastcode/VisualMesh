@@ -22,14 +22,22 @@
 
 namespace visualmesh {
 
+/**
+ * @brief An enum that describes the lens projection type
+ */
 enum LensProjection { RECTILINEAR, EQUISOLID, EQUIDISTANT };
 
+/**
+ * @brief A description of a lens that will be used for projection of unit vectors into camera space.
+ *
+ * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ */
 template <typename Scalar>
 struct Lens {
 
-  // The projection that this image is using
+  /// The projection that this image is using
   LensProjection projection;
-  // The dimensions of the image
+  /// The dimensions of the image
   std::array<int, 2> dimensions;
   /// The field of view of the camera measured in radians
   Scalar fov;

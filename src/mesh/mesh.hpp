@@ -33,9 +33,24 @@
 
 namespace visualmesh {
 
+/**
+ * @brief Holds a description of a Visual Mesh
+ *
+ * TODO LOTS OF DETAILS
+ *
+ * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ */
 template <typename Scalar>
 struct Mesh {
 private:
+  /**
+   * @brief An element of a binary search partitioning scheme to quickly work out which points are on the screen.
+   *
+   * @details
+   *  This is a node in a binary search partition. It is represented by a bounding code that can be used to work out if
+   *  any of the elements in that cone are on the screen. These cones will be split into sub cones to further limit the
+   *  scope of the search until a list of a few elements are found that can be checked manually.
+   */
   struct BSP {
     // The bounds of the range that this BSP element represents (start to one past the end)
     std::pair<int, int> range;
@@ -212,6 +227,15 @@ private:
    * Given the lens, get the cone objects that best fit each edge of the screen (or planes for the rectilinear case)
    * This is arranged as the axis (or normal) and the cos and sin of the angle for each of the edges.
    *
+   * @details
+   *  This function provides a heuristic for use with the BSP. It generates a set of cones that approximate the screen
+   *  edges. These will be perfect approximations for rectilinear lenses as the cones will be planes (cones with 90
+   *  degree angles). And for fisheye lenses they will give a decent approximation that will only have errors of a few
+   *  pixels typically in the overselection rather than underselection.
+   *
+   * @param Hoc   the homogenous transformation matrix that transforms from camera space to observation plane space
+   * @param lens  the lens object describing the type and geometry of the lens that is used
+   *
    * @return The cones that best describe the edges of the camera
    */
   static std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4> screen_edges(const mat4<Scalar> Hoc,
@@ -299,7 +323,15 @@ private:
   }
 
   /**
-   * Check if a point is on the screen, given a description of the edges of the screen as cones, and the axis
+   * @brief Check if a point is on the screen, given a description of the edges of the screen as cones, and the axis
+   *
+   * @param Rco     the 3x3 rotation matrix which rotates from observation plane space to camera space
+   * @param cone    the cone object that we are checking if it is on the screen
+   * @param lens    the lens object describing the type and geometry of the lens that is used
+   * @param edges   the matrix of 4 cone objects that describe the edge of the screen
+   *
+   * @return two booleans that describe if this cone is inside (first) the screen and outside(second) the screen. If
+   *         both are true then the cone is intersecting the screen edge.
    */
   static inline std::pair<bool, bool> check_on_screen(
     const mat3<Scalar>& Rco,
@@ -349,6 +381,21 @@ private:
 
 
 public:
+  /**
+   * @brief Construct a new Mesh object
+   *
+   * @details
+   *  Constructs a new Mesh object using the provided generator type. This mesh object generates a BSP tree and holds
+   *  the logic needed to quickly lookup points that are on screen and return valid index ranges.
+   *
+   * @tparam Generator the generator that is to be used to generate the Visual Mesh
+   * @tparam Shape     the type of shape that will be used to generate the Visual Mesh
+   *
+   * @param shape         the shape instance that will be used to generate the Visual Mesh
+   * @param h             the height of the camera above the observation plane
+   * @param k             the number of cross section intersections that are needed for the object
+   * @param max_distance  the maximum distance to generate the Visual Mesh for
+   */
   template <template <typename T> class Generator = generator::HexaPizza, typename Shape>
   Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance)
     : h(h), max_distance(max_distance), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
@@ -390,6 +437,15 @@ public:
     nodes = std::move(sorted_nodes);
   }
 
+  /**
+   * @brief Lookup which ranges in the Visual Mesh are on screen given the description of the camera lens/sensor and the
+   *        orientation of the camera relative to the observation plane.
+   *
+   * @param Hoc   the homogenous transformation matrix that transforms from camera space to observation plane space
+   * @param lens  the lens object describing the type and geometry of the lens that is used
+   *
+   * @return gives pairs of start/end ranges that are the points which are on the screen
+   */
   std::vector<std::pair<int, int>> lookup(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
 
     // Our FOV is an easy check to exclude things outside our view
@@ -494,6 +550,7 @@ public:
   std::vector<Node<Scalar>> nodes;
 
 private:
+  /// The binary search tree that is used for looking up which points are on screen in the mesh
   std::vector<BSP> bsp;
 };
 

@@ -25,14 +25,47 @@
 namespace visualmesh {
 namespace generator {
 
+  /**
+   * @brief Generator utilising the Hexapizza method
+   *
+   * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+   */
   template <typename Scalar>
-  struct HexaPizza {
+  struct Hexapizza {
   private:
+    /**
+     * @brief
+     *  Converts angles into a unit vector where phi is defined as the angle from -z to the vector, and theta is
+     *  measured around the z axis.
+     *
+     * @details
+     *  The reason that sin_phi and cos_phi are passed in rather than being calculated every time is that where this
+     *  function is called both of those are precalcualted and available. Therefore we can improve the performance by
+     *  using these already calculated values.
+     *
+     * @param sin_phi sin of the phi angle (up from -z)
+     * @param cos_phi cos of the phi angle (up from -z)
+     * @param theta   the theta angle (around the z axis)
+     *
+     * @return The unit vector that these angles represent
+     */
     static inline vec3<Scalar> unit_vector(const Scalar& sin_phi, const Scalar& cos_phi, const Scalar& theta) {
       return vec3<Scalar>{{std::cos(theta) * sin_phi, std::sin(theta) * sin_phi, -cos_phi}};
     }
 
   public:
+    /**
+     * @brief Generates the visual mesh vectors and graph using the Hexapizza method
+     *
+     * @tparam Shape  the type of shape that this generator will use to create the mesh
+     *
+     * @param shape         the shape instance that is used for calculating details
+     * @param h             the height of the camera above the observation plane
+     * @param k             the number of radial intersections per object
+     * @param max_distance  the maximum distance that this mesh will be targeted for
+     *
+     * @return the visual mesh graph that was generated
+     */
     template <typename Shape>
     static std::vector<Node<Scalar>> generate(const Shape& shape,
                                               const Scalar& h,
