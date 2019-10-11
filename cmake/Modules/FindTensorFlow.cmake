@@ -1,4 +1,3 @@
-
 find_package(PythonInterp 3 REQUIRED)
 
 execute_process(
@@ -17,24 +16,24 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-FIND_PATH(TENSORFLOW_INCLUDE_DIRS
+find_path(
+  TENSORFLOW_INCLUDE_DIRS
   NAMES tensorflow/core/framework/op.h
   HINTS ${tf_inc_dir}
   DOC "TensorFlow include directory"
 )
 
-FIND_LIBRARY(
-  TENSORFLOW_LIBRARIES
-  NAMES tensorflow_framework
-  HINTS ${tf_lib_dir}
-  DOC "TensorFlow library"
-)
+find_library(TENSORFLOW_LIBRARIES NAMES tensorflow_framework HINTS ${tf_lib_dir} DOC "TensorFlow library")
 
-
-INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(
   TensorFlow
-  FOUND_VAR TensorFlow_FOUND
-  REQUIRED_VARS TENSORFLOW_INCLUDE_DIRS TENSORFLOW_LIBRARIES TENSORFLOW_VERSION
-  VERSION_VAR TENSORFLOW_VERSION
+  FOUND_VAR
+  TensorFlow_FOUND
+  REQUIRED_VARS
+  TENSORFLOW_INCLUDE_DIRS
+  TENSORFLOW_LIBRARIES
+  TENSORFLOW_VERSION
+  VERSION_VAR
+  TENSORFLOW_VERSION
 )
