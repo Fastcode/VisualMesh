@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <yaml-cpp/yaml.h>
+
 #include <algorithm>
 #include <fstream>
 #include <iostream>
@@ -10,6 +11,7 @@
 #include <opencv2/imgproc.hpp>
 #include <string>
 #include <system_error>
+
 #include "ArrayPrint.hpp"
 #include "Timer.hpp"
 #include "engine/opencl/opencl_engine.hpp"

@@ -23,7 +23,12 @@ find_path(
   DOC "TensorFlow include directory"
 )
 
-find_library(TENSORFLOW_LIBRARIES NAMES tensorflow_framework HINTS ${tf_lib_dir} DOC "TensorFlow library")
+find_library(
+  TENSORFLOW_LIBRARIES
+  NAMES tensorflow_framework libtensorflow_framework.so.2
+  HINTS ${tf_lib_dir}
+  DOC "TensorFlow library"
+)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(
