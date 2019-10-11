@@ -18,6 +18,8 @@
 #ifndef VISUALMESH_UTILITY_FOURCC_HPP
 #define VISUALMESH_UTILITY_FOURCC_HPP
 
+#include <string>
+
 namespace visualmesh {
 
 /**

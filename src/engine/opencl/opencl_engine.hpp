@@ -27,6 +27,7 @@
 
 #include <numeric>
 #include <tuple>
+
 #include "engine/opencl/classifier.hpp"
 #include "engine/opencl/kernels/project_equidistant.cl.hpp"
 #include "engine/opencl/kernels/project_equisolid.cl.hpp"

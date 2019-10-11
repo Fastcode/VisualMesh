@@ -26,6 +26,7 @@
 #endif  // !__APPLE__
 
 #include <string>
+
 #include "wrapper.hpp"
 namespace visualmesh {
 namespace engine {

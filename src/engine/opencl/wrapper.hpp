@@ -28,6 +28,7 @@
 #include <memory>
 #include <string>
 #include <type_traits>
+
 #include "engine/opencl/opencl_error_category.hpp"
 
 namespace visualmesh {

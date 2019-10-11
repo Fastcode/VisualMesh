@@ -19,6 +19,7 @@
 #define VISUALMESH_ENGINE_CPU_ENGINE_HPP
 
 #include <numeric>
+
 #include "classifier.hpp"
 #include "mesh/mesh.hpp"
 #include "mesh/network_structure.hpp"

@@ -29,6 +29,7 @@
 #include <memory>
 #include <mutex>
 #include <tuple>
+
 #include "engine/opencl/kernels/read_image_to_network.cl.hpp"
 #include "engine/opencl/opencl_error_category.hpp"
 #include "engine/opencl/util.hpp"

@@ -20,6 +20,7 @@
 
 #include <array>
 #include <vector>
+
 #include "mesh/node.hpp"
 
 namespace visualmesh {

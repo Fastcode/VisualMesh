@@ -95,9 +95,7 @@ inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const std:
  * Vector Scalar addition
  */
 template <typename Scalar, std::size_t L, std::size_t... I>
-inline std::array<Scalar, L> add(const std::array<Scalar, L>& a,
-                                 const Scalar& b,
-                                 const std::index_sequence<I...>&) {
+inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const Scalar& b, const std::index_sequence<I...>&) {
   return {{(a[I] + b)...}};
 }
 

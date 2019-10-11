@@ -18,6 +18,8 @@
 #ifndef VISUALMESH_TEST_MESH_HPP
 #define VISUALMESH_TEST_MESH_HPP
 
+#include "math.hpp"
+
 namespace visualmesh {
 namespace util {
 

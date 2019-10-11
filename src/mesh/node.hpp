@@ -19,6 +19,7 @@
 #define VISUALMESH_NODE_HPP
 
 #include <array>
+
 #include "util/math.hpp"
 
 namespace visualmesh {

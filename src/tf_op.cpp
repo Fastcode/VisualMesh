@@ -18,8 +18,10 @@
 #include <tensorflow/core/framework/op.h>
 #include <tensorflow/core/framework/op_kernel.h>
 #include <tensorflow/core/framework/shape_inference.h>
+
 #include <memory>
 #include <mutex>
+
 #include "engine/cpu/cpu_engine.hpp"
 #include "geometry/Circle.hpp"
 #include "geometry/Sphere.hpp"
