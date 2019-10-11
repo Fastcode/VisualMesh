@@ -37,7 +37,13 @@ namespace visualmesh {
 /**
  * @brief Holds a description of a Visual Mesh
  *
- * TODO LOTS OF DETAILS
+ * @details
+ *  This object holds a Visual Mesh for a single height. It utilises a generator class to create a mesh, and then
+ *  transforms it into a structure that is suppored as a BSP tree. It then uses this tree to lookup the mesh given
+ *  different lens paramters. Note that because of teh way it oes the lookup, this lookup isn't perfect esperically for
+ *  fisheye lenses. In this case it will sometimes give points that are outside the bounds of the image. The CPU engine
+ *  removes these extra points however the OpenCL engine does not. So if you are relying on these pixel coordinates
+ *  being in bounds you should ensure that you use the CPU engine.
  *
  * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
  */
