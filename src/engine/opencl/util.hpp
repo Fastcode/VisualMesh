@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -26,11 +26,20 @@
 #endif  // !__APPLE__
 
 #include <string>
+
 #include "wrapper.hpp"
 namespace visualmesh {
 namespace engine {
   namespace opencl {
 
+    /**
+     * @brief Make an OpenCL command queue
+     *
+     * @param context the context to make the queue for
+     * @param device  the device to make the queue for
+     *
+     * @return cl::command_queue a reference counted tracker of a command queu
+     */
     inline cl::command_queue make_queue(cl_context context, cl_device_id device) {
       cl_command_queue queue;
       cl_int error;
@@ -41,6 +50,11 @@ namespace engine {
       return cl::command_queue(queue, ::clReleaseCommandQueue);
     }
 
+    /**
+     * @brief Get the scalar defines for floating point
+     *
+     * @return a string containing the defines that are needed if the Scalar type is float
+     */
     inline constexpr auto get_scalar_defines(float) {
       return "#define Scalar float\n"
              "#define Scalar2 float2\n"
@@ -50,6 +64,11 @@ namespace engine {
              "#define Scalar16 float16\n";
     }
 
+    /**
+     * @brief Get the scalar defines for double  point
+     *
+     * @return a string containing the defines that are needed if the Scalar type is double
+     */
     inline constexpr auto get_scalar_defines(double) {
       return "#define Scalar double\n"
              "#define Scalar2 double2\n"

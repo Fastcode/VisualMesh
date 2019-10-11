@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -19,6 +19,7 @@
 #define VISUALMESH_ENGINE_CPU_ENGINE_HPP
 
 #include <numeric>
+
 #include "classifier.hpp"
 #include "mesh/mesh.hpp"
 #include "mesh/network_structure.hpp"
@@ -35,47 +36,37 @@ namespace engine {
 
     public:
       ProjectedMesh<Scalar> project(const Mesh<Scalar>& mesh,
-                                    const std::vector<std::pair<unsigned int, unsigned int>>& ranges,
+                                    const std::vector<std::pair<int, int>>& ranges,
                                     const mat4<Scalar>& Hoc,
                                     const Lens<Scalar>& lens) const {
 
         // Convenience variables
         const auto& nodes = mesh.nodes;
-        const auto Hco    = transpose(Hoc);
+        const mat3<Scalar> Rco(block<3, 3>(transpose(Hoc)));
 
-        // Work out how many points total there are
-        int n_points = 0;
+        // Work out how many points total there are in the ranges
+        unsigned int n_points = 0;
         for (auto& r : ranges) {
           n_points += r.second - r.first;
         }
 
         // Output variables
-        std::vector<int> indices(n_points);
         std::vector<int> global_indices;
         global_indices.reserve(n_points);
         std::vector<vec2<Scalar>> pixels;
         pixels.reserve(n_points);
 
-        // Get the indices for each point in the mesh on screen
-        auto it = indices.begin();
+        // Loop through adding global indices and pixel coordinates
         for (const auto& range : ranges) {
-          auto n = std::next(it, range.second - range.first);
-          std::iota(it, n, range.first);
-          it = n;
-        }
-
-        // Project each of the nodes into pixel space
-        for (unsigned int i = 0; i < indices.size(); ++i) {
-          const Node<Scalar>& node = nodes[indices[i]];
-
-          // Rotate point by matrix (since we are doing this rowwise, it's like we are transposing at the same time)
-          vec4<Scalar> p  = {{dot(node.ray, Hco[0]), dot(node.ray, Hco[1]), dot(node.ray, Hco[2]), 0}};
-          vec2<Scalar> px = ::visualmesh::project(p, lens);
-
-          // Check if the pixel is on the screen, this is needed as the cutoffs for some lenses aren't perfect yet
-          if (0 < px[0] && px[0] < lens.dimensions[0] - 1 && 0 < px[1] && px[1] < lens.dimensions[1] - 1) {
-            pixels.emplace_back(px);
-            global_indices.emplace_back(indices[i]);
+          for (int i = range.first; i < range.second; ++i) {
+            // Even though we have already gone through a bsp to remove out of range points, sometimes it's not perfect
+            // and misses by a few pixels. So as we are projecting the points here we also need to check that they are
+            // on screen
+            auto px = ::visualmesh::project(multiply(Rco, nodes[i].ray), lens);
+            if (0 < px[0] && px[0] + 1 < lens.dimensions[0] && 0 < px[1] && px[1] + 1 < lens.dimensions[1]) {
+              global_indices.emplace_back(i);
+              pixels.emplace_back(px);
+            }
           }
         }
 
@@ -83,11 +74,10 @@ namespace engine {
         n_points = pixels.size();
 
         // Build our reverse lookup, the default point goes to the null point
-        std::vector<int> r_lookup(nodes.size(), n_points);
+        std::vector<int> r_lookup(nodes.size() + 1, n_points);
         for (unsigned int i = 0; i < n_points; ++i) {
           r_lookup[global_indices[i]] = i;
         }
-
 
         // Build our local neighbourhood map
         std::vector<std::array<int, 6>> neighbourhood(n_points + 1);  // +1 for the null point

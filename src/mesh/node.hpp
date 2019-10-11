@@ -15,34 +15,34 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_UTILITY_FOURCC_HPP
-#define VISUALMESH_UTILITY_FOURCC_HPP
+#ifndef VISUALMESH_NODE_HPP
+#define VISUALMESH_NODE_HPP
 
-#include <string>
+#include <array>
+
+#include "util/math.hpp"
 
 namespace visualmesh {
 
 /**
- * @brief Given a fourcc (four character code), in string form convert it into it's uint32_t representation
+ * @brief This represents a single node in the visual mesh.
  *
- * @param code the four characters to convert
+ * @details
+ *  A single node in the visual mesh is a single point, it is made up of a vector in observation plane space that points
+ *  to the position, as well as a list of neighbours that are connected to this point. A collection of these with each
+ *  having neighbours pointing to indices of other points in the list make up a Visual Mesh. The neighbours are ordered
+ *  in a clockwise fashion.
  *
- * @return the uint32_t representing this four character code
+ * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
  */
-inline constexpr uint32_t fourcc(const char (&code)[5]) {
-  return uint32_t(code[0] | (code[1] << 8) | (code[2] << 16) | (code[3] << 24));
-}
-
-/**
- * @brief Given a fourcc (four character code), in uint32_t form convert it into it's four character representation
- *
- * @param code
- * @return std::string
- */
-inline std::string fourcc_text(const uint32_t& code) {
-  return std::string({char(code & 0xFF), char(code >> 8 & 0xFF), char(code >> 16 & 0xFF), char(code >> 24 & 0xFF)});
-}
+template <typename Scalar>
+struct Node {
+  /// The unit vector in the direction for this node
+  vec3<Scalar> ray;
+  /// Absolute indices to the linked nodes ordered L, TL, TR, R, BR, BL (clockwise)
+  std::array<int, 6> neighbours;
+};
 
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_UTILITY_FOURCC_HPP
+#endif  // VISUALMESH_NODE_HPP

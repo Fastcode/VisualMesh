@@ -19,24 +19,13 @@ class VisualMeshDataset:
     self.classes = classes
     self.batch_size = batch_size
     self.geometry = tf.constant(geometry.shape, dtype=tf.string, name='GeometryType')
+    self.radius = geometry.radius
+    self.n_intersections = geometry.intersections
+    self.intersection_tolerance = geometry.intersection_tolerance
+    self.cached_meshes = geometry.cached_meshes
+    self.max_distance = geometry.max_distance
     self.prefetch = prefetch
-
     self._variants = variants
-
-    # Convert our geometry into a set of numbers
-    if geometry.shape in ['CIRCLE', 'SPHERE']:
-      self.geometry_params = tf.constant([geometry.radius, geometry.intersections, geometry.max_distance],
-                                         dtype=tf.float32,
-                                         name='GeometryParams')
-
-    elif geometry.shape in ['CYLINDER']:
-      self.geometry_params = tf.constant([
-        geometry.height, geometry.radius, geometry.intersections, geometry.max_distance
-      ],
-                                         dtype=tf.float32,
-                                         name='GeometryParams')
-    else:
-      raise Exception('Unknown geometry type {}'.format(self.geometry))
 
   def _load_example(self, proto):
     example = tf.parse_single_example(
@@ -44,11 +33,11 @@ class VisualMeshDataset:
         'image': tf.FixedLenFeature([], tf.string),
         'mask': tf.FixedLenFeature([], tf.string),
         'lens/projection': tf.FixedLenFeature([], tf.string),
-        'lens/focal_length': tf.FixedLenFeature([1], tf.float32),
-        'lens/fov': tf.FixedLenFeature([1], tf.float32),
+        'lens/focal_length': tf.FixedLenFeature([], tf.float32),
+        'lens/fov': tf.FixedLenFeature([], tf.float32),
         'lens/centre': tf.FixedLenFeature([2], tf.float32),
         'mesh/orientation': tf.FixedLenFeature([3, 3], tf.float32),
-        'mesh/height': tf.FixedLenFeature([1], tf.float32),
+        'mesh/height': tf.FixedLenFeature([], tf.float32),
       }
     )
 
@@ -104,15 +93,19 @@ class VisualMeshDataset:
 
     # Run the visual mesh to get our values
     pixels, neighbours = VisualMesh(
-      tf.shape(args['image']),
+      tf.shape(args['image'])[:2],
       args['projection'],
       args['focal_length'],
       args['fov'],
       args['lens_centre'],
       orientation,
       height,
+      self.n_intersections,
+      self.cached_meshes,
+      self.intersection_tolerance,
+      self.max_distance,
       self.geometry,
-      self.geometry_params,
+      self.radius,
       name='ProjectVisualMesh',
     )
 
@@ -207,13 +200,11 @@ class VisualMeshDataset:
         )
       )
     if 'gamma' in var and var.gamma.stddev > 0:
-      X = tf.image.adjust_gamma(
-        X, tf.truncated_normal(
-          shape=(),
-          mean=var.gamma.mean,
-          stddev=var.gamma.stddev,
-        )
-      )
+      X = tf.image.adjust_gamma(X, tf.truncated_normal(
+        shape=(),
+        mean=var.gamma.mean,
+        stddev=var.gamma.stddev,
+      ))
 
     # Remove the extra dimension we added
     return tf.squeeze(X, axis=0)

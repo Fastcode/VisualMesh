@@ -10,10 +10,5 @@
     "editor.rulers": [
         120
     ],
-    "cSpell.words": [
-        "EQUISOLID",
-        "convolutional"
-    ],
-    "python.pythonPath": "/usr/bin/python3",
-    "opencl.formatting.name": "clang-format",
+    "cSpell.language": "en-GB"
 }

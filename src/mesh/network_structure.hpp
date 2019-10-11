@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -20,15 +20,20 @@
 
 namespace visualmesh {
 
+/// Weights are a matrix (vector of vectors)
 template <typename Scalar>
 using weights_t = std::vector<std::vector<Scalar>>;
+/// Biases are a vector
 template <typename Scalar>
 using biases_t = std::vector<Scalar>;
 
+/// A layer is made up of a pair of weights and biases
 template <typename Scalar>
 using layer_t = std::pair<weights_t<Scalar>, biases_t<Scalar>>;
+/// A convolutional layer is made up of a list of network layers
 template <typename Scalar>
 using conv_layer_t = std::vector<layer_t<Scalar>>;
+/// A network is a list of convolutional layers
 template <typename Scalar>
 using network_structure_t = std::vector<conv_layer_t<Scalar>>;
 

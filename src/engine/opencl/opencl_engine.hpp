@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -27,6 +27,7 @@
 
 #include <numeric>
 #include <tuple>
+
 #include "engine/opencl/classifier.hpp"
 #include "engine/opencl/kernels/project_equidistant.cl.hpp"
 #include "engine/opencl/kernels/project_equisolid.cl.hpp"
@@ -58,9 +59,8 @@ namespace engine {
         ::clGetPlatformIDs(platforms.size(), platforms.data(), nullptr);
 
         // Which device/platform we are going to use
-        cl_platform_id best_platform = nullptr;
-        cl_device_id best_device     = nullptr;
-        int best_compute_units       = 0;
+        cl_device_id best_device   = nullptr;
+        cl_uint best_compute_units = 0;
 
         // Go through our platforms
         for (const auto& platform : platforms) {
@@ -105,7 +105,6 @@ namespace engine {
 
             if (max_compute_units > best_compute_units) {
               best_compute_units = max_compute_units;
-              best_platform      = platform;
               best_device        = device;
             }
 
@@ -196,7 +195,7 @@ namespace engine {
       }
 
       ProjectedMesh<Scalar> project(const Mesh<Scalar>& mesh,
-                                    const std::vector<std::pair<unsigned int, unsigned int>>& ranges,
+                                    const std::vector<std::pair<int, int>>& ranges,
                                     const mat4<Scalar>& Hoc,
                                     const Lens<Scalar>& lens) const {
 
@@ -235,7 +234,7 @@ namespace engine {
     private:
       std::tuple<std::vector<std::array<int, 6>>, std::vector<int>, cl::mem, cl::event> do_project(
         const Mesh<Scalar>& mesh,
-        const std::vector<std::pair<unsigned int, unsigned int>>& ranges,
+        const std::vector<std::pair<int, int>>& ranges,
         const mat4<Scalar>& Hoc,
         const Lens<Scalar>& lens) const {
 
@@ -266,10 +265,10 @@ namespace engine {
             ::clReleaseMemObject);
 
           // Flatten our rays
-          std::vector<std::array<Scalar, 4>> rays;
+          std::vector<vec4<Scalar>> rays;
           rays.reserve(mesh.nodes.size());
           for (const auto& n : mesh.nodes) {
-            rays.push_back(n.ray);
+            rays.emplace_back(vec4<Scalar>{n.ray[0], n.ray[1], n.ray[2], 0});
           }
 
           // Write the points buffer to the device and cache it
@@ -376,16 +375,16 @@ namespace engine {
 
         // This can happen on the CPU while the OpenCL device is busy
         // Build the reverse lookup map where the offscreen point is one past the end
-        std::vector<int> r_indices(nodes.size(), points);
-        for (uint i = 0; i < indices.size(); ++i) {
+        std::vector<int> r_indices(nodes.size() + 1, points);
+        for (unsigned int i = 0; i < indices.size(); ++i) {
           r_indices[indices[i]] = i;
         }
 
         // Build the packed neighbourhood map with an extra offscreen point at the end
         std::vector<std::array<int, 6>> local_neighbourhood(points + 1);
-        for (uint i = 0; i < indices.size(); ++i) {
+        for (unsigned int i = 0; i < indices.size(); ++i) {
           const auto& node = nodes[indices[i]];
-          for (uint j = 0; j < 6; ++j) {
+          for (unsigned int j = 0; j < 6; ++j) {
             const auto& n             = node.neighbours[j];
             local_neighbourhood[i][j] = r_indices[n];
           }

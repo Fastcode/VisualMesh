@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -18,10 +18,11 @@
 /**
  * Project visual mesh points to a rectilinear camera
  *
- * @param points        VisualMesh unit vectors
+ * @param points        VisualMesh unit vectors as 4d vectors [x, y, z, 0]
  * @param indices       map from local indices to global indices
  * @param Rco           rotation from the observation space to camera space
  *                      note that while this is a 4x4, that is for memory alignment, no translation should exist
+ *                      (or would be applied anyway)
  * @param f             the focal length of the lens measured in pixels
  * @param dimensions    the dimensions of the input image
  * @param centre        the offset from the centre of the lens axis to the centre of the image in pixels

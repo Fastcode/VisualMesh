@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -17,7 +17,6 @@
 
 const sampler_t bayer_sampler  = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
 const sampler_t interp_sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_LINEAR;
-
 
 enum FOURCC {
   GREY    = 0x59455247,
@@ -47,12 +46,32 @@ enum FOURCC {
   UNKNOWN = 0
 };
 
-
-float fetch(read_only image2d_t raw_image, sampler_t sampler, float2 pos) {
-  return read_imagef(raw_image, sampler, pos).x;
+/**
+ * @brief Given an image, fetches the r component for use with debayering
+ *
+ * @param raw_image the raw image that the sampler will be accessing from
+ * @param sampler   the sampler that will be used for accessing memory
+ * @param coord     the floating point coordinates to access
+ *
+ * @return returns the pixel at the given coordinates
+ */
+float fetch(read_only image2d_t raw_image, sampler_t sampler, float2 coord) {
+  return read_imagef(raw_image, sampler, coord).r;
 }
 
-// http://graphics.cs.williams.edu/papers/BayerJGT09/
+//
+/**
+ * @brief Converts a single pixel from a bayer pattern to RGB and returns it
+ *
+ * @details Code adapted from http://graphics.cs.williams.edu/papers/BayerJGT09/
+ *
+ * @param raw_image   the raw bayer pattern image that we are reading from
+ * @param sampler     the sampler to use for reading the raw bayer image
+ * @param coord       the coordinate to read from
+ * @param first_red   the coordinate for the first red pixel in the bayer pattern
+ *
+ * @return the RGB pixel at the given location in the bayer image
+ */
 float4 bayerToRGB(read_only image2d_t raw_image, sampler_t sampler, float2 coord, float2 first_red) {
   float4 centre = (float4){0.0f, 0.0f, 0.0f, 0.0f};
   centre.xy     = coord;
@@ -146,37 +165,45 @@ float4 bayerToRGB(read_only image2d_t raw_image, sampler_t sampler, float2 coord
   return result;
 }
 
-
-float4 read_image(read_only image2d_t image, const enum FOURCC format, const float2 coordinates) {
+/**
+ * @brief Reads a pixel at a position and returns a vec4 value
+ *
+ * @param image   the image to read from
+ * @param format  the fourcc code for the image to decode from
+ * @param pos
+ */
+float4 read_image(read_only image2d_t image, const enum FOURCC format, const float2 coord) {
   switch (format) {
-    case GRBG: {
-      return bayerToRGB(image, bayer_sampler, coordinates, (float2)(1.0, 0.0));
-    }
-    case RGGB: {
-      return bayerToRGB(image, bayer_sampler, coordinates, (float2)(0.0, 0.0));
-    }
-    case GBRG: {
-      return bayerToRGB(image, bayer_sampler, coordinates, (float2)(0.0, 1.0));
-    }
-    case BGGR: {
-      return bayerToRGB(image, bayer_sampler, coordinates, (float2)(1.0, 1.0));
-    }
+    // Bayer formats use the bayer sampler (nearest neighbour)
+    case GRBG: return bayerToRGB(image, bayer_sampler, coord, (float2)(1.0, 0.0));
+    case RGGB: return bayerToRGB(image, bayer_sampler, coord, (float2)(0.0, 0.0));
+    case GBRG: return bayerToRGB(image, bayer_sampler, coord, (float2)(0.0, 1.0));
+    case BGGR: return bayerToRGB(image, bayer_sampler, coord, (float2)(1.0, 1.0));
+    // RGB formats read with interpolation
     case RGB3:
     case BGRA:
     case RGBA: {
-      return read_imagef(image, interp_sampler, coordinates);
+      return read_imagef(image, interp_sampler, coord);
     }
     default: { return (float4)(0); }
   }
 }
 
+/**
+ * @brief Reads data from an image into a network layer using the projected visual mesh points
+ *
+ * @param image   the image to read from
+ * @param format  the format that the image is encoded in
+ * @param coords  the pixel coordinates for each element in the visual mesh graph
+ * @param network the memory storage for the first layer of the network
+ */
 kernel void read_image_to_network(read_only image2d_t image,
                                   const enum FOURCC format,
-                                  global float2* coordinates,
+                                  global float2* coords,
                                   global float4* network) {
 
   const int idx = get_global_id(0);
 
   // Read our pixel coordinate into the image
-  network[idx] = read_image(image, format, coordinates[idx]);
+  network[idx] = read_image(image, format, coords[idx]);
 }

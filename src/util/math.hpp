@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -49,7 +49,35 @@ inline std::array<OutScalar, L> cast(const std::array<InScalar, L>& a) {
 }
 
 /**
- * Vector subtraction
+ * Get the head of a vector
+ */
+template <std::size_t S, typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, S> head(const std::array<Scalar, L>& a, const std::index_sequence<I...>&) {
+  return {{a[I]...}};
+}
+
+template <std::size_t S, typename Scalar, std::size_t L>
+inline std::enable_if_t<(S < L), std::array<Scalar, S>> head(const std::array<Scalar, L>& a) {
+  return head<S>(a, std::make_index_sequence<S>());
+}
+
+/**
+ * Vector Scalar subtraction
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a,
+                                      const Scalar& b,
+                                      const std::index_sequence<I...>&) {
+  return {{(a[I] - b)...}};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const Scalar& b) {
+  return subtract(a, b, std::make_index_sequence<L>());
+}
+
+/**
+ * Vector Vector subtraction
  */
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a,
@@ -64,7 +92,20 @@ inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const std:
 }
 
 /**
- * Vector addition
+ * Vector Scalar addition
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const Scalar& b, const std::index_sequence<I...>&) {
+  return {{(a[I] + b)...}};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const Scalar& b) {
+  return add(a, b, std::make_index_sequence<L>());
+}
+
+/**
+ * Vector Vector addition
  */
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> add(const std::array<Scalar, L>& a,
@@ -148,6 +189,27 @@ inline vec3<Scalar> cross(const vec3<Scalar>& a, const vec3<Scalar>& b) {
 }
 
 /**
+ * Matrix block (head of matrix)
+ */
+template <std::size_t S, std::size_t T, typename Scalar, std::size_t L, std::size_t M, std::size_t... I>
+inline std::array<std::array<Scalar, T>, S> block(const std::array<std::array<Scalar, M>, L>& a,
+                                                  const std::index_sequence<I...>&) {
+  return {{head<T>(a[I])...}};
+}
+
+template <std::size_t S, std::size_t T, typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<std::array<Scalar, T>, S> block(const std::array<std::array<Scalar, T>, L>& a,
+                                                  const std::index_sequence<I...>&) {
+  return {{a[I]...}};
+}
+
+template <std::size_t S, std::size_t T, typename Scalar, std::size_t L, std::size_t M>
+inline std::enable_if_t<(S <= L && T < M) || (S < L && T <= M), std::array<std::array<Scalar, T>, S>> block(
+  const std::array<std::array<Scalar, M>, L>& a) {
+  return block<S, T>(a, std::make_index_sequence<S>());
+}
+
+/**
  * Matrix transpose
  */
 template <std::size_t X, typename Scalar, std::size_t L, std::size_t M, std::size_t... Y>
@@ -167,6 +229,38 @@ inline std::array<std::array<Scalar, M>, L> transpose(const std::array<std::arra
   return transpose(mat, std::make_index_sequence<L>());
 }
 
+
+/**
+ * Matrix Vector multiplication
+ * (the vector is treated as a column vector for this function)
+ */
+template <typename Scalar>
+inline vec3<Scalar> multiply(const mat3<Scalar>& a, const vec3<Scalar>& b) {
+  return vec3<Scalar>{{dot(a[0], b), dot(a[1], b), dot(a[2], b)}};
+}
+
+/**
+ * Matrix inverse
+ */
+template <typename Scalar>
+inline mat3<Scalar> invert(const mat3<Scalar>& m) {
+
+  // computes the inverse of a matrix m
+  Scalar idet = static_cast<Scalar>(1)
+                / (m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2]) -  //
+                   m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +  //
+                   m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]));  //
+
+  return {vec3<Scalar>{(m[1][1] * m[2][2] - m[2][1] * m[1][2]) * idet,
+                       (m[0][2] * m[2][1] - m[0][1] * m[2][2]) * idet,
+                       (m[0][1] * m[1][2] - m[0][2] * m[1][1]) * idet},
+          vec3<Scalar>{(m[1][2] * m[2][0] - m[1][0] * m[2][2]) * idet,
+                       (m[0][0] * m[2][2] - m[0][2] * m[2][0]) * idet,
+                       (m[1][0] * m[0][2] - m[0][0] * m[1][2]) * idet},
+          vec3<Scalar>{(m[1][0] * m[2][1] - m[2][0] * m[1][1]) * idet,
+                       (m[2][0] * m[0][1] - m[0][0] * m[2][1]) * idet,
+                       (m[0][0] * m[1][1] - m[1][0] * m[0][1]) * idet}};
+}
 }  // namespace visualmesh
 
 #endif  // VISUALMESH_UTILITY_MATH_HPP

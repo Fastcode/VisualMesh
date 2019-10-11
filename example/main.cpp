@@ -1,8 +1,8 @@
 #include <dirent.h>
 #include <fcntl.h>
-#include <fmt/format.h>
 #include <sys/stat.h>
 #include <yaml-cpp/yaml.h>
+
 #include <algorithm>
 #include <fstream>
 #include <iostream>
@@ -11,11 +11,11 @@
 #include <opencv2/imgproc.hpp>
 #include <string>
 #include <system_error>
+
 #include "ArrayPrint.hpp"
 #include "Timer.hpp"
 #include "engine/opencl/opencl_engine.hpp"
 #include "geometry/Sphere.hpp"
-#include "mesh/test_mesh.hpp"
 #include "util/fourcc.hpp"
 #include "visualmesh.hpp"
 
@@ -59,8 +59,8 @@ int main() {
   // Construct our VisualMesh
   Timer t;
   visualmesh::geometry::Sphere<float> sphere(0.0949996);
-  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> cl_mesh(sphere, 0.5, 1.5, 100, 6, 20);
-  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine> cpu_mesh(sphere, 0.5, 1.5, 100, 6, 20);
+  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> cl_mesh(sphere, 0.5, 1.5, 6, 0.5, 20);
+  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine> cpu_mesh(sphere, 0.5, 1.5, 6, 0.5, 20);
   t.measure("Built Visual Mesh");
 
   // Build our classification network
@@ -163,14 +163,17 @@ int main() {
         // Horizontal field of view
         float h_fov = meta["camera"]["lens"]["fov"].as<float>();
 
+        // Calculate diagonal field of view
+        float aspect = static_cast<float>(lens.dimensions[1]) / static_cast<float>(lens.dimensions[0]);
+        float fov    = 2.0 * std::atan(std::sqrt((aspect * aspect + 1) * std::tan(h_fov * 0.5)));
+
         // Construct rectilinear projection
         lens.projection   = visualmesh::RECTILINEAR;
-        lens.fov          = h_fov;
+        lens.fov          = fov;
         lens.focal_length = (lens.dimensions[0] * 0.5) / std::tan(h_fov * 0.5);
       }
       else if (meta["camera"]["lens"]["type"].as<std::string>() == "FISHEYE") {
         float fov             = meta["camera"]["lens"]["fov"].as<float>();
-        float height_mm       = meta["camera"]["lens"]["sensor_height"].as<float>();
         float width_mm        = meta["camera"]["lens"]["sensor_width"].as<float>();
         float focal_length_mm = meta["camera"]["lens"]["focal_length"].as<float>();
 
@@ -196,7 +199,7 @@ int main() {
 
         cv::Mat scratch = img.clone();
 
-        for (int i = 0; i < pixel_coordinates.size(); ++i) {
+        for (unsigned int i = 0; i < pixel_coordinates.size(); ++i) {
           cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
 
           // Work out what colour based on mixing
@@ -212,7 +215,7 @@ int main() {
           colour += cv::Scalar(0, 255 * cl[3], 0);
 
           for (const auto& n : neighbourhood[i]) {
-            if (n < pixel_coordinates.size()) {
+            if (n < static_cast<int>(pixel_coordinates.size())) {
               cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
               cv::Point p2x = p1 + ((p2 - p1) * 0.5);
               cv::line(scratch, p1, p2x, colour, 1);
@@ -239,7 +242,7 @@ int main() {
 
         cv::Mat scratch = img.clone();
 
-        for (int i = 0; i < pixel_coordinates.size(); ++i) {
+        for (int i = 0; i < static_cast<int>(pixel_coordinates.size()); ++i) {
           cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
 
           // Work out what colour based on mixing
@@ -255,7 +258,7 @@ int main() {
           colour += cv::Scalar(0, 255 * cl[3], 0);
 
           for (const auto& n : neighbourhood[i]) {
-            if (n < pixel_coordinates.size()) {
+            if (n < static_cast<int>(pixel_coordinates.size())) {
               cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
               cv::Point p2x = p1 + ((p2 - p1) * 0.5);
               cv::line(scratch, p1, p2x, colour, 1);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -18,613 +18,547 @@
 #ifndef VISUALMESH_MESH_HPP
 #define VISUALMESH_MESH_HPP
 
+#include <algorithm>
 #include <array>
+#include <numeric>
+#include <tuple>
 #include <utility>
 #include <vector>
+
+#include "generator/hexapizza.hpp"
 #include "lens.hpp"
+#include "node.hpp"
+#include "util/cone.hpp"
 #include "util/math.hpp"
+#include "util/projection.hpp"
 
 namespace visualmesh {
 
-template <typename Scalar>
-struct Node {
-  /// The unit vector in the direction for this node
-  vec4<Scalar> ray;
-  /// Relative indices to the linked hexagon nodes in the LUT ordered TL, TR, L, R, BL, BR,
-  std::array<int, 6> neighbours;
-};
-
-template <typename Scalar>
-struct Row {
-  Row(const Scalar& phi, const int& begin, const int& end) : phi(phi), begin(begin), end(end) {}
-
-  /// The phi value this row represents
-  Scalar phi;
-  /// The index of the beginning of this row in the node table
-  int begin;
-  /// The index of one past the end of this row in the node table
-  int end;
-
-  /**
-   * @brief Compare based on phi
-   *
-   * @param other other item to compare to
-   *
-   * @return if our phi is less than other phi
-   */
-  bool operator<(const Row& other) const {
-    return phi < other.phi;
-  }
-};
-
+/**
+ * @brief Holds a description of a Visual Mesh
+ *
+ * @details
+ *  This object holds a Visual Mesh for a single height. It utilises a generator class to create a mesh, and then
+ *  transforms it into a structure that is suppored as a BSP tree. It then uses this tree to lookup the mesh given
+ *  different lens paramters. Note that because of teh way it oes the lookup, this lookup isn't perfect esperically for
+ *  fisheye lenses. In this case it will sometimes give points that are outside the bounds of the image. The CPU engine
+ *  removes these extra points however the OpenCL engine does not. So if you are relying on these pixel coordinates
+ *  being in bounds you should ensure that you use the CPU engine.
+ *
+ * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ */
 template <typename Scalar>
 struct Mesh {
-
-  template <typename Shape>
-  Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance) : h(h) {
-
-    // This is a list of phi values along with the delta theta values associated with them
-    std::vector<std::pair<Scalar, int>> phis;
-
-    const Scalar jump = 1.0 / k;
-    for (Scalar n = 0; phis.empty() || h * std::tan(phis.back().first) < max_distance; n += jump) {
-
-      // Calculate phi and theta for this shape and calculate how many slices ensures we have at least enough
-      Scalar phi   = shape.phi(n, h);
-      Scalar theta = shape.theta(phi, h);
-      int slices   = static_cast<int>(std::ceil(k * 2 * M_PI / theta));
-
-      // Push back this new slice
-      if (!std::isnan(theta)) { phis.emplace_back(phi, slices); }
-    }
-
-    // Work out how big our LUT will be
-    unsigned int lut_size = 0;
-    for (const auto& v : phis) {
-      lut_size += v.second;
-    }
-    nodes.reserve(lut_size);
-
-    // The start and end of each row in the final lut
-    rows.reserve(phis.size());
-
-    // Loop through our LUT and calculate our left and right neighbours
-    for (const auto& v : phis) {
-      // Get our phi and delta theta values for a clean circle
-      const auto& phi      = v.first;
-      const Scalar sin_phi = std::sin(phi);
-      const Scalar cos_phi = std::cos(phi);
-      const auto& steps    = v.second;
-      const Scalar dtheta  = (Scalar(2.0) * M_PI) / steps;
-
-      // We will use the start position of each row later for linking the graph
-      rows.emplace_back(phi, nodes.size(), nodes.size() + steps);
-
-      // Generate for each of the theta values from 0 to 2 pi
-      Scalar theta = 0;
-      for (int i = 0; i < steps; ++i) {
-        Node<Scalar> n;
-
-        // Calculate our unit vector with x facing forward and z up
-        n.ray = {{
-          std::cos(theta) * sin_phi,  //
-          std::sin(theta) * sin_phi,  //
-          -cos_phi,                   //
-          Scalar(0.0)                 //
-        }};
-
-        // Get the indices for our left/right neighbours relative to this row
-        // If the next/previous point wraps around, we wrap it here
-        const int l = i == 0 ? steps - 1 : i - 1;
-        const int r = i == steps - 1 ? 0 : i + 1;
-
-        // Set these two neighbours and default the others to ourself
-        n.neighbours[0] = 0;
-        n.neighbours[1] = 0;
-        n.neighbours[2] = l - i;  // L
-        n.neighbours[3] = r - i;  // R
-        n.neighbours[4] = 0;
-        n.neighbours[5] = 0;
-
-        // Move on to the next theta value
-        theta += dtheta;
-
-        nodes.push_back(std::move(n));
-      }
-    }
-
-
-    /**
-     * This function links to the previous and next rows
-     *
-     * @param i       the absolute index to the node we are linking
-     * @param pos     the position of this node in its row as a value between 0 and 1
-     * @param start   the start of the row to link to
-     * @param size    the size of the row we are linking to
-     * @param offset  the offset for our neighbour (0 for TL,TR 4 for BL BR)
-     */
-    auto link = [](std::vector<Node<Scalar>>& lut,
-                   const int& i,
-                   const Scalar& pos,
-                   const int& start,
-                   const int& size,
-                   const unsigned int offset) {
-      // Grab our current node
-      auto& node = lut[i];
-
-      // If the size of the row we are linking to is 1, all elements will link to it
-      // This is the case for the very first and very last row
-      if (size == 1) {
-
-        // Now use these to set our TL and TR neighbours
-        node.neighbours[offset]     = start - i;
-        node.neighbours[offset + 1] = start - i;
-      }
-      else {
-        // Work out if we are closer to the left or right and make an offset var for it
-        // Note this bool is used like a bool and int. It is 0 when we should access TR first
-        // and 1 when we should access TL first. This is to avoid accessing values which wrap around
-        // and instead access a non wrap element and use its neighbours to work out ours
-        const bool left = pos > Scalar(0.5);
-
-        // Get our closest neighbour on the previous row and use it to work out where the other one
-        // is This will be the Right element when < 0.5 and Left when > 0.5
-        const int o1 = start + std::floor(pos * size + !left);  // Use `left` to add one to one
-        const int o2 = o1 + lut[o1].neighbours[2 + left];       // But not the other
-
-        // Now use these to set our TL and TR neighbours
-        node.neighbours[offset]     = (left ? o1 : o2) - i;
-        node.neighbours[offset + 1] = (left ? o2 : o1) - i;
-      }
-    };
-
-    // Now we iterate upwards and downwards to fill in the missing links
-    for (unsigned int r = 1; r + 1 < rows.size(); ++r) {
-      // Alias for convenience
-      const auto& prev    = rows[r - 1];
-      const auto& current = rows[r];
-      const auto& next    = rows[r + 1];
-
-      // Work out how big our rows are if they are within valid indices
-      const int prev_size    = prev.end - prev.begin;
-      const int current_size = current.end - current.begin;
-      const int next_size    = next.end - next.begin;
-
-      // Go through all the nodes on our current row
-      for (int i = current.begin; i < current.end; ++i) {
-
-        // Find where we are in our row as a value between 0 and 1
-        const Scalar pos = Scalar(i - current.begin) / Scalar(current_size);
-
-        // Perform both links
-        link(nodes, i, pos, prev.begin, prev_size, 0);
-        link(nodes, i, pos, next.begin, next_size, 4);
-      }
-    }
-
-    // Now we have to deal with the very first, and very last rows as they can't be linked in the normal way
-    if (!rows.empty()) {
-      const auto& front    = rows.front();
-      const int front_size = front.end - front.begin;
-
-      const auto& row_2    = rows.size() > 1 ? rows[1] : rows.front();
-      const int row_2_size = row_2.end - row_2.begin;
-
-      const auto& back    = rows.back();
-      const int back_size = back.end - back.begin;
-
-      const auto& row_2_last    = rows.size() > 1 ? rows[rows.size() - 1] : rows.back();
-      const int row_2_last_size = row_2_last.end - row_2_last.begin;
-
-      // Link to our next row in a circle
-      if (front_size == 1) {
-        Scalar delta(Scalar(row_2_size) / Scalar(6.0));
-        auto& n = nodes.front().neighbours;
-        for (int i = 0; i < 6; ++i) {
-          // Get the position on the next row
-          n[i] = row_2.begin + int(std::round(delta * i));
-        }
-      }
-
-      // Link to our next row in a circle
-      if (back_size == 1) {
-        Scalar delta(Scalar(row_2_last_size) / Scalar(6.0));
-        auto& n = nodes.back().neighbours;
-        for (int i = 0; i < 6; ++i) {
-          // Get the position on the previous row
-          n[i] = row_2_last.begin + int(std::round(delta * i)) - (nodes.size() - 1);
-        }
-      }
-    }
-
-    // Convert all the relative indices we calculated to absolute indices
-    for (unsigned int i = 0; i < nodes.size(); ++i) {
-      for (auto& n : nodes[i].neighbours) {
-        n = i + n;
-      }
-    }
-  }
+private:
+  /**
+   * @brief An element of a binary search partitioning scheme to quickly work out which points are on the screen.
+   *
+   * @details
+   *  This is a node in a binary search partition. It is represented by a bounding code that can be used to work out if
+   *  any of the elements in that cone are on the screen. These cones will be split into sub cones to further limit the
+   *  scope of the search until a list of a few elements are found that can be checked manually.
+   */
+  struct BSP {
+    // The bounds of the range that this BSP element represents (start to one past the end)
+    std::pair<int, int> range;
+    // The indicies of the two children in this BSP
+    std::array<int, 2> children;
+    // The paramters of the cone that describe this part of the BSP
+    // These include the unit axis in world space, and the cos and sin of the cone angle (θ)
+    //
+    //  \    a    /
+    //   \   |   /
+    //    \  |--/
+    //     \ |θ/
+    //      \|/
+    //       V
+    std::pair<vec3<Scalar>, vec2<Scalar>> cone;
+  };
 
   /**
-   * Performs a visual mesh lookup, finding the start and end indexes for visual mesh points that are on the screen.
-   * It uses the provided `theta_limits` function to identify the start and end points on the screen for a specific phi.
+   * @brief Given a set of points, find the smallest cone that contains all points
    *
-   * @param theta_limits the function that is used to identify the start and end of theta for a phi value
+   * @details
+   *  Implements welzls algorithm for circles, but instead for cones. You should randomize the iterator before running
+   *  this algorithm, otherwise you can suffer from very poor performance
    *
-   * @tparam Func        the type of the function that identifies theta ranges given a phi value
+   * @tparam Iterator the type of the iterator passed in
+   *
+   * @param start the start iterator of points to consider for the circle
+   * @param end   the end iterator of points to consider for the circle
    */
-  template <typename Func>
-  std::vector<std::pair<unsigned int, unsigned int>> lookup(Func&& theta_limits) const {
-
-    std::vector<std::pair<unsigned int, unsigned int>> indices;
-
-    // Loop through each phi row
-    for (const auto& row : rows) {
-
-      const auto row_size = row.end - row.begin;
-
-      // Get the theta values that are valid for this phi
-      const auto theta_ranges = theta_limits(row.phi);
-
-      // Work out what this range means in terms of theta
-      for (const auto& range : theta_ranges) {
-
-        // Convert our theta values into local indices
-        int begin = std::ceil(row_size * range.first * (Scalar(1.0) / (Scalar(2.0) * M_PI)));
-        int end   = std::ceil(row_size * range.second * (Scalar(1.0) / (Scalar(2.0) * M_PI)));
-
-        // Floating point numbers are annoying... did you know pi * 1/pi is slightly larger than 1?
-        // It's also possible that our theta ranges cross the wrap around but the indices mean they don't
-        // This will cause segfaults unless we fix the wrap
-        begin = begin > row_size ? 0 : begin;
-        end   = end > row_size ? row_size : end;
-
-        // If we define an empty range don't bother doing any more
-        if (begin != end) {
-          // If we define a nice enclosed range range add it
-          if (begin < end) { indices.emplace_back(row.begin + begin, row.begin + end); }
-          // Our phi values wrap around so we need two ranges
-          else {
-            indices.emplace_back(row.begin, row.begin + end);
-            indices.emplace_back(row.begin + begin, row.end);
-          }
-        }
-      }
-    }
-
-    return indices;
-  }
-
-  std::vector<std::pair<unsigned int, unsigned int>> lookup_rectilinear(const mat4<Scalar>& Hoc,
-                                                                        const Lens<Scalar>& lens) const {
-
-    // We multiply a lot of things by 2
-    constexpr const Scalar x2 = Scalar(2.0);
-
-    // Extract our rotation matrix
-    const mat3<Scalar> Roc = {{
-      {{Hoc[0][0], Hoc[0][1], Hoc[0][2]}},  //
-      {{Hoc[1][0], Hoc[1][1], Hoc[1][2]}},  //
-      {{Hoc[2][0], Hoc[2][1], Hoc[2][2]}}   //
-    }};
-
-    // Extract the camera vector
-    const std::array<Scalar, 3> cam = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
-
-    // Work out how much additional y and z we get from our field of view if we have a focal length of 1
-    const Scalar y_extent = (lens.dimensions[0] * static_cast<Scalar>(0.5)) / lens.focal_length;
-    const Scalar z_extent = (lens.dimensions[1] * static_cast<Scalar>(0.5)) / lens.focal_length;
-
-    // The centre offset in this space
-    const Scalar y_offset = -lens.centre[0] / lens.focal_length;
-    const Scalar z_offset = -lens.centre[1] / lens.focal_length;
-
-    /* The labels for each of the corners of the frustum is shown below.
-        ^    T       U
-        |        C
-        z    W       V
-        <- y
-     */
-    // Make vectors to the corners in cam space, making sure to apply
-    const std::array<vec3<Scalar>, 4> rNCc = {{
-      {{Scalar(1.0), +y_extent + y_offset, +z_extent + z_offset}},  // rTCc
-      {{Scalar(1.0), -y_extent + y_offset, +z_extent + z_offset}},  // rUCc
-      {{Scalar(1.0), -y_extent + y_offset, -z_extent + z_offset}},  // rVCc
-      {{Scalar(1.0), +y_extent + y_offset, -z_extent + z_offset}}   // rWCc
-    }};
-
-    // Rotate these into world space by multiplying by the rotation matrix
-    const std::array<vec3<Scalar>, 4> rNCo = {{
-      {{dot(rNCc[0], Roc[0]), dot(rNCc[0], Roc[1]), dot(rNCc[0], Roc[2])}},  // rTCo
-      {{dot(rNCc[1], Roc[0]), dot(rNCc[1], Roc[1]), dot(rNCc[1], Roc[2])}},  // rUCo
-      {{dot(rNCc[2], Roc[0]), dot(rNCc[2], Roc[1]), dot(rNCc[2], Roc[2])}},  // rVCo
-      {{dot(rNCc[3], Roc[0]), dot(rNCc[3], Roc[1]), dot(rNCc[3], Roc[2])}},  // rWCo
-    }};
-
-    // Make our corner to next corner vectors
-    // In cam space these are 0,1,0 style vectors so we just get a col of the other matrix
-    // But since we are multiplying by the transpose we get a row of the matrix
-    // When we are storing this matrix we represent each corner as N and the following clockwise corner
-    // as M Then it is multiplied by the extent to make a vector of the length of the edge of the
-    // frustum
-    const std::array<vec3<Scalar>, 4> rMNo = {{
-      {{-Roc[0][1] * x2 * y_extent, -Roc[1][1] * x2 * y_extent, -Roc[2][1] * x2 * y_extent}},  // rUTo
-      {{-Roc[0][2] * x2 * z_extent, -Roc[1][2] * x2 * z_extent, -Roc[2][2] * x2 * z_extent}},  // rVUo
-      {{+Roc[0][1] * x2 * y_extent, +Roc[1][1] * x2 * y_extent, +Roc[2][1] * x2 * y_extent}},  // rWVo
-      {{+Roc[0][2] * x2 * z_extent, +Roc[1][2] * x2 * z_extent, +Roc[2][2] * x2 * z_extent}}   // rTWo
-    }};
-
-    // Make our normals to the frustum edges
-    const std::array<vec3<Scalar>, 4> edges = {{
-      cross(rNCo[0], rNCo[1]),  // Top edge
-      cross(rNCo[1], rNCo[2]),  // Left edge
-      cross(rNCo[2], rNCo[3]),  // Base edge
-      cross(rNCo[3], rNCo[0]),  // Right edge
-    }};
-
-    // These calculations are intermediates for the solution to the cone/line equation. Since these
-    // parts are the same for all phi values, we can pre-calculate them here to save effort later
-    std::array<std::array<Scalar, 6>, 4> eq_parts;
-    for (int i = 0; i < 4; ++i) {
-      const auto& o = rNCo[i];  // Line origin
-      const auto& d = rMNo[i];  // Line direction
-
-      // Later we will use these constants like so
-      // (p[0] + c2 * p[1] ± sqrt(c2 * p[2] + p[3]))/(p[4] + c2 * p[5]);
-
-      // c2 dependant part of numerator
-      eq_parts[i][0] = d[2] * o[2];  // -dz oz
-
-      // Non c2 dependant part of numerator
-      eq_parts[i][1] = -d[1] * o[1] - d[0] * o[0];  // -dy oy - dx ox
-
-      // c2 dependant part of discriminant
-      eq_parts[i][2] = d[0] * d[0] * o[2] * o[2]         // dx^2 oz^2
-                       - x2 * d[0] * d[2] * o[0] * o[2]  // 2 dx dz ox oz
-                       + d[1] * d[1] * o[2] * o[2]       // dy^2 oz^2
-                       - x2 * d[1] * d[2] * o[1] * o[2]  // 2 dy dz oy oz
-                       + d[2] * d[2] * o[0] * o[0]       // d_z^2 o_x^2
-                       + d[2] * d[2] * o[1] * o[1];      // d_z^2 o_y^2
-
-      // non c2 dependant part of discriminant
-      eq_parts[i][3] = -d[0] * d[0] * o[1] * o[1]        // dx^2 oy^2
-                       + x2 * d[0] * d[1] * o[0] * o[1]  // 2 dx dy ox oy
-                       - d[1] * d[1] * o[0] * o[0];      // dy^2 ox^2
-
-      // c2 dependant part of denominator
-      eq_parts[i][4] = -d[2] * d[2];  // -(dz^2)
-
-      // non c2 dependant part of denominator
-      eq_parts[i][5] = d[0] * d[0] + d[1] * d[1];  // dx^2 + dy^2
-    }
-
-    // Calculate our theta limits
-    auto theta_limits = [&](const Scalar& phi) {
-      // Precalculate some trigonometric functions
-      const Scalar sin_phi = std::sin(phi);
-      const Scalar cos_phi = std::cos(phi);
-      const Scalar tan_phi = std::tan(phi);
-
-      // Cone gradient squared
-      const Scalar c2 = tan_phi * tan_phi;
-
-      // Store any limits we find
-      std::vector<Scalar> limits;
-
-      // Count how many complex solutions we get
-      int complex_sols = 0;
-
-      for (int i = 0; i < 4; ++i) {
-        // We make a line origin + ray to define a parametric line
-        // Note that both of these vectors are always unit length
-        const auto& o = rNCo[i];  // Line origin
-        const auto& d = rMNo[i];  // Line direction
-
-        // Calculate the first half of our numerator
-        const Scalar num = c2 * eq_parts[i][0] + eq_parts[i][1];
-
-        // Calculate our discriminant.
-        const Scalar disc = c2 * eq_parts[i][2] + eq_parts[i][3];
-
-        // Calculate our denominator
-        const Scalar denom = c2 * eq_parts[i][4] + eq_parts[i][5];
-
-        // We need to count how many complex solutions we get, if at least 3 are complex phi is totally enclosed
-        // We also don't care about the case with one solution (touching an edge)
-        if (disc <= Scalar(0.0)) { ++complex_sols; }
-        else if (denom != Scalar(0.0)) {
-
-          // We have two intersections with either the upper or lower cone
-          Scalar root = std::sqrt(disc);
-
-          // Get our two solutions for t
-          for (const Scalar t : {(num + root) / denom, (num - root) / denom}) {
-
-            // Check we are within the valid range for our segment.
-            // Since we set the length of the direction vector to the length of the side we can
-            // check it's less than one
-            if (t >= Scalar(0.0) && t <= Scalar(1.0)) {
-
-              // We check z first to make sure it's on the correct side
-              const Scalar z = o[2] + d[2] * t;
-
-              // If we are both above, or both below the horizon
-              if ((z > Scalar(0.0)) == (phi > M_PI_2)) {
-
-                const Scalar x     = o[0] + d[0] * t;
-                const Scalar y     = o[1] + d[1] * t;
-                const Scalar theta = std::atan2(y, x);
-                // atan2 gives a result from -pi -> pi, we need 0 -> 2 pi
-                limits.emplace_back(theta > 0 ? theta : theta + M_PI * Scalar(2.0));
+  template <typename Iterator>
+  std::pair<vec3<Scalar>, vec2<Scalar>> bounding_cone(Iterator start, Iterator end) {
+    std::pair<vec3<Scalar>, Scalar> cone(cone_from_points<Scalar>());
+    for (auto i = start; i < end; ++i) {
+      if (dot(cone.first, nodes[*i].ray) < cone.second) {
+        cone = cone_from_points(nodes[*i].ray);
+        for (auto j = start; j < i; ++j) {
+          if (dot(cone.first, nodes[*j].ray) < cone.second) {
+            cone = cone_from_points(nodes[*i].ray, nodes[*j].ray);
+            for (auto k = start; k < j; ++k) {
+              if (dot(cone.first, nodes[*k].ray) < cone.second) {
+                cone = cone_from_points(nodes[*i].ray, nodes[*j].ray, nodes[*k].ray);
               }
             }
           }
         }
       }
-
-      // If at least 3 solutions are complex we totally enclose the phi however we still need to check the cone is on
-      // the correct side. 3 is appropriate here as 3 would mean only 1 intersection (just touching)
-      if (complex_sols > 3 && ((cos_phi > Scalar(0.0)) == (cam[2] < Scalar(0.0)))) {
-
-        // Make a test unit vector that is on the cone, theta=0 is easiest
-        const vec3<Scalar> test_vec = {{sin_phi, Scalar(0.0), -cos_phi}};
-
-        bool external = false;
-        for (int i = 0; !external && i < 4; ++i) {
-          // If we get a negative dot product our point is external
-          external = Scalar(0.0) > dot(test_vec, edges[i]);
-        }
-        if (!external) {
-          return std::vector<std::pair<Scalar, Scalar>>(1, std::make_pair(Scalar(0.0), Scalar(2.0) * M_PI));
-        }
-      }
-      // If we have a sane number of intersections
-      else if (limits.size() >= 2) {
-        // Sort the limits
-        std::sort(limits.begin(), limits.end());
-
-        // Get a test point half way between the first two points
-        const Scalar test_theta = (limits[0] + limits[1]) * Scalar(0.5);
-        const Scalar sin_theta  = std::sin(test_theta);
-        const Scalar cos_theta  = std::cos(test_theta);
-
-        // Make a unit vector from the phi and theta
-        const vec3<Scalar> test_vec = {{cos_theta * sin_phi, sin_theta * sin_phi, -cos_phi}};
-
-        bool first_is_end = false;
-        for (int i = 0; !first_is_end && i < 4; ++i) {
-          // If we get a negative dot product our first point is an end segment
-          first_is_end = Scalar(0.0) > dot(test_vec, edges[i]);
-        }
-
-        // If we have an odd number of solutions, we need to remove one of them (the one that should be just touching)
-        // Now that we know if the first solution is the start or end of the block we can remove the appropriate point
-        if (limits.size() == 3) {
-          if (first_is_end) {
-            // Remove the 3rd element
-            limits.erase(std::next(limits.end(), -1));
-          }
-          else {
-            // Remove the 2nd element
-            limits.erase(std::next(limits.begin(), 1));
-          }
-        }
-
-        // If this is entering, point 0 is a start, and point 1 is an end
-        std::vector<std::pair<Scalar, Scalar>> output;
-        for (unsigned int i = first_is_end ? 1 : 0; i + 1 < limits.size(); i += 2) {
-          output.emplace_back(limits[i], limits[i + 1]);
-        }
-        if (first_is_end) { output.emplace_back(limits.back(), limits.front()); }
-        return output;
-      }
-
-      // Default to returning an empty list
-      return std::vector<std::pair<Scalar, Scalar>>();
-    };
-
-    return lookup(theta_limits);
-  }
-
-  std::vector<std::pair<unsigned int, unsigned int>> lookup_fisheye(const mat4<Scalar>& Hoc,
-                                                                    const Lens<Scalar>& lens) const {
-    // Solution for intersections on the edge is the intersection between a unit sphere, a plane, and a
-    // cone. The cone is the cone made by the phi angle, and the plane intersects with the unit sphere to
-    // form the circle that defines the edge of the field of view of the camera.
-    //
-    // Unit sphere
-    // x^2 + y^2 + z^2 = 1
-    //
-    // Cone (don't need to check side for phi since it's squared)
-    // z^2 = (x^2+y^2)/c^2
-    // c = tan(phi)
-    //
-    // Plane
-    // N = the unit vector in the direction of the camera
-    // r_0 = N * cos(fov/2)
-    // N . (r - r_0) = 0
-    //
-    // To simplify things however, we remove the y component and assume the camera vector is only ever
-    // on the x/z plane. We calculate the offset to make this happen and re apply it at the end
-
-    // The gradient of our field of view cone
-    const Scalar cos_half_fov = std::cos(lens.fov * Scalar(0.5));
-    const vec3<Scalar> cam    = {{Hoc[0][0], Hoc[1][0], Hoc[2][0]}};
-
-    // The cameras inclination from straight down (same reference frame as phi)
-    const Scalar cam_inc  = std::acos(-cam[2]);
-    const Scalar half_fov = lens.fov * 0.5;
-
-    auto theta_limits = [&](const Scalar& phi) -> std::array<std::pair<Scalar, Scalar>, 1> {
-      // Check if we are intersecting with an upper or lower cone
-      const bool upper = phi > M_PI_2;
-
-      // First we should check if this phi is totally contained in our fov
-      // Work out what our largest fully contained phi value is
-      // We can work this out by subtracting our offset angle from our fov and checking if phi is
-      // smaller
-      if ((upper && half_fov - (M_PI - cam_inc) > M_PI - phi) || (!upper && half_fov - cam_inc > phi)) {
-        return {{std::make_pair(Scalar(0.0), Scalar(2.0) * M_PI)}};
-      }
-      // Also if we can tell that the phi is totally outside we can bail out early
-      // To check this we check phi is greater than our inclination plus our fov
-      if ((upper && half_fov + (M_PI - cam_inc) < M_PI - phi) || (!upper && half_fov + cam_inc < phi)) {
-        return {{std::make_pair(Scalar(0.0), Scalar(0.0))}};
-      }
-
-      // The solution only works for camera vectors that lie in the x/z plane
-      // So we have to rotate our vector into that space, solve it and then rotate them back
-      // Normally this would be somewhat unsafe as cam[1] and cam[0] could be both 0
-      // However, that case is resolved by the checks above that confirm we intersect
-      const Scalar offset     = std::atan2(cam[1], cam[0]);
-      const Scalar sin_offset = std::sin(offset);
-      const Scalar cos_offset = std::cos(offset);
-
-      // Now we must rotate our cam vector before doing the solution
-      // Since y will be 0, and z doesn't change we only need this one
-      const Scalar r_x = cam[0] * cos_offset + cam[1] * sin_offset;
-
-      // The z component of our solution
-      const Scalar z = -std::cos(phi);
-
-      // Calculate intermediate products
-      const Scalar a = Scalar(1.0) - z * z;  // aka sin^2(phi)
-      const Scalar x = (cos_half_fov - cam[2] * z) / r_x;
-
-      // The y component is ± this square root
-      const Scalar y_disc = a - x * x;
-
-      if (y_disc < 0) { return {{std::make_pair(Scalar(0.0), Scalar(0.0))}}; }
-
-      const Scalar y  = std::sqrt(y_disc);
-      const Scalar t1 = offset + std::atan2(-y, x);
-      const Scalar t2 = offset + std::atan2(y, x);
-
-      return {{std::make_pair(t1 > Scalar(0.0) ? t1 : t1 + Scalar(2.0) * M_PI,
-                              t2 > Scalar(0.0) ? t2 : t2 + Scalar(2.0) * M_PI)}};
-    };
-
-    // Lookup the mesh
-    return lookup(theta_limits);
-  }
-
-  std::vector<std::pair<unsigned int, unsigned int>> lookup(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
-
-    // Cut down how many points we send here by calculating how many will be on screen
-    switch (lens.projection) {
-      case RECTILINEAR: return lookup_rectilinear(Hoc, lens);
-      case EQUIDISTANT:
-      case EQUISOLID: return lookup_fisheye(Hoc, lens);
-      default: { throw std::runtime_error("Unknown lens type"); }
     }
+
+    // Add in sin_theta when we return the final cone
+    return std::make_pair(cone.first,
+                          vec2<Scalar>{cone.second, std::sqrt(static_cast<Scalar>(1.0) - cone.second * cone.second)});
+  }
+
+  /**
+   * @brief Given an iterator to a set of Visual Mesh nodes, calculate a binary search partition for it
+   *
+   * @details
+   *  This algorithm takes in iterators to a set of Visual Mesh nodes and sorts them such that they conform to a binary
+   *  search partitioning scheme. These partitions are described using bounding cones which can then be used to include
+   *  or throw out points on mass
+   *
+   * @tparam Iterator the type of the iterator passed in, must evalute to an object of type Node
+   *
+   * @param start       the start iterator of points to sort into the bsp
+   * @param end         the end iterator of points to sort into the bsp
+   * @param min_points  the number of points that the algorithm terminates at
+   * @param offset      the offset from the start of the nodes list to the region this BSP node represents
+   */
+  template <typename Iterator>
+  int build_bsp(Iterator start, Iterator end, int min_points = 8, int offset = 0) {
+    // No points in this partition, this should never happen
+    if (std::distance(start, end) == 0) { throw std::runtime_error("We tried to make a tree with no nodes"); }
+
+    // If we have few enough points, terminate the search here and return what we have. It can be cheaper to project a
+    // list of pixels than to do more BSP steps. This also makes it cheaper to build the BSP and less memory to store.
+    if (std::distance(start, end) <= min_points) {
+      int elem = bsp.size();
+
+      // Add this element with children -1,-1 to signify it has no children
+      bsp.push_back(BSP{std::make_pair(offset, static_cast<int>(offset + std::distance(start, end))),
+                        {{-1, -1}},
+                        bounding_cone(start, end)});
+
+      // By default, sort by index that they were generated with to remove the remaining randomness
+      std::sort(start, end);
+
+      return elem;
+    }
+    // We treat the first element specially
+    else if (bsp.empty()) {
+      // The first tree is always a split in the theta angle, and it is the split that will split +y from -y so that
+      // future loops can sort purely based on x value making for a faster algorithm
+
+      // Find the largest phi value for making the cone
+      auto max_phi_element = std::max_element(start, end, [this](const int& a, const int& b) {
+        return nodes[a].ray[2] < nodes[b].ray[2];  // comparing z is the same as comparing phi
+      });
+
+      // Negate as we would be dotting with the -z axis to get the angle
+      const Scalar cone_cos = -nodes[*max_phi_element].ray[2];
+      const Scalar cone_sin = std::sqrt(1 - cone_cos * cone_cos);
+
+      // The cone will have a known axis (the -z axis) and our cos and sin theta come from the most positive z value
+      std::pair<vec3<Scalar>, vec2<Scalar>> cone =
+        std::make_pair(vec3<Scalar>{0, 0, -1}, vec2<Scalar>{cone_cos, cone_sin});
+
+      // Partition based on the sign of the y component
+      Iterator mid = std::partition(start, end, [this](const int& a) { return nodes[a].ray[1] > 0; });
+
+      bsp.push_back(BSP{
+        std::make_pair(offset, static_cast<int>(std::distance(start, end))),
+        {{-2, -2}},
+        cone,
+      });
+      bsp.front().children = {{
+        build_bsp(start, mid, min_points, 0),
+        build_bsp(mid, end, min_points, std::distance(start, mid)),
+      }};
+      return 0;
+    }
+    else {
+      // Calculate our bounding cone for this cluster. We have to do a random sort of our segment here so that the
+      // performance of the bounding cone algorithm is expected to be linear
+      auto cone = bounding_cone(start, end);
+
+      // Split the larger angle range so we have as close to cone shapes as we can
+      auto minmax_phi   = std::minmax_element(start, end, [this](const int& a, const int& b) {
+        return nodes[a].ray[2] < nodes[b].ray[2];  // comparing z is the same as comparing phi
+      });
+      auto minmax_theta = std::minmax_element(start, end, [this](const int& a, const int& b) {
+        // Since we have already sorted such that our y value is either positive or negative, we can now just sort by
+        // the x component once we normalise it to a 2d unit vector.
+        return nodes[a].ray[0] / std::sqrt(1 - nodes[a].ray[2] * nodes[a].ray[2])
+               < nodes[b].ray[0] / std::sqrt(1 - nodes[b].ray[2] * nodes[b].ray[2]);
+      });
+
+      // Get our min and max phi and theta
+      Scalar min_phi   = nodes[*minmax_phi.first].ray[2];
+      Scalar max_phi   = nodes[*minmax_phi.second].ray[2];
+      Scalar min_theta = nodes[*minmax_theta.first].ray[0]
+                         / std::sqrt(1 - nodes[*minmax_theta.first].ray[2] * nodes[*minmax_theta.first].ray[2]);
+      Scalar max_theta = nodes[*minmax_theta.second].ray[0]
+                         / std::sqrt(1 - nodes[*minmax_theta.second].ray[2] * nodes[*minmax_theta.second].ray[2]);
+
+      // Work out the z and x values we need to split on
+      Scalar split_phi   = std::cos((std::acos(min_phi) + std::acos(max_phi)) * 0.5);
+      Scalar split_theta = std::cos((std::acos(std::max(min_theta, static_cast<Scalar>(-1)))
+                                     + std::acos(std::min(max_theta, static_cast<Scalar>(1))))
+                                    * 0.5);
+
+      // Partition based on either phi or theta
+      Iterator mid =
+        max_phi - min_phi > max_theta - min_theta
+          ? std::partition(start, end, [this, &split_phi](const int& a) { return nodes[a].ray[2] > split_phi; })
+          : std::partition(start, end, [this, &split_theta](const int& a) {
+              return nodes[a].ray[0] / std::sqrt(1 - nodes[a].ray[2] * nodes[a].ray[2]) < split_theta;
+            });
+
+      int elem = bsp.size();
+      bsp.push_back(BSP{
+        std::make_pair(offset, static_cast<int>(offset + std::distance(start, end))),
+        {{-2, -2}},
+        cone,
+      });
+      bsp[elem].children = {{
+        build_bsp(start, mid, min_points, offset),
+        build_bsp(mid, end, min_points, offset + std::distance(start, mid)),
+      }};
+      return elem;
+    }
+  }
+
+  /**
+   * Given the lens, get the cone objects that best fit each edge of the screen (or planes for the rectilinear case)
+   * This is arranged as the axis (or normal) and the cos and sin of the angle for each of the edges.
+   *
+   * @details
+   *  This function provides a heuristic for use with the BSP. It generates a set of cones that approximate the screen
+   *  edges. These will be perfect approximations for rectilinear lenses as the cones will be planes (cones with 90
+   *  degree angles). And for fisheye lenses they will give a decent approximation that will only have errors of a few
+   *  pixels typically in the overselection rather than underselection.
+   *
+   * @param Hoc   the homogenous transformation matrix that transforms from camera space to observation plane space
+   * @param lens  the lens object describing the type and geometry of the lens that is used
+   *
+   * @return The cones that best describe the edges of the camera
+   */
+  static std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4> screen_edges(const mat4<Scalar> Hoc,
+                                                                           const Lens<Scalar>& lens) {
+
+    // Extract our rotation matrix
+    const mat3<Scalar> Roc = {{
+      {{Hoc[0][0], Hoc[0][1], Hoc[0][2]}},
+      {{Hoc[1][0], Hoc[1][1], Hoc[1][2]}},
+      {{Hoc[2][0], Hoc[2][1], Hoc[2][2]}},
+    }};
+
+    /* The labels for each of the corners of the screen in cam space are is shown below.
+     * ^    T       U
+     * |        C
+     * z    W       V
+     * <- y
+     */
+
+    // Unproject each of the four corners of the screen and rotate them into world space
+    // Add a 1 pixel offset from the edge so that we don't go over the edge from rounding errors
+    const vec2<Scalar> dimensions          = subtract(cast<Scalar>(lens.dimensions), static_cast<Scalar>(1.0));
+    const std::array<vec3<Scalar>, 4> rNCo = {{
+      multiply(Roc, visualmesh::unproject(vec2<Scalar>{1, 1}, lens)),                          // rTCo
+      multiply(Roc, visualmesh::unproject(vec2<Scalar>{dimensions[0], 1}, lens)),              // rUCo
+      multiply(Roc, visualmesh::unproject(vec2<Scalar>{dimensions[0], dimensions[1]}, lens)),  // rVCo
+      multiply(Roc, visualmesh::unproject(vec2<Scalar>{1, dimensions[1]}, lens)),              // rWCo
+    }};
+
+    switch (lens.projection) {
+      case LensProjection::RECTILINEAR: {
+        // For the case of a plane, we have a cone with a 90 degrees which means cos(theta) = 0 and sin(theta) = 1
+        return std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>{{
+          std::make_pair(normalise(cross(rNCo[1], rNCo[0])), vec2<Scalar>{0, 1}),
+          std::make_pair(normalise(cross(rNCo[2], rNCo[1])), vec2<Scalar>{0, 1}),
+          std::make_pair(normalise(cross(rNCo[3], rNCo[2])), vec2<Scalar>{0, 1}),
+          std::make_pair(normalise(cross(rNCo[0], rNCo[3])), vec2<Scalar>{0, 1}),
+        }};
+      }
+      case LensProjection::EQUIDISTANT:
+      case LensProjection::EQUISOLID: {
+        /* The labels for each of the edge centres of the screen in cam space are is shown below.
+         * ^        D
+         * |    G   C   E
+         * z        F
+         * <- y
+         */
+        // Get the lens axis centre coordinates
+        vec2<Scalar> centre = add(multiply(dimensions, static_cast<Scalar>(0.5)), lens.centre);
+
+        // Unproject the centre of each of the edges using the lens axis as the centre and rotate into world space
+        const std::array<vec3<Scalar>, 4> rECo = {{
+          multiply(Roc, visualmesh::unproject(vec2<Scalar>{centre[0], 1}, lens)),              // rTCo
+          multiply(Roc, visualmesh::unproject(vec2<Scalar>{dimensions[0], centre[1]}, lens)),  // rUCo
+          multiply(Roc, visualmesh::unproject(vec2<Scalar>{centre[0], dimensions[1]}, lens)),  // rVCo
+          multiply(Roc, visualmesh::unproject(vec2<Scalar>{1, centre[1]}, lens)),              // rWCo
+        }};
+
+        // Calculate cones from each of the four screen edges
+        const std::array<std::pair<vec3<Scalar>, Scalar>, 4> cones{{
+          cone_from_points(rNCo[1], rECo[0], rNCo[0]),
+          cone_from_points(rNCo[2], rECo[1], rNCo[1]),
+          cone_from_points(rNCo[3], rECo[2], rNCo[2]),
+          cone_from_points(rNCo[0], rECo[3], rNCo[3]),
+        }};
+
+        // Add in sin_theta
+        return std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>{{
+          std::make_pair(
+            cones[0].first,
+            vec2<Scalar>{cones[0].second, std::sqrt(static_cast<Scalar>(1.0) - cones[0].second * cones[0].second)}),
+          std::make_pair(
+            cones[1].first,
+            vec2<Scalar>{cones[1].second, std::sqrt(static_cast<Scalar>(1.0) - cones[1].second * cones[1].second)}),
+          std::make_pair(
+            cones[2].first,
+            vec2<Scalar>{cones[2].second, std::sqrt(static_cast<Scalar>(1.0) - cones[2].second * cones[2].second)}),
+          std::make_pair(
+            cones[3].first,
+            vec2<Scalar>{cones[3].second, std::sqrt(static_cast<Scalar>(1.0) - cones[3].second * cones[3].second)}),
+        }};
+      }
+      default: throw std::runtime_error("Unknown lens type");
+    }
+  }
+
+  /**
+   * @brief Check if a point is on the screen, given a description of the edges of the screen as cones, and the axis
+   *
+   * @param Rco     the 3x3 rotation matrix which rotates from observation plane space to camera space
+   * @param cone    the cone object that we are checking if it is on the screen
+   * @param lens    the lens object describing the type and geometry of the lens that is used
+   * @param edges   the matrix of 4 cone objects that describe the edge of the screen
+   *
+   * @return two booleans that describe if this cone is inside (first) the screen and outside(second) the screen. If
+   *         both are true then the cone is intersecting the screen edge.
+   */
+  static inline std::pair<bool, bool> check_on_screen(
+    const mat3<Scalar>& Rco,
+    const std::pair<vec3<Scalar>, vec2<Scalar>>& cone,
+    const Lens<Scalar>& lens,
+    const std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>& edges) {
+
+    // Firstly check if the cone axis is on the screen
+    vec2<Scalar> px = ::visualmesh::project(multiply(Rco, cone.first), lens);
+    bool axis_on_screen =
+      0 <= px[0] && px[0] + 1 <= lens.dimensions[0] && 0 <= px[1] && px[1] + 1 <= lens.dimensions[1];
+
+    std::array<Scalar, 4> angles{{
+      dot(cone.first, edges[0].first),
+      dot(cone.first, edges[1].first),
+      dot(cone.first, edges[2].first),
+      dot(cone.first, edges[3].first),
+    }};
+
+    // Check if our cone is entirely contained within a screen edge
+    // acos(dot(cone_axis, edge_axis)) < edge_angle - cone_angle
+    std::array<bool, 4> contains{{
+      angles[0] > edges[0].second[0] * cone.second[0] + edges[0].second[1] * cone.second[1],
+      angles[1] > edges[1].second[0] * cone.second[0] + edges[1].second[1] * cone.second[1],
+      angles[2] > edges[2].second[0] * cone.second[0] + edges[2].second[1] * cone.second[1],
+      angles[3] > edges[3].second[0] * cone.second[0] + edges[3].second[1] * cone.second[1],
+    }};
+
+    // If we are off the screen, we are not on it?
+    const bool outside = !axis_on_screen && (contains[0] || contains[1] || contains[2] || contains[3]);
+    if (outside) { return std::make_pair(false, true); }
+
+    // Check if we intersect with any of the edges of the screen
+    // acos(dot(cone_axis, edge_axis) > edge_angle + cone_angle
+    std::array<bool, 4> intersects{{
+      angles[0] < edges[0].second[0] * cone.second[0] - edges[0].second[1] * cone.second[1],
+      angles[1] < edges[1].second[0] * cone.second[0] - edges[1].second[1] * cone.second[1],
+      angles[2] < edges[2].second[0] * cone.second[0] - edges[2].second[1] * cone.second[1],
+      angles[3] < edges[3].second[0] * cone.second[0] - edges[3].second[1] * cone.second[1],
+    }};
+
+    // Inside if the axis is on the screen and we don't intersect with any of the edges
+    const bool inside = axis_on_screen && intersects[0] && intersects[1] && intersects[2] && intersects[3];
+
+    return std::make_pair(inside, outside);
+  }
+
+
+public:
+  /**
+   * @brief Construct a new Mesh object
+   *
+   * @details
+   *  Constructs a new Mesh object using the provided generator type. This mesh object generates a BSP tree and holds
+   *  the logic needed to quickly lookup points that are on screen and return valid index ranges.
+   *
+   * @tparam Generator the generator that is to be used to generate the Visual Mesh
+   * @tparam Shape     the type of shape that will be used to generate the Visual Mesh
+   *
+   * @param shape         the shape instance that will be used to generate the Visual Mesh
+   * @param h             the height of the camera above the observation plane
+   * @param k             the number of cross section intersections that are needed for the object
+   * @param max_distance  the maximum distance to generate the Visual Mesh for
+   */
+  template <template <typename T> class Generator = generator::Hexapizza, typename Shape>
+  Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance)
+    : h(h), max_distance(max_distance), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
+
+    // To ensure that later we can fix the graph we need to perform our sorting on an index list
+    std::vector<int> sorting(nodes.size());
+    std::iota(sorting.begin(), sorting.end(), 0);
+
+    // We need to shuffle our list to ensure that the bounding cone algorithm has roughly linear performance.
+    // We could use std::random_shuffle here but since we only need the list to be "kinda shuffled" so that it's
+    // unlikely that we hit the worst case of the bounding cone algorithm. We can actually just shuffle every nth
+    // element and use a fairly bad random number generator algorithm
+    for (int i = sorting.size() - 1; i > 0; i -= 5) {
+      std::swap(sorting[i], sorting[rand() % i]);
+    }
+
+    // Build our bsp tree
+    // Reserve enough memory for the bsp as we know how many nodes it will need
+    bsp.reserve(nodes.size() * 2);
+    build_bsp(sorting.begin(), sorting.end());
+
+    // Make our reverse lookup so we can correct the neighbourhood indices
+    std::vector<int> r_sorting(nodes.size() + 1);
+    r_sorting[nodes.size()] = nodes.size();
+    for (unsigned int i = 0; i < nodes.size(); ++i) {
+      r_sorting[sorting[i]] = i;
+    }
+
+    // Sort the nodes and correct the neighbourhood graph based on our BSP sorting
+    std::vector<Node<Scalar>> sorted_nodes;
+    sorted_nodes.reserve(nodes.size());
+    for (const auto& i : sorting) {
+      sorted_nodes.push_back(nodes[i]);
+      for (int& n : sorted_nodes.back().neighbours) {
+        n = r_sorting[n];
+      }
+    }
+
+    nodes = std::move(sorted_nodes);
+  }
+
+  /**
+   * @brief Lookup which ranges in the Visual Mesh are on screen given the description of the camera lens/sensor and the
+   *        orientation of the camera relative to the observation plane.
+   *
+   * @param Hoc   the homogenous transformation matrix that transforms from camera space to observation plane space
+   * @param lens  the lens object describing the type and geometry of the lens that is used
+   *
+   * @return gives pairs of start/end ranges that are the points which are on the screen
+   */
+  std::vector<std::pair<int, int>> lookup(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
+
+    // Our FOV is an easy check to exclude things outside our view
+    // Multiply by 0.5 to get the cone angle
+    const Scalar cos_fov = std::cos(lens.fov * static_cast<Scalar>(0.5));
+    const Scalar sin_fov = std::sin(lens.fov * static_cast<Scalar>(0.5));
+
+    // Get the x axis of the camera in world space and the cone equations that describe the edges of the screen
+    const mat3<Scalar> Rco(block<3, 3>(transpose(Hoc)));
+    const vec3<Scalar>& rXCo = Rco[0];  // Camera x in world space
+    const auto edges         = screen_edges(Hoc, lens);
+
+    // Go through our BSP tree to work out which segments of the mesh are on screen
+    // The first element of the tree is the root element of the bsp
+    std::vector<int> stack(1, 0);
+    std::vector<std::pair<int, int>> ranges;
+    bool building   = false;
+    int range_start = 0;
+    int range_end   = 0;
+    while (!stack.empty()) {
+      // Grab our next bsp element
+      int i = stack.back();
+      stack.pop_back();
+
+      // Get the data from our bsp element
+      const auto& elem = bsp[i];
+      const auto& cone = elem.cone;
+
+      // Check if we are outside the field of view of the lens using an easy check
+      // To check if we are inside or outside the cone we need to check how angle between the cones compares
+      // outside == dot(cam, axis) < cos(fov + acos(gradient))
+      // However given that the thetas don't change and we have gradient naturally from the dot product it's easier
+      // to calculate it using the compound angle formula
+      const Scalar delta = dot(rXCo, cone.first);
+      bool outside       = delta < cos_fov * cone.second[0] - sin_fov * cone.second[1];
+      bool inside        = delta > cos_fov * cone.second[0] + sin_fov * cone.second[1];
+
+      // The FOV can either entirely exclude our points, or split based on intersection. If it can't do either of these
+      // (entirely inside) we need to use the screen edges to do a proper check.
+      if (!outside && inside) { std::tie(inside, outside) = check_on_screen(Rco, cone, lens, edges); }
+
+      if (inside) {
+        // If we are building just update our end point
+        if (building) {
+          range_end = elem.range.second;  //
+        }
+        else {
+          range_start = elem.range.first;
+          range_end   = elem.range.second;
+          building    = true;
+        }
+      }
+      else if (outside) {
+        // If we found an outside point we have finished building our range
+        if (building) {
+          ranges.emplace_back(std::make_pair(range_start, range_end));
+          building = false;
+        }
+      }
+      // We have reached the end of a tree, from here we need to check each point on screen individually
+      else if (elem.children[0] < 0) {
+        for (int i = elem.range.first; i < elem.range.second; ++i) {
+          // Check if the pixel is on the screen
+          auto px              = visualmesh::project(multiply(Rco, nodes[i].ray), lens);
+          const bool on_screen = dot(rXCo, nodes[i].ray) > cos_fov && 0 <= px[0] && px[0] + 1 <= lens.dimensions[0]
+                                 && 0 <= px[1] && px[1] + 1 <= lens.dimensions[1];
+
+          if (on_screen && building) {
+            // Extend the end
+            range_end = i + 1;
+          }
+          else if (!on_screen && building) {
+            // Add the range we just closed
+            ranges.emplace_back(std::make_pair(range_start, range_end));
+            building = false;
+          }
+          else if (on_screen && !building) {
+            // Start a new range
+            range_start = i;
+            range_end   = i + 1;
+            building    = true;
+          }
+        }
+      }
+
+      else {
+        // Add the children of this to the search in order 1,0 so we pop 0 first (contiguous indices)
+        stack.push_back(elem.children[1]);
+        stack.push_back(elem.children[0]);
+      }
+    }
+    // If we finished while building add the last point
+    if (building) { ranges.emplace_back(std::make_pair(range_start, range_end)); }
+
+    return ranges;
   }
   /// The height that this mesh is designed to run at
   Scalar h;
+  /// The maximum distance this mesh is setup for
+  Scalar max_distance;
   /// The lookup table for this mesh
   std::vector<Node<Scalar>> nodes;
-  /// A set of individual rows for phi values.
-  /// `begin` and `end` refer to the table with end being 1 past the end
-  std::vector<Row<Scalar>> rows;
+
+private:
+  /// The binary search tree that is used for looking up which points are on screen in the mesh
+  std::vector<BSP> bsp;
 };
 
 }  // namespace visualmesh

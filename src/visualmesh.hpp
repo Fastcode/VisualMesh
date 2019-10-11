@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -22,17 +22,21 @@
 #include <map>
 #include <memory>
 #include <vector>
+
 #include "engine/cpu/cpu_engine.hpp"
 #include "mesh/mesh.hpp"
 
 namespace visualmesh {
 
 /**
- * An aggregate of many Visual Meshs at different heights that can be looked up
- * Provides convenience functions for accessing projection and classification of the mesh using different engines.
- * The available engines are currently limited to OpenCL and CPU, however CUDA and Vulkan can be added later.
+ * @brief An aggregate of many Visual Meshs at different heights that can be looked up for performance.
+ *
+ * @details
+ *  Provides convenience functions for accessing projection and classification of the mesh using different engines.
+ *  The available engines are currently limited to OpenCL and CPU, however CUDA and Vulkan can be added later.
  *
  * @tparam Scalar the type that will hold the vectors <float, double>
+ * @tparam Engine the computational engine that will be used when creating classifiers
  */
 template <typename Scalar = float, template <typename> class Engine = engine::cpu::Engine>
 class VisualMesh {
@@ -45,24 +49,46 @@ public:
   /**
    * @brief Generate a new visual mesh for the given shape.
    *
+   * @tparam Shape the shape type that this mesh will generate using
+   *
    * @param shape        the shape we are generating a visual mesh for
    * @param min_height   the minimum height that our camera will be at
    * @param max_height   the maximum height our camera will be at
-   * @param n_heights    the number of look up tables to generated (height gradations)
+   * @param k            the number of intersections with the object
+   * @param max_error    the maximum amount of error in terms of k that a mesh can have
+   * @param max_distance the maximum distance that this mesh will project for
    */
   template <typename Shape>
   explicit VisualMesh(const Shape& shape,
                       const Scalar& min_height,
                       const Scalar& max_height,
-                      const uint& n_heights,
                       const Scalar& k,
+                      const Scalar& max_error,
                       const Scalar& max_distance) {
 
-    // Loop through to make a mesh for each of our height possibilities
-    for (Scalar h = min_height; h < max_height; h += (max_height - min_height) / n_heights) {
+    // Add an element for the min and max height
+    luts.insert(std::make_pair(min_height, Mesh<Scalar>(shape, min_height, k, max_distance)));
+    luts.insert(std::make_pair(max_height, Mesh<Scalar>(shape, max_height, k, max_distance)));
 
-      // Insert our constructed mesh into the lookup
-      luts.insert(std::make_pair(h, Mesh<Scalar>(shape, h, k, max_distance)));
+    // Run through a stack splitting the range in two until the region is filled appropriately
+    std::vector<vec2<Scalar>> stack;
+    stack.emplace_back(vec2<Scalar>{min_height, max_height});
+
+    while (!stack.empty()) {
+      // Get the next element for consideration
+      vec2<Scalar> range = stack.back();
+      Scalar h           = (range[0] + range[1]) / 2;
+      stack.pop_back();
+
+      Scalar lower_err = std::abs(k - k * shape.k(range[0], h));
+      Scalar upper_err = std::abs(k - k * shape.k(range[1], h));
+
+      // If we aren't close enough to both elements
+      if (lower_err > max_error || upper_err > max_error) {
+        luts.insert(std::make_pair(h, Mesh<Scalar>(shape, h, k, max_distance)));
+        stack.emplace_back(vec2<Scalar>{range[0], h});
+        stack.emplace_back(vec2<Scalar>{h, range[1]});
+      }
     }
   }
 
@@ -73,7 +99,7 @@ public:
    *
    * @param  height the height above the observation plane for the mesh we are trying to find
    *
-   * @return        the closest generated visual mesh to the provided height
+   * @return the closest generated visual mesh to the provided height
    */
   const Mesh<Scalar>& height(const Scalar& height) const {
     // Find the bounding height values
@@ -88,7 +114,7 @@ public:
         return luts.begin()->second;
       }
     }
-    // Otherwise see which is closer
+    // Otherwise see which has less error
     else if (std::abs(range.first->first - height) < std::abs(range.second->first - height)) {
       return range.first->second;
     }
@@ -98,32 +124,12 @@ public:
   }
 
   /**
-   * Performs a visual mesh lookup, finding the start and end indexes for visual mesh points that are on the screen.
-   * It uses the provided `theta_limits` function to identify the start and end points on the screen for a specific phi.
-   *
-   * @param height       the height to use for looking up the mesh, follows the same rules as `VisualMesh::height`
-   * @param theta_limits the function that is used to calculate the start/end indices for a specific phi
-   *
-   * @return             the mesh that was used for this lookup and a vector of start/end indices that are on the
-   *                     screen.
-   *
-   * @tparam Func        the type of the function that identifies theta ranges given a phi value
-   */
-  template <typename Func>
-  std::pair<const Mesh<Scalar>&, std::vector<std::pair<uint, uint>>> lookup(const Scalar& height,
-                                                                            Func&& theta_limits) const {
-
-    const auto& mesh = this->height(height);
-    return std::make_pair(mesh, mesh->lookup(std::forward<Func>(theta_limits)));
-  }
-
-  /**
    * Performs a visual mesh lookup using the description of the lens provided to find visual mesh points on the image.
    *
    * @param Hoc   A 4x4 homogeneous transformation matrix that transforms from the observation plane to camera space.
    * @param lens  A description of the lens used to project the mesh.
    *
-   * @return      the mesh that was used for this lookup and a vector of start/end indices that are on the screen.
+   * @return the mesh that was used for this lookup and a vector of start/end indices that are on the screen.
    */
   std::pair<const Mesh<Scalar>&, std::vector<std::pair<uint, uint>>> lookup(const mat4<Scalar>& Hoc,
                                                                             const Lens<Scalar>& lens) const {
@@ -140,7 +146,7 @@ public:
    * @param Hoc  A 4x4 homogeneous transformation matrix that transforms from the camera space to the observation plane.
    * @param lens A description of the lens used to project the mesh.
    *
-   * @return     the pixel coordinates that the visual mesh projects to, and the neighbourhood graph for those points.
+   * @return the pixel coordinates that the visual mesh projects to, and the neighbourhood graph for those points.
    */
   ProjectedMesh<Scalar> project(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
 
