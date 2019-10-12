@@ -9,18 +9,18 @@ output_path = sys.argv[2]
 
 # Make our output directory if it doesn't exist
 try:
-    os.makedirs(os.path.dirname(output_path))
+  os.makedirs(os.path.dirname(output_path))
 except:
-    pass
+  pass
 
 with open(input_path, 'r') as input_file:
-    with open(output_path, 'w') as output_file:
+  with open(output_path, 'w') as output_file:
 
-        # Work out what our define will be
-        define = os.path.basename(input_path)[:-3].replace(os.sep, '_').upper()
-        output = [l.rstrip('\n').replace('\\', '\\\\').replace('"', '\\"') for l in input_file]
-        output.append('')
+    # Work out what our define will be
+    define = os.path.basename(input_path)[:-3].replace(os.sep, '_').upper()
+    output = [l.rstrip('\n').replace('\\', '\\\\').replace('"', '\\"') for l in input_file]
+    output.append('')
 
-        output = '#define {}_CL "{}"'.format(define, '\\n\\\n'.join(output))
-        output_file.write(output)
-        output_file.write('\n')
+    output = '#define {}_CL "{}"'.format(define, '\\n\\\n'.join(output))
+    output_file.write(output)
+    output_file.write('\n')

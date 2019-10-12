@@ -58,7 +58,6 @@ hashruler_min_length = 10
 # only `command_case` is supported.
 per_command = {"ToolchainLibraryFinder": {"command_case": "unchanged"}}
 
-
 # --------------------------
 # Comment Formatting Options
 # --------------------------
@@ -91,7 +90,6 @@ ruler_pattern = "^\\s*[^\\w\\s]{3}.*[^\\w\\s]{3}$"
 # If true, then insert a space between the first hash char and remaining hash
 # chars in a hash ruler, and normalize it's length to fill the column
 canonicalize_hashrulers = True
-
 
 # ---------------------------------
 # Miscellaneous Options
