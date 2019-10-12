@@ -3,7 +3,7 @@
 import tensorflow as tf
 from training.model import VisualMeshModel
 from training.dataset import VisualMeshDataset
-from training.loss import WeightedLoss
+from training.loss import weighted_loss
 
 
 # Train the network
@@ -20,14 +20,25 @@ def train(config, output_path):
   ).build()
 
   # Define the model
-  model = VisualMeshModel(config.network.structure, len(config.network.classes))
+  model = VisualMeshModel(
+    structure=config.network.structure, n_classes=len(config.network.classes), activation=config.network.activation_fn
+  )
   model.compile(
     optimizer=tf.optimizers.Adam(),
-    loss=WeightedLoss,
+    loss=weighted_loss,
     metrics=None,
   )
 
-  tensorboard = tf.keras.callbacks.TensorBoard(log_dir=output_path, write_graph=True, write_images=True)
+  # TODO only load the weights if they exist?
+  model.load_weights(output_path)
 
   # Fit the model
-  model.fit(dataset, callbacks=[tensorboard])
+  model.fit(
+    dataset,
+    callbacks=[
+      tf.keras.callbacks.TensorBoard(log_dir=output_path, write_graph=True, write_images=True),
+      tf.keras.callbacks.ModelCheckpoint(
+        filepath=os.path.join(output_path, 'model.ckpt'), save_weights_only=True, verbose=1
+      ),
+    ]
+  )

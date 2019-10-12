@@ -6,7 +6,7 @@ import yaml
 
 import tensorflow as tf
 import training.training as training
-import training.testing as testing
+# import training.testing as testing
 
 
 class Config():
@@ -62,5 +62,5 @@ if __name__ == "__main__":
   if args.command == 'train':
     training.train(config, output_path)
 
-  elif args.command == 'test':
-    testing.test(config, output_path)
+  # elif args.command == 'test':
+  #   testing.test(config, output_path)

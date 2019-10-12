@@ -6,7 +6,7 @@ from training.layer import GraphConvolution
 
 class VisualMeshModel(tf.keras.Model):
 
-  def __init__(self, structure, n_classes):
+  def __init__(self, structure, n_classes, activation):
     super(VisualMeshModel, self).__init__()
 
     self.stages = []
@@ -19,7 +19,7 @@ class VisualMeshModel(tf.keras.Model):
 
       # Dense internal layers
       for j, units in enumerate(c):
-        self.stages.append(tf.keras.layers.Dense(units=units))
+        self.stages.append(tf.keras.layers.Dense(units=units, activation=activation))
 
     # Final dense layer for the number of classes
     self.stages.append(tf.keras.layers.Dense(units=n_classes, activation=tf.nn.softmax))
