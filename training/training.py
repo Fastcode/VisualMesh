@@ -22,8 +22,8 @@ def train(config, output_path):
   # Define the model
   model = VisualMeshModel(config.network.structure, len(config.network.classes))
   model.compile(
-    optimizer=optimizer,
-    loss=WeightedLoss(),
+    optimizer=tf.optimizers.Adam(),
+    loss=WeightedLoss,
     metrics=None,
   )
 
