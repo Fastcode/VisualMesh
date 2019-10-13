@@ -57,7 +57,9 @@ def train(config, output_path):
 
     # Define the model
     model = VisualMeshModel(
-      structure=config.network.structure, n_classes=len(config.network.classes), activation=config.network.activation_fn
+      structure=config.network.structure,
+      n_classes=len(config.network.classes),
+      activation=config.network.activation_fn
     )
     model.compile(
       optimizer=tf.optimizers.Adam(),
@@ -82,7 +84,9 @@ def train(config, output_path):
       validation_data=validation_dataset,
       validation_steps=config.training.validation.samples,
       callbacks=[
-        tf.keras.callbacks.TensorBoard(log_dir=output_path, write_graph=True, write_images=True),
+        tf.keras.callbacks.TensorBoard(
+          log_dir=output_path, update_freq='batch', write_graph=True, write_images=True, histogram_freq=1
+        ),
         tf.keras.callbacks.ModelCheckpoint(
           filepath=os.path.join(output_path, 'model.ckpt'), save_weights_only=True, verbose=1
         ),
