@@ -36,4 +36,7 @@ class VisualMeshModel(tf.keras.Model):
       elif isinstance(l, tf.keras.layers.Dense):
         logits = l(logits)
 
+    # At the very end of the network, we remove the offscreen point
+    logits = logits[:-1]
+
     return logits
