@@ -4,7 +4,6 @@ import os
 import argparse
 import yaml
 
-import tensorflow as tf
 import training.training as training
 # import training.testing as testing
 

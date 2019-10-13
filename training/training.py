@@ -10,7 +10,7 @@ from training.dataset import VisualMeshDataset
 def _prepare_dataset(args):
 
   # The weights given for each value from the training data
-  W = tf.math.multiply(args['Y'], args['W'])
+  W = tf.math.multiply(args['Y'], tf.expand_dims(args['W'], axis=-1))
 
   # Balance the weights by class
   class_weights = tf.math.reduce_sum(W, axis=0)
@@ -65,8 +65,10 @@ def train(config, output_path):
     ],
   )
 
-  # TODO only load the weights if they exist?
-  model.load_weights(output_path)
+  # Find the latest checkpoint file
+  checkpoint_file = tf.train.latest_checkpoint(output_path)
+  if checkpoint_file is not None:
+    model.load_weights(checkpoint_file)
 
   # Fit the model
   model.fit(
