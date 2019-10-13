@@ -58,16 +58,16 @@ testing:
 training:
   # The batch size to use when training the network (how many images to feed in a single training step).
   # Do not make this number too large or it will create poor gradients.
-  batch_size: 50
+  batch_size: 20
   # Number of batches to consider an epoch, if None then it is the length of the input dataset
   batches_per_epoch: 1000
 
   # Settings for the validation step of the network.
   validation:
     # How big the batch should be for validation step.
-    batch_size: 200
+    batch_size: 20
     # How many batches to load for the validation step
-    samples: 5
+    samples: 10
     # How many images to show in tensorboard, they are taken as the first n images of the validation set.
     progress_images: 20
 
