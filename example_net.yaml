@@ -59,52 +59,17 @@ training:
   # The batch size to use when training the network (how many images to feed in a single training step).
   # Do not make this number too large or it will create poor gradients.
   batch_size: 50
-  # Number of batches to accumulate gradients over.
-  batch_accumulation: 2
-  # How many batches between saving the progress of the network.
-  save_frequency: 1000
-  # The policy to use for controlling the learning rate and number of batches when training
-  learning_policy:
-    # One cycle policy, this involves a linear increase, and then decrease of the learning rate followed by a decay
-    type: ONE_CYCLE
-    # Minimum learning rate to cycle up from
-    min_learning_rate: 0.0004
-    # Maximum learning rate at peak
-    max_learning_rate: 0.004
-    # Learning rate to decay down to during the decay step
-    decay_learning_rate: 0.00004
-    # Number of batches to do in the cycle
-    cycle_batches: 100000
-    # Number of batches to spend decaying the learning rate
-    decay_batches: 50000
-    # If hot_start is true, the training will restart it's training as if beginning at 0 without resetting the network
-    # This means the one cycle will begin again treating the current global_step as the 0 point and going
-    # cycle_batches + decay_batches more
-    hot_start: False
-  # learning_policy:
-  #   # Static learning rate policy, the learning rate remains fixed for the entirety of training
-  #   type: STATIC
-  #   # The learning rate to use for the optimiser
-  #   learning_rate: 0.0001
-  #   # The number of batches to train for
-  #   batches: 250000
-  #   If hot_start is true, the training will restart it's training as if beginning at 0 without resetting the network
-  #   For static this means the final training will be global_step + `batches` total steps
-  #   hot_start: False
-  # Settings for the tutor network.
+  # Number of batches to consider an epoch, if None then it is the length of the input dataset
+  batches_per_epoch: 1000
 
   # Settings for the validation step of the network.
   validation:
     # How big the batch should be for validation step.
     batch_size: 200
-    # How many validation batches to accumulate statistics over
-    batch_accumulation: 2
+    # How many batches to load for the validation step
+    samples: 5
     # How many images to show in tensorboard, they are taken as the first n images of the validation set.
     progress_images: 20
-    # How often to perform a validation step.
-    frequency: 50
-    # How often to update the progress images.
-    image_frequency: 1000
 
   # Variations to apply to the training data, note this only applies to training data and not validation.
   # They are defined using a mean value and a standard deviation using a truncated normal distribution.
@@ -114,5 +79,5 @@ training:
       # Adjustments to the height of the mesh above the observation plane.
       height: { "mean": 0, "stddev": 0.05 }
       # Adjustments to the orientation of the observation plane.
-      # This value is used as three componentwise euler rotations added to the initial rotation in radians.
+      # This value is used for three euler rotations added to the camera rotation in radians.
       rotation: { "mean": 0, "stddev": 0.0872665 }
