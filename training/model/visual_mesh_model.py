@@ -24,9 +24,9 @@ class VisualMeshModel(tf.keras.Model):
     # Final dense layer for the number of classes
     self.stages.append(tf.keras.layers.Dense(units=n_classes, activation=tf.nn.softmax))
 
-  def call(self, X, G):
+  def call(self, X, training=False):
 
-    logits = X
+    logits, G = X
 
     # Run through each of our layers in sequence
     for l in self.stages:

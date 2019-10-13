@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import tensorflow as tf
 from training.model import VisualMeshModel
 from training.dataset import VisualMeshDataset
