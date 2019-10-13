@@ -22,7 +22,7 @@ def _prepare_dataset(args):
   W = tf.math.divide(W, tf.math.count_nonzero(class_weights, dtype=tf.float32))
 
   # Make the average value be 1 for the batch
-  W = tf.math.multiply(W, tf.size(args['W'], out_type=tf.float32))
+  W = tf.math.multiply(W, tf.cast(tf.size(args['W']), dtype=tf.float32))
 
   # Return in the format (x, y, weights)
   return ((args['X'], args['G']), args['Y'], W)
