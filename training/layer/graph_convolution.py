@@ -11,5 +11,7 @@ class GraphConvolution(tf.keras.layers.Layer):
   def build(self):
     super(GraphConvolution, self).build()
 
-  def call(self, X, G):
+  def call(self, X):
+    # Expand out the list
+    X, G = X
     return tf.reshape(tf.gather(X, G, name='NetworkGather'), shape=[-1, tf.shape(X)[1] * tf.shape(G)[1]])

@@ -32,7 +32,7 @@ class VisualMeshModel(tf.keras.Model):
     # Run through each of our layers in sequence
     for l in self.stages:
       if isinstance(l, GraphConvolution):
-        logits = l(logits, G)
+        logits = l([logits, G])
       elif isinstance(l, tf.keras.layers.Dense):
         logits = l(logits)
 
