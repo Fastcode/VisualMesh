@@ -46,9 +46,9 @@ REGISTER_OP("VisualMesh")
   .Output("pixels: T")
   .Output("neighbours: int32")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-    // nx2 points on image, and n+1x7 neighbours (including off screen point)
+    // nx2 points on image, and n+1xG neighbours (including off screen point)
     c->set_output(0, c->MakeShape({c->kUnknownDim, 2}));
-    c->set_output(1, c->MakeShape({c->kUnknownDim, 7}));
+    c->set_output(1, c->MakeShape({c->kUnknownDim, c->kUnknownDim}));
     return tensorflow::Status::OK();
   });
 
@@ -346,7 +346,7 @@ public:
     tensorflow::Tensor* neighbours = nullptr;
     tensorflow::TensorShape neighbours_shape;
     neighbours_shape.AddDim(neighbourhood.size());
-    neighbours_shape.AddDim(7);
+    neighbours_shape.AddDim(neighbourhood.front().size() + 1);
     OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
 
     // Copy across our neighbourhood graph, adding in a point for itself
