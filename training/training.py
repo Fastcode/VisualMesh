@@ -13,8 +13,9 @@ def _prepare_dataset(args):
   W = tf.math.multiply(args['Y'], args['W'])
 
   # Balance the weights by class
+  class_weights = tf.math.reduce_sum(W, axis=0)
   # Divide each class by how many samples there are (each col sums to 1)
-  W = tf.math.divide(W, tf.reduce_sum(W, axis=0))
+  W = tf.math.divide(W, class_weights)
   # Sum across classes to remove the 0 values (weights by sample)
   W = tf.math.reduce_sum(W, axis=-1)
   # Normalise the weights by how many classes there are so the total weight sums to 1
