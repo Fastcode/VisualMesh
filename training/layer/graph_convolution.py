@@ -9,4 +9,4 @@ class GraphConvolution(tf.keras.layers.Layer):
     super(GraphConvolution, self).__init__()
 
   def call(self, X, G):
-    return tf.reshape(tf.gather(X, G, name='NetworkGather'), shape=[-1, tf.shape(X)[1] * tf.shape(G)[1]])
+    return tf.reshape(tf.gather(X, G, name='NetworkGather'), shape=[-1, X.shape[-1] * G.shape[-1]])
