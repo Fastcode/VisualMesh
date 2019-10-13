@@ -77,6 +77,7 @@ def train(config, output_path):
     # Fit the model
     model.fit(
       training_dataset,
+      epochs=config.training.epochs,
       steps_per_epoch=config.training.batches_per_epoch,
       validation_data=validation_dataset,
       validation_steps=config.training.validation.samples,

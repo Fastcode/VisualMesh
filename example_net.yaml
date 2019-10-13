@@ -61,6 +61,8 @@ training:
   batch_size: 20
   # Number of batches to consider an epoch, if None then it is the length of the input dataset
   batches_per_epoch: 1000
+  # Number of epochs to execute
+  epochs: 100
 
   # Settings for the validation step of the network.
   validation:
