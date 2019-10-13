@@ -9,18 +9,18 @@ from training.dataset import VisualMeshDataset
 def _prepare_dataset(args):
 
   # The weights given for each value from the training data
-  W = tf.multiply(Y, args['W'])
+  W = tf.math.multiply(args['Y'], args['W'])
 
   # Balance the weights by class
   # Divide each class by how many samples there are (each col sums to 1)
-  W = tf.divide(W, tf.reduce_sum(W, axis=0))
+  W = tf.math.divide(W, tf.reduce_sum(W, axis=0))
   # Sum across classes to remove the 0 values (weights by sample)
-  W = tf.reduce_sum(W, axis=-1)
+  W = tf.math.reduce_sum(W, axis=-1)
   # Normalise the weights by how many classes there are so the total weight sums to 1
-  W = tf.divide(W, tf.count_nonzero(class_weights, dtype=tf.float32))
+  W = tf.math.divide(W, tf.math.count_nonzero(class_weights, dtype=tf.float32))
 
   # Make the average value be 1 for the batch
-  W = tf.multiply(W, tf.size(args['W'], out_type=tf.float32))
+  W = tf.math.multiply(W, tf.size(args['W'], out_type=tf.float32))
 
   # Return in the format (x, y, weights)
   return ((args['X'], args['G']), args['Y'], W)
