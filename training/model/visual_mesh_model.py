@@ -12,13 +12,13 @@ class VisualMeshModel(tf.keras.Model):
     self.stages = []
 
     # Build our network structure
-    for i, c in enumerate(structure):
+    for c in structure:
 
       # Graph convolution
       self.stages.append(GraphConvolution())
 
       # Dense internal layers
-      for j, units in enumerate(c):
+      for units in c:
         self.stages.append(tf.keras.layers.Dense(units=units, activation=activation))
 
     # Final dense layer for the number of classes
