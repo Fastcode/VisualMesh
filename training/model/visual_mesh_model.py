@@ -22,7 +22,11 @@ class VisualMeshModel(tf.keras.Model):
         self.stages.append(tf.keras.layers.Dense(units=units, activation=activation))
 
     # Final dense layer for the number of classes
-    self.stages.append(tf.keras.layers.Dense(units=n_classes, activation=tf.nn.softmax))
+    self.stages.append(
+      tf.keras.layers.Dense(
+        units=n_classes, activation=tf.nn.softmax, kernel_initializer='glorot_normal', bias_initializer='glorot_normal'
+      )
+    )
 
   def call(self, X, training=False):
 
