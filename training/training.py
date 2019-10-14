@@ -46,6 +46,10 @@ def train(config, output_path):
       variants=config.training.variants,
     ).build().map(_prepare_dataset)
 
+    # If we are using batches_per_epoch as a number rather than the whole dataset
+    if config.training.batches_per_epoch is not None:
+      training_dataset = training_dataset.repeat()
+
     # Get the validation dataset
     validation_dataset = VisualMeshDataset(
       input_files=config.dataset.validation,
