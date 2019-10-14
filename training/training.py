@@ -5,6 +5,7 @@ import tensorflow as tf
 from training.model import VisualMeshModel
 from training.dataset import VisualMeshDataset
 from training.metrics import ClassPrecision, ClassRecall
+from training.callbacks import MeshImages
 
 
 # Convert a dataset into a format that will be accepted by keras fit
@@ -93,6 +94,13 @@ def train(config, output_path):
       tf.keras.callbacks.TensorBoard(log_dir=output_path, update_freq='batch', write_graph=True, histogram_freq=1),
       tf.keras.callbacks.ModelCheckpoint(
         filepath=os.path.join(output_path, 'model.ckpt'), save_weights_only=True, verbose=1
+      ),
+      MeshImages(
+        config.dataset.validation,
+        config.network.classes,
+        config.geometry,
+        config.training.validation.progress_images,
+        [c[1] for c in config.network.classes],
       ),
     ]
   )
