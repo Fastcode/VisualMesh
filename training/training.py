@@ -4,6 +4,7 @@ import os
 import tensorflow as tf
 from training.model import VisualMeshModel
 from training.dataset import VisualMeshDataset
+from training.metrics import ClassPrecision, ClassRecall
 
 
 # Convert a dataset into a format that will be accepted by keras fit
@@ -55,6 +56,13 @@ def train(config, output_path):
       variants={},
     ).build().map(_prepare_dataset)
 
+    # Build up the list of metrics we want to track
+    metrics = [tf.metrics.CategoricalCrossentropy(), tf.metrics.Precision(), tf.metrics.Recall()]
+
+    for i, k in enumerate(config.network.classes):
+      metrics.append(ClassPrecision(i, name='{}_precision'.format(k[0])))
+      metrics.append(ClassRecall(i, name='{}_recall'.format(k[0])))
+
     # Define the model
     model = VisualMeshModel(
       structure=config.network.structure,
@@ -64,11 +72,7 @@ def train(config, output_path):
     model.compile(
       optimizer=tf.optimizers.Adam(),
       loss=tf.losses.CategoricalCrossentropy(),
-      metrics=[
-        tf.metrics.CategoricalCrossentropy(),
-        tf.metrics.Precision(),
-        tf.metrics.Recall(),
-      ],
+      metrics=metrics,
     )
 
     # Find the latest checkpoint file
@@ -84,9 +88,7 @@ def train(config, output_path):
       validation_data=validation_dataset,
       validation_steps=config.training.validation.samples,
       callbacks=[
-        tf.keras.callbacks.TensorBoard(
-          log_dir=output_path, update_freq='batch', write_graph=True, write_images=True, histogram_freq=1
-        ),
+        tf.keras.callbacks.TensorBoard(log_dir=output_path, update_freq='batch', write_graph=True, histogram_freq=1),
         tf.keras.callbacks.ModelCheckpoint(
           filepath=os.path.join(output_path, 'model.ckpt'), save_weights_only=True, verbose=1
         ),
