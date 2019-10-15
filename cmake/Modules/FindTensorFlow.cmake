@@ -23,9 +23,11 @@ FIND_PATH(TENSORFLOW_INCLUDE_DIRS
   DOC "TensorFlow include directory"
 )
 
+MESSAGE(LibDir ${tf_lib_dir})
+
 FIND_LIBRARY(
   TENSORFLOW_LIBRARIES
-  NAMES tensorflow_framework
+  NAMES tensorflow_framework libtensorflow_framework.so.1
   HINTS ${tf_lib_dir}
   DOC "TensorFlow library"
 )

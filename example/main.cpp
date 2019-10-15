@@ -57,11 +57,12 @@ int main() {
 
   // Construct our VisualMesh
   Timer t;
+  // 0.0949996
   visualmesh::geometry::Sphere<float> sphere(0.0949996);
-  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine, visualmesh::generator::HexaPizza> cl_mesh(
-    sphere, 0.5, 1.5, 100, 6, 20);
-  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine, visualmesh::generator::HexaPizza> cpu_mesh(
-    sphere, 0.5, 1.5, 100, 6, 20);
+  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine, visualmesh::generator::QuadPizza> cl_mesh(
+    sphere, 0.5, 1.5, 100, 8, 20);
+  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine, visualmesh::generator::QuadPizza> cpu_mesh(
+    sphere, 0.5, 1.5, 100, 8, 20);
   t.measure("Built Visual Mesh");
 
   // Build our classification network
@@ -216,7 +217,9 @@ int main() {
           colour += cv::Scalar(255 * cl[2], 255 * cl[2], 255 * cl[2]);
           // Field
           colour += cv::Scalar(0, 255 * cl[3], 0);
-          colour = cv::Scalar(255, 255, 255);
+          // colour = cv::Scalar(255, 255, 255);
+          colour = cv::Scalar(10, 240, 0);
+          cv::Scalar colour2(0, 0, 255);
 
           for (const auto& n : neighbourhood[i]) {
             if (n < pixel_coordinates.size()) {
@@ -225,10 +228,21 @@ int main() {
               cv::line(scratch, p1, p2x, colour, 1);
             }
           }
+          // for (int j = 0; j < neighbourhood[i].size(); ++j) {
+          //   if ((j < pixel_coordinates.size()) && (j == 2 || j == 5)) {
+          //     cv::Point p2(pixel_coordinates[neighbourhood[i][j]][0], pixel_coordinates[neighbourhood[i][j]][1]);
+          //     cv::Point p2x = p1 + ((p2 - p1) * 0.5);
+          //     cv::line(scratch, p1, p2x, colour2, 1);
+          //   }
+          // }
         }
 
+        cv::Mat rgb_img_GPU;
+        // cv::cvtColor(scratch, rgb_img_GPU, cv::COLOR_RGBA2RGB);
+
         cv::imshow("Image", scratch);
-        cv::imwrite("OutGPU.png", scratch);
+        // cv::imwrite("/home/asugo/HonoursData/OutGPU.png", rgb_img_GPU);
+
         // Wait for esc key
         if (char(cv::waitKey(0)) == 27) break;
       }
@@ -261,7 +275,11 @@ int main() {
           colour += cv::Scalar(255 * cl[2], 255 * cl[2], 255 * cl[2]);
           // Field
           colour += cv::Scalar(0, 255 * cl[3], 0);
-          colour = cv::Scalar(255, 255, 255);
+          // colour = cv::Scalar(255, 255, 255);
+          // colour = cv::Scalar(0, 255, 60);
+          colour = cv::Scalar(10, 240, 0);
+          cv::Scalar colour2(0, 0, 255);
+
 
           for (const auto& n : neighbourhood[i]) {
             if (n < pixel_coordinates.size()) {
@@ -270,10 +288,21 @@ int main() {
               cv::line(scratch, p1, p2x, colour, 1);
             }
           }
+
+          // for (int j = 0; j < neighbourhood[i].size(); ++j) {
+          //   if ((j < pixel_coordinates.size()) && (j == 2 || j == 5)) {
+          //     cv::Point p2(pixel_coordinates[neighbourhood[i][j]][0], pixel_coordinates[neighbourhood[i][j]][1]);
+          //     cv::Point p2x = p1 + ((p2 - p1) * 0.5);
+          //     cv::line(scratch, p1, p2x, colour2, 1);
+          //   }
+          // }
         }
 
+        cv::Mat rgb_img_CPU;
+        cv::cvtColor(scratch, rgb_img_CPU, cv::COLOR_RGBA2RGB);
+
         cv::imshow("Image", scratch);
-        cv::imwrite("OutCPU.png", scratch);
+        // cv::imwrite("/home/asugo/HonoursData/OutCPU.png", rgb_img_CPU);
         // Wait for esc key
         if (char(cv::waitKey(0)) == 27) break;
       }
