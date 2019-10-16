@@ -276,6 +276,7 @@ def _build_training_graph(gpus, config):
 
     # This iterator is used so we can swap datasets as we go
     handle = tf.placeholder(tf.string, shape=[])
+    # This is a hack, 5 is the number of neighbours + 1
     iterator = tf.data.Iterator.from_string_handle(
       handle, {
         'X': tf.float32,
@@ -288,7 +289,7 @@ def _build_training_graph(gpus, config):
       }, {
         'X': [None, 3],
         'Y': [None, len(config.network.classes)],
-        'G': [None, 7],
+        'G': [None, 5],
         'W': [None],
         'n': [None],
         'px': [None, 2],

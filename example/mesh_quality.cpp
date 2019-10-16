@@ -16,7 +16,7 @@ using vec3 = visualmesh::vec3<Scalar>;
 int main() {
 
   visualmesh::geometry::Sphere<float> shape(0.0949996);
-  visualmesh::Mesh<float> mesh(shape, 1.0, 1, 20);
+  visualmesh::Mesh<float, visualmesh::generator::QuadPizza> mesh(shape, 1.0, 1, 20);
 
   // Loop through all the nodes in the mesh
   for (const auto& node : mesh.nodes) {

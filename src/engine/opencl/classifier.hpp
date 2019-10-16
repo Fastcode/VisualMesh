@@ -46,7 +46,7 @@ namespace engine {
     template <typename Scalar>
     class Engine;
 
-    template <typename Scalar>
+    template <typename Scalar, template <typename> class Generator>
     class Classifier {
 
     public:
@@ -71,14 +71,14 @@ namespace engine {
         // Set our precision for how many digits our scalar has
         code << std::setprecision(std::numeric_limits<Scalar>::digits10 + 2);
 
-        auto vector_type = [](const int& size) { return (size == 1 || size == 2 || size == 4) ? size : 0; };
+        auto vector_type = [](const unsigned int& size) { return (size == 1 || size == 2 || size == 4) ? size : 0; };
 
-        for (uint conv_no = 0; conv_no < structure.size(); ++conv_no) {
+        for (unsigned int conv_no = 0; conv_no < structure.size(); ++conv_no) {
           auto& conv = structure[conv_no];
 
           // We need to work out the input and output sizes for our convolution
-          int conv_in_size;
-          int conv_out_size;
+          unsigned int conv_in_size;
+          unsigned int conv_out_size;
 
           // On the first convolution we assume an input size of 4
           if (conv_no == 0) { conv_in_size = 4; }
@@ -110,30 +110,31 @@ namespace engine {
 
           code << "  // Gather from our neighbourhood " << std::endl;
           if (vector_type(conv_in_size)) {
-            code << "  " << in_type << " in0[7] = {" << std::endl;
+            code << "  " << in_type << " in0[" << (Generator<Scalar>::N_NEIGHBOURS + 1) << "] = {" << std::endl;
             code << "    input[idx]," << std::endl;
-            for (int i = 0; i < 6; ++i) {
-              code << "    input[neighbourhood[idx * 6 + " << i << "]]";
-              if (i != 5) { code << ","; }
+            for (unsigned int i = 0; i < Generator<Scalar>::N_NEIGHBOURS; ++i) {
+              code << "    input[neighbourhood[idx * " << Generator<Scalar>::N_NEIGHBOURS << " + " << i << "]]";
+              if (i != Generator<Scalar>::N_NEIGHBOURS - 1) { code << ","; }
               code << std::endl;
             }
             code << "  };";
           }
           // Perform our gather step for non vectorized data
           else {
-            code << "  float in0[" << (conv_in_size * 7) << "] = {" << std::endl;
+            code << "  float in0[" << (conv_in_size * (Generator<Scalar>::N_NEIGHBOURS + 1)) << "] = {" << std::endl;
 
             // Read the ones for our own index
-            for (int j = 0; j < conv_in_size; ++j) {
+            for (unsigned int j = 0; j < conv_in_size; ++j) {
               code << "    input[idx * " << conv_in_size << " + " << j << "]," << std::endl;
             }
 
             // Read our neighbourhood
-            for (int i = 0; i < 6; ++i) {
-              for (int j = 0; j < conv_in_size; ++j) {
-                code << "    input[neighbourhood[idx * 6 + " << i << "] * " << conv_in_size << " + " << j << "]";
+            for (unsigned int i = 0; i < Generator<Scalar>::N_NEIGHBOURS; ++i) {
+              for (unsigned int j = 0; j < conv_in_size; ++j) {
+                code << "    input[neighbourhood[idx * " << Generator<Scalar>::N_NEIGHBOURS << " + " << i << "] * "
+                     << conv_in_size << " + " << j << "]";
 
-                if (i < 6 || j + 1 < conv_in_size) { code << ","; }
+                if (i < Generator<Scalar>::N_NEIGHBOURS || j + 1 < conv_in_size) { code << ","; }
                 code << std::endl;
               }
             }
@@ -147,13 +148,13 @@ namespace engine {
            *************************************************/
 
           // Now we have to do our layer operations
-          int in_size = conv_in_size;
-          for (uint layer_no = 0; layer_no < conv.size(); ++layer_no) {
+          unsigned int in_size = conv_in_size;
+          for (unsigned int layer_no = 0; layer_no < conv.size(); ++layer_no) {
             const auto& weights = conv[layer_no].first;
             const auto& biases  = conv[layer_no].second;
 
-            const int vector_in  = vector_type(in_size);
-            const int vector_out = vector_type(biases.size());
+            const unsigned int vector_in  = vector_type(in_size);
+            const unsigned int vector_out = vector_type(biases.size());
 
             code << "  // Perform our matrix multiplication for weights and add bias for layer " << layer_no
                  << std::endl;
@@ -169,9 +170,9 @@ namespace engine {
 
             // Matrix multiplication + bias
             if (vector_in) {
-              for (uint i = 0; i < biases.size(); ++i) {
+              for (unsigned int i = 0; i < biases.size(); ++i) {
                 code << "    ";
-                for (uint j = 0; j < weights.size(); j += vector_in) {
+                for (unsigned int j = 0; j < weights.size(); j += vector_in) {
 
                   // If our data is gathered, we need to get our gathered index
                   std::string gathered_index = layer_no == 0 ? "[" + std::to_string(j / vector_in) + "]" : "";
@@ -180,7 +181,7 @@ namespace engine {
                   code << "dot(in" << layer_no << gathered_index << ", (float" << vector_in << ")(";
 
                   // Write our fixed data
-                  for (uint k = j; k < j + vector_in; ++k) {
+                  for (unsigned int k = j; k < j + vector_in; ++k) {
                     code << weights[k][i];
                     if (k + 1 < j + vector_in) { code << ", "; }
                   }
@@ -194,9 +195,9 @@ namespace engine {
               }
             }
             else {
-              for (uint i = 0; i < biases.size(); ++i) {
+              for (unsigned int i = 0; i < biases.size(); ++i) {
                 code << "    ";
-                for (uint j = 0; j < weights.size(); ++j) {
+                for (unsigned int j = 0; j < weights.size(); ++j) {
                   code << "in" << layer_no << "[" << j << "] * " << weights[j][i] << " + ";
                 }
                 code << biases[i];
@@ -234,7 +235,7 @@ namespace engine {
                      << std::endl;  // select(a, b, c) == c ? b : a
               }
               else {
-                for (uint i = 0; i < biases.size(); ++i) {
+                for (unsigned int i = 0; i < biases.size(); ++i) {
                   std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
                   code << "  " << e << " = " << lambda << "f * (" << e << " > 0 ? " << e << " : " << alpha << "f * exp("
                        << e << ") - " << alpha << "f);" << std::endl;
@@ -252,20 +253,20 @@ namespace engine {
               else {
 
                 // Apply exp to each of the elements
-                for (uint i = 0; i < biases.size(); ++i) {
+                for (unsigned int i = 0; i < biases.size(); ++i) {
                   std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
                   code << "  " << e << " = exp(" << e << ");" << std::endl;
                 }
 
                 // Sum up all the values
                 code << "float exp_sum = 0;" << std::endl;
-                for (uint i = 0; i < biases.size(); ++i) {
+                for (unsigned int i = 0; i < biases.size(); ++i) {
                   std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
                   code << "  exp_sum += " << e << ";" << std::endl;
                 }
 
                 // Divide all the values
-                for (uint i = 0; i < biases.size(); ++i) {
+                for (unsigned int i = 0; i < biases.size(); ++i) {
                   std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
                   code << "  " << e << " /= exp_sum;" << std::endl;
                 }
@@ -286,7 +287,7 @@ namespace engine {
                  << "in" << conv.size() << ";" << std::endl;
           }
           else {
-            for (int i = 0; i < conv_out_size; ++i) {
+            for (unsigned int i = 0; i < conv_out_size; ++i) {
               code << "  output[idx * " << conv_out_size << " + " << i << "] = in" << conv.size() << "[" << i << "];"
                    << std::endl;
             }
@@ -330,9 +331,9 @@ namespace engine {
                                   "Error building classifier program\n" + std::string(log.begin(), log.begin() + used));
         }
 
-        for (uint i = 0; i < structure.size(); ++i) {
-          std::string kernel = "conv" + std::to_string(i);
-          uint output_size   = structure[i].back().second.size();
+        for (unsigned int i = 0; i < structure.size(); ++i) {
+          std::string kernel       = "conv" + std::to_string(i);
+          unsigned int output_size = structure[i].back().second.size();
 
           cl::kernel k(::clCreateKernel(program, kernel.c_str(), &error), ::clReleaseKernel);
           throw_cl_error(error, "Failed to create kernel " + kernel);
@@ -351,11 +352,11 @@ namespace engine {
         }
       }
 
-      ClassifiedMesh<Scalar> operator()(const Mesh<Scalar>& mesh,
-                                        const void* image,
-                                        const uint32_t& format,
-                                        const mat4<Scalar>& Hoc,
-                                        const Lens<Scalar>& lens) const {
+      ClassifiedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS> operator()(const Mesh<Scalar, Generator>& mesh,
+                                                                         const void* image,
+                                                                         const uint32_t& format,
+                                                                         const mat4<Scalar>& Hoc,
+                                                                         const Lens<Scalar>& lens) const {
 
         cl_image_format fmt;
 
@@ -407,7 +408,7 @@ namespace engine {
         throw_cl_error(error, "Error mapping image onto device");
 
         // Project our visual mesh
-        std::vector<std::array<int, 6>> neighbourhood;
+        std::vector<std::array<int, Generator<Scalar>::N_NEIGHBOURS>> neighbourhood;
         std::vector<int> indices;
         cl::mem cl_pixels;
         cl::event cl_pixels_loaded;
@@ -418,9 +419,12 @@ namespace engine {
         int n_points = neighbourhood.size();
 
         // Allocate the neighbourhood buffer
-        cl::mem cl_neighbourhood(
-          ::clCreateBuffer(engine->context, CL_MEM_READ_WRITE, n_points * sizeof(std::array<int, 6>), nullptr, &error),
-          ::clReleaseMemObject);
+        cl::mem cl_neighbourhood(::clCreateBuffer(engine->context,
+                                                  CL_MEM_READ_WRITE,
+                                                  n_points * sizeof(std::array<int, Generator<Scalar>::N_NEIGHBOURS>),
+                                                  nullptr,
+                                                  &error),
+                                 ::clReleaseMemObject);
         throw_cl_error(error, "Error allocating neighbourhood buffer on device");
 
         // Upload the neighbourhood buffer
@@ -430,7 +434,7 @@ namespace engine {
                                        cl_neighbourhood,
                                        false,
                                        0,
-                                       n_points * sizeof(std::array<int, 6>),
+                                       n_points * sizeof(std::array<int, Generator<Scalar>::N_NEIGHBOURS>),
                                        neighbourhood.data(),
                                        0,
                                        nullptr,
@@ -560,7 +564,7 @@ namespace engine {
         cl_event end_events[2] = {pixels_read, classes_read};
         ::clWaitForEvents(2, end_events);
 
-        return ClassifiedMesh<Scalar>{
+        return ClassifiedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS>{
           std::move(pixels), std::move(neighbourhood), std::move(indices), std::move(classifications)};
       }
 

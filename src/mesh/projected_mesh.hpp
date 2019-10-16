@@ -26,15 +26,16 @@ namespace visualmesh {
 /**
  * @brief A projected mesh is a Visual Mesh that has been projected onto a camera image
  *
- * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ * @tparam Scalar     the scalar type used for calculations and storage (normally one of float or double)
+ * @tparam Neighbours the number of neighbours that each point has
  */
-template <typename Scalar>
+template <typename Scalar, size_t Neighbours>
 struct ProjectedMesh {
 
   /// The pixel coordinates (x,y) of the points projected from the visual mesh
   std::vector<std::array<Scalar, 2>> pixel_coordinates;
   /// The index graph giving the locations of the neighbours of each point
-  std::vector<std::array<int, 6>> neighbourhood;
+  std::vector<std::array<int, Neighbours>> neighbourhood;
   /// The original indicies of these points in the visual mesh
   std::vector<int> global_indices;
 };

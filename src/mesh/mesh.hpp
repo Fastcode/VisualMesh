@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "generator/hexapizza.hpp"
+#include "generator/quadpizza.hpp"
 #include "lens.hpp"
 #include "node.hpp"
 #include "util/cone.hpp"
@@ -45,9 +46,10 @@ namespace visualmesh {
  *  removes these extra points however the OpenCL engine does not. So if you are relying on these pixel coordinates
  *  being in bounds you should ensure that you use the CPU engine.
  *
- * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ * @tparam Scalar     the scalar type used for calculations and storage (normally one of float or double)
+ * @tparam Generator  the generator that is used to build the Visual Mesh graph
  */
-template <typename Scalar>
+template <typename Scalar, template <typename> class Generator>
 struct Mesh {
 private:
   /**
@@ -395,7 +397,6 @@ public:
    *  Constructs a new Mesh object using the provided generator type. This mesh object generates a BSP tree and holds
    *  the logic needed to quickly lookup points that are on screen and return valid index ranges.
    *
-   * @tparam Generator the generator that is to be used to generate the Visual Mesh
    * @tparam Shape     the type of shape that will be used to generate the Visual Mesh
    *
    * @param shape         the shape instance that will be used to generate the Visual Mesh
@@ -403,7 +404,7 @@ public:
    * @param k             the number of cross section intersections that are needed for the object
    * @param max_distance  the maximum distance to generate the Visual Mesh for
    */
-  template <template <typename T> class Generator = generator::Hexapizza, typename Shape>
+  template <typename Shape>
   Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance)
     : h(h), max_distance(max_distance), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
 
@@ -432,7 +433,7 @@ public:
     }
 
     // Sort the nodes and correct the neighbourhood graph based on our BSP sorting
-    std::vector<Node<Scalar>> sorted_nodes;
+    std::vector<Node<Scalar, Generator<Scalar>::N_NEIGHBOURS>> sorted_nodes;
     sorted_nodes.reserve(nodes.size());
     for (const auto& i : sorting) {
       sorted_nodes.push_back(nodes[i]);
@@ -554,7 +555,7 @@ public:
   /// The maximum distance this mesh is setup for
   Scalar max_distance;
   /// The lookup table for this mesh
-  std::vector<Node<Scalar>> nodes;
+  std::vector<Node<Scalar, Generator<Scalar>::N_NEIGHBOURS>> nodes;
 
 private:
   /// The binary search tree that is used for looking up which points are on screen in the mesh

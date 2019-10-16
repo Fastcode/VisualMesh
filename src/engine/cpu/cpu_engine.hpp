@@ -35,10 +35,11 @@ namespace engine {
     class Engine {
 
     public:
-      ProjectedMesh<Scalar> project(const Mesh<Scalar>& mesh,
-                                    const std::vector<std::pair<int, int>>& ranges,
-                                    const mat4<Scalar>& Hoc,
-                                    const Lens<Scalar>& lens) const {
+      template <template <typename> class Generator>
+      ProjectedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Generator>& mesh,
+                                                                     const std::vector<std::pair<int, int>>& ranges,
+                                                                     const mat4<Scalar>& Hoc,
+                                                                     const Lens<Scalar>& lens) const {
 
         // Convenience variables
         const auto& nodes = mesh.nodes;
@@ -80,10 +81,11 @@ namespace engine {
         }
 
         // Build our local neighbourhood map
-        std::vector<std::array<int, 6>> neighbourhood(n_points + 1);  // +1 for the null point
+        std::vector<std::array<int, Generator<Scalar>::N_NEIGHBOURS>> neighbourhood(n_points
+                                                                                    + 1);  // +1 for the null point
         for (unsigned int i = 0; i < n_points; ++i) {
-          const Node<Scalar>& node = nodes[global_indices[i]];
-          for (unsigned int j = 0; j < 6; ++j) {
+          const Node<Scalar, Generator<Scalar>::N_NEIGHBOURS>& node = nodes[global_indices[i]];
+          for (unsigned int j = 0; j < node.neighbours.size(); ++j) {
             const auto& n       = node.neighbours[j];
             neighbourhood[i][j] = r_lookup[n];
           }
@@ -91,11 +93,13 @@ namespace engine {
         // Last point is the null point
         neighbourhood[n_points].fill(n_points);
 
-        return ProjectedMesh<Scalar>{std::move(pixels), std::move(neighbourhood), std::move(global_indices)};
+        return ProjectedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS>{
+          std::move(pixels), std::move(neighbourhood), std::move(global_indices)};
       }
 
+      template <template <typename> class Generator>
       auto make_classifier(const network_structure_t<Scalar>& structure) {
-        return Classifier<Scalar>(this, structure);
+        return Classifier<Scalar, Generator>(this, structure);
       }
     };
 

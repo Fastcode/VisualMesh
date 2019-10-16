@@ -59,8 +59,10 @@ int main() {
   // Construct our VisualMesh
   Timer t;
   visualmesh::geometry::Sphere<float> sphere(0.0949996);
-  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> cl_mesh(sphere, 0.5, 1.5, 6, 0.5, 20);
-  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine> cpu_mesh(sphere, 0.5, 1.5, 6, 0.5, 20);
+  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine, visualmesh::generator::QuadPizza> cl_mesh(
+    sphere, 0.5, 1.5, 6, 0.5, 20);
+  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine, visualmesh::generator::QuadPizza> cpu_mesh(
+    sphere, 0.5, 1.5, 6, 0.5, 20);
   t.measure("Built Visual Mesh");
 
   // Build our classification network

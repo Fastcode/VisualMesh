@@ -48,7 +48,7 @@ REGISTER_OP("VisualMesh")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
     // nx2 points on image, and n+1x7 neighbours (including off screen point)
     c->set_output(0, c->MakeShape({c->kUnknownDim, 2}));
-    c->set_output(1, c->MakeShape({c->kUnknownDim, 7}));
+    c->set_output(1, c->MakeShape({c->kUnknownDim, c->kUnknownDim}));
     return tensorflow::Status::OK();
   });
 
@@ -103,13 +103,14 @@ Scalar mesh_k_error(const Shape<Scalar>& shape, const Scalar& h_0, const Scalar&
  * @return either returns a shared_ptr to the mesh that would best fit within our tolerance, or if none could be found a
  *         nullptr
  */
-template <typename Scalar, template <typename> class Shape>
-std::shared_ptr<visualmesh::Mesh<Scalar>> find_mesh(std::vector<std::shared_ptr<visualmesh::Mesh<Scalar>>>& meshes,
-                                                    const Shape<Scalar>& shape,
-                                                    const Scalar& h,
-                                                    const Scalar& k,
-                                                    const Scalar& t,
-                                                    const Scalar& d) {
+template <typename Scalar, template <typename> class Generator, template <typename> class Shape>
+std::shared_ptr<visualmesh::Mesh<Scalar, Generator>> find_mesh(
+  std::vector<std::shared_ptr<visualmesh::Mesh<Scalar, Generator>>>& meshes,
+  const Shape<Scalar>& shape,
+  const Scalar& h,
+  const Scalar& k,
+  const Scalar& t,
+  const Scalar& d) {
 
   // Nothing in the map!
   if (meshes.empty()) { return nullptr; }
@@ -154,16 +155,16 @@ std::shared_ptr<visualmesh::Mesh<Scalar>> find_mesh(std::vector<std::shared_ptr<
  *
  * @return std::shared_ptr<visualmesh::Mesh<Scalar>>
  */
-template <typename Scalar, template <typename> class Shape>
-std::shared_ptr<visualmesh::Mesh<Scalar>> get_mesh(const Shape<Scalar>& shape,
-                                                   const Scalar& height,
-                                                   const Scalar& n_intersections,
-                                                   const Scalar& intersection_tolerance,
-                                                   const int32_t& cached_meshes,
-                                                   const Scalar& max_distance) {
+template <typename Scalar, template <typename> class Generator, template <typename> class Shape>
+std::shared_ptr<visualmesh::Mesh<Scalar, Generator>> get_mesh(const Shape<Scalar>& shape,
+                                                              const Scalar& height,
+                                                              const Scalar& n_intersections,
+                                                              const Scalar& intersection_tolerance,
+                                                              const int32_t& cached_meshes,
+                                                              const Scalar& max_distance) {
 
   // Static map of heights to meshes
-  static std::vector<std::shared_ptr<visualmesh::Mesh<Scalar>>> meshes;
+  static std::vector<std::shared_ptr<visualmesh::Mesh<Scalar, Generator>>> meshes;
   static std::mutex mesh_mutex;
 
   // Find and return an element if one is appropriate
@@ -176,7 +177,7 @@ std::shared_ptr<visualmesh::Mesh<Scalar>> get_mesh(const Shape<Scalar>& shape,
   }
 
   // We couldn't find an appropriate mesh, make a new one but don't hold the mutex while we do so others can still query
-  auto new_mesh = std::make_shared<visualmesh::Mesh<Scalar>>(shape, height, n_intersections, max_distance);
+  auto new_mesh = std::make_shared<visualmesh::Mesh<Scalar, Generator>>(shape, height, n_intersections, max_distance);
 
   /* mutex scope */ {
     std::lock_guard<std::mutex> lock(mesh_mutex);
@@ -212,6 +213,9 @@ std::shared_ptr<visualmesh::Mesh<Scalar>> get_mesh(const Shape<Scalar>& shape,
 template <typename T, typename U>
 class VisualMeshOp : public tensorflow::OpKernel {
 public:
+  template <typename V>
+  using Generator = visualmesh::generator::QuadPizza<V>;
+
   explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
 
   void Compute(tensorflow::OpKernelContext* context) override {
@@ -307,17 +311,17 @@ public:
 
     // Project the mesh using our engine and shape
     visualmesh::engine::cpu::Engine<T> engine;
-    visualmesh::ProjectedMesh<T> projected;
+    visualmesh::ProjectedMesh<T, Generator<T>::N_NEIGHBOURS> projected;
 
     if (geometry == "SPHERE") {
       visualmesh::geometry::Sphere<T> shape(radius);
-      std::shared_ptr<visualmesh::Mesh<T>> mesh = get_mesh<T, visualmesh::geometry::Sphere>(
+      std::shared_ptr<visualmesh::Mesh<T, Generator>> mesh = get_mesh<T, Generator, visualmesh::geometry::Sphere>(
         shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
       projected = engine.project(*mesh, mesh->lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CIRCLE") {
       visualmesh::geometry::Circle<T> shape(radius);
-      std::shared_ptr<visualmesh::Mesh<T>> mesh = get_mesh<T, visualmesh::geometry::Circle>(
+      std::shared_ptr<visualmesh::Mesh<T, Generator>> mesh = get_mesh<T, Generator, visualmesh::geometry::Circle>(
         shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
       projected = engine.project(*mesh, mesh->lookup(Hoc, lens), Hoc, lens);
     }
@@ -346,7 +350,8 @@ public:
     tensorflow::Tensor* neighbours = nullptr;
     tensorflow::TensorShape neighbours_shape;
     neighbours_shape.AddDim(neighbourhood.size());
-    neighbours_shape.AddDim(7);
+    neighbours_shape.AddDim(
+      neighbourhood.front().size());  // TODO THIS WILL EXPLODE WHEN THERE ARE NO ELEMENTS ON SCREEN
     OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
 
     // Copy across our neighbourhood graph, adding in a point for itself
@@ -354,13 +359,11 @@ public:
     for (unsigned int i = 0; i < neighbourhood.size(); ++i) {
       // Get our old neighbours from original output
       const auto& m = neighbourhood[i];
-      n(i, 0)       = i;
-      n(i, 1)       = m[0];
-      n(i, 2)       = m[1];
-      n(i, 3)       = m[2];
-      n(i, 4)       = m[3];
-      n(i, 5)       = m[4];
-      n(i, 6)       = m[5];
+      // First point is ourself
+      n(i, 0) = i;
+      for (unsigned int j = 0; j < neighbourhood[i].size(); ++j) {
+        n(i, j + 1) = m[j];
+      }
     }
   }
 };

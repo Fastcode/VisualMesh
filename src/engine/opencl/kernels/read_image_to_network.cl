@@ -56,10 +56,9 @@ enum FOURCC {
  * @return returns the pixel at the given coordinates
  */
 float fetch(read_only image2d_t raw_image, sampler_t sampler, float2 coord) {
-  return read_imagef(raw_image, sampler, coord).r;
+  return read_imagef(raw_image, sampler, coord).x;
 }
 
-//
 /**
  * @brief Converts a single pixel from a bayer pattern to RGB and returns it
  *
