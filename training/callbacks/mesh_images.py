@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import tensorflow as tf
 import numpy as np
 import hashlib
@@ -14,9 +15,10 @@ from training.dataset import VisualMeshDataset
 
 class MeshImages(tf.keras.callbacks.Callback):
 
-  def __init__(self, dataset_path, classes, geometry, progress_images, colours):
+  def __init__(self, output_path, dataset_path, classes, geometry, progress_images, colours):
 
     self.colours = colours
+    self.writer = tf.summary.create_file_writer(os.path.join(output_path, 'images'))
 
     # Load the dataset and extract a single record from it
     for d in VisualMeshDataset(
@@ -71,12 +73,16 @@ class MeshImages(tf.keras.callbacks.Callback):
 
     # Write the image as a jpg to a BytesIO and return it
     data = io.BytesIO()
-    fig.savefig(data, format='jpg', dpi=dpi)
+    fig.savefig(data, format='raw', dpi=dpi)
     ax.cla()
     fig.clf()
     plt.close(fig)
     data.seek(0)
-    return (img_hash, height, width, data.read())
+
+    # Convert the image from raw format into a height*width*3
+    data = np.reshape(np.fromstring(data.read(), dtype=np.uint8), [height, width, 4])[:, :, :3]
+
+    return (img_hash, data)
 
   def on_epoch_end(self, epoch, logs=None):
 
@@ -104,20 +110,8 @@ class MeshImages(tf.keras.callbacks.Callback):
       )
 
     # Sort by hash so the images show up in the same order every time
-    images.sort()
+    images = tf.stack([i for h, i in sorted(images)], axis=0)
 
-    import pdb; pdb.set_trace()
-
-    tf.summary.write(tf.compat.v1.Summary(
-      value=[
-        tf.compat.v1.Summary.Value(
-          tag="Mesh/Image/{}".format(i),
-          image=tf.compat.v1.Summary.Image(
-            height=data[1],
-            width=data[2],
-            colorspace=3,
-            encoded_image_string=data[3],
-          )
-        ) for i, data in enumerate(images)
-      ]
-    ))
+    with self.writer.as_default():
+      # Write the images
+      tf.summary.image('mesh/{}'.format(i), images, step=epoch, max_outputs=images.shape[0])

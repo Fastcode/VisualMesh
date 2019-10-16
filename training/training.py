@@ -96,6 +96,7 @@ def train(config, output_path):
         filepath=os.path.join(output_path, 'model.ckpt'), save_weights_only=True, verbose=1
       ),
       MeshImages(
+        output_path,
         config.dataset.validation,
         config.network.classes,
         config.geometry,
