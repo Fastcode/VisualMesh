@@ -153,8 +153,8 @@ namespace engine {
             // Apply the weights and bias
             auto in_point = input.begin();
             for (unsigned int i = 0; i < n_points; ++i) {
-              for (unsigned int j = 0; j < biases.size(); ++j) {
-                output.emplace_back(std::inner_product(weights[j].begin(), weights[j].end(), in_point, biases[j]));
+              for (unsigned int j = 0; j < outd; ++j) {
+                output.emplace_back(std::inner_product(in_point, in_point + ind, weights[j].begin(), biases[j]));
               }
               in_point += ind;
             }
