@@ -103,9 +103,9 @@ Scalar mesh_k_error(const Shape<Scalar>& shape, const Scalar& h_0, const Scalar&
  * @return either returns a shared_ptr to the mesh that would best fit within our tolerance, or if none could be found a
  *         nullptr
  */
-template <typename Scalar, template <typename> class Generator, template <typename> class Shape>
-std::shared_ptr<visualmesh::Mesh<Scalar, Generator>> find_mesh(
-  std::vector<std::shared_ptr<visualmesh::Mesh<Scalar, Generator>>>& meshes,
+template <typename Scalar, template <typename> class Model, template <typename> class Shape>
+std::shared_ptr<visualmesh::Mesh<Scalar, Model>> find_mesh(
+  std::vector<std::shared_ptr<visualmesh::Mesh<Scalar, Model>>>& meshes,
   const Shape<Scalar>& shape,
   const Scalar& h,
   const Scalar& k,
@@ -155,16 +155,16 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Generator>> find_mesh(
  *
  * @return std::shared_ptr<visualmesh::Mesh<Scalar>>
  */
-template <typename Scalar, template <typename> class Generator, template <typename> class Shape>
-std::shared_ptr<visualmesh::Mesh<Scalar, Generator>> get_mesh(const Shape<Scalar>& shape,
-                                                              const Scalar& height,
-                                                              const Scalar& n_intersections,
-                                                              const Scalar& intersection_tolerance,
-                                                              const int32_t& cached_meshes,
-                                                              const Scalar& max_distance) {
+template <typename Scalar, template <typename> class Model, template <typename> class Shape>
+std::shared_ptr<visualmesh::Mesh<Scalar, Model>> get_mesh(const Shape<Scalar>& shape,
+                                                          const Scalar& height,
+                                                          const Scalar& n_intersections,
+                                                          const Scalar& intersection_tolerance,
+                                                          const int32_t& cached_meshes,
+                                                          const Scalar& max_distance) {
 
   // Static map of heights to meshes
-  static std::vector<std::shared_ptr<visualmesh::Mesh<Scalar, Generator>>> meshes;
+  static std::vector<std::shared_ptr<visualmesh::Mesh<Scalar, Model>>> meshes;
   static std::mutex mesh_mutex;
 
   // Find and return an element if one is appropriate
@@ -177,7 +177,7 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Generator>> get_mesh(const Shape<Scalar
   }
 
   // We couldn't find an appropriate mesh, make a new one but don't hold the mutex while we do so others can still query
-  auto new_mesh = std::make_shared<visualmesh::Mesh<Scalar, Generator>>(shape, height, n_intersections, max_distance);
+  auto new_mesh = std::make_shared<visualmesh::Mesh<Scalar, Model>>(shape, height, n_intersections, max_distance);
 
   /* mutex scope */ {
     std::lock_guard<std::mutex> lock(mesh_mutex);
@@ -214,7 +214,7 @@ template <typename T, typename U>
 class VisualMeshOp : public tensorflow::OpKernel {
 public:
   template <typename V>
-  using Generator = visualmesh::generator::QuadPizza<V>;
+  using Model = visualmesh::model::QuadPizza<V>;
 
   explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
 
@@ -311,17 +311,17 @@ public:
 
     // Project the mesh using our engine and shape
     visualmesh::engine::cpu::Engine<T> engine;
-    visualmesh::ProjectedMesh<T, Generator<T>::N_NEIGHBOURS> projected;
+    visualmesh::ProjectedMesh<T, Model<T>::N_NEIGHBOURS> projected;
 
     if (geometry == "SPHERE") {
       visualmesh::geometry::Sphere<T> shape(radius);
-      std::shared_ptr<visualmesh::Mesh<T, Generator>> mesh = get_mesh<T, Generator, visualmesh::geometry::Sphere>(
+      std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Sphere>(
         shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
       projected = engine.project(*mesh, mesh->lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CIRCLE") {
       visualmesh::geometry::Circle<T> shape(radius);
-      std::shared_ptr<visualmesh::Mesh<T, Generator>> mesh = get_mesh<T, Generator, visualmesh::geometry::Circle>(
+      std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Circle>(
         shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
       projected = engine.project(*mesh, mesh->lookup(Hoc, lens), Hoc, lens);
     }

@@ -15,8 +15,8 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_GENERATOR_HEXAPIZZA_HPP
-#define VISUALMESH_GENERATOR_HEXAPIZZA_HPP
+#ifndef VISUALMESH_MODEL_HEXAPIZZA_HPP
+#define VISUALMESH_MODEL_HEXAPIZZA_HPP
 
 #include <array>
 #include <vector>
@@ -24,10 +24,10 @@
 #include "mesh/node.hpp"
 
 namespace visualmesh {
-namespace generator {
+namespace model {
 
   /**
-   * @brief Generator utilising the Hexapizza method
+   * @brief Model utilising the Hexapizza method
    *
    * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
    */
@@ -61,7 +61,7 @@ namespace generator {
     /**
      * @brief Generates the visual mesh vectors and graph using the Hexapizza method
      *
-     * @tparam Shape  the type of shape that this generator will use to create the mesh
+     * @tparam Shape  the type of shape that this model will use to create the mesh
      *
      * @param shape         the shape instance that is used for calculating details
      * @param h             the height of the camera above the observation plane
@@ -187,7 +187,7 @@ namespace generator {
     }
   };
 
-}  // namespace generator
+}  // namespace model
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_GENERATOR_HEXAPIZZA_HPP
+#endif  // VISUALMESH_MODEL_HEXAPIZZA_HPP

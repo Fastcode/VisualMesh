@@ -44,7 +44,7 @@ namespace visualmesh {
 namespace engine {
   namespace opencl {
 
-    template <typename Scalar, template <typename> class Generator>
+    template <typename Scalar, template <typename> class Model>
     class Classifier;
 
     template <typename Scalar>
@@ -194,13 +194,13 @@ namespace engine {
         }
       }
 
-      template <template <typename> class Generator>
-      ProjectedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Generator>& mesh,
-                                                                     const std::vector<std::pair<int, int>>& ranges,
-                                                                     const mat4<Scalar>& Hoc,
-                                                                     const Lens<Scalar>& lens) const {
+      template <template <typename> class Model>
+      ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Model>& mesh,
+                                                                 const std::vector<std::pair<int, int>>& ranges,
+                                                                 const mat4<Scalar>& Hoc,
+                                                                 const Lens<Scalar>& lens) const {
 
-        std::vector<std::array<int, Generator<Scalar>::N_NEIGHBOURS>> neighbourhood;
+        std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>> neighbourhood;
         std::vector<int> indices;
         cl::mem cl_pixels;
         cl::event projected;
@@ -221,13 +221,13 @@ namespace engine {
                                              nullptr);
         throw_cl_error(error, "Failed reading projected pixels from the device");
 
-        return ProjectedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS>{
+        return ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS>{
           std::move(pixels), std::move(neighbourhood), std::move(indices)};
       }
 
-      template <template <typename> class Generator>
+      template <template <typename> class Model>
       auto make_classifier(const network_structure_t<Scalar>& structure) {
-        return Classifier<Scalar, Generator>(this, structure);
+        return Classifier<Scalar, Model>(this, structure);
       }
 
       void clear_cache() {
@@ -235,9 +235,9 @@ namespace engine {
       }
 
     private:
-      template <template <typename> class Generator>
-      std::tuple<std::vector<std::array<int, Generator<Scalar>::N_NEIGHBOURS>>, std::vector<int>, cl::mem, cl::event>
-        do_project(const Mesh<Scalar, Generator>& mesh,
+      template <template <typename> class Model>
+      std::tuple<std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>>, std::vector<int>, cl::mem, cl::event>
+        do_project(const Mesh<Scalar, Model>& mesh,
                    const std::vector<std::pair<int, int>>& ranges,
                    const mat4<Scalar>& Hoc,
                    const Lens<Scalar>& lens) const {
@@ -296,10 +296,8 @@ namespace engine {
 
         // No point processing if we have no points, return an empty mesh
         if (points == 0) {
-          return std::make_tuple(std::vector<std::array<int, Generator<Scalar>::N_NEIGHBOURS>>(),
-                                 std::vector<int>(),
-                                 cl::mem(),
-                                 cl::event());
+          return std::make_tuple(
+            std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>>(), std::vector<int>(), cl::mem(), cl::event());
         }
 
         // Build up our list of indices for OpenCL
@@ -381,7 +379,7 @@ namespace engine {
         }
 
         // Build the packed neighbourhood map with an extra offscreen point at the end
-        std::vector<std::array<int, Generator<Scalar>::N_NEIGHBOURS>> local_neighbourhood(points + 1);
+        std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>> local_neighbourhood(points + 1);
         for (unsigned int i = 0; i < indices.size(); ++i) {
           const auto& node = nodes[indices[i]];
           for (unsigned int j = 0; j < node.neighbours.size(); ++j) {
@@ -423,7 +421,7 @@ namespace engine {
       // A mutex to protect the cache
       mutable std::mutex cache_mutex;
 
-      template <typename S, template <typename> class Generator>
+      template <typename S, template <typename> class Model>
       friend class Classifier;
     };
 

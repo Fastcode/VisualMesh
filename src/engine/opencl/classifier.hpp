@@ -46,10 +46,10 @@ namespace engine {
     template <typename Scalar>
     class Engine;
 
-    template <typename Scalar, template <typename> class Generator>
+    template <typename Scalar, template <typename> class Model>
     class Classifier {
     private:
-      static constexpr size_t N_NEIGHBOURS = Generator<Scalar>::N_NEIGHBOURS;
+      static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
     public:
       Classifier(Engine<Scalar>* engine, const network_structure_t<Scalar>& structure)
@@ -266,11 +266,11 @@ namespace engine {
         }
       }
 
-      ClassifiedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS> operator()(const Mesh<Scalar, Generator>& mesh,
-                                                                         const void* image,
-                                                                         const uint32_t& format,
-                                                                         const mat4<Scalar>& Hoc,
-                                                                         const Lens<Scalar>& lens) const {
+      ClassifiedMesh<Scalar, N_NEIGHBOURS> operator()(const Mesh<Scalar, Model>& mesh,
+                                                      const void* image,
+                                                      const uint32_t& format,
+                                                      const mat4<Scalar>& Hoc,
+                                                      const Lens<Scalar>& lens) const {
 
         cl_image_format fmt;
 
@@ -322,7 +322,7 @@ namespace engine {
         throw_cl_error(error, "Error mapping image onto device");
 
         // Project our visual mesh
-        std::vector<std::array<int, Generator<Scalar>::N_NEIGHBOURS>> neighbourhood;
+        std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
         std::vector<int> indices;
         cl::mem cl_pixels;
         cl::event cl_pixels_loaded;
@@ -333,12 +333,10 @@ namespace engine {
         int n_points = neighbourhood.size();
 
         // Allocate the neighbourhood buffer
-        cl::mem cl_neighbourhood(::clCreateBuffer(engine->context,
-                                                  CL_MEM_READ_WRITE,
-                                                  n_points * sizeof(std::array<int, Generator<Scalar>::N_NEIGHBOURS>),
-                                                  nullptr,
-                                                  &error),
-                                 ::clReleaseMemObject);
+        cl::mem cl_neighbourhood(
+          ::clCreateBuffer(
+            engine->context, CL_MEM_READ_WRITE, n_points * sizeof(std::array<int, N_NEIGHBOURS>), nullptr, &error),
+          ::clReleaseMemObject);
         throw_cl_error(error, "Error allocating neighbourhood buffer on device");
 
         // Upload the neighbourhood buffer
@@ -348,7 +346,7 @@ namespace engine {
                                        cl_neighbourhood,
                                        false,
                                        0,
-                                       n_points * sizeof(std::array<int, Generator<Scalar>::N_NEIGHBOURS>),
+                                       n_points * sizeof(std::array<int, N_NEIGHBOURS>),
                                        neighbourhood.data(),
                                        0,
                                        nullptr,
@@ -478,7 +476,7 @@ namespace engine {
         cl_event end_events[2] = {pixels_read, classes_read};
         ::clWaitForEvents(2, end_events);
 
-        return ClassifiedMesh<Scalar, Generator<Scalar>::N_NEIGHBOURS>{
+        return ClassifiedMesh<Scalar, N_NEIGHBOURS>{
           std::move(pixels), std::move(neighbourhood), std::move(indices), std::move(classifications)};
       }
 

@@ -27,11 +27,11 @@ struct NodeQuality {
   std::array<Scalar, Neighbours> angular;
 };
 
-template <typename Scalar, template <typename> class Shape, template <typename> class Generator>
-std::vector<NodeQuality<Scalar, Generator<Scalar>::N_NEIGHBOURS>> check_quality(
-  const Shape<Scalar>& shape, const visualmesh::Mesh<Scalar, Generator>& mesh) {
+template <typename Scalar, template <typename> class Shape, template <typename> class Model>
+std::vector<NodeQuality<Scalar, Model<Scalar>::N_NEIGHBOURS>> check_quality(
+  const Shape<Scalar>& shape, const visualmesh::Mesh<Scalar, Model>& mesh) {
 
-  constexpr size_t N_NEIGHBOURS = Generator<Scalar>::N_NEIGHBOURS;
+  constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
   // Loop through all the nodes in the mesh
   std::vector<NodeQuality<Scalar, N_NEIGHBOURS>> nodes;
@@ -159,7 +159,7 @@ int main(int argc, const char* argv[]) {
 
   {
     std::cout << "Hexapizza Quality:" << std::endl;
-    visualmesh::Mesh<float, visualmesh::generator::Hexapizza> mesh(shape, h, k, max_distance);
+    visualmesh::Mesh<float, visualmesh::model::Hexapizza> mesh(shape, h, k, max_distance);
     auto quality = check_quality(shape, mesh);
     print_quality(quality, k);
     std::cout << std::endl;
@@ -167,7 +167,7 @@ int main(int argc, const char* argv[]) {
 
   {
     std::cout << "Quadpizza Quality:" << std::endl;
-    visualmesh::Mesh<float, visualmesh::generator::QuadPizza> mesh(shape, h, k, max_distance);
+    visualmesh::Mesh<float, visualmesh::model::QuadPizza> mesh(shape, h, k, max_distance);
     auto quality = check_quality(shape, mesh);
     print_quality(quality, k);
     std::cout << std::endl;

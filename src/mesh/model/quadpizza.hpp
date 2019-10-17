@@ -15,8 +15,8 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_GENERATOR_ORIGINALQUAD_HPP
-#define VISUALMESH_GENERATOR_ORIGINALQUAD_HPP
+#ifndef VISUALMESH_MODEL_QUADPIZZA_HPP
+#define VISUALMESH_MODEL_QUADPIZZA_HPP
 
 #include <array>
 #include <fstream>
@@ -26,10 +26,10 @@
 #include "mesh/node.hpp"
 
 namespace visualmesh {
-namespace generator {
+namespace model {
 
   template <typename Scalar>
-  struct OriginalQuad {
+  struct QuadPizza {
   private:
     static inline vec3<Scalar> unit_vector(const Scalar& sin_phi, const Scalar& cos_phi, const Scalar& theta) {
       return vec3<Scalar>{{std::cos(theta) * sin_phi, std::sin(theta) * sin_phi, -cos_phi}};
@@ -103,8 +103,7 @@ namespace generator {
         bool growing    = false;
 
         // hack // odd v generates clockwise, even v generates anti-clockwise.
-        // int one               = std::round(std::pow(-1, v));
-        int one               = 1;
+        int one               = std::round(std::pow(-1, v));
         int number_points_now = number_points[v - 1];
         int number_points_next;
 
@@ -161,7 +160,7 @@ namespace generator {
         THETA_NEXT.push_back(theta_next);
         DISTRIBUTION.push_back(distribution);
 
-        if (distribution >= 2 * k + 2) { half_offset = false; };
+        if (distribution >= 2 * k + 2) { half_offset = true; };
 
         std::vector<int> indices;
         for (int i = begin; i < end; ++i) {
@@ -169,25 +168,23 @@ namespace generator {
         }
 
         // Chooses starting node
-        // int new_offset = 1;
-        // if (v == 1) { new_offset = 0; }
-        // else if (half_offset) {
-        //   new_offset = std::floor(distribution / 2);
-        // }
-        // else {
-        //   new_offset = 1;
-        // }
+        int new_offset = 1;
+        if (v == 1) { new_offset = 0; }
+        else if (half_offset) {
+          new_offset = std::floor(distribution / 2);
+        }
+        else {
+          new_offset = 1;
+        }
 
+        std::vector<int> vector_of_indices;
 
-        // std::vector<int> vector_of_indices;
-        std::vector<int> vector_of_indices = indices;
-
-        // for (int m = new_offset; m >= 0; --m) {
-        //   vector_of_indices.push_back(indices[m]);
-        // }
-        // for (int p = indices.size() - 1; p > new_offset; --p) {
-        //   vector_of_indices.push_back(indices[p]);
-        // }
+        for (int m = new_offset; m >= 0; --m) {
+          vector_of_indices.push_back(indices[m]);
+        }
+        for (int p = indices.size() - 1; p > new_offset; --p) {
+          vector_of_indices.push_back(indices[p]);
+        }
 
         int relative_index_now  = 0;
         int relative_index_next = 0;
@@ -247,7 +244,7 @@ namespace generator {
       }
 
       // specify the neighbours of the last ring of points
-      for (int i = (nodes.size() - number_points.back()); i < nodes.size(); ++i) {
+      for (unsigned int i = (nodes.size() - number_points.back()); i < nodes.size(); ++i) {
         nodes[i].neighbours[TOP] = i;
       }
 
@@ -300,10 +297,11 @@ namespace generator {
         std::vector<std::vector<Scalar>> Variation;
 
         for (int i = 1; i < 4; ++i) {
-          Scalar counter = nodes.size() - 1 - 4300 + (600 * i);
+          // Scalar counter = nodes.size() - 1 - (1000 * i);
+          Scalar counter = nodes.size() - 1 - 4000 + (900 * i);
           std::cout << counter << std::endl;
           std::vector<Scalar> variation;
-          for (int t = last - 1; t > 1; --t) {
+          for (int t = last - 1; t > 2; --t) {
             variation.push_back(std::atan2(nodes[counter].ray[1], nodes[counter].ray[0]));
             counter = nodes[counter].neighbours[BELOW];
           }
@@ -312,10 +310,10 @@ namespace generator {
 
 
         std::ofstream outfile2;
-        outfile2.open("/home/asugo/LatexPlotData/ThetaVariationQuadOriginal8.csv");
+        outfile2.open("/home/asugo/LatexPlotData/ThetaVariationQuadAlt8.csv");
         outfile2 << "Phi_Number,Distance,Theta0,Theta1,Theta2\n";
 
-        for (int t = 0; t < Variation[0].size(); ++t) {
+        for (unsigned int t = 0; t < Variation[0].size(); ++t) {
           outfile2 << last - 1 - t << "," << h * std::tan(PHI[last - 1 - t]) << "," << Variation[0][t] << ","
                    << Variation[1][t] << "," << Variation[2][t] << "\n";
         }
@@ -330,10 +328,10 @@ namespace generator {
       // }
 
       return nodes;
-    }  // namespace generator
-  };   // namespace generator
+    }
+  };
 
-}  // namespace generator
+}  // namespace model
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_GENERATOR_ORIGINALQUAD_HPP
+#endif  // VISUALMESH_MODEL_QUADPIZZA_HPP

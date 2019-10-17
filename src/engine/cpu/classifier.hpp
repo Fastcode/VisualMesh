@@ -34,10 +34,10 @@ namespace engine {
     template <typename Scalar>
     class Engine;
 
-    template <typename Scalar, template <typename> class Generator>
+    template <typename Scalar, template <typename> class Model>
     class Classifier {
     private:
-      static constexpr size_t N_NEIGHBOURS = Generator<Scalar>::N_NEIGHBOURS;
+      static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
     public:
       Classifier(Engine<Scalar>* engine, const network_structure_t<Scalar>& structure)
@@ -61,7 +61,7 @@ namespace engine {
       /**
        * Classify using the visual mesh network architecture provided.
        */
-      ClassifiedMesh<Scalar, N_NEIGHBOURS> operator()(const Mesh<Scalar, Generator>& mesh,
+      ClassifiedMesh<Scalar, N_NEIGHBOURS> operator()(const Mesh<Scalar, Model>& mesh,
                                                       const void* image,
                                                       const uint32_t& format,
                                                       const mat4<Scalar>& Hoc,

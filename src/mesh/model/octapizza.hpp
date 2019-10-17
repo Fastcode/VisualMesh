@@ -15,8 +15,8 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_GENERATOR_OCTAPIZZA_HPP
-#define VISUALMESH_GENERATOR_OCTAPIZZA_HPP
+#ifndef VISUALMESH_MODEL_OCTAPIZZA_HPP
+#define VISUALMESH_MODEL_OCTAPIZZA_HPP
 
 #include <array>
 #include <vector>
@@ -24,7 +24,7 @@
 #include "mesh/node.hpp"
 
 namespace visualmesh {
-namespace generator {
+namespace model {
 
   template <typename Scalar>
   struct OctaPizza {
@@ -262,10 +262,10 @@ namespace generator {
       // }
 
       return nodes;
-    }  // namespace generator
-  };   // namespace generator
+    }
+  };
 
-}  // namespace generator
+}  // namespace model
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_GENERATOR_OCTAPIZZA_HPP
+#endif  // VISUALMESH_MODEL_OCTAPIZZA_HPP
