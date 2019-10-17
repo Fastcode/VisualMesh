@@ -246,10 +246,17 @@ template <typename Scalar>
 inline mat3<Scalar> invert(const mat3<Scalar>& m) {
 
   // computes the inverse of a matrix m
-  Scalar idet = static_cast<Scalar>(1)
-                / (m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2]) -  //
-                   m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +  //
-                   m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]));  //
+  const Scalar det = (m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2]) -  //
+                      m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +  //
+                      m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]));  //
+
+  // Matrix is not invertible
+  if (det == 0) {
+    const Scalar nan = std::numeric_limits<Scalar>::quiet_NaN();
+    return {vec3<Scalar>{nan, nan, nan}, vec3<Scalar>{nan, nan, nan}, vec3<Scalar>{nan, nan, nan}};
+  }
+
+  const Scalar idet = static_cast<Scalar>(1) / det;
 
   return {vec3<Scalar>{(m[1][1] * m[2][2] - m[2][1] * m[1][2]) * idet,
                        (m[0][2] * m[2][1] - m[0][1] * m[2][2]) * idet,
