@@ -27,7 +27,6 @@
 
 #include "lens.hpp"
 #include "model/hexapizza.hpp"
-#include "model/quadpizza.hpp"
 #include "node.hpp"
 #include "util/cone.hpp"
 #include "util/math.hpp"

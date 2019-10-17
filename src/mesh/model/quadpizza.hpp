@@ -29,7 +29,7 @@ namespace visualmesh {
 namespace model {
 
   template <typename Scalar>
-  struct QuadPizza {
+  struct Quadpizza {
   private:
     static inline vec3<Scalar> unit_vector(const Scalar& sin_phi, const Scalar& cos_phi, const Scalar& theta) {
       return vec3<Scalar>{{std::cos(theta) * sin_phi, std::sin(theta) * sin_phi, -cos_phi}};

@@ -8,21 +8,28 @@ dataset:
   # Test dataset, used for performing final evaluations on the performance of the network.
   testing: dataset/testing.tfrecord
 
-# The geometry of the object we are detecting in the visual mesh.
-geometry:
-  # How many intersections with the target object we should have.
-  intersections: 6
-  # How many intersections the mesh can vary by before it will generate a new mesh
-  intersection_tolerance: 0.5
-  # How many distinct meshes to cache before dropping old ones
-  cached_meshes: 100
-  # The maximum distance the visual mesh will be projected for. This should be slightly further than the most distant
-  # object that you wish to detect to account for noises in the projection.
-  max_distance: 20
-  # The radius of the object to be detected.
-  radius: 0.0949996
-  # The shape to project, either CIRCLE or SPHERE.
-  shape: SPHERE
+# The model and geometry we are using
+model:
+  # The type of model that we are using to generate the Visual Mesh
+  mesh:
+    # The type of Visual Mesh we are generating
+    type: RADIAL6
+    # How many distinct meshes to cache before dropping old ones
+    cached_meshes: 100
+    # The maximum distance the Visual Mesh will be projected for. This should be slightly further than the most distant
+    # object that you wish to detect to account for noises in the projection.
+    max_distance: 20
+
+  # The geometry of the object we are detecting in the Visual Mesh.
+  geometry:
+    # The shape to project, either CIRCLE or SPHERE.
+    shape: SPHERE
+    # The radius of the object to be detected.
+    radius: 0.0949996
+    # How many intersections with the target object we should have.
+    intersections: 6
+    # How many intersections the mesh can vary by before it will generate a new mesh
+    intersection_tolerance: 0.5
 
 # Configuration for the convolutional neural network.
 network:

@@ -1,4 +1,5 @@
 
+#include <iomanip>
 #include <iostream>
 
 #include "ArrayPrint.hpp"
@@ -6,6 +7,8 @@
 //
 #include "geometry/Circle.hpp"
 #include "geometry/Sphere.hpp"
+#include "mesh/model/hexapizza.hpp"
+#include "mesh/model/quadpizza.hpp"
 #include "util/math.hpp"
 #include "util/phi_difference.hpp"
 #include "visualmesh.hpp"
@@ -167,7 +170,7 @@ int main(int argc, const char* argv[]) {
 
   {
     std::cout << "Quadpizza Quality:" << std::endl;
-    visualmesh::Mesh<float, visualmesh::model::QuadPizza> mesh(shape, h, k, max_distance);
+    visualmesh::Mesh<float, visualmesh::model::Quadpizza> mesh(shape, h, k, max_distance);
     auto quality = check_quality(shape, mesh);
     print_quality(quality, k);
     std::cout << std::endl;

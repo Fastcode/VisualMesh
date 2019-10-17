@@ -26,6 +26,8 @@
 #include "geometry/Circle.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/mesh.hpp"
+#include "mesh/model/hexapizza.hpp"
+#include "mesh/model/quadpizza.hpp"
 
 REGISTER_OP("VisualMesh")
   .Attr("T: {float, double}")
@@ -37,12 +39,13 @@ REGISTER_OP("VisualMesh")
   .Input("lens_centre: T")
   .Input("cam_to_observation_plane: T")
   .Input("height: T")
-  .Input("n_intersections: T")
+  .Input("model: string")
   .Input("cached_meshes: int32")
-  .Input("intersection_tolerance: T")
   .Input("max_distance: T")
   .Input("geometry: string")
   .Input("radius: T")
+  .Input("n_intersections: T")
+  .Input("intersection_tolerance: T")
   .Output("pixels: T")
   .Output("neighbours: int32")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
@@ -60,12 +63,13 @@ enum Args {
   LENS_CENTRE            = 4,
   ROC                    = 5,
   HEIGHT                 = 6,
-  N_INTERSECTIONS        = 7,
+  MODEL                  = 7,
   CACHED_MESHES          = 8,
-  INTERSECTION_TOLERANCE = 9,
-  MAX_DISTANCE           = 10,
-  GEOMETRY               = 11,
-  RADIUS                 = 12
+  MAX_DISTANCE           = 9,
+  GEOMETRY               = 10,
+  RADIUS                 = 11,
+  N_INTERSECTIONS        = 12,
+  INTERSECTION_TOLERANCE = 13
 };
 
 /**
@@ -212,13 +216,9 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> get_mesh(const Shape<Scalar>& s
  */
 template <typename T, typename U>
 class VisualMeshOp : public tensorflow::OpKernel {
-public:
-  template <typename V>
-  using Model = visualmesh::model::QuadPizza<V>;
-
-  explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
-
-  void Compute(tensorflow::OpKernelContext* context) override {
+private:
+  template <template <typename> class Model>
+  void ComputeModel(tensorflow::OpKernelContext* context) {
 
     // Check that the shape of each of the inputs is valid
     OP_REQUIRES(context,
@@ -350,8 +350,7 @@ public:
     tensorflow::Tensor* neighbours = nullptr;
     tensorflow::TensorShape neighbours_shape;
     neighbours_shape.AddDim(neighbourhood.size());
-    neighbours_shape.AddDim(
-      neighbourhood.front().size());  // TODO THIS WILL EXPLODE WHEN THERE ARE NO ELEMENTS ON SCREEN
+    neighbours_shape.AddDim(Model<T>::N_NEIGHBOURS);
     OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
 
     // Copy across our neighbourhood graph, adding in a point for itself
@@ -364,6 +363,31 @@ public:
       for (unsigned int j = 0; j < neighbourhood[i].size(); ++j) {
         n(i, j + 1) = m[j];
       }
+    }
+  }
+
+public:
+  explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
+
+  void Compute(tensorflow::OpKernelContext* context) override {
+
+    // Check that the model is a string
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
+                tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
+
+    // Grab the Visual Mesh model we are using
+    std::string model = *context->input(Args::MODEL).flat<tensorflow::string>().data();
+
+    // clang-format off
+    if (model == "HEXAPIZZA") { ComputeModel<visualmesh::model::Hexapizza>(context); }
+    else if (model == "QUADPIZZA") { ComputeModel<visualmesh::model::Quadpizza>(context); }
+    // clang-format on
+    else {
+      OP_REQUIRES(
+        context,
+        false,
+        tensorflow::errors::InvalidArgument("The provided Visual Mesh model was not one of the known models"));
     }
   }
 };
