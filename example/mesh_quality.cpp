@@ -11,6 +11,7 @@
 #include "mesh/model/radial8.hpp"
 #include "mesh/model/ring4.hpp"
 #include "mesh/model/ring6.hpp"
+#include "mesh/model/xgrid4.hpp"
 #include "util/math.hpp"
 #include "util/phi_difference.hpp"
 #include "visualmesh.hpp"
@@ -189,6 +190,14 @@ int main(int argc, const char* argv[]) {
   {
     std::cout << "Radial4 Quality:" << std::endl;
     visualmesh::Mesh<float, visualmesh::model::Radial4> mesh(shape, h, k, max_distance);
+    auto quality = check_quality(shape, mesh);
+    print_quality(quality, k);
+    std::cout << std::endl;
+  }
+
+  {
+    std::cout << "XGrid4 Quality:" << std::endl;
+    visualmesh::Mesh<float, visualmesh::model::XGrid4> mesh(shape, h, k, max_distance);
     auto quality = check_quality(shape, mesh);
     print_quality(quality, k);
     std::cout << std::endl;

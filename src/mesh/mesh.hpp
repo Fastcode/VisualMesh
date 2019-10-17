@@ -183,24 +183,22 @@ private:
       // performance of the bounding cone algorithm is expected to be linear
       auto cone = bounding_cone(start, end);
 
-      // Split the larger angle range so we have as close to cone shapes as we can
-      auto minmax_phi   = std::minmax_element(start, end, [this](const int& a, const int& b) {
-        return nodes[a].ray[2] < nodes[b].ray[2];  // comparing z is the same as comparing phi
-      });
-      auto minmax_theta = std::minmax_element(start, end, [this](const int& a, const int& b) {
-        // Since we have already sorted such that our y value is either positive or negative, we can now just sort by
-        // the x component once we normalise it to a 2d unit vector.
-        return nodes[a].ray[0] / std::sqrt(1 - nodes[a].ray[2] * nodes[a].ray[2])
-               < nodes[b].ray[0] / std::sqrt(1 - nodes[b].ray[2] * nodes[b].ray[2]);
-      });
+      // Find the extents of our data
+      Scalar min_phi   = std::numeric_limits<Scalar>::max();
+      Scalar max_phi   = std::numeric_limits<Scalar>::lowest();
+      Scalar min_theta = std::numeric_limits<Scalar>::max();
+      Scalar max_theta = std::numeric_limits<Scalar>::lowest();
 
-      // Get our min and max phi and theta
-      Scalar min_phi   = nodes[*minmax_phi.first].ray[2];
-      Scalar max_phi   = nodes[*minmax_phi.second].ray[2];
-      Scalar min_theta = nodes[*minmax_theta.first].ray[0]
-                         / std::sqrt(1 - nodes[*minmax_theta.first].ray[2] * nodes[*minmax_theta.first].ray[2]);
-      Scalar max_theta = nodes[*minmax_theta.second].ray[0]
-                         / std::sqrt(1 - nodes[*minmax_theta.second].ray[2] * nodes[*minmax_theta.second].ray[2]);
+      for (auto it = start; it != end; ++it) {
+        const auto& ray    = nodes[*it].ray;
+        const auto& phi    = ray[2];
+        const Scalar theta = ray[0] / std::sqrt(1 - ray[2] * ray[2]);
+
+        min_phi   = std::min(min_phi, phi);
+        max_phi   = std::max(max_phi, phi);
+        min_theta = std::isfinite(theta) ? std::min(min_theta, theta) : min_theta;
+        max_theta = std::isfinite(theta) ? std::max(max_theta, theta) : max_theta;
+      }
 
       // Work out the z and x values we need to split on
       Scalar split_phi   = std::cos((std::acos(min_phi) + std::acos(max_phi)) * 0.5);
