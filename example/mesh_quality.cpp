@@ -7,8 +7,10 @@
 //
 #include "geometry/Circle.hpp"
 #include "geometry/Sphere.hpp"
-#include "mesh/model/hexapizza.hpp"
-#include "mesh/model/quadpizza.hpp"
+#include "mesh/model/radial4.hpp"
+#include "mesh/model/radial8.hpp"
+#include "mesh/model/ring4.hpp"
+#include "mesh/model/ring6.hpp"
 #include "util/math.hpp"
 #include "util/phi_difference.hpp"
 #include "visualmesh.hpp"
@@ -161,16 +163,32 @@ int main(int argc, const char* argv[]) {
   visualmesh::geometry::Sphere<float> shape(r);
 
   {
-    std::cout << "Hexapizza Quality:" << std::endl;
-    visualmesh::Mesh<float, visualmesh::model::Hexapizza> mesh(shape, h, k, max_distance);
+    std::cout << "Ring6 Quality:" << std::endl;
+    visualmesh::Mesh<float, visualmesh::model::Ring6> mesh(shape, h, k, max_distance);
     auto quality = check_quality(shape, mesh);
     print_quality(quality, k);
     std::cout << std::endl;
   }
 
   {
-    std::cout << "Quadpizza Quality:" << std::endl;
-    visualmesh::Mesh<float, visualmesh::model::Quadpizza> mesh(shape, h, k, max_distance);
+    std::cout << "Ring4 Quality:" << std::endl;
+    visualmesh::Mesh<float, visualmesh::model::Ring4> mesh(shape, h, k, max_distance);
+    auto quality = check_quality(shape, mesh);
+    print_quality(quality, k);
+    std::cout << std::endl;
+  }
+
+  {
+    std::cout << "Radial8 Quality:" << std::endl;
+    visualmesh::Mesh<float, visualmesh::model::Radial8> mesh(shape, h, k, max_distance);
+    auto quality = check_quality(shape, mesh);
+    print_quality(quality, k);
+    std::cout << std::endl;
+  }
+
+  {
+    std::cout << "Radial4 Quality:" << std::endl;
+    visualmesh::Mesh<float, visualmesh::model::Radial4> mesh(shape, h, k, max_distance);
     auto quality = check_quality(shape, mesh);
     print_quality(quality, k);
     std::cout << std::endl;

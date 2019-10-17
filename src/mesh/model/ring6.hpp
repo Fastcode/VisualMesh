@@ -15,8 +15,8 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_MODEL_HEXAPIZZA_HPP
-#define VISUALMESH_MODEL_HEXAPIZZA_HPP
+#ifndef VISUALMESH_MODEL_RING6_HPP
+#define VISUALMESH_MODEL_RING6_HPP
 
 #include <array>
 #include <vector>
@@ -27,12 +27,12 @@ namespace visualmesh {
 namespace model {
 
   /**
-   * @brief Model utilising the Hexapizza method
+   * @brief Model utilising the Ring6 method
    *
    * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
    */
   template <typename Scalar>
-  struct Hexapizza {
+  struct Ring6 {
   private:
     /**
      * @brief
@@ -59,7 +59,7 @@ namespace model {
     static constexpr size_t N_NEIGHBOURS = 6;
 
     /**
-     * @brief Generates the visual mesh vectors and graph using the Hexapizza method
+     * @brief Generates the visual mesh vectors and graph using the Ring6 method
      *
      * @tparam Shape  the type of shape that this model will use to create the mesh
      *
@@ -190,4 +190,4 @@ namespace model {
 }  // namespace model
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_MODEL_HEXAPIZZA_HPP
+#endif  // VISUALMESH_MODEL_RING6_HPP

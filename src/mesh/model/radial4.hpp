@@ -15,10 +15,12 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_MODEL_OCTAPIZZA_HPP
-#define VISUALMESH_MODEL_OCTAPIZZA_HPP
+#ifndef VISUALMESH_MODEL_RADIAL4_HPP
+#define VISUALMESH_MODEL_RADIAL4_HPP
 
 #include <array>
+#include <fstream>
+#include <iostream>
 #include <vector>
 
 #include "mesh/node.hpp"
@@ -27,14 +29,14 @@ namespace visualmesh {
 namespace model {
 
   template <typename Scalar>
-  struct OctaPizza {
+  struct Radial4 {
   private:
     static inline vec3<Scalar> unit_vector(const Scalar& sin_phi, const Scalar& cos_phi, const Scalar& theta) {
       return vec3<Scalar>{{std::cos(theta) * sin_phi, std::sin(theta) * sin_phi, -cos_phi}};
     }
 
   public:
-    static constexpr size_t N_NEIGHBOURS = 8;
+    static constexpr size_t N_NEIGHBOURS = 4;
 
     template <typename Shape>
     static std::vector<Node<Scalar, N_NEIGHBOURS>> generate(const Shape& shape,
@@ -46,14 +48,17 @@ namespace model {
       std::vector<int> number_points;
 
       // L, T, R, B
-      int LEFT = 0;
-      // TOP_LEFT = 1;
-      int TOP = 2;
-      // TOP_RIGHT = 3;
-      int RIGHT = 4;
-      // BELOW_RIGHT = 5;
-      int BELOW = 6;
-      // BELOW_LEFT = 7;
+      int LEFT  = 0;
+      int TOP   = 1;
+      int RIGHT = 2;
+      int BELOW = 3;
+
+
+      // **********************************DATA*******************************
+
+      std::vector<int> DISTRIBUTION;
+      std::vector<Scalar> THETA_NEXT;
+      // **********************************************************************
 
       std::array<int, 4> first_neighbours = {2, 3, 0, 1};
 
@@ -69,6 +74,8 @@ namespace model {
         nodes.push_back(std::move(first));
       }
       number_points.emplace_back(4);
+      THETA_NEXT.push_back(2 * M_PI / 4);
+      DISTRIBUTION.push_back(1);
 
       int running_index = nodes.size();
 
@@ -79,15 +86,16 @@ namespace model {
       int stop;
       if (k < 9) { stop = 5; }
       else {
-        stop = 7;
+        stop = 8;
       }
 
       for (int i = 0; i < stop; ++i) {
         origin_number_points.emplace_back(8 + 8 * i);
       }
 
+      bool half_offset = false;
       for (int v = 1; h * std::tan(shape.phi(v / k, h)) < max_distance; ++v) {
-        // for (int v = 1; v < 5; ++v) {
+        // check this int to Scalar conversion
         Scalar phi_next = shape.phi(v / k, h);
         int begin       = running_index - number_points.back();
         int end         = running_index;
@@ -95,9 +103,7 @@ namespace model {
         bool growing    = false;
 
         // hack // odd v generates clockwise, even v generates anti-clockwise.
-        int one = std::round(std::pow(-1, v));
-
-        Scalar theta_offset   = Theta_Offset.back();
+        int one               = std::round(std::pow(-1, v));
         int number_points_now = number_points[v - 1];
         int number_points_next;
 
@@ -105,7 +111,6 @@ namespace model {
         // fix this limit
         if (v < stop) { number_points_next = origin_number_points[v]; }
         else {
-          // floor vs ceil
           number_points_next = std::ceil((2 * M_PI * k) / shape.theta(phi_next, h));
         }
 
@@ -152,30 +157,40 @@ namespace model {
         theta_next = 2 * M_PI / number_points_next;
         number_points.emplace_back(number_points_next);
 
+        THETA_NEXT.push_back(theta_next);
+        DISTRIBUTION.push_back(distribution);
+
+        if (distribution >= 2 * k + 2) { half_offset = true; };
+
         std::vector<int> indices;
         for (int i = begin; i < end; ++i) {
           indices.push_back(i);
         }
 
-        // condense this
-        std::vector<int> vector_of_indices;
-        if (v == 1) {
-          vector_of_indices.push_back(indices[0]);
-          for (int m = indices.size() - 1; m > 0; --m) {
-            vector_of_indices.push_back(indices[m]);
-          }
+        // Chooses starting node
+        int new_offset = 1;
+        if (v == 1) { new_offset = 0; }
+        else if (half_offset) {
+          new_offset = std::floor(distribution / 2);
         }
         else {
-          vector_of_indices.push_back(indices[1]);
-          vector_of_indices.push_back(indices[0]);
-          for (int m = indices.size() - 1; m > 1; --m) {
-            vector_of_indices.push_back(indices[m]);
-          }
+          new_offset = 1;
+        }
+
+        std::vector<int> vector_of_indices;
+
+        for (int m = new_offset; m >= 0; --m) {
+          vector_of_indices.push_back(indices[m]);
+        }
+        for (int p = indices.size() - 1; p > new_offset; --p) {
+          vector_of_indices.push_back(indices[p]);
         }
 
         int relative_index_now  = 0;
         int relative_index_next = 0;
         int number_splits       = 0;
+        Scalar theta_offset =
+          std::atan2(nodes[*vector_of_indices.begin()].ray[1], nodes[*vector_of_indices.begin()].ray[0]);
 
         for (auto it = vector_of_indices.begin(); it != vector_of_indices.end(); ++it) {
           Node<Scalar, N_NEIGHBOURS> new_node;
@@ -193,10 +208,6 @@ namespace model {
 
           nodes.push_back(std::move(new_node));
           relative_index_next += 1;
-
-          if (relative_index_next == 1) {
-            Theta_Offset.push_back(theta_offset + one * relative_index_next * theta_next);
-          }
 
           // *************** Generate Second Node ***********************
           if (growing) {
@@ -233,32 +244,87 @@ namespace model {
       }
 
       // specify the neighbours of the last ring of points
-      for (int i = (nodes.size() - number_points.back()); i < nodes.size(); ++i) {
+      for (unsigned int i = (nodes.size() - number_points.back()); i < nodes.size(); ++i) {
         nodes[i].neighbours[TOP] = i;
       }
 
-      // Join the corners to make octa mesh from quadpizza.
-      // Note because of the splits, it ends up most correct to take the top row using the top nodes neihgbours, and
-      // to make the bottom row using the left and right below neighbours. This can be visualised as a a 2x2 lattice,
-      // with one of the lower quadrants merged into a triangle by the split.
-      for (int p = 0; p < nodes.size(); ++p) {
-        // TOP_LEFT
-        nodes[p].neighbours[1] = nodes[nodes[p].neighbours[TOP]].neighbours[LEFT];
-        // TOP_RIGHT
-        nodes[p].neighbours[3] = nodes[nodes[p].neighbours[TOP]].neighbours[RIGHT];
-        // BELOW_RIGHT
-        nodes[p].neighbours[5] = nodes[nodes[p].neighbours[RIGHT]].neighbours[BELOW];
-        // BELOW_LEFT
-        nodes[p].neighbours[7] = nodes[nodes[p].neighbours[LEFT]].neighbours[BELOW];
+      //***********************************Data Collector***************************************
+      std::vector<Scalar> PHI;
+      std::vector<Scalar> THETA_RAW;
+      std::vector<int> NUMBER;
+
+
+      for (int j = 0; h * std::tan(shape.phi(j / k, h)) < max_distance; ++j) {
+        PHI.push_back(shape.phi(j / k, h));
+        THETA_RAW.push_back(shape.theta(shape.phi(j / k, h), h));
+        NUMBER.push_back(std::ceil((2 * M_PI * k) / shape.theta(shape.phi(j / k, h), h)));
       }
+
+      int last;
+      last = std::max(
+        {PHI.size(), THETA_RAW.size(), NUMBER.size(), number_points.size(), THETA_NEXT.size(), DISTRIBUTION.size()});
+
+      // if (h >= 0.94 - 0.001 && h <= 0.94 + 0.001) {
+      //   std::ofstream outfile;
+      //   outfile.open("/home/asugo/LatexPlotData/Error/Robot6.csv");
+      //   if (outfile.fail()) { std::cout << "Couldn't open the file!" << std::endl; }
+      //   // outfile << "#,"
+      //   // << "kNumber," << k << ",Height," << h << ",Stop," << stop << ",LastRing," << last << ",Distance,"
+      //   // << max_distance << "\n";
+      //   // outfile << "PhiNumber,Phi,THETA_RAW,NumberOfPoints,PointsByGraph,Difference,\n";
+      //   outfile
+      //     <<
+      //     "PhiNumber,Phi,Distance,Theta_Raw,NumberOfPoints,PointsByGraph,Difference,Distribution,Theta_next,Ratio\n";
+      //   int diff;
+      //   for (size_t j = 5; j < last; ++j) {
+      //     if (std::isfinite(THETA_RAW[j]) && std::isfinite(THETA_RAW[j - 1])) { diff = NUMBER[j] - NUMBER[j - 1]; }
+      //     else {
+      //       diff = 0;
+      //     }
+      //     Scalar distance = h * std::tan(PHI[j]);
+      //     Scalar T        = std::isfinite(THETA_RAW[j]) ? THETA_RAW[j] : 10000;
+      //     Scalar N        = std::isfinite(THETA_RAW[j]) ? NUMBER[j] : 0;
+      //     int Ratio       = std::floor(THETA_NEXT[j] / (THETA_NEXT[j - 1] - THETA_NEXT[j]));
+      //     outfile << j << "," << PHI[j] << "," << distance << "," << T << "," << N << "," << number_points[j] << ","
+      //             << diff << "," << DISTRIBUTION[j] << "," << THETA_NEXT[j] << "," << Ratio << "\n";
+      //   }
+      //   outfile.close();
+      // }
+
+
+      if (h >= 0.94 - 0.001 && h <= 0.94 + 0.001) {
+
+        std::vector<std::vector<Scalar>> Variation;
+
+        for (int i = 1; i < 4; ++i) {
+          // Scalar counter = nodes.size() - 1 - (1000 * i);
+          Scalar counter = nodes.size() - 1 - 4000 + (900 * i);
+          std::cout << counter << std::endl;
+          std::vector<Scalar> variation;
+          for (int t = last - 1; t > 2; --t) {
+            variation.push_back(std::atan2(nodes[counter].ray[1], nodes[counter].ray[0]));
+            counter = nodes[counter].neighbours[BELOW];
+          }
+          Variation.push_back(variation);
+        }
+
+
+        std::ofstream outfile2;
+        outfile2.open("/home/asugo/LatexPlotData/ThetaVariationQuadAlt8.csv");
+        outfile2 << "Phi_Number,Distance,Theta0,Theta1,Theta2\n";
+
+        for (unsigned int t = 0; t < Variation[0].size(); ++t) {
+          outfile2 << last - 1 - t << "," << h * std::tan(PHI[last - 1 - t]) << "," << Variation[0][t] << ","
+                   << Variation[1][t] << "," << Variation[2][t] << "\n";
+        }
+      }
+
+      //****************************************************************************************
 
       // // print out mesh points
       // for (int i = 0; i < nodes.size(); ++i) {
-      //   std::cout << "meshpoint: " << i << ": " << nodes[i].neighbours[TOP] << ", " << nodes[i].neighbours[BELOW]
-      //             << ", " << nodes[i].neighbours[RIGHT] << ", " << nodes[i].neighbours[LEFT] << ", "
-      //             << nodes[i].neighbours[1] << ", " << nodes[i].neighbours[3] << ", " << nodes[i].neighbours[5] << ",
-      //             "
-      //             << nodes[i].neighbours[7] << std::endl;
+      //   std::cout << "meshpoint: " << i << ": " << nodes[i].neighbours[LEFT] << ", " << nodes[i].neighbours[RIGHT]
+      //             << ", " << nodes[i].neighbours[TOP] << ", " << nodes[i].neighbours[BELOW] << std::endl;
       // }
 
       return nodes;
@@ -268,4 +334,4 @@ namespace model {
 }  // namespace model
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_MODEL_OCTAPIZZA_HPP
+#endif  // VISUALMESH_MODEL_RADIAL4_HPP
