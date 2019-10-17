@@ -120,7 +120,7 @@ inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const std::arra
 }
 
 /**
- * Vector multiply by scalar
+ * Vector Scalar multiplication
  */
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
@@ -132,6 +132,21 @@ inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
 template <typename Scalar, std::size_t L>
 inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a, const Scalar& s) {
   return multiply(a, s, std::make_index_sequence<L>());
+}
+
+/**
+ * Vector Vector multiplication
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
+                                      const std::array<Scalar, L>& b,
+                                      const std::index_sequence<I...>&) {
+  return {{(a[I] * b[I])...}};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+  return multiply(a, b, std::make_index_sequence<L>());
 }
 
 /**

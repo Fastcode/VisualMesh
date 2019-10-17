@@ -24,6 +24,11 @@
 namespace visualmesh {
 namespace geometry {
 
+  /**
+   * @brief Represents a spherical object for the visual mesh
+   *
+   * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+   */
   template <typename Scalar>
   struct Sphere {
 
@@ -123,6 +128,17 @@ namespace geometry {
      */
     Scalar k(const Scalar& h_0, const Scalar& h_1) const {
       return (std::log(h_1 - 2 * r) - std::log(h_1)) / (std::log(h_0 - 2 * r) - std::log(h_0));
+    }
+
+    /**
+     * @brief Gets the height of the centre of the object above the observation plane
+     *
+     * @details For a sphere the height of the object above the observation plane is its radius
+     *
+     * @return Scalar the height of the centre of the object above the observation plane
+     */
+    Scalar c() const {
+      return r;
     }
 
     /**
