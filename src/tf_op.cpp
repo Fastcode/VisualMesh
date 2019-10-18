@@ -353,7 +353,7 @@ private:
     tensorflow::Tensor* neighbours = nullptr;
     tensorflow::TensorShape neighbours_shape;
     neighbours_shape.AddDim(neighbourhood.size());
-    neighbours_shape.AddDim(Model<T>::N_NEIGHBOURS);
+    neighbours_shape.AddDim(Model<T>::N_NEIGHBOURS + 1);
     OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
 
     // Copy across our neighbourhood graph, adding in a point for itself
