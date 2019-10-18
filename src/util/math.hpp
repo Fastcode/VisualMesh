@@ -120,7 +120,7 @@ inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const std::arra
 }
 
 /**
- * Vector multiply by scalar
+ * Vector Scalar multiplication
  */
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
@@ -132,6 +132,21 @@ inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
 template <typename Scalar, std::size_t L>
 inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a, const Scalar& s) {
   return multiply(a, s, std::make_index_sequence<L>());
+}
+
+/**
+ * Vector Vector multiplication
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
+                                      const std::array<Scalar, L>& b,
+                                      const std::index_sequence<I...>&) {
+  return {{(a[I] * b[I])...}};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+  return multiply(a, b, std::make_index_sequence<L>());
 }
 
 /**
@@ -246,10 +261,17 @@ template <typename Scalar>
 inline mat3<Scalar> invert(const mat3<Scalar>& m) {
 
   // computes the inverse of a matrix m
-  Scalar idet = static_cast<Scalar>(1)
-                / (m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2]) -  //
-                   m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +  //
-                   m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]));  //
+  const Scalar det = (m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2]) -  //
+                      m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +  //
+                      m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]));  //
+
+  // Matrix is not invertible
+  if (det == 0) {
+    const Scalar nan = std::numeric_limits<Scalar>::quiet_NaN();
+    return {vec3<Scalar>{nan, nan, nan}, vec3<Scalar>{nan, nan, nan}, vec3<Scalar>{nan, nan, nan}};
+  }
+
+  const Scalar idet = static_cast<Scalar>(1) / det;
 
   return {vec3<Scalar>{(m[1][1] * m[2][2] - m[2][1] * m[1][2]) * idet,
                        (m[0][2] * m[2][1] - m[0][1] * m[2][2]) * idet,

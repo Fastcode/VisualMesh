@@ -34,13 +34,16 @@ namespace engine {
     template <typename Scalar>
     class Engine;
 
-    template <typename Scalar>
+    template <typename Scalar, template <typename> class Model>
     class Classifier {
+    private:
+      static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+
     public:
       Classifier(Engine<Scalar>* engine, const network_structure_t<Scalar>& structure)
         : engine(engine), structure(structure) {
 
-        // Transpose all the weights matrices
+        // Transpose all the weights matrices to make it easier for us to multiply against
         for (auto& conv : this->structure) {
           for (auto& layer : conv) {
             auto& w = layer.first;
@@ -58,11 +61,11 @@ namespace engine {
       /**
        * Classify using the visual mesh network architecture provided.
        */
-      ClassifiedMesh<Scalar> operator()(const Mesh<Scalar>& mesh,
-                                        const void* image,
-                                        const uint32_t& format,
-                                        const mat4<Scalar>& Hoc,
-                                        const Lens<Scalar>& lens) const {
+      ClassifiedMesh<Scalar, N_NEIGHBOURS> operator()(const Mesh<Scalar, Model>& mesh,
+                                                      const void* image,
+                                                      const uint32_t& format,
+                                                      const mat4<Scalar>& Hoc,
+                                                      const Lens<Scalar>& lens) const {
         // Two buffers we can ping pong between
         std::vector<Scalar> input;
         std::vector<Scalar> output;
@@ -71,9 +74,9 @@ namespace engine {
         auto ranges = mesh.lookup(Hoc, lens);
 
         // Project the pixels to the display
-        ProjectedMesh<Scalar> projected = engine->project(mesh, ranges, Hoc, lens);
-        auto& neighbourhood             = projected.neighbourhood;
-        unsigned int n_points           = neighbourhood.size();
+        ProjectedMesh<Scalar, N_NEIGHBOURS> projected = engine->project(mesh, ranges, Hoc, lens);
+        auto& neighbourhood                           = projected.neighbourhood;
+        unsigned int n_points                         = neighbourhood.size();
 
         // Based on the fourcc code, load the data from the image into input
         input.reserve(n_points * 4);
@@ -116,8 +119,8 @@ namespace engine {
         input.insert(input.end(), {Scalar(-1.0), Scalar(-1.0), Scalar(-1.0), Scalar(-1.0)});
 
         // We start out with 4d input (RGBAesque)
-        int ind  = 4;
-        int outd = 0;
+        unsigned int input_dimensions  = 4;
+        unsigned int output_dimensions = 0;
 
         // For each convolutional layer
         for (unsigned int conv_no = 0; conv_no < structure.size(); ++conv_no) {
@@ -125,20 +128,24 @@ namespace engine {
 
           // Ensure enough space for the convolutional gather
           output.resize(0);
-          output.reserve(input.size() * 7);
-          outd = ind * 7;
+          output.reserve(input.size() * (N_NEIGHBOURS + 1));
+          output_dimensions = input_dimensions * (N_NEIGHBOURS + 1);
 
           // Gather over each of the neighbours
           for (unsigned int i = 0; i < neighbourhood.size(); ++i) {
-            output.insert(output.end(), std::next(input.begin(), i * ind), std::next(input.begin(), (i + 1) * ind));
+            output.insert(output.end(),
+                          std::next(input.begin(), i * input_dimensions),
+                          std::next(input.begin(), (i + 1) * input_dimensions));
             for (const auto& n : neighbourhood[i]) {
-              output.insert(output.end(), std::next(input.begin(), n * ind), std::next(input.begin(), (n + 1) * ind));
+              output.insert(output.end(),
+                            std::next(input.begin(), n * input_dimensions),
+                            std::next(input.begin(), (n + 1) * input_dimensions));
             }
           }
 
           // Output becomes input
           std::swap(input, output);
-          ind = outd;
+          input_dimensions = output_dimensions;
 
           // For each network layer
           for (unsigned int layer_no = 0; layer_no < conv.size(); ++layer_no) {
@@ -146,17 +153,18 @@ namespace engine {
             const auto& biases  = conv[layer_no].second;
 
             // Setup the shapes
-            outd = biases.size();
+            output_dimensions = biases.size();
             output.resize(0);
-            output.reserve(n_points * outd);
+            output.reserve(n_points * output_dimensions);
 
             // Apply the weights and bias
             auto in_point = input.begin();
             for (unsigned int i = 0; i < n_points; ++i) {
-              for (unsigned int j = 0; j < biases.size(); ++j) {
-                output.emplace_back(std::inner_product(weights[j].begin(), weights[j].end(), in_point, biases[j]));
+              for (unsigned int j = 0; j < output_dimensions; ++j) {
+                output.emplace_back(
+                  std::inner_product(in_point, in_point + input_dimensions, weights[j].begin(), biases[j]));
               }
-              in_point += ind;
+              in_point += input_dimensions;
             }
 
             // If we are not on our last layer apply selu
@@ -170,22 +178,22 @@ namespace engine {
 
             // Swap our values over
             std::swap(input, output);
-            ind = outd;
+            input_dimensions = output_dimensions;
           }
         }
 
         // Apply softmax
-        for (auto it = input.begin(); it < input.end(); std::advance(it, ind)) {
-          const auto end = std::next(it, ind);
-          std::transform(it, end, it, [](const Scalar& s) { return std::exp(s); });
-          Scalar total = std::accumulate(it, end, static_cast<Scalar>(0.0));
+        std::transform(input.begin(), input.end(), input.begin(), [](const Scalar& s) { return std::exp(s); });
+        for (auto it = input.begin(); it < input.end(); std::advance(it, input_dimensions)) {
+          const auto end = std::next(it, input_dimensions);
+          Scalar total   = std::accumulate(it, end, static_cast<Scalar>(0.0));
           std::transform(it, end, it, [total](const Scalar& s) { return s / total; });
         }
 
-        return ClassifiedMesh<Scalar>{std::move(projected.pixel_coordinates),
-                                      std::move(projected.neighbourhood),
-                                      std::move(projected.global_indices),
-                                      std::move(input)};
+        return ClassifiedMesh<Scalar, N_NEIGHBOURS>{std::move(projected.pixel_coordinates),
+                                                    std::move(projected.neighbourhood),
+                                                    std::move(projected.global_indices),
+                                                    std::move(input)};
       }
 
     private:

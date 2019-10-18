@@ -25,7 +25,7 @@ find_path(
 
 find_library(
   TENSORFLOW_LIBRARIES
-  NAMES tensorflow_framework libtensorflow_framework.so.2
+  NAMES tensorflow_framework libtensorflow_framework.so.2 libtensorflow_framework.so.1
   HINTS ${tf_lib_dir}
   DOC "TensorFlow library"
 )

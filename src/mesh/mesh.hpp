@@ -25,7 +25,7 @@
 #include <utility>
 #include <vector>
 
-#include "generator/hexapizza.hpp"
+#include "../example/ArrayPrint.hpp"
 #include "lens.hpp"
 #include "node.hpp"
 #include "util/cone.hpp"
@@ -38,16 +38,17 @@ namespace visualmesh {
  * @brief Holds a description of a Visual Mesh
  *
  * @details
- *  This object holds a Visual Mesh for a single height. It utilises a generator class to create a mesh, and then
+ *  This object holds a Visual Mesh for a single height. It utilises a model class to create a mesh, and then
  *  transforms it into a structure that is suppored as a BSP tree. It then uses this tree to lookup the mesh given
  *  different lens paramters. Note that because of teh way it oes the lookup, this lookup isn't perfect esperically for
  *  fisheye lenses. In this case it will sometimes give points that are outside the bounds of the image. The CPU engine
  *  removes these extra points however the OpenCL engine does not. So if you are relying on these pixel coordinates
  *  being in bounds you should ensure that you use the CPU engine.
  *
- * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+ * @tparam Scalar     the scalar type used for calculations and storage (normally one of float or double)
+ * @tparam Model      the model that is used to build the Visual Mesh graph
  */
-template <typename Scalar>
+template <typename Scalar, template <typename> class Model>
 struct Mesh {
 private:
   /**
@@ -183,24 +184,22 @@ private:
       // performance of the bounding cone algorithm is expected to be linear
       auto cone = bounding_cone(start, end);
 
-      // Split the larger angle range so we have as close to cone shapes as we can
-      auto minmax_phi   = std::minmax_element(start, end, [this](const int& a, const int& b) {
-        return nodes[a].ray[2] < nodes[b].ray[2];  // comparing z is the same as comparing phi
-      });
-      auto minmax_theta = std::minmax_element(start, end, [this](const int& a, const int& b) {
-        // Since we have already sorted such that our y value is either positive or negative, we can now just sort by
-        // the x component once we normalise it to a 2d unit vector.
-        return nodes[a].ray[0] / std::sqrt(1 - nodes[a].ray[2] * nodes[a].ray[2])
-               < nodes[b].ray[0] / std::sqrt(1 - nodes[b].ray[2] * nodes[b].ray[2]);
-      });
+      // Find the extents of our data
+      Scalar min_phi   = std::numeric_limits<Scalar>::max();
+      Scalar max_phi   = std::numeric_limits<Scalar>::lowest();
+      Scalar min_theta = std::numeric_limits<Scalar>::max();
+      Scalar max_theta = std::numeric_limits<Scalar>::lowest();
 
-      // Get our min and max phi and theta
-      Scalar min_phi   = nodes[*minmax_phi.first].ray[2];
-      Scalar max_phi   = nodes[*minmax_phi.second].ray[2];
-      Scalar min_theta = nodes[*minmax_theta.first].ray[0]
-                         / std::sqrt(1 - nodes[*minmax_theta.first].ray[2] * nodes[*minmax_theta.first].ray[2]);
-      Scalar max_theta = nodes[*minmax_theta.second].ray[0]
-                         / std::sqrt(1 - nodes[*minmax_theta.second].ray[2] * nodes[*minmax_theta.second].ray[2]);
+      for (auto it = start; it != end; ++it) {
+        const auto& ray    = nodes[*it].ray;
+        const auto& phi    = ray[2];
+        const Scalar theta = ray[0] / std::sqrt(1 - ray[2] * ray[2]);
+
+        min_phi   = std::min(min_phi, phi);
+        max_phi   = std::max(max_phi, phi);
+        min_theta = std::isfinite(theta) ? std::min(min_theta, theta) : min_theta;
+        max_theta = std::isfinite(theta) ? std::max(max_theta, theta) : max_theta;
+      }
 
       // Work out the z and x values we need to split on
       Scalar split_phi   = std::cos((std::acos(min_phi) + std::acos(max_phi)) * 0.5);
@@ -213,6 +212,8 @@ private:
         max_phi - min_phi > max_theta - min_theta
           ? std::partition(start, end, [this, &split_phi](const int& a) { return nodes[a].ray[2] > split_phi; })
           : std::partition(start, end, [this, &split_theta](const int& a) {
+              // If an origin point is in here, this will be nan, which means the origin point will always evaluate
+              // false here therefore going to one of the partitions
               return nodes[a].ray[0] / std::sqrt(1 - nodes[a].ray[2] * nodes[a].ray[2]) < split_theta;
             });
 
@@ -392,10 +393,9 @@ public:
    * @brief Construct a new Mesh object
    *
    * @details
-   *  Constructs a new Mesh object using the provided generator type. This mesh object generates a BSP tree and holds
-   *  the logic needed to quickly lookup points that are on screen and return valid index ranges.
+   *  Constructs a new Mesh object using the provided model type. This mesh object generates a BSP tree and holds the
+   *  logic needed to quickly lookup points that are on screen and return valid index ranges.
    *
-   * @tparam Generator the generator that is to be used to generate the Visual Mesh
    * @tparam Shape     the type of shape that will be used to generate the Visual Mesh
    *
    * @param shape         the shape instance that will be used to generate the Visual Mesh
@@ -403,9 +403,9 @@ public:
    * @param k             the number of cross section intersections that are needed for the object
    * @param max_distance  the maximum distance to generate the Visual Mesh for
    */
-  template <template <typename T> class Generator = generator::Hexapizza, typename Shape>
+  template <typename Shape>
   Mesh(const Shape& shape, const Scalar& h, const Scalar& k, const Scalar& max_distance)
-    : h(h), max_distance(max_distance), nodes(Generator<Scalar>::generate(shape, h, k, max_distance)) {
+    : h(h), max_distance(max_distance), nodes(Model<Scalar>::generate(shape, h, k, max_distance)) {
 
     // To ensure that later we can fix the graph we need to perform our sorting on an index list
     std::vector<int> sorting(nodes.size());
@@ -414,7 +414,7 @@ public:
     // We need to shuffle our list to ensure that the bounding cone algorithm has roughly linear performance.
     // We could use std::random_shuffle here but since we only need the list to be "kinda shuffled" so that it's
     // unlikely that we hit the worst case of the bounding cone algorithm. We can actually just shuffle every nth
-    // element and use a fairly bad random number generator algorithm
+    // element and use a fairly bad random number model algorithm
     for (int i = sorting.size() - 1; i > 0; i -= 5) {
       std::swap(sorting[i], sorting[rand() % i]);
     }
@@ -432,7 +432,7 @@ public:
     }
 
     // Sort the nodes and correct the neighbourhood graph based on our BSP sorting
-    std::vector<Node<Scalar>> sorted_nodes;
+    std::vector<Node<Scalar, Model<Scalar>::N_NEIGHBOURS>> sorted_nodes;
     sorted_nodes.reserve(nodes.size());
     for (const auto& i : sorting) {
       sorted_nodes.push_back(nodes[i]);
@@ -554,7 +554,7 @@ public:
   /// The maximum distance this mesh is setup for
   Scalar max_distance;
   /// The lookup table for this mesh
-  std::vector<Node<Scalar>> nodes;
+  std::vector<Node<Scalar, Model<Scalar>::N_NEIGHBOURS>> nodes;
 
 private:
   /// The binary search tree that is used for looking up which points are on screen in the mesh

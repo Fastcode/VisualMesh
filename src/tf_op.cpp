@@ -26,6 +26,11 @@
 #include "geometry/Circle.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/mesh.hpp"
+#include "mesh/model/radial4.hpp"
+#include "mesh/model/radial8.hpp"
+#include "mesh/model/ring4.hpp"
+#include "mesh/model/ring6.hpp"
+#include "mesh/model/xgrid4.hpp"
 
 REGISTER_OP("VisualMesh")
   .Attr("T: {float, double}")
@@ -37,12 +42,13 @@ REGISTER_OP("VisualMesh")
   .Input("lens_centre: T")
   .Input("cam_to_observation_plane: T")
   .Input("height: T")
-  .Input("n_intersections: T")
+  .Input("model: string")
   .Input("cached_meshes: int32")
-  .Input("intersection_tolerance: T")
   .Input("max_distance: T")
   .Input("geometry: string")
   .Input("radius: T")
+  .Input("n_intersections: T")
+  .Input("intersection_tolerance: T")
   .Output("pixels: T")
   .Output("neighbours: int32")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
@@ -60,12 +66,13 @@ enum Args {
   LENS_CENTRE            = 4,
   ROC                    = 5,
   HEIGHT                 = 6,
-  N_INTERSECTIONS        = 7,
+  MODEL                  = 7,
   CACHED_MESHES          = 8,
-  INTERSECTION_TOLERANCE = 9,
-  MAX_DISTANCE           = 10,
-  GEOMETRY               = 11,
-  RADIUS                 = 12
+  MAX_DISTANCE           = 9,
+  GEOMETRY               = 10,
+  RADIUS                 = 11,
+  N_INTERSECTIONS        = 12,
+  INTERSECTION_TOLERANCE = 13
 };
 
 /**
@@ -103,13 +110,14 @@ Scalar mesh_k_error(const Shape<Scalar>& shape, const Scalar& h_0, const Scalar&
  * @return either returns a shared_ptr to the mesh that would best fit within our tolerance, or if none could be found a
  *         nullptr
  */
-template <typename Scalar, template <typename> class Shape>
-std::shared_ptr<visualmesh::Mesh<Scalar>> find_mesh(std::vector<std::shared_ptr<visualmesh::Mesh<Scalar>>>& meshes,
-                                                    const Shape<Scalar>& shape,
-                                                    const Scalar& h,
-                                                    const Scalar& k,
-                                                    const Scalar& t,
-                                                    const Scalar& d) {
+template <typename Scalar, template <typename> class Model, template <typename> class Shape>
+std::shared_ptr<visualmesh::Mesh<Scalar, Model>> find_mesh(
+  std::vector<std::shared_ptr<visualmesh::Mesh<Scalar, Model>>>& meshes,
+  const Shape<Scalar>& shape,
+  const Scalar& h,
+  const Scalar& k,
+  const Scalar& t,
+  const Scalar& d) {
 
   // Nothing in the map!
   if (meshes.empty()) { return nullptr; }
@@ -154,16 +162,16 @@ std::shared_ptr<visualmesh::Mesh<Scalar>> find_mesh(std::vector<std::shared_ptr<
  *
  * @return std::shared_ptr<visualmesh::Mesh<Scalar>>
  */
-template <typename Scalar, template <typename> class Shape>
-std::shared_ptr<visualmesh::Mesh<Scalar>> get_mesh(const Shape<Scalar>& shape,
-                                                   const Scalar& height,
-                                                   const Scalar& n_intersections,
-                                                   const Scalar& intersection_tolerance,
-                                                   const int32_t& cached_meshes,
-                                                   const Scalar& max_distance) {
+template <typename Scalar, template <typename> class Model, template <typename> class Shape>
+std::shared_ptr<visualmesh::Mesh<Scalar, Model>> get_mesh(const Shape<Scalar>& shape,
+                                                          const Scalar& height,
+                                                          const Scalar& n_intersections,
+                                                          const Scalar& intersection_tolerance,
+                                                          const int32_t& cached_meshes,
+                                                          const Scalar& max_distance) {
 
   // Static map of heights to meshes
-  static std::vector<std::shared_ptr<visualmesh::Mesh<Scalar>>> meshes;
+  static std::vector<std::shared_ptr<visualmesh::Mesh<Scalar, Model>>> meshes;
   static std::mutex mesh_mutex;
 
   // Find and return an element if one is appropriate
@@ -176,7 +184,7 @@ std::shared_ptr<visualmesh::Mesh<Scalar>> get_mesh(const Shape<Scalar>& shape,
   }
 
   // We couldn't find an appropriate mesh, make a new one but don't hold the mutex while we do so others can still query
-  auto new_mesh = std::make_shared<visualmesh::Mesh<Scalar>>(shape, height, n_intersections, max_distance);
+  auto new_mesh = std::make_shared<visualmesh::Mesh<Scalar, Model>>(shape, height, n_intersections, max_distance);
 
   /* mutex scope */ {
     std::lock_guard<std::mutex> lock(mesh_mutex);
@@ -211,10 +219,9 @@ std::shared_ptr<visualmesh::Mesh<Scalar>> get_mesh(const Shape<Scalar>& shape,
  */
 template <typename T, typename U>
 class VisualMeshOp : public tensorflow::OpKernel {
-public:
-  explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
-
-  void Compute(tensorflow::OpKernelContext* context) override {
+private:
+  template <template <typename> class Model>
+  void ComputeModel(tensorflow::OpKernelContext* context) {
 
     // Check that the shape of each of the inputs is valid
     OP_REQUIRES(context,
@@ -307,17 +314,17 @@ public:
 
     // Project the mesh using our engine and shape
     visualmesh::engine::cpu::Engine<T> engine;
-    visualmesh::ProjectedMesh<T> projected;
+    visualmesh::ProjectedMesh<T, Model<T>::N_NEIGHBOURS> projected;
 
     if (geometry == "SPHERE") {
       visualmesh::geometry::Sphere<T> shape(radius);
-      std::shared_ptr<visualmesh::Mesh<T>> mesh = get_mesh<T, visualmesh::geometry::Sphere>(
+      std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Sphere>(
         shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
       projected = engine.project(*mesh, mesh->lookup(Hoc, lens), Hoc, lens);
     }
     else if (geometry == "CIRCLE") {
       visualmesh::geometry::Circle<T> shape(radius);
-      std::shared_ptr<visualmesh::Mesh<T>> mesh = get_mesh<T, visualmesh::geometry::Circle>(
+      std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Circle>(
         shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
       projected = engine.project(*mesh, mesh->lookup(Hoc, lens), Hoc, lens);
     }
@@ -346,7 +353,7 @@ public:
     tensorflow::Tensor* neighbours = nullptr;
     tensorflow::TensorShape neighbours_shape;
     neighbours_shape.AddDim(neighbourhood.size());
-    neighbours_shape.AddDim(neighbourhood.front().size() + 1);
+    neighbours_shape.AddDim(Model<T>::N_NEIGHBOURS + 1);
     OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
 
     // Copy across our neighbourhood graph, adding in a point for itself
@@ -354,13 +361,39 @@ public:
     for (unsigned int i = 0; i < neighbourhood.size(); ++i) {
       // Get our old neighbours from original output
       const auto& m = neighbourhood[i];
-      n(i, 0)       = i;
-      n(i, 1)       = m[0];
-      n(i, 2)       = m[1];
-      n(i, 3)       = m[2];
-      n(i, 4)       = m[3];
-      n(i, 5)       = m[4];
-      n(i, 6)       = m[5];
+      // First point is ourself
+      n(i, 0) = i;
+      for (unsigned int j = 0; j < neighbourhood[i].size(); ++j) {
+        n(i, j + 1) = m[j];
+      }
+    }
+  }
+
+public:
+  explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
+
+  void Compute(tensorflow::OpKernelContext* context) override {
+
+    // Check that the model is a string
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
+                tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
+
+    // Grab the Visual Mesh model we are using
+    std::string model = *context->input(Args::MODEL).flat<tensorflow::string>().data();
+
+    // clang-format off
+    if (model == "RING6") { ComputeModel<visualmesh::model::Ring6>(context); }
+    else if (model == "RING4") { ComputeModel<visualmesh::model::Ring4>(context); }
+    else if (model == "RADIAL8") { ComputeModel<visualmesh::model::Radial8>(context); }
+    else if (model == "RADIAL4") { ComputeModel<visualmesh::model::Radial4>(context); }
+    else if (model == "XGRID4") { ComputeModel<visualmesh::model::XGrid4>(context); }
+    // clang-format on
+    else {
+      OP_REQUIRES(
+        context,
+        false,
+        tensorflow::errors::InvalidArgument("The provided Visual Mesh model was not one of the known models"));
     }
   }
 };

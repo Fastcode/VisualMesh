@@ -24,6 +24,11 @@
 namespace visualmesh {
 namespace geometry {
 
+  /**
+   * @brief Represents a 2d circle on the observation plane
+   *
+   * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+   */
   template <typename Scalar>
   struct Circle {
 
@@ -101,6 +106,17 @@ namespace geometry {
      */
     Scalar k(const Scalar& h_0, const Scalar& h_1) const {
       return h_0 / h_1;
+    }
+
+    /**
+     * @brief Gets the height of the centre of the object above the observation plane
+     *
+     * @details For a circle the objects centre is in the observation plane
+     *
+     * @return Scalar the height of the centre of the object above the observation plane
+     */
+    Scalar c() const {
+      return 0;
     }
 
     /**

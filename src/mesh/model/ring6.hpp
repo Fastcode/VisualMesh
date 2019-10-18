@@ -15,8 +15,8 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_GENERATOR_HEXAPIZZA_HPP
-#define VISUALMESH_GENERATOR_HEXAPIZZA_HPP
+#ifndef VISUALMESH_MODEL_RING6_HPP
+#define VISUALMESH_MODEL_RING6_HPP
 
 #include <array>
 #include <vector>
@@ -24,15 +24,15 @@
 #include "mesh/node.hpp"
 
 namespace visualmesh {
-namespace generator {
+namespace model {
 
   /**
-   * @brief Generator utilising the Hexapizza method
+   * @brief Model utilising the Ring6 method
    *
    * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
    */
   template <typename Scalar>
-  struct Hexapizza {
+  struct Ring6 {
   private:
     /**
      * @brief
@@ -55,10 +55,13 @@ namespace generator {
     }
 
   public:
+    /// The number of neighbours that each node in the graph has
+    static constexpr size_t N_NEIGHBOURS = 6;
+
     /**
-     * @brief Generates the visual mesh vectors and graph using the Hexapizza method
+     * @brief Generates the visual mesh vectors and graph using the Ring6 method
      *
-     * @tparam Shape  the type of shape that this generator will use to create the mesh
+     * @tparam Shape  the type of shape that this model will use to create the mesh
      *
      * @param shape         the shape instance that is used for calculating details
      * @param h             the height of the camera above the observation plane
@@ -68,13 +71,13 @@ namespace generator {
      * @return the visual mesh graph that was generated
      */
     template <typename Shape>
-    static std::vector<Node<Scalar>> generate(const Shape& shape,
-                                              const Scalar& h,
-                                              const Scalar& k,
-                                              const Scalar& max_distance) {
+    static std::vector<Node<Scalar, N_NEIGHBOURS>> generate(const Shape& shape,
+                                                            const Scalar& h,
+                                                            const Scalar& k,
+                                                            const Scalar& max_distance) {
 
       // Loop through until we reach our max distance
-      std::vector<Node<Scalar>> nodes;
+      std::vector<Node<Scalar, N_NEIGHBOURS>> nodes;
 
       // Create our first interconnected ring of 6 values that exist in a ring
       const Scalar start_n      = static_cast<Scalar>(1.0) / (2.0 * k);
@@ -85,7 +88,7 @@ namespace generator {
 
       // Around the origin are 6 equally spaced points
       for (int j = 0; j < first_ring_size; ++j) {
-        Node<Scalar> n;
+        Node<Scalar, N_NEIGHBOURS> n;
         n.ray = unit_vector(sin_phi_0, cos_phi_0, j * M_PI * 2.0 / 6.0);
 
         // Left and right is just our index += 1 with wraparound
@@ -146,7 +149,7 @@ namespace generator {
           for (int j = 0; j < c_slices; ++j) {
             Scalar theta = c_dtheta * j;
 
-            Node<Scalar> n;
+            Node<Scalar, N_NEIGHBOURS> n;
             //  Calculate our unit vector with x facing forward and z up
             n.ray = unit_vector(sin_phi, cos_phi, theta);
 
@@ -184,7 +187,7 @@ namespace generator {
     }
   };
 
-}  // namespace generator
+}  // namespace model
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_GENERATOR_HEXAPIZZA_HPP
+#endif  // VISUALMESH_MODEL_RING6_HPP

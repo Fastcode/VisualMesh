@@ -44,7 +44,7 @@ namespace visualmesh {
 namespace engine {
   namespace opencl {
 
-    template <typename Scalar>
+    template <typename Scalar, template <typename> class Model>
     class Classifier;
 
     template <typename Scalar>
@@ -66,9 +66,9 @@ namespace engine {
         for (const auto& platform : platforms) {
 
           cl_uint device_count = 0;
-          ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, nullptr, &device_count);
+          ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &device_count);
           std::vector<cl_device_id> devices(device_count);
-          ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, device_count, devices.data(), nullptr);
+          ::clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, device_count, devices.data(), nullptr);
 
           // Go through our devices on the platform
           for (const auto& device : devices) {
@@ -194,12 +194,13 @@ namespace engine {
         }
       }
 
-      ProjectedMesh<Scalar> project(const Mesh<Scalar>& mesh,
-                                    const std::vector<std::pair<int, int>>& ranges,
-                                    const mat4<Scalar>& Hoc,
-                                    const Lens<Scalar>& lens) const {
+      template <template <typename> class Model>
+      ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Model>& mesh,
+                                                                 const std::vector<std::pair<int, int>>& ranges,
+                                                                 const mat4<Scalar>& Hoc,
+                                                                 const Lens<Scalar>& lens) const {
 
-        std::vector<std::array<int, 6>> neighbourhood;
+        std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>> neighbourhood;
         std::vector<int> indices;
         cl::mem cl_pixels;
         cl::event projected;
@@ -220,11 +221,13 @@ namespace engine {
                                              nullptr);
         throw_cl_error(error, "Failed reading projected pixels from the device");
 
-        return ProjectedMesh<Scalar>{std::move(pixels), std::move(neighbourhood), std::move(indices)};
+        return ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS>{
+          std::move(pixels), std::move(neighbourhood), std::move(indices)};
       }
 
+      template <template <typename> class Model>
       auto make_classifier(const network_structure_t<Scalar>& structure) {
-        return Classifier<Scalar>(this, structure);
+        return Classifier<Scalar, Model>(this, structure);
       }
 
       void clear_cache() {
@@ -232,11 +235,12 @@ namespace engine {
       }
 
     private:
-      std::tuple<std::vector<std::array<int, 6>>, std::vector<int>, cl::mem, cl::event> do_project(
-        const Mesh<Scalar>& mesh,
-        const std::vector<std::pair<int, int>>& ranges,
-        const mat4<Scalar>& Hoc,
-        const Lens<Scalar>& lens) const {
+      template <template <typename> class Model>
+      std::tuple<std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>>, std::vector<int>, cl::mem, cl::event>
+        do_project(const Mesh<Scalar, Model>& mesh,
+                   const std::vector<std::pair<int, int>>& ranges,
+                   const mat4<Scalar>& Hoc,
+                   const Lens<Scalar>& lens) const {
 
         // Reused variables
         cl_int error;
@@ -272,15 +276,8 @@ namespace engine {
           }
 
           // Write the points buffer to the device and cache it
-          error = ::clEnqueueWriteBuffer(queue,
-                                         cl_points,
-                                         true,
-                                         0,
-                                         mesh.nodes.size() * sizeof(std::array<Scalar, 4>),
-                                         rays.data(),
-                                         0,
-                                         nullptr,
-                                         nullptr);
+          error = ::clEnqueueWriteBuffer(
+            queue, cl_points, true, 0, rays.size() * sizeof(vec4<Scalar>), rays.data(), 0, nullptr, nullptr);
           throw_cl_error(error, "Error writing points to the device buffer");
 
           // Cache for future runs
@@ -299,7 +296,8 @@ namespace engine {
 
         // No point processing if we have no points, return an empty mesh
         if (points == 0) {
-          return std::make_tuple(std::vector<std::array<int, 6>>(), std::vector<int>(), cl::mem(), cl::event());
+          return std::make_tuple(
+            std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>>(), std::vector<int>(), cl::mem(), cl::event());
         }
 
         // Build up our list of indices for OpenCL
@@ -381,10 +379,10 @@ namespace engine {
         }
 
         // Build the packed neighbourhood map with an extra offscreen point at the end
-        std::vector<std::array<int, 6>> local_neighbourhood(points + 1);
+        std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>> local_neighbourhood(points + 1);
         for (unsigned int i = 0; i < indices.size(); ++i) {
           const auto& node = nodes[indices[i]];
-          for (unsigned int j = 0; j < 6; ++j) {
+          for (unsigned int j = 0; j < node.neighbours.size(); ++j) {
             const auto& n             = node.neighbours[j];
             local_neighbourhood[i][j] = r_indices[n];
           }
@@ -419,11 +417,12 @@ namespace engine {
       mutable std::mutex projection_mutex;
 
       // Cache of opencl buffers from mesh objects
-      mutable std::map<const Mesh<Scalar>*, cl::mem> device_points_cache;
+      mutable std::map<const void*, cl::mem> device_points_cache;
       // A mutex to protect the cache
       mutable std::mutex cache_mutex;
 
-      friend class Classifier<Scalar>;
+      template <typename S, template <typename> class Model>
+      friend class Classifier;
     };
 
   }  // namespace opencl

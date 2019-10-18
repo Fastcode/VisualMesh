@@ -14,16 +14,17 @@ else:
 
 class VisualMeshDataset:
 
-  def __init__(self, input_files, classes, geometry, batch_size, prefetch, variants):
+  def __init__(self, input_files, classes, model, batch_size, prefetch, variants):
     self.input_files = input_files
     self.classes = classes
     self.batch_size = batch_size
-    self.geometry = tf.constant(geometry.shape, dtype=tf.string, name='GeometryType')
-    self.radius = geometry.radius
-    self.n_intersections = geometry.intersections
-    self.intersection_tolerance = geometry.intersection_tolerance
-    self.cached_meshes = geometry.cached_meshes
-    self.max_distance = geometry.max_distance
+    self.mesh_type = model.mesh.type
+    self.cached_meshes = model.mesh.cached_meshes
+    self.max_distance = model.mesh.max_distance
+    self.geometry = tf.constant(model.geometry.shape, dtype=tf.string, name='GeometryType')
+    self.radius = model.geometry.radius
+    self.n_intersections = model.geometry.intersections
+    self.intersection_tolerance = model.geometry.intersection_tolerance
     self.prefetch = prefetch
     self._variants = variants
 
@@ -101,12 +102,13 @@ class VisualMeshDataset:
       args['lens_centre'],
       orientation,
       height,
-      self.n_intersections,
+      self.mesh_type,
       self.cached_meshes,
-      self.intersection_tolerance,
       self.max_distance,
       self.geometry,
       self.radius,
+      self.n_intersections,
+      self.intersection_tolerance,
       name='ProjectVisualMesh',
     )
 
@@ -250,8 +252,9 @@ class VisualMeshDataset:
       ns.append(n)
 
     # Add on the null point for X and G
+    # This is a hack 5 is number of neighbours + 1
     Xs.append(tf.constant([[-1.0, -1.0, -1.0]], dtype=tf.float32))
-    Gs.append(tf.fill([1, 7], n_elems))
+    Gs.append(tf.fill([1, 5], n_elems))
 
     X = tf.concat(Xs, axis=0)
     Y = tf.concat(Ys, axis=0)
