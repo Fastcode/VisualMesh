@@ -291,33 +291,18 @@ namespace engine {
 
         // Create a buffer for our image
         cl_int error;
-        cl::mem cl_image(
-          ::clCreateImage(
-            context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, &fmt, &desc, const_cast<void*>(image), &error),
-          ::clReleaseMemObject);
-        if (error != CL_SUCCESS) {
-          throw std::system_error(error, opencl_error_category(), "Error creating image on device");
-        }
+        cl::mem cl_image(::clCreateImage(context, CL_MEM_READ_ONLY, &fmt, &desc, nullptr, &error),
+                         ::clReleaseMemObject);
+        throw_cl_error(error, "Error creating image on device");
 
         // Map our image into device memory
         std::array<size_t, 3> origin = {{0, 0, 0}};
         std::array<size_t, 3> region = {{size_t(lens.dimensions[0]), size_t(lens.dimensions[1]), 1}};
 
         cl::event cl_image_loaded;
-        cl_event ev           = nullptr;
-        std::size_t row_pitch = 0;
-        ::clEnqueueMapImage(write_queue,
-                            cl_image,
-                            false,
-                            CL_MAP_READ,
-                            origin.data(),
-                            region.data(),
-                            &row_pitch,
-                            nullptr,
-                            0,
-                            nullptr,
-                            &ev,
-                            &error);
+        cl_event ev = nullptr;
+        error =
+          clEnqueueWriteImage(write_queue, cl_image, false, origin.data(), region.data(), 0, 0, image, 0, nullptr, &ev);
         if (ev) cl_image_loaded = cl::event(ev, ::clReleaseEvent);
         throw_cl_error(error, "Error mapping image onto device");
 
