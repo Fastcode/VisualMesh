@@ -32,6 +32,29 @@ namespace model {
   public:
     static constexpr size_t N_NEIGHBOURS = 4;
 
+    /**
+     * @brief Takes a point in n, m space (jumps along x and jumps along y) and converts it into a vector to the centre
+     *        of the object using the x grid method
+     *
+     * @param shape the shape object used to calculate the angles
+     * @param n     the coordinate in the n coordinate (object jumps along the x axis)
+     * @param m     the coordinate in the m coordinate (object jumps along the y axis)
+     * @param h     the height of the camera above the observation plane
+     * @param c     the height of the object above the observation plane
+     *
+     * @return a vector <x, y, z> that points to the centre of the object at these coordinates
+     */
+    template <typename Shape>
+    static vec3<Scalar> map(const Shape& shape, const Scalar& n, const Scalar& m, const Scalar& h, const Scalar& c) {
+      const Scalar phi_x = shape.phi(n, h);
+      const Scalar x     = (h - c) * std::tan(phi_x);
+
+      const Scalar h_p = (h - c) / std::cos(phi_x);
+      const Scalar y   = h_p * std::tan(shape.phi(m, h_p + c));
+
+      return vec3<Scalar>{x, y, c - h};
+    }
+
     template <typename Shape>
     static std::vector<Node<Scalar, N_NEIGHBOURS>> generate(const Shape& shape,
                                                             const Scalar& h,
@@ -44,54 +67,58 @@ namespace model {
       // The height difference for the shape between the ground plane and object centre
       const Scalar c = shape.c();
 
-      // Loop through the values for phi
-      std::list<Scalar> phi_xs(1, shape.phi(0, h));
-      for (int i = 1; h * std::tan(shape.phi(i * jump, h)) < max_distance; ++i) {
-
-        // Add the phis in both directions
-        phi_xs.push_back(shape.phi(i * jump, h));
-        phi_xs.push_front(shape.phi(-i * jump, h));
-      }
-
-      // For each plane phi we need to work out our h' and calculate our rays
-      std::vector<std::vector<vec3<Scalar>>> grid;
-      for (const auto& phi_x : phi_xs) {
-        // Calculate h' and the distance to our object centre in x
-        // In this case h' is to the plane in the centre of the object
-        const Scalar h_p = (h - c) / std::cos(phi_x);
-        const Scalar x   = (h - c) * std::tan(phi_x);
-
-        // Calculate our y values in the plane
-        std::list<vec3<Scalar>> row(1, normalise(vec3<Scalar>{x, h_p * std::tan(shape.phi(0, h_p + c)), c - h}));
-        for (int i = 0; i < static_cast<int>(phi_xs.size()) / 2; ++i) {
-
-          const Scalar y1 = h_p * std::tan(shape.phi(i * jump, h_p + c));
-          const Scalar y2 = h_p * std::tan(shape.phi(-i * jump, h_p + c));
-
-          row.push_back(normalise(vec3<Scalar>{x, y1, c - h}));
-          row.push_front(normalise(vec3<Scalar>{x, y2, c - h}));
+      // Function to build a row that fits on the screen located at n
+      auto add_row = [&](const Scalar& n) {
+        std::list<vec3<Scalar>> out;
+        out.push_back(map(shape, n, 0, h, c));
+        for (int j = 1; norm(head<2>(map(shape, n, j * jump, h, c))) < max_distance; ++j) {
+          out.push_back(map(shape, n, j * jump, h, c));
+          out.push_front(map(shape, n, -j * jump, h, c));
         }
+        return std::vector<vec3<Scalar>>(out.begin(), out.end());
+      };
 
-        grid.emplace_back(row.begin(), row.end());
+      // Build the grid that covers the area by generating each row until the length exceeds the max distance
+      std::list<std::vector<vec3<Scalar>>> vecs;
+      unsigned int n_nodes = 0;
+      vecs.push_back(add_row(0));
+      n_nodes += vecs.back().size();
+      for (int i = 1; norm(head<2>(map(shape, i * jump, 0, h, c))) < max_distance; ++i) {
+        vecs.push_back(add_row(i * jump));
+        vecs.push_front(add_row(-i * jump));
+        n_nodes += vecs.back().size();
+        n_nodes += vecs.front().size();
       }
 
-      // Calculate the unit vectors from the two phi values and the coordinates of the neighbours as they are in a grid
-      std::vector<Node<Scalar, N_NEIGHBOURS>> output(phi_xs.size() * phi_xs.size());
-      for (unsigned int i = 0; i < grid.size(); ++i) {
-        const auto& row = grid[i];
-        for (unsigned int j = 0; j < row.size(); ++j) {
+      // Go through the lists we built up to work out coordinates
+      std::vector<Node<Scalar, N_NEIGHBOURS>> output;
+      for (auto it = vecs.begin(); it != vecs.end(); ++it) {
+        // Get relevant sizes for calculations
+        int start     = static_cast<int>(output.size());
+        int prev_size = it == vecs.begin() ? 0 : static_cast<int>(std::prev(it)->size());
+        int curr_size = static_cast<int>(it->size());
+        int next_size = std::next(it) == vecs.end() ? 0 : static_cast<int>(std::next(it)->size());
 
-          // Calculate our index in the nodes list
-          int idx = i * grid.size() + j;
+        for (int j = 0; j < static_cast<int>(it->size()); ++j) {
+          Node<Scalar, N_NEIGHBOURS> node;
+          node.ray = normalise((*it)[j]);
 
-          // Put in our ray
-          output[idx].ray = row[j];
+          // Adjacent neighbours
+          node.neighbours[0] = j == 0 ? n_nodes : start + j - 1;
+          node.neighbours[2] = j + 1 == static_cast<int>(it->size()) ? n_nodes : start + j + 1;
 
-          // Calculate the indicies of our four neighbours accounting for off screen
-          output[idx].neighbours[0] = j == 0 ? output.size() : (i * grid.size() + j - 1);
-          output[idx].neighbours[1] = i + 1 == grid.size() ? output.size() : ((i + 1) * grid.size() + j);
-          output[idx].neighbours[2] = j + 1 == grid.size() ? output.size() : (i * grid.size() + j + 1);
-          output[idx].neighbours[3] = i == 0 ? output.size() : ((i - 1) * grid.size() + j);
+          // Our point offset from the centre of our row
+          int c = j - curr_size / 2;
+
+          // Our point position on other rows (relative to the start)
+          int n = c + next_size / 2;
+          int p = c + prev_size / 2;
+
+          // Up/down neighbours
+          node.neighbours[1] = 0 <= p && p < prev_size ? start - prev_size + p : n_nodes;
+          node.neighbours[3] = 0 <= n && n < next_size ? start + curr_size + n : n_nodes;
+
+          output.push_back(node);
         }
       }
 

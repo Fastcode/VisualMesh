@@ -25,6 +25,7 @@
 #include <utility>
 #include <vector>
 
+#include "../example/ArrayPrint.hpp"
 #include "lens.hpp"
 #include "node.hpp"
 #include "util/cone.hpp"
@@ -211,6 +212,8 @@ private:
         max_phi - min_phi > max_theta - min_theta
           ? std::partition(start, end, [this, &split_phi](const int& a) { return nodes[a].ray[2] > split_phi; })
           : std::partition(start, end, [this, &split_theta](const int& a) {
+              // If an origin point is in here, this will be nan, which means the origin point will always evaluate
+              // false here therefore going to one of the partitions
               return nodes[a].ray[0] / std::sqrt(1 - nodes[a].ray[2] * nodes[a].ray[2]) < split_theta;
             });
 

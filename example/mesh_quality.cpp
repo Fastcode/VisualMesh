@@ -146,6 +146,7 @@ void print_quality(const std::vector<NodeQuality<Scalar, Neighbours>>& nodes, co
   }
 
   std::cout << std::setprecision(4);
+  std::cout << "Covered with " << nodes.size() << " nodes" << std::endl;
   for (unsigned int i = 0; i < Neighbours; ++i) {
     std::cout << "* " << (radial.means[i]) << "±" << (std::sqrt(radial_var.means[i]));
     std::cout << " o " << (cyclical.means[i]) << "±" << (std::sqrt(cyclical_var.means[i]));
