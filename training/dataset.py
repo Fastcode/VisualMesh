@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-import tensorflow as tf
-import os
 import math
+import os
+
+import tensorflow as tf
 
 # Load the visual mesh op
 op_file = os.path.join(os.path.dirname(__file__), 'visualmesh_op.so')

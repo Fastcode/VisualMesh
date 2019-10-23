@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
-import os
 import copy
+import os
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.client import device_lib
 from tqdm import tqdm
 
-from . import dataset
-from . import network
+from . import dataset, network
 
 
 def _distribute_megabatch(classes, input_ops, output_ops, batches):

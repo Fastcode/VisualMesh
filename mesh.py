@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
-import os
 import argparse
-import yaml
+import os
 
 import tensorflow as tf
-import training.training as training
+import yaml
+
 import training.testing as testing
+import training.training as training
 
 
 class Config():

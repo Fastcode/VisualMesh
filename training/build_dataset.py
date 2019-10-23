@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
-from tqdm import tqdm
-import sys
-import re
-import os
-import math
-import tensorflow as tf
 import json
+import math
+import os
+import re
+import sys
 from glob import glob
+
+import tensorflow as tf
+from tqdm import tqdm
 
 
 def float_feature(value):

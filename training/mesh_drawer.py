@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
-import numpy as np
+import gc
 import hashlib
-import cv2
 import io
 import warnings
+
+import cv2
 import matplotlib as mpl
-import gc
-mpl.use('Agg')
 import matplotlib.pyplot as plt
+import numpy as np
+
+mpl.use('Agg')
 
 
 def draw(img, px, X, colours=None):

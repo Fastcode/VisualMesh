@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 
-import os
-import tensorflow as tf
-import numpy as np
-from tensorflow.python.client import device_lib
 import copy
-import yaml
+import multiprocessing
+import os
 import re
 import time
-import multiprocessing
+
+import numpy as np
+import tensorflow as tf
+import yaml
+from tensorflow.python.client import device_lib
 
 import training.lr_policy as lr_policy
-from . import mesh_drawer
-from . import network
-from . import dataset
+
+from . import dataset, mesh_drawer, network
 
 
 def save_yaml_model(sess, output_path, global_step):
