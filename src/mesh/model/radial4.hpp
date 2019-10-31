@@ -18,6 +18,7 @@
 #ifndef VISUALMESH_MODEL_RADIAL4_HPP
 #define VISUALMESH_MODEL_RADIAL4_HPP
 
+#include <algorithm>
 #include <array>
 #include <fstream>
 #include <iostream>

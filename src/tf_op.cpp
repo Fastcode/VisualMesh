@@ -22,7 +22,7 @@
 #include <memory>
 #include <mutex>
 
-#include "engine/cpu/cpu_engine.hpp"
+#include "engine/cpu/engine.hpp"
 #include "geometry/Circle.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/mesh.hpp"
@@ -313,20 +313,20 @@ private:
     }
 
     // Project the mesh using our engine and shape
-    visualmesh::engine::cpu::Engine<T> engine;
+    visualmesh::engine::cpu::Engine<T, Model> engine;
     visualmesh::ProjectedMesh<T, Model<T>::N_NEIGHBOURS> projected;
 
     if (geometry == "SPHERE") {
       visualmesh::geometry::Sphere<T> shape(radius);
       std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Sphere>(
         shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
-      projected = engine.project(*mesh, mesh->lookup(Hoc, lens), Hoc, lens);
+      projected = engine.project(*mesh, Hoc, lens);
     }
     else if (geometry == "CIRCLE") {
       visualmesh::geometry::Circle<T> shape(radius);
       std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Circle>(
         shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
-      projected = engine.project(*mesh, mesh->lookup(Hoc, lens), Hoc, lens);
+      projected = engine.project(*mesh, Hoc, lens);
     }
 
     // Get the interesting things out of the projected mesh

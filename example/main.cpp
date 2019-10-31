@@ -14,10 +14,14 @@
 
 #include "ArrayPrint.hpp"
 #include "Timer.hpp"
-#include "engine/opencl/opencl_engine.hpp"
+#include "engine/cpu/engine.hpp"
+// #include "engine/opencl/engine.hpp"
 #include "geometry/Sphere.hpp"
 #include "util/fourcc.hpp"
 #include "visualmesh.hpp"
+
+template <typename Scalar>
+using Model = visualmesh::model::Ring6<Scalar>;
 
 // List the contents of a directory
 std::vector<std::string> listdir(const std::string& path) {
@@ -58,10 +62,6 @@ int main() {
 
   // Construct our VisualMesh
   Timer t;
-  visualmesh::geometry::Sphere<float> sphere(0.0949996);
-  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> cl_mesh(sphere, 0.5, 1.5, 6, 0.5, 20);
-  visualmesh::VisualMesh<float, visualmesh::engine::cpu::Engine> cpu_mesh(sphere, 0.5, 1.5, 6, 0.5, 20);
-  t.measure("Built Visual Mesh");
 
   // Build our classification network
   std::vector<std::vector<std::pair<std::vector<std::vector<float>>, std::vector<float>>>> network;
@@ -97,9 +97,15 @@ int main() {
     }
   }
 
-  // Make a classifier for this network
-  auto cl_classifier  = cl_mesh.make_classifier(network);
-  auto cpu_classifier = cpu_mesh.make_classifier(network);
+  t.measure("Loaded network from YAML file");
+
+  visualmesh::geometry::Sphere<float> sphere(0.0949996);
+  visualmesh::VisualMesh<float, Model> mesh(sphere, 0.5, 1.5, 6, 0.5, 20);
+  t.measure("Built Visual Mesh");
+
+  visualmesh::engine::cpu::Engine<float, Model> cpu_engine(network);
+  visualmesh::engine::cpu::Engine<float, Model> cl_engine(network);
+  t.measure("Loaded engines");
 
   // Go through all our training data
   std::cerr << "Looping through training data" << std::endl;
@@ -189,7 +195,7 @@ int main() {
 
       // Run our classifier
       {
-        auto classified = cl_classifier(cl_mesh.height(Hoc[2][3]), img.data, visualmesh::fourcc("BGRA"), Hoc, lens);
+        auto classified = cl_engine(mesh, Hoc, lens, img.data, visualmesh::fourcc("BGRA"));
 
         auto& neighbourhood                                 = classified.neighbourhood;
         std::vector<std::array<float, 2>> pixel_coordinates = classified.pixel_coordinates;
@@ -232,7 +238,7 @@ int main() {
       // Run our classifier
       {
         t.reset();
-        auto classified = cpu_classifier(cpu_mesh.height(Hoc[2][3]), img.data, visualmesh::fourcc("BGRA"), Hoc, lens);
+        auto classified = cpu_engine(mesh, Hoc, lens, img.data, visualmesh::fourcc("BGRA"));
 
         auto& neighbourhood                                 = classified.neighbourhood;
         std::vector<std::array<float, 2>> pixel_coordinates = classified.pixel_coordinates;

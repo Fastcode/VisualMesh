@@ -27,7 +27,7 @@ namespace visualmesh {
 namespace model {
 
   /**
-   * @brief Model utilising the Ring6 method
+   * @brief Model utilising the Ring6 method. This mesh is the original mesh that was developed
    *
    * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
    */

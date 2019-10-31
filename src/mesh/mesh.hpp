@@ -451,7 +451,7 @@ public:
    * @param Hoc   the homogenous transformation matrix that transforms from camera space to observation plane space
    * @param lens  the lens object describing the type and geometry of the lens that is used
    *
-   * @return gives pairs of start/end ranges that are the points which are on the screen
+   * @return pairs of start/end ranges that are the points which are on the screen
    */
   std::vector<std::pair<int, int>> lookup(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
 

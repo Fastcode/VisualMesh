@@ -15,8 +15,8 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_ENGINE_CPU_CLASSIFIER_HPP
-#define VISUALMESH_ENGINE_CPU_CLASSIFIER_HPP
+#ifndef VISUALMESH_ENGINE_CPU_ENGINE_HPP
+#define VISUALMESH_ENGINE_CPU_ENGINE_HPP
 
 #include <cstdint>
 #include <numeric>
@@ -26,22 +26,21 @@
 #include "mesh/network_structure.hpp"
 #include "mesh/projected_mesh.hpp"
 #include "util/fourcc.hpp"
+#include "visualmesh.hpp"
 
 namespace visualmesh {
 namespace engine {
   namespace cpu {
 
-    template <typename Scalar>
-    class Engine;
-
     template <typename Scalar, template <typename> class Model>
-    class Classifier {
+    class Engine {
     private:
       static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
     public:
-      Classifier(Engine<Scalar>* engine, const network_structure_t<Scalar>& structure)
-        : engine(engine), structure(structure) {
+      Engine() {}
+
+      Engine(const network_structure_t<Scalar>& structure) : structure(structure) {
 
         // Transpose all the weights matrices to make it easier for us to multiply against
         for (auto& conv : this->structure) {
@@ -58,23 +57,85 @@ namespace engine {
         }
       }
 
+      ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Model>& mesh,
+                                                                 const mat4<Scalar>& Hoc,
+                                                                 const Lens<Scalar>& lens) const {
+
+        // Lookup the on screen ranges
+        auto ranges = mesh.lookup(Hoc, lens);
+
+        // Convenience variables
+        const auto& nodes = mesh.nodes;
+        const mat3<Scalar> Rco(block<3, 3>(transpose(Hoc)));
+
+        // Work out how many points total there are in the ranges
+        unsigned int n_points = 0;
+        for (auto& r : ranges) {
+          n_points += r.second - r.first;
+        }
+
+        // Output variables
+        std::vector<int> global_indices;
+        global_indices.reserve(n_points);
+        std::vector<vec2<Scalar>> pixels;
+        pixels.reserve(n_points);
+
+        // Loop through adding global indices and pixel coordinates
+        for (const auto& range : ranges) {
+          for (int i = range.first; i < range.second; ++i) {
+            // Even though we have already gone through a bsp to remove out of range points, sometimes it's not perfect
+            // and misses by a few pixels. So as we are projecting the points here we also need to check that they are
+            // on screen
+            auto px = ::visualmesh::project(multiply(Rco, nodes[i].ray), lens);
+            if (0 < px[0] && px[0] + 1 < lens.dimensions[0] && 0 < px[1] && px[1] + 1 < lens.dimensions[1]) {
+              global_indices.emplace_back(i);
+              pixels.emplace_back(px);
+            }
+          }
+        }
+
+        // Update the number of points to account for how many pixels we removed
+        n_points = pixels.size();
+
+        // Build our reverse lookup, the default point goes to the null point
+        std::vector<int> r_lookup(nodes.size() + 1, n_points);
+        for (unsigned int i = 0; i < n_points; ++i) {
+          r_lookup[global_indices[i]] = i;
+        }
+
+        // Build our local neighbourhood map
+        std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>> neighbourhood(n_points + 1);  // +1 for the null point
+        for (unsigned int i = 0; i < n_points; ++i) {
+          const Node<Scalar, Model<Scalar>::N_NEIGHBOURS>& node = nodes[global_indices[i]];
+          for (unsigned int j = 0; j < node.neighbours.size(); ++j) {
+            const auto& n       = node.neighbours[j];
+            neighbourhood[i][j] = r_lookup[n];
+          }
+        }
+        // Last point is the null point
+        neighbourhood[n_points].fill(n_points);
+
+        return ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS>{
+          std::move(pixels), std::move(neighbourhood), std::move(global_indices)};
+      }
+
+      inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const VisualMesh<Scalar, Model>& mesh,
+                                                                        const mat4<Scalar>& Hoc,
+                                                                        const Lens<Scalar>& lens) const {
+        return project(mesh.height(Hoc[2][3]), Hoc, lens);
+      }
+
       /**
        * Classify using the visual mesh network architecture provided.
        */
       ClassifiedMesh<Scalar, N_NEIGHBOURS> operator()(const Mesh<Scalar, Model>& mesh,
-                                                      const void* image,
-                                                      const uint32_t& format,
                                                       const mat4<Scalar>& Hoc,
-                                                      const Lens<Scalar>& lens) const {
-        // Two buffers we can ping pong between
-        std::vector<Scalar> input;
-        std::vector<Scalar> output;
-
-        // Get the parts of the mesh we need
-        auto ranges = mesh.lookup(Hoc, lens);
+                                                      const Lens<Scalar>& lens,
+                                                      const void* image,
+                                                      const uint32_t& format) const {
 
         // Project the pixels to the display
-        ProjectedMesh<Scalar, N_NEIGHBOURS> projected = engine->project(mesh, ranges, Hoc, lens);
+        ProjectedMesh<Scalar, N_NEIGHBOURS> projected = project(mesh, Hoc, lens);
         auto& neighbourhood                           = projected.neighbourhood;
         unsigned int n_points                         = neighbourhood.size();
 
@@ -196,13 +257,26 @@ namespace engine {
                                                     std::move(input)};
       }
 
+      ClassifiedMesh<Scalar, N_NEIGHBOURS> operator()(const VisualMesh<Scalar, Model>& mesh,
+                                                      const mat4<Scalar>& Hoc,
+                                                      const Lens<Scalar>& lens,
+                                                      const void* image,
+                                                      const uint32_t& format) const {
+        return operator()(mesh.height(Hoc[2][3]), Hoc, lens, image, format);
+      }
+
     private:
-      Engine<Scalar>* engine;
+      /// The network structure used to perform the operations
       network_structure_t<Scalar> structure;
-    };  // namespace cpu
+
+      /// An input buffer used to ping/pong when doing classification so we don't have to reuse them
+      mutable std::vector<Scalar> input;
+      /// An output buffer used to ping/pong when doing classification so we don't have to reuse them
+      mutable std::vector<Scalar> output;
+    };
 
   }  // namespace cpu
 }  // namespace engine
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_ENGINE_CPU_CLASSIFIER_HPP
+#endif  // VISUALMESH_ENGINE_CPU_ENGINE_HPP

@@ -23,7 +23,6 @@
 #include <memory>
 #include <vector>
 
-#include "engine/cpu/cpu_engine.hpp"
 #include "mesh/mesh.hpp"
 #include "mesh/model/ring6.hpp"
 
@@ -37,11 +36,9 @@ namespace visualmesh {
  *  The available engines are currently limited to OpenCL and CPU, however CUDA and Vulkan can be added later.
  *
  * @tparam Scalar the type that will hold the vectors <float, double>
- * @tparam Engine the computational engine that will be used when creating classifiers
+ * @tparam Model  the model used to generate the mesh in each of the individual heights
  */
-template <typename Scalar                  = float,
-          template <typename> class Engine = engine::cpu::Engine,
-          template <typename> class Model  = model::Ring6>
+template <typename Scalar = float, template <typename> class Model = model::Ring6>
 class VisualMesh {
 public:
   /**
@@ -140,35 +137,12 @@ public:
     // z height from the transformation matrix
     const Scalar& h = Hoc[2][3];
     auto mesh       = height(h);
-    return std::make_pair(mesh, mesh->lookup(Hoc, lens));
-  }
-
-  /**
-   * Project a segment of the visual mesh onto an image.
-   *
-   * @param Hoc  A 4x4 homogeneous transformation matrix that transforms from the camera space to the observation plane.
-   * @param lens A description of the lens used to project the mesh.
-   *
-   * @return the pixel coordinates that the visual mesh projects to, and the neighbourhood graph for those points.
-   */
-  ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
-
-    // z height from the transformation matrix
-    const Scalar& h  = Hoc[2][3];
-    const auto& mesh = height(h);
-    auto range       = mesh.lookup(Hoc, lens);
-    return engine.project(mesh, range, Hoc, lens);
-  }
-
-  auto make_classifier(const network_structure_t<Scalar>& structure) {
-    return engine.template make_classifier<Model>(structure);
+    return mesh->lookup(Hoc, lens);
   }
 
 private:
   /// A map from heights to visual mesh tables
   std::map<Scalar, const Mesh<Scalar, Model>> luts;
-  /// The engine used to do projection and classification
-  Engine<Scalar> engine;
 };
 
 }  // namespace visualmesh
