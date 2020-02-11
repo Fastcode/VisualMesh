@@ -15,8 +15,8 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_MODEL_XGRID_HPP
-#define VISUALMESH_MODEL_XGRID_HPP
+#ifndef VISUALMESH_MODEL_XGRID4_HPP
+#define VISUALMESH_MODEL_XGRID4_HPP
 
 #include <array>
 #include <list>
@@ -129,4 +129,4 @@ namespace model {
 }  // namespace model
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_MODEL_XGRID_HPP
+#endif  // VISUALMESH_MODEL_XGRID4_HPP

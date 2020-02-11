@@ -15,10 +15,9 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_MODEL_RADIAL4_HPP
-#define VISUALMESH_MODEL_RADIAL4_HPP
+#ifndef VISUALMESH_MODEL_RADIAL6_HPP
+#define VISUALMESH_MODEL_RADIAL6_HPP
 
-#include <algorithm>
 #include <array>
 #include <fstream>
 #include <iostream>
@@ -30,14 +29,14 @@ namespace visualmesh {
 namespace model {
 
   template <typename Scalar>
-  struct Radial4 {
+  struct Radial6 {
   private:
     static inline vec3<Scalar> unit_vector(const Scalar& sin_phi, const Scalar& cos_phi, const Scalar& theta) {
       return vec3<Scalar>{{std::cos(theta) * sin_phi, std::sin(theta) * sin_phi, -cos_phi}};
     }
 
   public:
-    static constexpr size_t N_NEIGHBOURS = 4;
+    static constexpr size_t N_NEIGHBOURS = 6;
 
     template <typename Shape>
     static std::vector<Node<Scalar, N_NEIGHBOURS>> generate(const Shape& shape,
@@ -45,41 +44,41 @@ namespace model {
                                                             const Scalar& k,
                                                             const Scalar& max_distance) {
       std::vector<Node<Scalar, N_NEIGHBOURS>> nodes;
-      // Allows adjustment of starting offset in theta for each ring
-      std::vector<Scalar> Theta_Offset;
       // Stores the number of points in each ring
       std::vector<int> number_points;
 
-      // L, T, R, B
+      // L, TL, TR, R, BR, BL
       // add easily configurable neighbour ordering
-      int LEFT  = 0;
-      int TOP   = 1;
-      int RIGHT = 2;
-      int BELOW = 3;
+      int LEFT       = 0;
+      int TOPLEFT    = 1;
+      int TOPRIGHT   = 2;
+      int RIGHT      = 3;
+      int BELOWRIGHT = 4;
+      int BELOWLEFT  = 5;
 
       // Add origin point to node vector
       // ?the left and right neighbours may need to be switched, pending experiment.
-      nodes.push_back(Node<Scalar, N_NEIGHBOURS>{{0, 0, -1}, {3, 1, 7, 5}});
+      nodes.push_back(Node<Scalar, N_NEIGHBOURS>{{0, 0, -1}, {3, 2, 1, 6, 5, 4}});
 
       // Stores the number of points for the origin patch
       std::vector<int> origin_number_points;
       // Add the one point for the origin
       origin_number_points.emplace_back(1);
-      // Theta offset for first ring
-      Theta_Offset.push_back(0);
+
 
       // Initiate first ring
       Scalar phi_first = shape.phi(1 / k, h);
       // Eight points in the first ring, all connect below to the origin
-      for (int j = 0; j < 8; ++j) {
+      for (int j = 0; j < 6; ++j) {
         Node<Scalar, N_NEIGHBOURS> first;
-        first.ray               = unit_vector(std::sin(phi_first), std::cos(phi_first), j * (2 * M_PI / 8));
-        first.neighbours[BELOW] = 0;
-        first.neighbours[LEFT]  = 1 + ((j + 1) % 8 + 8) % 8;
-        first.neighbours[RIGHT] = 1 + ((j - 1) % 8 + 8) % 8;
+        first.ray = unit_vector(std::sin(phi_first), std::cos(phi_first), (j - 1 / 2) * (2 * M_PI / 6));
+        first.neighbours[BELOWRIGHT] = 0;
+        first.neighbours[BELOWLEFT]  = 0;
+        first.neighbours[LEFT]       = 1 + ((j + 1) % 6 + 6) % 6;
+        first.neighbours[RIGHT]      = 1 + ((j - 1) % 6 + 6) % 6;
         nodes.push_back(std::move(first));
       }
-      number_points.emplace_back(8);
+      number_points.emplace_back(6);
 
       // Stores the last index in order to loop through the last row to generate the next row
       int running_index = nodes.size();
@@ -92,8 +91,11 @@ namespace model {
       }
 
       // The number of points in each ring to create the origin patch
-      for (int i = 1; i < stop; ++i) {
-        origin_number_points.emplace_back(8 + 8 * i);
+      origin_number_points.emplace_back(12);
+      origin_number_points.emplace_back(24);
+
+      for (int i = 4; i < 4 + stop; ++i) {
+        origin_number_points.emplace_back(8 * i);
       }
 
       bool half_offset = false;
@@ -115,7 +117,7 @@ namespace model {
         bool growing = false;
 
         // Odd v generates clockwise, even v generates anti-clockwise
-        int one = (v % 2 == 0 ? 1 : -1);
+        int one = (v % 2 == 0 ? 1 : 1);
         // Number of points in the last ring
         int number_points_now = number_points[v - 1];
         // Number of points in the next ring
@@ -179,8 +181,8 @@ namespace model {
 
         // Gets the global indices of the last row
         std::vector<int> indices;
-        for (int i = begin; i < end; ++i) {
-          indices.push_back(i);
+        for (int m = begin; m < end; ++m) {
+          indices.push_back(m);
         }
 
         // Switches the offset of the splits to half the distribution when the distribution is greater than 2k + 2
@@ -197,27 +199,17 @@ namespace model {
           new_offset = 1;
         }
 
-        // This rearranges the indices of the nodes of the last ring according to the reversal of the direction and
-        // to offset of the splits
-        std::vector<int> vector_of_indices;
-        for (int m = new_offset; m >= 0; --m) {
-          vector_of_indices.push_back(indices[m]);
-        }
-        for (int p = indices.size() - 1; p > new_offset; --p) {
-          vector_of_indices.push_back(indices[p]);
-        }
-
         // Initiate relative indices within the ring that will be generated
         int relative_index_now  = 0;
         int relative_index_next = 0;
         // Keeps track of number of splits
         int number_splits = 0;
         // Gets the theta position of the starting node
-        Scalar theta_offset =
-          std::atan2(nodes[*vector_of_indices.begin()].ray[1], nodes[*vector_of_indices.begin()].ray[0]);
+        Scalar theta_offset = std::atan2(nodes[indices[new_offset]].ray[1], nodes[indices[new_offset]].ray[0]);
 
         // Loops through the nodes of the last ring to generate the new nodes
-        for (auto it = vector_of_indices.begin(); it != vector_of_indices.end(); ++it) {
+        for (size_t i = 0; i < indices.size(); ++i) {
+          int it = (i + new_offset) % indices.size();
           // *************** Generate First Node ***********************
           Node<Scalar, N_NEIGHBOURS> new_node;
           new_node.ray =
@@ -227,11 +219,12 @@ namespace model {
             end + (((relative_index_next + one) % number_points_next + number_points_next) % number_points_next);
           new_node.neighbours[RIGHT] =
             end + (((relative_index_next - one) % number_points_next + number_points_next) % number_points_next);
-          new_node.neighbours[BELOW] = *it;
+          new_node.neighbours[BELOWRIGHT] = indices[it];
+          new_node.neighbours[BELOWLEFT]  = indices[(it + 1) % indices.size()];
 
           // Real equation: nodes[*it].neighbours[TOP] = end + relative_index_next % number_points_next;
-          nodes[*it].neighbours[TOP] = end + relative_index_next;
-
+          nodes[indices[it]].neighbours[TOPLEFT]  = end + relative_index_next;
+          nodes[indices[it]].neighbours[TOPRIGHT] = end + (relative_index_next - 1) % number_points_next;
           nodes.push_back(std::move(new_node));
           relative_index_next += 1;
           // *********************************************************************************
@@ -256,15 +249,24 @@ namespace model {
                 end + (((relative_index_next + one) % number_points_next + number_points_next) % number_points_next);
               second_new_node.neighbours[RIGHT] =
                 end + (((relative_index_next - one) % number_points_next + number_points_next) % number_points_next);
-              second_new_node.neighbours[BELOW] = *it;
+              second_new_node.neighbours[BELOWRIGHT] = indices[it];
+              second_new_node.neighbours[BELOWLEFT]  = indices[(it + 1) % indices.size()];
+
+              nodes[nodes.size() - 1].neighbours[BELOWRIGHT] =
+                indices[((it - 1) % number_points_now + number_points_now) % number_points_now];
+              nodes[nodes.size() - 1].neighbours[BELOWLEFT] = indices[it];
+
+              nodes[indices[it]].neighbours[TOPLEFT]  = end + ((relative_index_next - 1) % number_points_next);
+              nodes[indices[it]].neighbours[TOPRIGHT] = end + ((relative_index_next) % number_points_next);
 
               nodes.push_back(std::move(second_new_node));
-
               number_splits += 1;
               relative_index_next += 1;
             }
           }
+
           // *********************************************************************************
+
           relative_index_now += 1;
         }
         running_index = nodes.size();
@@ -272,8 +274,17 @@ namespace model {
 
       // Join the last ring of points to one past the end
       for (unsigned int i = (nodes.size() - number_points.back()); i < nodes.size(); ++i) {
-        nodes[i].neighbours[TOP] = nodes.size();
+        nodes[i].neighbours[TOPLEFT]  = nodes.size();
+        nodes[i].neighbours[TOPRIGHT] = nodes.size();
       }
+
+      // // print out mesh points
+      // for (size_t i = 0; i < nodes.size(); ++i) {
+      //   std::cout << "meshpoint: " << i << ": " << nodes[i].neighbours[LEFT] << ", " << nodes[i].neighbours[TOPLEFT]
+      //             << ", " << nodes[i].neighbours[TOPRIGHT] << ", " << nodes[i].neighbours[RIGHT] << ", "
+      //             << nodes[i].neighbours[BELOWRIGHT] << "," << nodes[i].neighbours[BELOWLEFT] << std::endl;
+      // }
+
 
       return nodes;
     }
@@ -282,4 +293,4 @@ namespace model {
 }  // namespace model
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_MODEL_RADIAL4_HPP
+#endif  // VISUALMESH_MODEL_RADIAL6_HPP
