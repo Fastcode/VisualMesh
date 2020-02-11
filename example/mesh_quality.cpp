@@ -8,6 +8,7 @@
 #include "geometry/Circle.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/model/radial4.hpp"
+#include "mesh/model/radial6.hpp"
 #include "mesh/model/radial8.hpp"
 #include "mesh/model/ring4.hpp"
 #include "mesh/model/ring6.hpp"
@@ -184,6 +185,14 @@ int main(int argc, const char* argv[]) {
   {
     std::cout << "Radial8 Quality:" << std::endl;
     visualmesh::Mesh<float, visualmesh::model::Radial8> mesh(shape, h, k, max_distance);
+    auto quality = check_quality(shape, mesh);
+    print_quality(quality, k);
+    std::cout << std::endl;
+  }
+
+  {
+    std::cout << "Radial6 Quality:" << std::endl;
+    visualmesh::Mesh<float, visualmesh::model::Radial6> mesh(shape, h, k, max_distance);
     auto quality = check_quality(shape, mesh);
     print_quality(quality, k);
     std::cout << std::endl;
