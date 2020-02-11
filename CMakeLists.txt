@@ -48,9 +48,8 @@ foreach(cl IN LISTS cls)
 
   add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp"
-    COMMAND
-      ${PYTHON_EXECUTABLE} ARGS "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py" "${cl}"
-      "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp"
+    COMMAND ${PYTHON_EXECUTABLE} ARGS "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py" "${cl}"
+            "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp"
     DEPENDS "${cl}" "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py"
     COMMENT "Wrapping OpenCL file ${cl_path} in a header"
   )
@@ -85,16 +84,8 @@ if(TOP_LEVEL_PROJECT)
     set_target_properties(
       tf_op
       PROPERTIES
-        CXX_STANDARD
-        14
-        LIBRARY_OUTPUT_DIRECTORY
-        ${PROJECT_SOURCE_DIR}/training
-        PREFIX
-        ""
-        OUTPUT_NAME
-        visualmesh_op
-        SUFFIX
-        ".so"
+        CXX_STANDARD 14 LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/training PREFIX "" OUTPUT_NAME visualmesh_op
+        SUFFIX ".so"
     )
     target_include_directories(tf_op SYSTEM PRIVATE ${TENSORFLOW_INCLUDE_DIRS})
     target_include_directories(tf_op PRIVATE ${PROJECT_SOURCE_DIR}/src)
@@ -106,7 +97,7 @@ if(TOP_LEVEL_PROJECT)
   option(BUILD_EXAMPLE "Build the example program that executes the mesh" OFF)
   if(BUILD_EXAMPLE)
 
-    find_package(OpenCV REQUIRED)
+    find_package(OpenCV REQUIRED core highgui imgproc)
     find_package(YAML-CPP REQUIRED)
     find_package(OpenCL REQUIRED)
     find_package(Threads REQUIRED)
@@ -119,12 +110,7 @@ if(TOP_LEVEL_PROJECT)
     target_include_directories(main PRIVATE ${PROJECT_SOURCE_DIR}/src)
     target_include_directories(main PRIVATE ${PROJECT_BINARY_DIR}/src)
     target_link_libraries(
-      main
-      ${OpenCL_LIBRARIES}
-      ${OpenCV_LIBS}
-      ${fmt_LIBRARIES}
-      ${YAML_CPP_LIBRARIES}
-      Threads::Threads
+      main ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES} Threads::Threads
     )
 
     add_executable(mesh_quality "example/mesh_quality.cpp" ${hdr})
