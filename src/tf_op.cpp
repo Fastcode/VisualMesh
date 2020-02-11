@@ -27,6 +27,7 @@
 #include "geometry/Sphere.hpp"
 #include "mesh/mesh.hpp"
 #include "mesh/model/radial4.hpp"
+#include "mesh/model/radial6.hpp"
 #include "mesh/model/radial8.hpp"
 #include "mesh/model/ring4.hpp"
 #include "mesh/model/ring6.hpp"
@@ -386,6 +387,7 @@ public:
     if (model == "RING6") { ComputeModel<visualmesh::model::Ring6>(context); }
     else if (model == "RING4") { ComputeModel<visualmesh::model::Ring4>(context); }
     else if (model == "RADIAL8") { ComputeModel<visualmesh::model::Radial8>(context); }
+    else if (model == "RADIAL6") { ComputeModel<visualmesh::model::Radial6>(context); }
     else if (model == "RADIAL4") { ComputeModel<visualmesh::model::Radial4>(context); }
     else if (model == "XGRID4") { ComputeModel<visualmesh::model::XGrid4>(context); }
     // clang-format on
