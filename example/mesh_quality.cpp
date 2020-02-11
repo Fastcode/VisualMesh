@@ -8,6 +8,7 @@
 #include "geometry/Circle.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/model/radial4.hpp"
+#include "mesh/model/radial6.hpp"
 #include "mesh/model/radial8.hpp"
 #include "mesh/model/ring4.hpp"
 #include "mesh/model/ring6.hpp"
@@ -137,11 +138,12 @@ void print_quality(const std::vector<NodeQuality<Scalar, Neighbours>>& nodes, co
 
   // Sum up the variance
   for (const auto& node : nodes) {
-    auto v = visualmesh::subtract(node.radial, radial.means);
+    auto v = visualmesh::subtract(visualmesh::multiply(node.radial, k), radial.means);
     radial_var.update(visualmesh::multiply(v, v));
-    auto c = visualmesh::subtract(node.cyclical, cyclical.means);
+    auto c = visualmesh::subtract(visualmesh::multiply(node.cyclical, k), cyclical.means);
     cyclical_var.update(visualmesh::multiply(c, c));
-    auto a = visualmesh::subtract(node.angular, angular.means);
+    auto a = visualmesh::subtract(visualmesh::multiply(node.angular, static_cast<Scalar>(Neighbours * (M_PI * 2.0))),
+                                  angular.means);
     angular_var.update(visualmesh::multiply(a, a));
   }
 
@@ -183,6 +185,14 @@ int main(int argc, const char* argv[]) {
   {
     std::cout << "Radial8 Quality:" << std::endl;
     visualmesh::Mesh<float, visualmesh::model::Radial8> mesh(shape, h, k, max_distance);
+    auto quality = check_quality(shape, mesh);
+    print_quality(quality, k);
+    std::cout << std::endl;
+  }
+
+  {
+    std::cout << "Radial6 Quality:" << std::endl;
+    visualmesh::Mesh<float, visualmesh::model::Radial6> mesh(shape, h, k, max_distance);
     auto quality = check_quality(shape, mesh);
     print_quality(quality, k);
     std::cout << std::endl;

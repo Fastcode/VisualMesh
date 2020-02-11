@@ -25,6 +25,8 @@
 
 #include "engine/cpu/cpu_engine.hpp"
 #include "mesh/mesh.hpp"
+#include "mesh/model/radial4.hpp"
+#include "mesh/model/radial6.hpp"
 #include "mesh/model/ring6.hpp"
 
 namespace visualmesh {
@@ -41,7 +43,7 @@ namespace visualmesh {
  */
 template <typename Scalar                  = float,
           template <typename> class Engine = engine::cpu::Engine,
-          template <typename> class Model  = model::Ring6>
+          template <typename> class Model  = model::Radial6>
 class VisualMesh {
 public:
   /**
