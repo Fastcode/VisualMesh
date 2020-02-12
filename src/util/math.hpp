@@ -187,7 +187,7 @@ inline Scalar norm(const std::array<Scalar, L>& a) {
  */
 template <typename Scalar, std::size_t L>
 inline std::array<Scalar, L> normalise(const std::array<Scalar, L>& a) {
-  const Scalar len = static_cast<Scalar>(1.0) / norm(a);
+  const Scalar len = Scalar(1.0) / norm(a);
   return multiply(a, len);
 }
 
@@ -271,7 +271,7 @@ inline mat3<Scalar> invert(const mat3<Scalar>& m) {
     return {vec3<Scalar>{nan, nan, nan}, vec3<Scalar>{nan, nan, nan}, vec3<Scalar>{nan, nan, nan}};
   }
 
-  const Scalar idet = static_cast<Scalar>(1) / det;
+  const Scalar idet = Scalar(1) / det;
 
   return {vec3<Scalar>{(m[1][1] * m[2][2] - m[2][1] * m[1][2]) * idet,
                        (m[0][2] * m[2][1] - m[0][1] * m[2][2]) * idet,

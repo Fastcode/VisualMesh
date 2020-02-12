@@ -80,7 +80,7 @@ namespace model {
       std::vector<Node<Scalar, N_NEIGHBOURS>> nodes;
 
       // Create our first interconnected ring of 6 values that exist in a ring
-      const Scalar start_n      = static_cast<Scalar>(1.0) / (2.0 * k);
+      const Scalar start_n      = Scalar(1.0) / (2.0 * k);
       const Scalar phi_0        = shape.phi(start_n, h);
       const Scalar cos_phi_0    = std::cos(phi_0);
       const Scalar sin_phi_0    = std::sin(phi_0);
@@ -154,7 +154,7 @@ namespace model {
             n.ray = unit_vector(sin_phi, cos_phi, theta);
 
             // Get how far we are through this ring as a value between 0 and 1
-            const Scalar f = static_cast<Scalar>(j) / static_cast<Scalar>(c_slices);
+            const Scalar f = Scalar(j) / Scalar(c_slices);
 
             // Left and right is just our index += 1 with wraparound
             const int l = static_cast<int>(j > 0 ? start + j - 1 : start + c_slices - 1);

@@ -133,7 +133,7 @@ void print_quality(const std::vector<NodeQuality<Scalar, Neighbours>>& nodes, co
   for (const auto& node : nodes) {
     radial.update(visualmesh::multiply(node.radial, k));
     cyclical.update(visualmesh::multiply(node.cyclical, k));
-    angular.update(visualmesh::multiply(node.angular, static_cast<Scalar>(Neighbours * (M_PI * 2.0))));
+    angular.update(visualmesh::multiply(node.angular, Scalar(Neighbours * (M_PI * 2.0))));
   }
 
   // Sum up the variance
@@ -142,7 +142,7 @@ void print_quality(const std::vector<NodeQuality<Scalar, Neighbours>>& nodes, co
     radial_var.update(visualmesh::multiply(v, v));
     auto c = visualmesh::subtract(visualmesh::multiply(node.cyclical, k), cyclical.means);
     cyclical_var.update(visualmesh::multiply(c, c));
-    auto a = visualmesh::subtract(visualmesh::multiply(node.angular, static_cast<Scalar>(Neighbours * (M_PI * 2.0))),
+    auto a = visualmesh::subtract(visualmesh::multiply(node.angular, Scalar(Neighbours * (M_PI * 2.0))),
                                   angular.means);
     angular_var.update(visualmesh::multiply(a, a));
   }

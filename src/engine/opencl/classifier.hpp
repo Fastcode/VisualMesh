@@ -351,9 +351,9 @@ namespace engine {
 
         // The offscreen point gets a value of -1.0 to make it easy to distinguish
         cl::event offscreen_fill_event;
-        ev               = nullptr;
-        Scalar minus_one = static_cast<Scalar>(-1.0);
-        error            = ::clEnqueueFillBuffer(write_queue,
+        Scalar minus_one(-1.0);
+        ev    = nullptr;
+        error = ::clEnqueueFillBuffer(write_queue,
                                       cl_conv_input,
                                       &minus_one,
                                       sizeof(Scalar),

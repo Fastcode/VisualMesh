@@ -40,10 +40,10 @@ namespace visualmesh {
  * @details
  *  This object holds a Visual Mesh for a single height. It utilises a model class to create a mesh, and then
  *  transforms it into a structure that is suppored as a BSP tree. It then uses this tree to lookup the mesh given
- *  different lens paramters. Note that because of teh way it oes the lookup, this lookup isn't perfect esperically for
+ *  different lens paramters. Note that because of the way it does the lookup, this lookup isn't perfect esperically for
  *  fisheye lenses. In this case it will sometimes give points that are outside the bounds of the image. The CPU engine
  *  removes these extra points however the OpenCL engine does not. So if you are relying on these pixel coordinates
- *  being in bounds you should ensure that you use the CPU engine.
+ *  being in bounds you should ensure that you use either use the CPU engine or filter them out afterwards yourself.
  *
  * @tparam Scalar     the scalar type used for calculations and storage (normally one of float or double)
  * @tparam Model      the model that is used to build the Visual Mesh graph
@@ -107,9 +107,8 @@ private:
       }
     }
 
-    // Add in sin_theta when we return the final cone
-    return std::make_pair(cone.first,
-                          vec2<Scalar>{cone.second, std::sqrt(static_cast<Scalar>(1.0) - cone.second * cone.second)});
+    // Add in sin_theta when we return the final cone as knowing both helps improve performance later
+    return std::make_pair(cone.first, vec2<Scalar>{cone.second, std::sqrt(Scalar(1.0) - cone.second * cone.second)});
   }
 
   /**
@@ -149,8 +148,8 @@ private:
     }
     // We treat the first element specially
     else if (bsp.empty()) {
-      // The first tree is always a split in the theta angle, and it is the split that will split +y from -y so that
-      // future loops can sort purely based on x value making for a faster algorithm
+      // The first tree is always a split in the theta angle, and it split between +y from -y so that future loops can
+      // sort purely based on x value making for a faster algorithm
 
       // Find the largest phi value for making the cone
       auto max_phi_element = std::max_element(start, end, [this](const int& a, const int& b) {
@@ -202,10 +201,9 @@ private:
       }
 
       // Work out the z and x values we need to split on
-      Scalar split_phi   = std::cos((std::acos(min_phi) + std::acos(max_phi)) * 0.5);
-      Scalar split_theta = std::cos((std::acos(std::max(min_theta, static_cast<Scalar>(-1)))
-                                     + std::acos(std::min(max_theta, static_cast<Scalar>(1))))
-                                    * 0.5);
+      Scalar split_phi = std::cos((std::acos(min_phi) + std::acos(max_phi)) * 0.5);
+      Scalar split_theta =
+        std::cos((std::acos(std::max(min_theta, Scalar(-1))) + std::acos(std::min(max_theta, Scalar(1)))) * 0.5);
 
       // Partition based on either phi or theta
       Iterator mid =
@@ -265,7 +263,7 @@ private:
 
     // Unproject each of the four corners of the screen and rotate them into world space
     // Add a 1 pixel offset from the edge so that we don't go over the edge from rounding errors
-    const vec2<Scalar> dimensions          = subtract(cast<Scalar>(lens.dimensions), static_cast<Scalar>(1.0));
+    const vec2<Scalar> dimensions          = subtract(cast<Scalar>(lens.dimensions), Scalar(1.0));
     const std::array<vec3<Scalar>, 4> rNCo = {{
       multiply(Roc, visualmesh::unproject(vec2<Scalar>{1, 1}, lens)),                          // rTCo
       multiply(Roc, visualmesh::unproject(vec2<Scalar>{dimensions[0], 1}, lens)),              // rUCo
@@ -292,7 +290,7 @@ private:
          * <- y
          */
         // Get the lens axis centre coordinates
-        vec2<Scalar> centre = add(multiply(dimensions, static_cast<Scalar>(0.5)), lens.centre);
+        vec2<Scalar> centre = add(multiply(dimensions, Scalar(0.5)), lens.centre);
 
         // Unproject the centre of each of the edges using the lens axis as the centre and rotate into world space
         const std::array<vec3<Scalar>, 4> rECo = {{
@@ -312,18 +310,14 @@ private:
 
         // Add in sin_theta
         return std::array<std::pair<vec3<Scalar>, vec2<Scalar>>, 4>{{
-          std::make_pair(
-            cones[0].first,
-            vec2<Scalar>{cones[0].second, std::sqrt(static_cast<Scalar>(1.0) - cones[0].second * cones[0].second)}),
-          std::make_pair(
-            cones[1].first,
-            vec2<Scalar>{cones[1].second, std::sqrt(static_cast<Scalar>(1.0) - cones[1].second * cones[1].second)}),
-          std::make_pair(
-            cones[2].first,
-            vec2<Scalar>{cones[2].second, std::sqrt(static_cast<Scalar>(1.0) - cones[2].second * cones[2].second)}),
-          std::make_pair(
-            cones[3].first,
-            vec2<Scalar>{cones[3].second, std::sqrt(static_cast<Scalar>(1.0) - cones[3].second * cones[3].second)}),
+          std::make_pair(cones[0].first,
+                         vec2<Scalar>{cones[0].second, std::sqrt(Scalar(1.0) - cones[0].second * cones[0].second)}),
+          std::make_pair(cones[1].first,
+                         vec2<Scalar>{cones[1].second, std::sqrt(Scalar(1.0) - cones[1].second * cones[1].second)}),
+          std::make_pair(cones[2].first,
+                         vec2<Scalar>{cones[2].second, std::sqrt(Scalar(1.0) - cones[2].second * cones[2].second)}),
+          std::make_pair(cones[3].first,
+                         vec2<Scalar>{cones[3].second, std::sqrt(Scalar(1.0) - cones[3].second * cones[3].second)}),
         }};
       }
       default: throw std::runtime_error("Unknown lens type");
@@ -457,8 +451,8 @@ public:
 
     // Our FOV is an easy check to exclude things outside our view
     // Multiply by 0.5 to get the cone angle
-    const Scalar cos_fov = std::cos(lens.fov * static_cast<Scalar>(0.5));
-    const Scalar sin_fov = std::sin(lens.fov * static_cast<Scalar>(0.5));
+    const Scalar cos_fov = std::cos(lens.fov * Scalar(0.5));
+    const Scalar sin_fov = std::sin(lens.fov * Scalar(0.5));
 
     // Get the x axis of the camera in world space and the cone equations that describe the edges of the screen
     const mat3<Scalar> Rco(block<3, 3>(transpose(Hoc)));

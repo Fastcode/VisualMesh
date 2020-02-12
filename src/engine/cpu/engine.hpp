@@ -247,7 +247,7 @@ namespace engine {
         std::transform(input.begin(), input.end(), input.begin(), [](const Scalar& s) { return std::exp(s); });
         for (auto it = input.begin(); it < input.end(); std::advance(it, input_dimensions)) {
           const auto end = std::next(it, input_dimensions);
-          Scalar total   = std::accumulate(it, end, static_cast<Scalar>(0.0));
+          Scalar total   = std::accumulate(it, end, Scalar(0.0));
           std::transform(it, end, it, [total](const Scalar& s) { return s / total; });
         }
 
