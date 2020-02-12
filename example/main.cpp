@@ -164,6 +164,7 @@ int main() {
       visualmesh::Lens<float> lens;
       lens.dimensions = {{img.size().width, img.size().height}};
       lens.centre     = {{0.0, 0.0}};
+      lens.k          = {{0.0, 0.0}};
       if (meta["camera"]["lens"]["type"].as<std::string>() == "PERSPECTIVE") {
 
         // Horizontal field of view

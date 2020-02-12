@@ -23,168 +23,100 @@
 
 namespace visualmesh {
 
+namespace equidistant {
+  template <typename Scalar>
+  inline Scalar r(const Scalar& theta, const Scalar& f) {
+    return f * theta;
+  }
+
+  template <typename Scalar>
+  inline Scalar theta(const Scalar& r, const Scalar& f) {
+    return r / f;
+  }
+}  // namespace equidistant
+
+namespace equisolid {
+  template <typename Scalar>
+  inline Scalar r(const Scalar& theta, const Scalar& f) {
+    return Scalar(2.0) * f * std::sin(theta * Scalar(0.5));
+  }
+
+  template <typename Scalar>
+  inline Scalar theta(const Scalar& r, const Scalar& f) {
+    return Scalar(2.0) * std::asin(r / (Scalar(2.0) * f));
+  }
+}  // namespace equisolid
+
+namespace rectilinear {
+  template <typename Scalar>
+  inline Scalar r(const Scalar& theta, const Scalar& f) {
+    return f * std::tan(theta);
+  }
+
+  template <typename Scalar>
+  inline Scalar theta(const Scalar& r, const Scalar& f) {
+    return std::atan(r / f);
+  }
+}  // namespace rectilinear
+
 /**
- * @brief Projects a unit vector into a pixel coordinate using an equidistant fisheye lens model
+ * @brief Undistorts radial distortion using the provided distortion coefficents
  *
  * @details
- *  This function expects a unit vector in camera space. For this camera space is defined as a coordinate system with
- *  the x axis going down the viewing direction of the camera, y is to the left of the image, and z is up in the
- *  resulting image. The pixel coordinate that results will have (0,0) at the top left of the image, with x to the right
- *  and y down.
+ *  Given a radial distance from the optical centre, this applies a polynomial distortion model in order to approximate
+ *  an ideal lens. After the radial distance has gone through this function it will approximate the equivilant radius
+ *  in an ideal lens projection (depending on which base lens projection you are using).
  *
  * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
  *
- * @param p     the unit vector in camera space to project
- * @param lens  the paramters that describe the lens that we are using to project
+ * @param r the radial distance from the optical centre
+ * @param k the distortion coefficents to use for undistortion
  *
- * @return a pixel coordinate that this vector projects into
+ * @return the undistorted radial distance from the optical centre
  */
 template <typename Scalar>
-inline vec2<Scalar> project_equidistant(const vec3<Scalar>& p, const Lens<Scalar>& lens) {
-  // Calculate some intermediates
-  Scalar theta      = std::acos(p[0]);
-  Scalar r          = lens.focal_length * theta;
-  Scalar rsin_theta = static_cast<Scalar>(1) / std::sqrt(static_cast<Scalar>(1) - p[0] * p[0]);
+inline Scalar distort(const Scalar& r, const vec2<Scalar>& k) {
+  // Uses the math from the paper
+  // An Exact Formula for Calculating Inverse Radial Lens Distortions
+  // https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4934233/pdf/sensors-16-00807.pdf
+  // These terms have been stripped back to only include k1 and k2 and only uses the first 4 terms
+  // if more are needed in the future go and get them from the original paper
+  // TODO if performance ever becomes an issue, this can be precomputed for the same k values
+  const Scalar b1 = -k[0];
+  const Scalar b2 = 3.0 * (k[0] * k[0]) - k[1];
+  const Scalar b3 = -12.0 * (k[0] * k[0]) * k[0] + 8.0 * k[0] * k[1];
+  const Scalar b4 = 55.0 * (k[0] * k[0]) * (k[0] * k[0]) - 55.0 * (k[0] * k[0]) * k[1] + 5.0 * (k[1] * k[1]);
 
-  // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
-  // Sometimes x is greater than one due to floating point error, this almost certainly means that we are facing
-  // directly forward
-  vec2<Scalar> screen = p[0] >= 1 ? vec2<Scalar>{{static_cast<Scalar>(0.0), static_cast<Scalar>(0.0)}}
-                                  : vec2<Scalar>{{r * p[1] * rsin_theta, r * p[2] * rsin_theta}};
-
-  // Apply our offset to move into image space (0 at top left, x to the right, y down)
-  // Then apply the offset to the centre of our lens
-  return subtract(subtract(multiply(cast<Scalar>(lens.dimensions), static_cast<Scalar>(0.5)), screen), lens.centre);
+  return r
+         * (1.0                                               //
+            + b1 * (r * r)                                    //
+            + b2 * ((r * r) * (r * r))                        //
+            + b3 * ((r * r) * (r * r)) * (r * r)              //
+            + b4 * ((r * r) * (r * r)) * ((r * r) * (r * r))  //
+         );
 }
 
 /**
- * @brief Unprojects a pixel coordinate into a unit vector using an equidistant fisheye lens model
+ * @brief Undistorts radial distortion using the provided distortion coefficents
  *
  * @details
- *  This function expects a pixel coordinate having (0,0) at the top left of the image, with x to the right and y down.
- *  It will then convert this into a unit vector in camera space. For this camera space is defined as a coordinate
- *  system with the x axis going down the viewing direction of the camera, y is to the left of the image, and z is up.
+ *  Given a radial distance from the optical centre, this applies a polynomial distortion model in order to approximate
+ *  an ideal lens. After the radial distance has gone through this function it will approximate the equivilant radius
+ *  in an ideal lens projection (depending on which base lens projection you are using).
  *
  * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
  *
- * @param p     the pixel coordinate to unproject
- * @param lens  the paramters that describe the lens that we are using to unproject
+ * @param r the radial distance from the optical centre
+ * @param k the distortion coefficents to use for undistortion
  *
- * @return the unit vector that this pixel represents in camera space
+ * @return the undistorted radial distance from the optical centre
  */
 template <typename Scalar>
-inline vec3<Scalar> unproject_equidistant(const vec2<Scalar>& point, const Lens<Scalar>& lens) {
-  vec2<Scalar> screen =
-    subtract(multiply(cast<Scalar>(lens.dimensions), static_cast<Scalar>(0.5)), add(point, lens.centre));
-  Scalar r     = norm(screen);
-  Scalar theta = r / lens.focal_length;
-  return normalise(vec3<Scalar>{std::cos(theta), std::sin(theta) * screen[0] / r, std::sin(theta) * screen[1] / r});
-}
-
-/**
- * @brief Projects a unit vector into a pixel coordinate using an equisolid fisheye lens model
- *
- * @details
- *  This function expects a unit vector in camera space. For this camera space is defined as a coordinate system with
- *  the x axis going down the viewing direction of the camera, y is to the left of the image, and z is up in the
- *  resulting image. The pixel coordinate that results will have (0,0) at the top left of the image, with x to the right
- *  and y down.
- *
- * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
- *
- * @param p     the unit vector to project
- * @param lens  the paramters that describe the lens that we are using to project
- *
- * @return a pixel coordinate that this vector projects into
- */
-template <typename Scalar>
-inline vec2<Scalar> project_equisolid(const vec3<Scalar>& p, const Lens<Scalar>& lens) {
-  // Calculate some intermediates
-  Scalar theta      = std::acos(p[0]);
-  Scalar r          = static_cast<Scalar>(2.0) * lens.focal_length * std::sin(theta * static_cast<Scalar>(0.5));
-  Scalar rsin_theta = static_cast<Scalar>(1) / std::sqrt(static_cast<Scalar>(1) - p[0] * p[0]);
-
-  // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
-  // Sometimes x is greater than one due to floating point error, this almost certainly means that we are facing
-  // directly forward
-  vec2<Scalar> screen = p[0] >= 1 ? vec2<Scalar>{{static_cast<Scalar>(0.0), static_cast<Scalar>(0.0)}}
-                                  : vec2<Scalar>{{r * p[1] * rsin_theta, r * p[2] * rsin_theta}};
-
-  // Apply our offset to move into image space (0 at top left, x to the right, y down)
-  // Then apply the offset to the centre of our lens
-  return subtract(subtract(multiply(cast<Scalar>(lens.dimensions), static_cast<Scalar>(0.5)), screen), lens.centre);
-}
-
-/**
- * @brief Unprojects a pixel coordinate into a unit vector using an equisolid fisheye lens model
- *
- * @details
- *  This function expects a pixel coordinate having (0,0) at the top left of the image, with x to the right and y down.
- *  It will then convert this into a unit vector in camera space. For this camera space is defined as a coordinate
- *  system with the x axis going down the viewing direction of the camera, y is to the left of the image, and z is up.
- *
- * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
- *
- * @param p     the pixel coordinate to unproject
- * @param lens  the paramters that describe the lens that we are using to unproject
- *
- * @return the unit vector that this pixel represents in camera space
- */
-template <typename Scalar>
-inline vec3<Scalar> unproject_equisolid(const vec2<Scalar>& point, const Lens<Scalar>& lens) {
-  vec2<Scalar> screen =
-    subtract(multiply(cast<Scalar>(lens.dimensions), static_cast<Scalar>(0.5)), add(point, lens.centre));
-  Scalar r     = norm(screen);
-  Scalar theta = 2.0 * std::asin(r / (2.0 * lens.focal_length));
-  return normalise(vec3<Scalar>{std::cos(theta), std::sin(theta) * screen[0] / r, std::sin(theta) * screen[1] / r});
-}
-
-/**
- * @brief Projects a unit vector into a pixel coordinate using an rectilinear (standard) lens model
- *
- * @details
- *  This function expects a unit vector in camera space. For this camera space is defined as a coordinate system with
- *  the x axis going down the viewing direction of the camera, y is to the left of the image, and z is up in the
- *  resulting image. The pixel coordinate that results will have (0,0) at the top left of the image, with x to the right
- *  and y down.
- *
- * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
- *
- * @param p     the unit vector to project
- * @param lens  the paramters that describe the lens that we are using to project
- *
- * @return a pixel coordinate that this vector projects into
- */
-template <typename Scalar>
-inline vec2<Scalar> project_rectilinear(const vec3<Scalar>& p, const Lens<Scalar>& lens) {
-  // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
-  vec2<Scalar> screen = {{lens.focal_length * p[1] / p[0], lens.focal_length * p[2] / p[0]}};
-
-  // Apply our offset to move into image space (0 at top left, x to the right, y down)
-  // Then apply the offset to the centre of our lens
-  return subtract(subtract(multiply(cast<Scalar>(lens.dimensions), static_cast<Scalar>(0.5)), screen), lens.centre);
-}
-
-/**
- * @brief Unprojects a pixel coordinate into a unit vector using an rectilinear (standard) lens model
- *
- * @details
- *  This function expects a pixel coordinate having (0,0) at the top left of the image, with x to the right and y down.
- *  It will then convert this into a unit vector in camera space. For this camera space is defined as a coordinate
- *  system with the x axis going down the viewing direction of the camera, y is to the left of the image, and z is up.
- *
- * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
- *
- * @param p     the pixel coordinate to unproject
- * @param lens  the paramters that describe the lens that we are using to unproject
- *
- * @return the unit vector that this pixel represents in camera space
- */
-template <typename Scalar>
-inline vec3<Scalar> unproject_rectilinear(const vec2<Scalar>& point, const Lens<Scalar>& lens) {
-  vec2<Scalar> screen =
-    subtract(multiply(cast<Scalar>(lens.dimensions), static_cast<Scalar>(0.5)), add(point, lens.centre));
-  return normalise(vec3<Scalar>{lens.focal_length, screen[0], screen[1]});
+inline Scalar undistort(const Scalar& r, const vec2<Scalar>& k) {
+  // These parenthesis are important as they allow the compiler to optimise further
+  // Since floating point multiplication is not commutative r * r * r * r != (r * r) * (r * r)
+  // This means that the first needs 3 multiplication operations while the second needs only 2
+  return r * (1.0 + k[0] * (r * r) + k[1] * ((r * r) * (r * r)) + k[2] * ((r * r) * (r * r)) * (r * r));
 }
 
 /**
@@ -205,13 +137,30 @@ inline vec3<Scalar> unproject_rectilinear(const vec2<Scalar>& point, const Lens<
  * @return a pixel coordinate that this vector projects into
  */
 template <typename Scalar>
-inline vec2<Scalar> project(const vec3<Scalar>& p, const Lens<Scalar>& lens) {
+vec2<Scalar> project(const vec3<Scalar>& ray, const Lens<Scalar>& lens) {
+
+  // Perform the projection math
+  const Scalar& f         = lens.focal_length;
+  const Scalar theta      = std::acos(ray[0]);
+  const Scalar rsin_theta = Scalar(1) / std::sqrt(Scalar(1) - ray[0] * ray[0]);
+  Scalar r_u;
   switch (lens.projection) {
-    case EQUISOLID: return project_equisolid(p, lens);
-    case EQUIDISTANT: return project_equidistant(p, lens);
-    case RECTILINEAR: return project_rectilinear(p, lens);
-    default: throw std::runtime_error("Unknown projection type");
+    case RECTILINEAR: r_u = rectilinear::r(theta, f); break;
+    case EQUISOLID: r_u = equisolid::r(theta, f); break;
+    case EQUIDISTANT: r_u = equidistant::r(theta, f); break;
+    default: throw std::runtime_error("Cannot project: Unknown lens type"); break;
   }
+  const Scalar r_d = distort(r_u, lens.k);
+
+  // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
+  // Sometimes x is greater than one due to floating point error, this almost certainly means that we are facing
+  // directly forward
+  vec2<Scalar> screen = ray[0] >= 1 ? vec2<Scalar>{{Scalar(0.0), Scalar(0.0)}}
+                                    : vec2<Scalar>{{r_d * ray[1] * rsin_theta, r_d * ray[2] * rsin_theta}};
+
+  // Apply our offset to move into image space (0 at top left, x to the right, y down)
+  // Then apply the offset to the centre of our lens
+  return subtract(subtract(multiply(cast<Scalar>(lens.dimensions), Scalar(0.5)), screen), lens.centre);
 }
 
 /**
@@ -224,19 +173,31 @@ inline vec2<Scalar> project(const vec3<Scalar>& p, const Lens<Scalar>& lens) {
  *
  * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
  *
- * @param p     the pixel coordinate to unproject
+ * @param px    the pixel coordinate to unproject
  * @param lens  the paramters that describe the lens that we are using to unproject
  *
  * @return the unit vector that this pixel represents in camera space
  */
 template <typename Scalar>
-inline vec3<Scalar> unproject(const vec2<Scalar>& p, const Lens<Scalar>& lens) {
+vec3<Scalar> unproject(const vec2<Scalar>& px, const Lens<Scalar>& lens) {
+
+  // Transform to centre of the screen:
+  vec2<Scalar> screen = subtract(multiply(cast<Scalar>(lens.dimensions), Scalar(0.5)), add(px, lens.centre));
+
+  // Perform the unprojection math
+  const Scalar& f  = lens.focal_length;
+  const Scalar r_d = norm(screen);
+  const Scalar r_u = undistort(r_d, lens.k);
+  Scalar theta;
   switch (lens.projection) {
-    case EQUISOLID: return unproject_equisolid(p, lens);
-    case EQUIDISTANT: return unproject_equidistant(p, lens);
-    case RECTILINEAR: return unproject_rectilinear(p, lens);
-    default: throw std::runtime_error("Unknown projection type");
+    case RECTILINEAR: theta = rectilinear::theta(r_u, f); break;
+    case EQUISOLID: theta = equisolid::theta(r_u, f); break;
+    case EQUIDISTANT: theta = equidistant::theta(r_u, f); break;
+    default: throw std::runtime_error("Cannot project: Unknown lens type"); break;
   }
+  const Scalar sin_theta = std::sin(theta);
+
+  return vec3<Scalar>{{std::cos(theta), sin_theta * screen[0] / r_d, sin_theta * screen[1] / r_d}};
 }
 
 }  // namespace visualmesh

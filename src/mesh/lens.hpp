@@ -44,10 +44,12 @@ struct Lens {
   /// sections on a fisheye camera). If there are no black sections on the image this should be set to the diagonal
   /// field of view of the lens.
   Scalar fov;
-  /// The focal length of the camera, normalised to the image width
-  Scalar focal_length;
   /// The offset required to move the centre of the lens to the centre of the image
   std::array<Scalar, 2> centre;
+  /// The distortion parameters for the camera model
+  std::array<Scalar, 2> k;
+  /// The focal length of the camera, normalised to the image width
+  Scalar focal_length;
 };
 
 }  // namespace visualmesh

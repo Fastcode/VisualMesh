@@ -39,8 +39,9 @@ REGISTER_OP("VisualMesh")
   .Input("image_dimensions: U")
   .Input("lens_type: string")
   .Input("lens_focal_length: T")
-  .Input("lens_fov: T")
   .Input("lens_centre: T")
+  .Input("lens_distortion: T")
+  .Input("lens_fov: T")
   .Input("cam_to_observation_plane: T")
   .Input("height: T")
   .Input("model: string")
@@ -63,17 +64,18 @@ enum Args {
   DIMENSIONS             = 0,
   PROJECTION             = 1,
   FOCAL_LENGTH           = 2,
-  FIELD_OF_VIEW          = 3,
-  LENS_CENTRE            = 4,
-  ROC                    = 5,
-  HEIGHT                 = 6,
-  MODEL                  = 7,
-  CACHED_MESHES          = 8,
-  MAX_DISTANCE           = 9,
-  GEOMETRY               = 10,
-  RADIUS                 = 11,
-  N_INTERSECTIONS        = 12,
-  INTERSECTION_TOLERANCE = 13
+  LENS_CENTRE            = 3,
+  LENS_DISTORTION        = 4,
+  FIELD_OF_VIEW          = 5,
+  ROC                    = 6,
+  HEIGHT                 = 7,
+  MODEL                  = 8,
+  CACHED_MESHES          = 9,
+  MAX_DISTANCE           = 10,
+  GEOMETRY               = 11,
+  RADIUS                 = 12,
+  N_INTERSECTIONS        = 13,
+  INTERSECTION_TOLERANCE = 14
 };
 
 /**
@@ -233,12 +235,16 @@ private:
                 tensorflow::TensorShapeUtils::IsScalar(context->input(Args::FOCAL_LENGTH).shape()),
                 tensorflow::errors::InvalidArgument("The focal length must be a scalar"));
     OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::FIELD_OF_VIEW).shape()),
-                tensorflow::errors::InvalidArgument("The field of view must be a scalar"));
-    OP_REQUIRES(context,
                 tensorflow::TensorShapeUtils::IsVector(context->input(Args::LENS_CENTRE).shape())
                   && context->input(Args::LENS_CENTRE).shape().dim_size(0) == 2,
                 tensorflow::errors::InvalidArgument("The lens centre must be a 2d vector of [y_size, x_size]"));
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsVector(context->input(Args::LENS_DISTORTION).shape())
+                  && context->input(Args::LENS_DISTORTION).shape().dim_size(0) == 2,
+                tensorflow::errors::InvalidArgument("The lens distortion must be a 2d vector of [y_size, x_size]"));
+    OP_REQUIRES(context,
+                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::FIELD_OF_VIEW).shape()),
+                tensorflow::errors::InvalidArgument("The field of view must be a scalar"));
     OP_REQUIRES(context,
                 tensorflow::TensorShapeUtils::IsSquareMatrix(context->input(Args::ROC).shape())
                   && context->input(Args::ROC).shape().dim_size(0) == 3,
@@ -270,8 +276,9 @@ private:
     visualmesh::vec2<int32_t> dimensions = {{int32_t(image_dimensions(1)), int32_t(image_dimensions(0))}};
     std::string projection               = *context->input(Args::PROJECTION).flat<tensorflow::string>().data();
     T focal_length                       = context->input(Args::FOCAL_LENGTH).scalar<T>()(0);
-    T fov                                = context->input(Args::FIELD_OF_VIEW).scalar<T>()(0);
     auto lens_centre                     = context->input(Args::LENS_CENTRE).flat<T>();
+    auto lens_distortion                 = context->input(Args::LENS_DISTORTION).flat<T>();
+    T fov                                = context->input(Args::FIELD_OF_VIEW).scalar<T>()(0);
     auto tRoc                            = context->input(Args::ROC).matrix<T>();
     T height                             = context->input(Args::HEIGHT).scalar<T>()(0);
     T max_distance                       = context->input(Args::MAX_DISTANCE).scalar<T>()(0);
@@ -301,8 +308,9 @@ private:
     visualmesh::Lens<T> lens;
     lens.dimensions   = dimensions;
     lens.focal_length = focal_length;
-    lens.fov          = fov;
     lens.centre       = {{lens_centre(1), lens_centre(0)}};  // Swap from tf coordinates to our coordinates
+    lens.k            = {{lens_distortion(0), lens_distortion(1)}};
+    lens.fov          = fov;
     if (projection == "EQUISOLID") {
       lens.projection = visualmesh::EQUISOLID;  //
     }
