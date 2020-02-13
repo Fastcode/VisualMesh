@@ -154,36 +154,10 @@ namespace engine {
                                                                      const void* image,
                                                                      const uint32_t& format) const {
         static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+        cl_int error                         = CL_SUCCESS;
 
-
-        // TODO CACHE THE IMAGE MEMORY OBJECT RATHER THAN RECREATING IT EVERY TIME
-
-
-        cl_image_format fmt;
-        switch (format) {
-          // Bayer
-          case fourcc("GRBG"):
-          case fourcc("RGGB"):
-          case fourcc("GBRG"):
-          case fourcc("BGGR"): fmt = cl_image_format{CL_R, CL_UNORM_INT8}; break;
-          case fourcc("BGRA"): fmt = cl_image_format{CL_BGRA, CL_UNORM_INT8}; break;
-          case fourcc("RGBA"): fmt = cl_image_format{CL_RGBA, CL_UNORM_INT8}; break;
-          // Oh no...
-          default: throw std::runtime_error("Unsupported image format " + fourcc_text(format));
-        }
-
-        cl_image_desc desc = {
-          CL_MEM_OBJECT_IMAGE2D, size_t(lens.dimensions[0]), size_t(lens.dimensions[1]), 1, 1, 0, 0, 0, 0, nullptr};
-
-        // Create a buffer for our image
-        cl_int error;
-        cl::mem cl_image(::clCreateImage(context, CL_MEM_READ_ONLY, &fmt, &desc, nullptr, &error),
-                         ::clReleaseMemObject);
-        throw_cl_error(error, "Error creating image on device");
-
-
-        // TODO END CACHE THE IMAGE OBJECT
-
+        // Grab the image memory from the cache
+        cl::mem cl_image = get_image_memory(lens.dimensions, format);
 
         // Map our image into device memory
         std::array<size_t, 3> origin = {{0, 0, 0}};
@@ -205,21 +179,8 @@ namespace engine {
         // This includes the offscreen point at the end
         int n_points = neighbourhood.size();
 
-        // Allocate the neighbourhood buffer
-
-
-        // TODO CACHE THIS BUFFER AND INCREASE ITS SIZE TO HANDLE MAX N_POINTS
-
-
-        cl::mem cl_neighbourhood(
-          ::clCreateBuffer(
-            context, CL_MEM_READ_WRITE, n_points * sizeof(std::array<int, N_NEIGHBOURS>), nullptr, &error),
-          ::clReleaseMemObject);
-        throw_cl_error(error, "Error allocating neighbourhood buffer on device");
-
-
-        // TODO END CACHE THE NEIGHBOURHOOD BUFFER
-
+        // Get the neighbourhood memory from cache
+        cl::mem cl_neighbourhood = get_neighbourhood_memory(n_points * N_NEIGHBOURS);
 
         // Upload the neighbourhood buffer
         cl::event cl_neighbourhood_loaded;
@@ -236,23 +197,10 @@ namespace engine {
         if (ev) cl_neighbourhood_loaded = cl::event(ev, ::clReleaseEvent);
         throw_cl_error(error, "Error writing neighbourhood points to the device");
 
-
-        // TODO PREALLOCATE THESE BUFFERS AND INCREASE THEM TO HOLD THE NUMBER OF POINTS WE NEED
-
-
-        // Allocate two buffers device buffers that we can ping pong
-        cl::mem cl_conv_input(
-          ::clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(Scalar) * max_width * n_points, nullptr, &error),
-          ::clReleaseMemObject);
-        throw_cl_error(error, "Error allocating ping pong buffer 1 on device");
-        cl::mem cl_conv_output(
-          ::clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(Scalar) * max_width * n_points, nullptr, &error),
-          ::clReleaseMemObject);
-        throw_cl_error(error, "Error allocating ping pong buffer 2 on device");
-
-
-        // TODO END PREALLOCATE AND CACHE PING PONG BUFFERS
-
+        // Grab our ping pong buffers from the cache
+        auto cl_conv_buffers   = get_network_memory(max_width * n_points);
+        cl::mem cl_conv_input  = cl_conv_buffers[0];
+        cl::mem cl_conv_output = cl_conv_buffers[1];
 
         // The offscreen point gets a value of -1.0 to make it easy to distinguish
         cl::event offscreen_fill_event;
@@ -375,6 +323,9 @@ namespace engine {
 
       void clear_cache() {
         device_points_cache.clear();
+        image_memory.memory     = nullptr;
+        image_memory.dimensions = {0, 0};
+        image_memory.format     = 0;
       }
 
     private:
@@ -547,6 +498,71 @@ namespace engine {
                                projected);                      // GPU event
       }
 
+      cl::mem get_image_memory(vec2<int> dimensions, uint32_t format) const {
+
+        // If our dimensions and format haven't changed from last time we can reuse the same memory location
+        if (dimensions != image_memory.dimensions || format != image_memory.format) {
+          cl_image_format fmt;
+          switch (format) {
+            // Bayer
+            case fourcc("GRBG"):
+            case fourcc("RGGB"):
+            case fourcc("GBRG"):
+            case fourcc("BGGR"): fmt = cl_image_format{CL_R, CL_UNORM_INT8}; break;
+            case fourcc("BGRA"): fmt = cl_image_format{CL_BGRA, CL_UNORM_INT8}; break;
+            case fourcc("RGBA"): fmt = cl_image_format{CL_RGBA, CL_UNORM_INT8}; break;
+            // Oh no...
+            default: throw std::runtime_error("Unsupported image format " + fourcc_text(format));
+          }
+
+          cl_image_desc desc = {
+            CL_MEM_OBJECT_IMAGE2D, size_t(dimensions[0]), size_t(dimensions[1]), 1, 1, 0, 0, 0, 0, nullptr};
+
+          // Create a buffer for our image
+          cl_int error;
+          cl::mem memory(::clCreateImage(context, CL_MEM_READ_ONLY, &fmt, &desc, nullptr, &error),
+                         ::clReleaseMemObject);
+          throw_cl_error(error, "Error creating image on device");
+
+          // Update what we are caching
+          image_memory.dimensions = dimensions;
+          image_memory.format     = format;
+          image_memory.memory     = memory;
+        }
+
+        // Return the cache
+        return image_memory.memory;
+      }
+
+      std::array<cl::mem, 2> get_network_memory(const int& max_size) const {
+        if (network_memory.max_size < max_size) {
+          cl_int error;
+          network_memory.memory[0] =
+            cl::mem(::clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(Scalar) * max_size, nullptr, &error),
+                    ::clReleaseMemObject);
+          throw_cl_error(error, "Error allocating ping pong buffer 1 on device");
+          network_memory.memory[1] =
+            cl::mem(::clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(Scalar) * max_size, nullptr, &error),
+                    ::clReleaseMemObject);
+          network_memory.max_size = max_size;
+          throw_cl_error(error, "Error allocating ping pong buffer 2 on device");
+        }
+        return network_memory.memory;
+      }
+
+      cl::mem get_neighbourhood_memory(const int& max_size) const {
+
+        if (neighbourhood_memory.max_size < max_size) {
+          cl_int error;
+          neighbourhood_memory.memory =
+            cl::mem(::clCreateBuffer(context, CL_MEM_READ_WRITE, max_size * sizeof(int), nullptr, &error),
+                    ::clReleaseMemObject);
+          throw_cl_error(error, "Error allocating neighbourhood buffer on device");
+          neighbourhood_memory.max_size = max_size;
+        }
+        return neighbourhood_memory.memory;
+      }
+
       /// OpenCL context
       cl::context context;
 
@@ -565,6 +581,22 @@ namespace engine {
       cl::kernel load_image;
       /// A list of kernels to run in sequence to run the network
       std::vector<std::pair<cl::kernel, size_t>> conv_layers;
+
+      mutable struct {
+        vec2<int> dimensions = {0, 0};
+        uint32_t format      = 0;
+        cl::mem memory;
+      } image_memory;
+
+      mutable struct {
+        int max_size = 0;
+        std::array<cl::mem, 2> memory;
+      } network_memory;
+
+      mutable struct {
+        int max_size = 0;
+        cl::mem memory;
+      } neighbourhood_memory;
 
       // The width of the maximumally wide layer in the network
       size_t max_width;
