@@ -136,12 +136,16 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> find_mesh(
     }
   }
 
-  // Swap it to the top of the list so we can keep somewhat of which items are most used
-  std::iter_swap(meshes.begin(), best_it);
-
   // If it was good enough return it, otherwise return null
-  return best_error <= t ? *best_it : nullptr;
-};
+  if (best_error <= t) {
+    // Swap it to the top of the list so we can keep somewhat of which items are most used
+    std::iter_swap(meshes.begin(), best_it);
+    return *best_it;
+  }
+  else {
+    return nullptr;
+  }
+}
 
 /**
  * @brief Lookup or create an appropriate Visual Mesh to use for this lens and height given the provided tolerances
@@ -322,7 +326,7 @@ private:
     }
 
     // Project the mesh using our engine and shape
-    visualmesh::engine::cpu::Engine<T, Model> engine;
+    visualmesh::engine::cpu::Engine<T> engine;
     visualmesh::ProjectedMesh<T, Model<T>::N_NEIGHBOURS> projected;
 
     if (geometry == "SPHERE") {
@@ -411,13 +415,13 @@ public:
 // Register a version for all the combinations of float/double and int32/int64
 REGISTER_KERNEL_BUILDER(
   Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<tensorflow::int32>("U"),
-  VisualMeshOp<float, tensorflow::int32>);
+  VisualMeshOp<float, tensorflow::int32>)
 REGISTER_KERNEL_BUILDER(
   Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<tensorflow::int64>("U"),
-  VisualMeshOp<float, tensorflow::int64>);
+  VisualMeshOp<float, tensorflow::int64>)
 REGISTER_KERNEL_BUILDER(
   Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T").TypeConstraint<tensorflow::int32>("U"),
-  VisualMeshOp<double, tensorflow::int32>);
+  VisualMeshOp<double, tensorflow::int32>)
 REGISTER_KERNEL_BUILDER(
   Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T").TypeConstraint<tensorflow::int64>("U"),
-  VisualMeshOp<double, tensorflow::int64>);
+  VisualMeshOp<double, tensorflow::int64>)

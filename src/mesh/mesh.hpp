@@ -28,9 +28,9 @@
 #include "../example/ArrayPrint.hpp"
 #include "lens.hpp"
 #include "node.hpp"
-#include "util/cone.hpp"
-#include "util/math.hpp"
-#include "util/projection.hpp"
+#include "utility/cone.hpp"
+#include "utility/math.hpp"
+#include "utility/projection.hpp"
 
 namespace visualmesh {
 

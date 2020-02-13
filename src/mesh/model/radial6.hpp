@@ -19,8 +19,6 @@
 #define VISUALMESH_MODEL_RADIAL6_HPP
 
 #include <array>
-#include <fstream>
-#include <iostream>
 #include <vector>
 
 #include "mesh/node.hpp"

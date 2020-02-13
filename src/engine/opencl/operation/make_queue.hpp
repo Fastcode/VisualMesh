@@ -15,35 +15,37 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_NODE_HPP
-#define VISUALMESH_NODE_HPP
+#ifndef VISUALMESH_OPENCL_OPERATION_MAKE_QUEUE_HPP
+#define VISUALMESH_OPENCL_OPERATION_MAKE_QUEUE_HPP
 
-#include <array>
-
-#include "utility/math.hpp"
+#include "wrapper.hpp"
 
 namespace visualmesh {
+namespace engine {
+  namespace opencl {
+    namespace operation {
 
-/**
- * @brief This represents a single node in the visual mesh.
- *
- * @details
- *  A single node in the visual mesh is a single point, it is made up of a vector in observation plane space that points
- *  to the position, as well as a list of neighbours that are connected to this point. A collection of these with each
- *  having neighbours pointing to indices of other points in the list make up a Visual Mesh. The neighbours are ordered
- *  in a clockwise fashion.
- *
- * @tparam Scalar     the scalar type used for calculations and storage (normally one of float or double)
- * @tparam Neighbours the number of neighbours that each point has
- */
-template <typename Scalar, size_t Neighbours>
-struct Node {
-  /// The unit vector in the direction for this node
-  vec3<Scalar> ray;
-  /// Absolute indices to the linked nodes ordered L, TL, TR, R, BR, BL (clockwise)
-  std::array<int, Neighbours> neighbours;
-};
+      /**
+       * @brief Make an OpenCL command queue
+       *
+       * @param context the context to make the queue for
+       * @param device  the device to make the queue for
+       *
+       * @return cl::command_queue a reference counted tracker of a command queu
+       */
+      inline cl::command_queue make_queue(cl_context context, cl_device_id device) {
+        cl_command_queue queue;
+        cl_int error;
+        // Use out of order execution if we can
+        queue = ::clCreateCommandQueue(context, device, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &error);
+        if (error == CL_INVALID_VALUE) { queue = ::clCreateCommandQueue(context, device, 0, &error); }
+        throw_cl_error(error, "Error creating the OpenCL command queue");
+        return cl::command_queue(queue, ::clReleaseCommandQueue);
+      }
 
+    }  // namespace operation
+  }    // namespace opencl
+}  // namespace engine
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_NODE_HPP
+#endif  // VISUALMESH_OPENCL_OPERATION_MAKE_QUEUE_HPP

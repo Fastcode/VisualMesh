@@ -25,18 +25,15 @@
 #include "mesh/mesh.hpp"
 #include "mesh/network_structure.hpp"
 #include "mesh/projected_mesh.hpp"
-#include "util/fourcc.hpp"
+#include "utility/fourcc.hpp"
 #include "visualmesh.hpp"
 
 namespace visualmesh {
 namespace engine {
   namespace cpu {
 
-    template <typename Scalar, template <typename> class Model>
+    template <typename Scalar>
     class Engine {
-    private:
-      static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
-
     public:
       Engine() {}
 
@@ -57,9 +54,11 @@ namespace engine {
         }
       }
 
+      template <template <typename> class Model>
       ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Model>& mesh,
                                                                  const mat4<Scalar>& Hoc,
                                                                  const Lens<Scalar>& lens) const {
+        static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
         // Lookup the on screen ranges
         auto ranges = mesh.lookup(Hoc, lens);
@@ -104,9 +103,9 @@ namespace engine {
         }
 
         // Build our local neighbourhood map
-        std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>> neighbourhood(n_points + 1);  // +1 for the null point
+        std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood(n_points + 1);  // +1 for the null point
         for (unsigned int i = 0; i < n_points; ++i) {
-          const Node<Scalar, Model<Scalar>::N_NEIGHBOURS>& node = nodes[global_indices[i]];
+          const Node<Scalar, N_NEIGHBOURS>& node = nodes[global_indices[i]];
           for (unsigned int j = 0; j < node.neighbours.size(); ++j) {
             const auto& n       = node.neighbours[j];
             neighbourhood[i][j] = r_lookup[n];
@@ -115,10 +114,11 @@ namespace engine {
         // Last point is the null point
         neighbourhood[n_points].fill(n_points);
 
-        return ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS>{
+        return ProjectedMesh<Scalar, N_NEIGHBOURS>{
           std::move(pixels), std::move(neighbourhood), std::move(global_indices)};
       }
 
+      template <template <typename> class Model>
       inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const VisualMesh<Scalar, Model>& mesh,
                                                                         const mat4<Scalar>& Hoc,
                                                                         const Lens<Scalar>& lens) const {
@@ -128,11 +128,13 @@ namespace engine {
       /**
        * Classify using the visual mesh network architecture provided.
        */
-      ClassifiedMesh<Scalar, N_NEIGHBOURS> operator()(const Mesh<Scalar, Model>& mesh,
-                                                      const mat4<Scalar>& Hoc,
-                                                      const Lens<Scalar>& lens,
-                                                      const void* image,
-                                                      const uint32_t& format) const {
+      template <template <typename> class Model>
+      ClassifiedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> operator()(const Mesh<Scalar, Model>& mesh,
+                                                                     const mat4<Scalar>& Hoc,
+                                                                     const Lens<Scalar>& lens,
+                                                                     const void* image,
+                                                                     const uint32_t& format) const {
+        static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
         // Project the pixels to the display
         ProjectedMesh<Scalar, N_NEIGHBOURS> projected = project(mesh, Hoc, lens);
@@ -257,11 +259,12 @@ namespace engine {
                                                     std::move(input)};
       }
 
-      ClassifiedMesh<Scalar, N_NEIGHBOURS> operator()(const VisualMesh<Scalar, Model>& mesh,
-                                                      const mat4<Scalar>& Hoc,
-                                                      const Lens<Scalar>& lens,
-                                                      const void* image,
-                                                      const uint32_t& format) const {
+      template <template <typename> class Model>
+      ClassifiedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> operator()(const VisualMesh<Scalar, Model>& mesh,
+                                                                     const mat4<Scalar>& Hoc,
+                                                                     const Lens<Scalar>& lens,
+                                                                     const void* image,
+                                                                     const uint32_t& format) const {
         return operator()(mesh.height(Hoc[2][3]), Hoc, lens, image, format);
       }
 

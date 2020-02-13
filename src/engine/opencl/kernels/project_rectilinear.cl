@@ -16,7 +16,7 @@
  */
 
 /**
- * Project visual mesh points to a rectilinear camera
+ * Projects visual mesh points to a rectilinear camera
  *
  * @param points      VisualMesh unit vectors as 4d vectors [x, y, z, 0]
  * @param indices     map from local indices to global indices
@@ -30,12 +30,12 @@
  * @param out         the output image coordinates
  */
 kernel void project_rectilinear(global const Scalar4* points,
-                                global const int* indices,
+                                global int* indices,
                                 const Scalar16 Rco,
                                 const Scalar f,
-                                const int2 dimensions,
                                 const Scalar2 centre,
                                 const Scalar4 k,
+                                const int2 dimensions,
                                 global Scalar2* out) {
 
   const int index = get_global_id(0);

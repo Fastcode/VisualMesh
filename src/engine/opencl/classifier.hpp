@@ -15,8 +15,8 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_OPENCL_CLASSIFIER_H
-#define VISUALMESH_OPENCL_CLASSIFIER_H
+#ifndef VISUALMESH_OPENCL_CLASSIFIER_HPP
+#define VISUALMESH_OPENCL_CLASSIFIER_HPP
 
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #if defined(__APPLE__) || defined(__MACOSX)
@@ -37,7 +37,7 @@
 #include "mesh/classified_mesh.hpp"
 #include "mesh/mesh.hpp"
 #include "mesh/network_structure.hpp"
-#include "util/fourcc.hpp"
+#include "utility/fourcc.hpp"
 
 namespace visualmesh {
 namespace engine {
@@ -482,4 +482,4 @@ namespace engine {
 }  // namespace engine
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_OPENCL_CLASSIFIER_H
+#endif  // VISUALMESH_OPENCL_CLASSIFIER_HPP

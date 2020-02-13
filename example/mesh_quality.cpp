@@ -1,4 +1,3 @@
-
 #include <iomanip>
 #include <iostream>
 
@@ -13,8 +12,8 @@
 #include "mesh/model/ring4.hpp"
 #include "mesh/model/ring6.hpp"
 #include "mesh/model/xgrid4.hpp"
-#include "util/math.hpp"
-#include "util/phi_difference.hpp"
+#include "utility/math.hpp"
+#include "utility/phi_difference.hpp"
 #include "visualmesh.hpp"
 
 template <typename Scalar>
@@ -142,8 +141,7 @@ void print_quality(const std::vector<NodeQuality<Scalar, Neighbours>>& nodes, co
     radial_var.update(visualmesh::multiply(v, v));
     auto c = visualmesh::subtract(visualmesh::multiply(node.cyclical, k), cyclical.means);
     cyclical_var.update(visualmesh::multiply(c, c));
-    auto a = visualmesh::subtract(visualmesh::multiply(node.angular, Scalar(Neighbours * (M_PI * 2.0))),
-                                  angular.means);
+    auto a = visualmesh::subtract(visualmesh::multiply(node.angular, Scalar(Neighbours * (M_PI * 2.0))), angular.means);
     angular_var.update(visualmesh::multiply(a, a));
   }
 

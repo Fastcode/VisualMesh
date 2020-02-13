@@ -34,7 +34,7 @@ endif()
 if(MSVC)
   add_compile_options(/W4 /WX)
 else()
-  add_compile_options(-Wall -Wextra -Werror)
+  add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 # All the header files for this library
@@ -102,15 +102,26 @@ if(TOP_LEVEL_PROJECT)
     find_package(OpenCL REQUIRED)
     find_package(Threads REQUIRED)
 
-    add_executable(main "example/main.cpp" ${hdr})
-    target_compile_options(main PRIVATE -march=native -mtune=native)
-    set_target_properties(main PROPERTIES CXX_STANDARD 14)
-    target_include_directories(main SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
-    target_include_directories(main SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
-    target_include_directories(main PRIVATE ${PROJECT_SOURCE_DIR}/src)
-    target_include_directories(main PRIVATE ${PROJECT_BINARY_DIR}/src)
+    add_executable(classified "example/classified.cpp" ${hdr})
+    target_compile_options(classified PRIVATE -march=native -mtune=native)
+    set_target_properties(classified PROPERTIES CXX_STANDARD 14)
+    target_include_directories(classified SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_include_directories(classified SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
+    target_include_directories(classified PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_include_directories(classified PRIVATE ${PROJECT_BINARY_DIR}/src)
     target_link_libraries(
-      main ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES} Threads::Threads
+      classified ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES} Threads::Threads
+    )
+
+    add_executable(mesh_types "example/mesh_types.cpp" ${hdr})
+    target_compile_options(mesh_types PRIVATE -march=native -mtune=native)
+    set_target_properties(mesh_types PROPERTIES CXX_STANDARD 14)
+    target_include_directories(mesh_types SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_include_directories(mesh_types SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
+    target_include_directories(mesh_types PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_include_directories(mesh_types PRIVATE ${PROJECT_BINARY_DIR}/src)
+    target_link_libraries(
+      mesh_types ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES} Threads::Threads
     )
 
     add_executable(mesh_quality "example/mesh_quality.cpp" ${hdr})
@@ -118,5 +129,12 @@ if(TOP_LEVEL_PROJECT)
     set_target_properties(mesh_quality PROPERTIES CXX_STANDARD 14)
     target_include_directories(mesh_quality PRIVATE ${PROJECT_SOURCE_DIR}/src)
     target_include_directories(mesh_quality PRIVATE ${PROJECT_BINARY_DIR}/src)
+
+    add_executable(benchmark "example/benchmark.cpp" ${hdr})
+    target_compile_options(benchmark PRIVATE -march=native -mtune=native)
+    set_target_properties(benchmark PROPERTIES CXX_STANDARD 14)
+    target_include_directories(benchmark PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_include_directories(benchmark PRIVATE ${PROJECT_BINARY_DIR}/src)
+
   endif(BUILD_EXAMPLE)
 endif(TOP_LEVEL_PROJECT)

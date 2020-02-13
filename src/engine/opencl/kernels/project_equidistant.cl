@@ -49,7 +49,7 @@ kernel void project_equidistant(global const Scalar4* points,
   // Rotate our ray by our matrix to put it into camera space
   ray = (Scalar4)(dot(Rco.s0123, ray), dot(Rco.s4567, ray), dot(Rco.s89ab, ray), 0);
 
-// Calculate some intermediates
+  // Calculate some intermediates
   const Scalar theta      = acos(ray.x);
   const Scalar rsin_theta = rsqrt((Scalar)(1.0) - ray.x * ray.x);
   const Scalar r_u        = f * theta;

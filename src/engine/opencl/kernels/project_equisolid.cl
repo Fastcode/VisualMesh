@@ -33,9 +33,9 @@ kernel void project_equisolid(global const Scalar4* points,
                               global int* indices,
                               const Scalar16 Rco,
                               const Scalar f,
-                              const int2 dimensions,
                               const Scalar2 centre,
                               const Scalar4 k,
+                              const int2 dimensions,
                               global Scalar2* out) {
 
   const int index = get_global_id(0);
