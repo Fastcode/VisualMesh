@@ -323,9 +323,13 @@ namespace engine {
 
       void clear_cache() {
         device_points_cache.clear();
-        image_memory.memory     = nullptr;
-        image_memory.dimensions = {0, 0};
-        image_memory.format     = 0;
+        image_memory.memory           = nullptr;
+        image_memory.dimensions       = {0, 0};
+        image_memory.format           = 0;
+        neighbourhood_memory.memory   = nullptr;
+        neighbourhood_memory.max_size = 0;
+        network_memory.memory         = {nullptr, nullptr};
+        network_memory.max_size       = 0;
       }
 
     private:
