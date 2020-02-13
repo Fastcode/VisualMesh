@@ -30,6 +30,15 @@ namespace engine {
   namespace opencl {
     namespace operation {
 
+      /**
+       * @brief Given a network structure object generate the OpenCL source code for the kernels needed to execute it
+       *
+       * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+       *
+       * @param structure the network structure to generate the kernels from
+       *
+       * @return the OpenCL source code for the kernels to be built
+       */
       template <typename Scalar>
       std::string make_network(const network_structure_t<Scalar>& structure) {
         // Generate the OpenCL kernels for the network

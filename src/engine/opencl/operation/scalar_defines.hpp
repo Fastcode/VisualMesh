@@ -26,7 +26,7 @@ namespace engine {
     namespace operation {
 
       /**
-       * @brief Get the scalar defines for floating point
+       * @brief Get the scalar defines for single precision floating point
        *
        * @return a string containing the defines that are needed if the Scalar type is float
        */
@@ -40,7 +40,7 @@ namespace engine {
       }
 
       /**
-       * @brief Get the scalar defines for double  point
+       * @brief Get the scalar defines for double precision floating point
        *
        * @return a string containing the defines that are needed if the Scalar type is double
        */

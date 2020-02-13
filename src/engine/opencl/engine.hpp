@@ -43,9 +43,24 @@ namespace visualmesh {
 namespace engine {
   namespace opencl {
 
+    /**
+     * @brief An OpenCL implementation of the visual mesh inference engine
+     *
+     * @details
+     *  The OpenCL implementation is designed to be used for high performance inference. It is able to take advantage of
+     *  either GPUs from Intel, AMD, ARM, NVIDIA etc as well as multithreaded CPU implementations. This allows it to be
+     *  very flexible with its deployment on devices.
+     *
+     * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+     */
     template <typename Scalar>
     class Engine {
     public:
+      /**
+       * @brief Construct a new OpenCL Engine object
+       *
+       * @param structure the network structure to use classification
+       */
       Engine(const network_structure_t<Scalar>& structure = {}) : max_width(4) {
 
         // Create the OpenCL context and command queue
@@ -110,6 +125,17 @@ namespace engine {
         }
       }
 
+      /**
+       * @brief Projects a provided mesh to pixel coordinates
+       *
+       * @tparam Model the mesh model that we are projecting
+       *
+       * @param mesh the mesh table that we are projecting to pixel coordinates
+       * @param Hoc  the homogenous transformation matrix from the camera to the observation plane
+       * @param lens the lens parameters that describe the optics of the camera
+       *
+       * @return a projected mesh for the provided arguments
+       */
       template <template <typename> class Model>
       inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Model>& mesh,
                                                                         const mat4<Scalar>& Hoc,
@@ -140,6 +166,17 @@ namespace engine {
         return ProjectedMesh<Scalar, N_NEIGHBOURS>{std::move(pixels), std::move(neighbourhood), std::move(indices)};
       }
 
+      /**
+       * @brief Projects a provided mesh to pixel coordinates from an aggregate VisualMesh object
+       *
+       * @tparam Model the mesh model that we are projecting
+       *
+       * @param mesh the mesh table that we are projecting to pixel coordinates
+       * @param Hoc  the homogenous transformation matrix from the camera to the observation plane
+       * @param lens the lens parameters that describe the optics of the camera
+       *
+       * @return a projected mesh for the provided arguments
+       */
       template <template <typename> class Model>
       inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const VisualMesh<Scalar, Model>& mesh,
                                                                         const mat4<Scalar>& Hoc,
@@ -147,6 +184,19 @@ namespace engine {
         return project(mesh.height(Hoc[2][3]), Hoc, lens);
       }
 
+      /**
+       * @brief Project and classify a mesh using the neural network that is loaded into this engine
+       *
+       * @tparam Model the mesh model that we are projecting
+       *
+       * @param mesh    the mesh table that we are projecting to pixel coordinates
+       * @param Hoc     the homogenous transformation matrix from the camera to the observation plane
+       * @param lens    the lens parameters that describe the optics of the camera
+       * @param image   the data that represents the image the network will run from
+       * @param format  the pixel format of this image as a fourcc code
+       *
+       * @return a classified mesh for the provided arguments
+       */
       template <template <typename> class Model>
       ClassifiedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> operator()(const Mesh<Scalar, Model>& mesh,
                                                                      const mat4<Scalar>& Hoc,
@@ -312,6 +362,20 @@ namespace engine {
           std::move(pixels), std::move(neighbourhood), std::move(indices), std::move(classifications)};
       }
 
+      /**
+       * @brief Project and classify a mesh using the neural network that is loaded into this engine.
+       * This version takes an aggregate VisualMesh object
+       *
+       * @tparam Model the mesh model that we are projecting
+       *
+       * @param mesh    the mesh table that we are projecting to pixel coordinates
+       * @param Hoc     the homogenous transformation matrix from the camera to the observation plane
+       * @param lens    the lens parameters that describe the optics of the camera
+       * @param image   the data that represents the image the network will run from
+       * @param format  the pixel format of this image as a fourcc code
+       *
+       * @return a classified mesh for the provided arguments
+       */
       template <template <typename> class Model>
       ClassifiedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> operator()(const VisualMesh<Scalar, Model>& mesh,
                                                                      const mat4<Scalar>& Hoc,

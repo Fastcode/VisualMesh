@@ -35,6 +35,12 @@ namespace visualmesh {
 namespace engine {
   namespace opencl {
 
+    /**
+     * @brief A shorthand function to throw an OpenCL system error if the error code is not success
+     *
+     * @param code  the error code to check and throw
+     * @param msg   the message to attach to the exception if it is thrown
+     */
     void throw_cl_error(const cl_int& code, const std::string& msg) {
       if (code != CL_SUCCESS) { throw std::system_error(code, operation::opencl_error_category(), msg); }
     }

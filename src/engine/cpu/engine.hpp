@@ -32,13 +32,26 @@ namespace visualmesh {
 namespace engine {
   namespace cpu {
 
+    /**
+     * @brief The reference CPU implementation of the visual mesh inference engine
+     *
+     * @details
+     *  The CPU implementation is designed to be a simple implementation of the visual mesh projection and
+     *  classification code. It is only single threaded and is not designed to be used in high performance contexts.
+     *  For those use another implementation that is able to take advantage of other system features such as GPUs or
+     *  multithreading.
+     *
+     * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+     */
     template <typename Scalar>
     class Engine {
     public:
-      Engine() {}
-
-      Engine(const network_structure_t<Scalar>& structure) : structure(structure) {
-
+      /**
+       * @brief Construct a new CPU Engine object
+       *
+       * @param structure the network structure to use classification
+       */
+      Engine(const network_structure_t<Scalar>& structure = {}) : structure(structure) {
         // Transpose all the weights matrices to make it easier for us to multiply against
         for (auto& conv : this->structure) {
           for (auto& layer : conv) {
@@ -54,6 +67,17 @@ namespace engine {
         }
       }
 
+      /**
+       * @brief Projects a provided mesh to pixel coordinates
+       *
+       * @tparam Model the mesh model that we are projecting
+       *
+       * @param mesh the mesh table that we are projecting to pixel coordinates
+       * @param Hoc  the homogenous transformation matrix from the camera to the observation plane
+       * @param lens the lens parameters that describe the optics of the camera
+       *
+       * @return a projected mesh for the provided arguments
+       */
       template <template <typename> class Model>
       ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Model>& mesh,
                                                                  const mat4<Scalar>& Hoc,
@@ -118,6 +142,17 @@ namespace engine {
           std::move(pixels), std::move(neighbourhood), std::move(global_indices)};
       }
 
+      /**
+       * @brief Projects a provided mesh to pixel coordinates from an aggregate VisualMesh object
+       *
+       * @tparam Model the mesh model that we are projecting
+       *
+       * @param mesh the mesh table that we are projecting to pixel coordinates
+       * @param Hoc  the homogenous transformation matrix from the camera to the observation plane
+       * @param lens the lens parameters that describe the optics of the camera
+       *
+       * @return a projected mesh for the provided arguments
+       */
       template <template <typename> class Model>
       inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const VisualMesh<Scalar, Model>& mesh,
                                                                         const mat4<Scalar>& Hoc,
@@ -126,7 +161,17 @@ namespace engine {
       }
 
       /**
-       * Classify using the visual mesh network architecture provided.
+       * @brief Project and classify a mesh using the neural network that is loaded into this engine
+       *
+       * @tparam Model the mesh model that we are projecting
+       *
+       * @param mesh    the mesh table that we are projecting to pixel coordinates
+       * @param Hoc     the homogenous transformation matrix from the camera to the observation plane
+       * @param lens    the lens parameters that describe the optics of the camera
+       * @param image   the data that represents the image the network will run from
+       * @param format  the pixel format of this image as a fourcc code
+       *
+       * @return a classified mesh for the provided arguments
        */
       template <template <typename> class Model>
       ClassifiedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> operator()(const Mesh<Scalar, Model>& mesh,
@@ -259,6 +304,20 @@ namespace engine {
                                                     std::move(input)};
       }
 
+      /**
+       * @brief Project and classify a mesh using the neural network that is loaded into this engine.
+       * This version takes an aggregate VisualMesh object
+       *
+       * @tparam Model the mesh model that we are projecting
+       *
+       * @param mesh    the mesh table that we are projecting to pixel coordinates
+       * @param Hoc     the homogenous transformation matrix from the camera to the observation plane
+       * @param lens    the lens parameters that describe the optics of the camera
+       * @param image   the data that represents the image the network will run from
+       * @param format  the pixel format of this image as a fourcc code
+       *
+       * @return a classified mesh for the provided arguments
+       */
       template <template <typename> class Model>
       ClassifiedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> operator()(const VisualMesh<Scalar, Model>& mesh,
                                                                      const mat4<Scalar>& Hoc,
@@ -272,9 +331,9 @@ namespace engine {
       /// The network structure used to perform the operations
       network_structure_t<Scalar> structure;
 
-      /// An input buffer used to ping/pong when doing classification so we don't have to reuse them
+      /// An input buffer used to ping/pong when doing classification so we don't have to remake them
       mutable std::vector<Scalar> input;
-      /// An output buffer used to ping/pong when doing classification so we don't have to reuse them
+      /// An output buffer used to ping/pong when doing classification so we don't have to remake them
       mutable std::vector<Scalar> output;
     };
 

@@ -32,6 +32,7 @@ namespace engine {
        * @brief Find and create an OpenCL command context for a specific device. Or the best device if a specific device
        * is not provided.
        *
+       * @return a pair of the context that was created as well as the device it was created for
        */
       inline std::pair<cl::context, cl_device_id> make_context() {
 

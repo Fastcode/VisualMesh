@@ -31,7 +31,7 @@ namespace engine {
        * @param context the context to make the queue for
        * @param device  the device to make the queue for
        *
-       * @return cl::command_queue a reference counted tracker of a command queu
+       * @return a reference counted tracker of a command queue
        */
       inline cl::command_queue make_queue(cl_context context, cl_device_id device) {
         cl_command_queue queue;

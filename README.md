@@ -163,28 +163,35 @@ Currently there are two engines that are supported when using the Visual Mesh.
 The first of these is the CPU engine.
 This is a basic engine that utilises normal c++ code to execute the Visual Mesh.
 If you intend to use the CPU to execute the visual mesh and have OpenCL available, the OpenCL implementation on the CPU is faster than this one.
+The CPU implementation is designed to be a simple implementation for testing and understandability.
 
 The second engine is an OpenCL based engine.
 This engine utilises OpenCL and therefore can execute on a large variety of hardware and take advantage of multiprocessing.
 The hardware it can execute on includes CPUs, Intel integrated GPUs and most NVIDIA or AMD GPUs.
 One unfortunate omission to this is that the Jetson TX2 is unable to execute OpenCL code because NVIDIA are a bunch of evil people who hate things they don't control.
 
-An example usage can be found in the example folder [here](./example/main.cpp).
+An example usage can be found in the example folder [here](./example).
 Or alternatively this is the basic usage.
 ```cpp
 #include "visualmesh.hpp"
 #include "engine/opencl/opencl_engine.hpp"
 
 int main() {
-  // Paramters are radius, number of sample points, maximum distance to project
-  visualmesh::geometry::Sphere<float> sphere(0.075, 5, 10);
-  // Paramters are shape, minimum height to generate a LUT for
-  // maximum height to generate a LUT for and the number of LUTs to generate
-  visualmesh::VisualMesh<float, visualmesh::engine::opencl::Engine> mesh(sphere, 0.5, 1.5, 100);
+  // Create a geometry that will be used to describe your space
+  // A sphere is described using a single paramter (radius)
+  visualmesh::geometry::Sphere<float> sphere(0.075, 5);
 
-  // When making a classifier make sure to keep a reference to the mesh that created it as it uses it internally
+  // Generate a lookup table of visual mesh points given a specific model
+  // This function takes a geometry, a minimum and maximum height,
+  // a maximum amount of error in number of intersections, and a maximum distance
+  visualmesh::VisualMesh<float, visualmesh::model::Ring6> mesh(sphere, 0.5, 1.5, 6, 0.5, 20);
+
+  // Create an engine that will run the inferences for you.
+  // These objects are not thread safe so don't use them from multiple threads at once
+  // If you want to boost your performance and make better utilisation of your hardware
+  // you can make multiple instances of these objects and pass different images to each one
   // The mesh structure type can be found in src/mesh/network_structure.hpp
-  auto classifier = mesh.make_classifier(structure);
+  visualmesh::engine::opencl::Engine<Scalar> engine(structure);
 
   // Construct an image the lens and transformation matrix from camera to ground and get it's fourcc code
   void* image_data;
@@ -192,7 +199,8 @@ int main() {
   visualmesh::mat4<float> Hoc; // A homogenous transformation matrix from the camera to the observation plane
   visualmesh::Lens<float> lens;
 
-  visualmesh::ClassifiedMesh<float> classified = classifier(mesh.height(camera_height), image_data, fourcc_code, Hoc, lens);
+  // Perform a classification using the engine
+  visualmesh::ClassifiedMesh<float> classified = engine(mesh, Hoc, lens, image_data, fourcc_code);
 
   // The classified variable now contains a visual mesh that has been executed by the network.
 }
@@ -206,6 +214,9 @@ Style guides are enforced by clang-format for c++ and yapf for python.
 If you would like to contribute to this project, an engine that executes using [Vulkan](https://www.khronos.org/vulkan/), [OpenGL](https://www.opengl.org/), or [CUDA](https://developer.nvidia.com/cuda-zone) would be appreciated.
 Also if you use a different lens geometry or image format that is not supported, additions to the current code is welcome.
 
-<!-- ## Citing
+## Citing
 
-If you use the VisualMesh in your work, please cite it -->
+If you use the VisualMesh in your work, please cite it
+```
+Houliston T., Chalup S.K. (2019) Visual Mesh: Real-Time Object Detection Using Constant Sample Density. In: Holz D., Genter K., Saad M., von Stryk O. (eds) RoboCup 2018: Robot World Cup XXII. RoboCup 2018. Lecture Notes in Computer Science, vol 11374. Springer, Cham
+```
