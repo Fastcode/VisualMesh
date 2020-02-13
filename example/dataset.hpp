@@ -32,7 +32,7 @@
 #include "utility/math.hpp"
 
 template <typename Scalar>
-struct DatasetElement {
+struct dataset_element {
   std::string number;
   cv::Mat image;
   visualmesh::Lens<Scalar> lens;
@@ -40,18 +40,18 @@ struct DatasetElement {
 };
 
 template <typename Scalar>
-std::vector<DatasetElement<Scalar>> load_dataset(const std::string& path) {
+std::vector<dataset_element<Scalar>> load_dataset(const std::string& path) {
 
   auto dir = ::opendir(path.c_str());
 
   if (dir != nullptr) {
-    std::vector<DatasetElement<Scalar>> dataset;
+    std::vector<dataset_element<Scalar>> dataset;
     for (dirent* ent = readdir(dir); ent != nullptr; ent = readdir(dir)) {
       auto file = std::string(ent->d_name);
 
       if (file.substr(0, 4) == "lens" && !(ent->d_type & DT_DIR)) {
 
-        DatasetElement<Scalar> element;
+        dataset_element<Scalar> element;
 
         // Extract the number so we can find the other files
         element.number         = file.substr(4, 7);

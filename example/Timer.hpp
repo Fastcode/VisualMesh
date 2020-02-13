@@ -19,6 +19,7 @@
 #define TIMER_HPP
 
 #include <chrono>
+#include <iostream>
 
 /**
  * @brief Easily time events while removing the influence of the timer as much as possible

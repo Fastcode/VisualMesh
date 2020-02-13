@@ -124,17 +124,22 @@ if(TOP_LEVEL_PROJECT)
       mesh_types ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES} Threads::Threads
     )
 
+    add_executable(benchmark "example/benchmark.cpp" ${hdr})
+    target_compile_options(benchmark PRIVATE -march=native -mtune=native)
+    set_target_properties(benchmark PROPERTIES CXX_STANDARD 14)
+    target_include_directories(benchmark SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_include_directories(benchmark SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
+    target_include_directories(benchmark PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_include_directories(benchmark PRIVATE ${PROJECT_BINARY_DIR}/src)
+    target_link_libraries(
+      benchmark ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES} Threads::Threads
+    )
+
     add_executable(mesh_quality "example/mesh_quality.cpp" ${hdr})
     target_compile_options(mesh_quality PRIVATE -march=native -mtune=native)
     set_target_properties(mesh_quality PROPERTIES CXX_STANDARD 14)
     target_include_directories(mesh_quality PRIVATE ${PROJECT_SOURCE_DIR}/src)
     target_include_directories(mesh_quality PRIVATE ${PROJECT_BINARY_DIR}/src)
-
-    add_executable(benchmark "example/benchmark.cpp" ${hdr})
-    target_compile_options(benchmark PRIVATE -march=native -mtune=native)
-    set_target_properties(benchmark PROPERTIES CXX_STANDARD 14)
-    target_include_directories(benchmark PRIVATE ${PROJECT_SOURCE_DIR}/src)
-    target_include_directories(benchmark PRIVATE ${PROJECT_BINARY_DIR}/src)
 
   endif(BUILD_EXAMPLE)
 endif(TOP_LEVEL_PROJECT)

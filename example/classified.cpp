@@ -17,6 +17,7 @@
 #include "engine/cpu/engine.hpp"
 #include "engine/opencl/engine.hpp"
 #include "geometry/Sphere.hpp"
+#include "mesh/network_structure.hpp"
 #include "utility/fourcc.hpp"
 #include "visualmesh.hpp"
 
@@ -50,7 +51,7 @@ int main() {
   Timer t;
 
   // Build our classification network
-  std::vector<std::vector<std::pair<std::vector<std::vector<Scalar>>, std::vector<Scalar>>>> network;
+  visualmesh::network_structure_t<Scalar> network;
   YAML::Node config = YAML::LoadFile(model_path);
   for (const auto& conv : config) {
     network.emplace_back();

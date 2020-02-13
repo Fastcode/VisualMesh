@@ -68,7 +68,7 @@ namespace engine {
         size_t csize       = source.size();
 
         program = cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
-        throw_cl_error(error, "Error adding sources to projection program");
+        throw_cl_error(error, "Error adding sources to OpenCL program");
 
         // Compile the program
         error = ::clBuildProgram(
@@ -81,7 +81,7 @@ namespace engine {
           ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
 
           // Throw an error with the build log
-          throw_cl_error(error, "Error building projection program\n" + std::string(log.begin(), log.begin() + used));
+          throw_cl_error(error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
         }
 
         project_rectilinear = cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
