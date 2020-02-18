@@ -214,7 +214,7 @@ namespace engine {
         // Descriptor Set 1: {image, coordinates, network}
         load_image_bindings.emplace_back();
         load_image_bindings.back().emplace_back(
-          0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr);
+          0, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eAll, nullptr);
         load_image_bindings.back().emplace_back(
           1, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr);
         load_image_bindings.back().emplace_back(

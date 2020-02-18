@@ -332,8 +332,8 @@ namespace engine {
         uint32_t interp_sampler = program.add_variable(sampler_ptr, spv::StorageClass::UniformConstant);
 
         // Prepare the image, coordinates array, and network array variables.
-        uint32_t image_ptr = program.add_variable(program.add_pointer(image_id, spv::StorageClass::UniformConstant),
-                                                  spv::StorageClass::UniformConstant);
+        uint32_t image_ptr =
+          program.add_variable(program.add_pointer(image_id, spv::StorageClass::Image), spv::StorageClass::Image);
 
         uint32_t coords_array  = program.add_array_type(fvec2);
         uint32_t coords_struct = program.add_struct({coords_array});
