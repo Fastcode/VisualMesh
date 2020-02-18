@@ -76,16 +76,6 @@ namespace engine {
 
         // Create the Vulkan instance and find the best devices and queues
         operation::create_device(operation::DeviceType::GPU, instance, true);
-
-        // Create device and queues
-        float queue_priority                                        = 1.0f;
-        std::array<vk::DeviceQueueCreateInfo, 2> queue_create_infos = {
-          vk::DeviceQueueCreateInfo(vk::DeviceQueueCreateFlags(), instance.compute_queue_family, 1, &queue_priority),
-          vk::DeviceQueueCreateInfo(vk::DeviceQueueCreateFlags(), instance.transfer_queue_family, 1, &queue_priority)};
-        vk::DeviceCreateInfo device_create_info(
-          vk::DeviceCreateFlags(), queue_create_infos.size(), queue_create_infos.data());
-        instance.device = instance.phys_device.createDevice(device_create_info);
-
         VULKAN_HPP_DEFAULT_DISPATCHER.init(instance.device);
 
         instance.compute_queue  = instance.device.getQueue(instance.compute_queue_family, 0);

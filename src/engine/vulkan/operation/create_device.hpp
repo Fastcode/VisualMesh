@@ -212,6 +212,15 @@ namespace engine {
         instance.phys_device           = best_physical_device;
         instance.compute_queue_family  = best_compute_queue_family;
         instance.transfer_queue_family = best_transfer_queue_family;
+
+        // Create device and queues
+        float queue_priority                                        = 1.0f;
+        std::array<vk::DeviceQueueCreateInfo, 2> queue_create_infos = {
+          vk::DeviceQueueCreateInfo(vk::DeviceQueueCreateFlags(), instance.compute_queue_family, 1, &queue_priority),
+          vk::DeviceQueueCreateInfo(vk::DeviceQueueCreateFlags(), instance.transfer_queue_family, 1, &queue_priority)};
+        vk::DeviceCreateInfo device_create_info(
+          vk::DeviceCreateFlags(), queue_create_infos.size(), queue_create_infos.data());
+        instance.device = instance.phys_device.createDevice(device_create_info);
       }
     }  // namespace operation
   }    // namespace vulkan
