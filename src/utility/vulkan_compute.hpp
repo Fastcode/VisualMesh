@@ -308,7 +308,9 @@ struct Program {
   uint32_t add_constant(const uint32_t& type, const std::vector<float>& params, const bool& is_spec_op = false) {
     std::vector<uint32_t> p = {type, 0};
     std::transform(params.begin(), params.end(), std::back_inserter(p), [&](float f) -> uint32_t {
-      return add_constant(add_type(spv::Op::OpTypeFloat, {32}), {*(reinterpret_cast<uint32_t*>(&f))}, 1, is_spec_op);
+      uint32_t word;
+      std::memcpy(&word, &f, sizeof(uint32_t));
+      return add_constant(add_type(spv::Op::OpTypeFloat, {32}), {word}, 1, is_spec_op);
     });
 
     const spv::Op constant_op    = is_spec_op ? spv::Op::OpSpecConstant : spv::Op::OpConstant;
@@ -330,7 +332,8 @@ struct Program {
   uint32_t add_constant(const uint32_t& type, const std::vector<double>& params, const bool& is_spec_op = false) {
     std::vector<uint32_t> p = {type, 0};
     std::transform(params.begin(), params.end(), std::back_inserter(p), [&](double d) -> uint32_t {
-      uint64_t words = *(reinterpret_cast<uint64_t*>(&d));
+      uint64_t words;
+      std::memcpy(&words, &d, sizeof(uint64_t));
       return add_constant(
         add_type(spv::Op::OpTypeFloat, {64}),
         {static_cast<uint32_t>(words & 0x00000000FFFFFFFF), static_cast<uint32_t>((words >> 32) & 0x00000000FFFFFFFF)},
@@ -344,10 +347,11 @@ struct Program {
     const spv::Op composite_op = is_spec_op ? spv::Op::OpSpecConstantComposite : spv::Op::OpConstantComposite;
     spv::Op op                 = composite_op;
     if (params.size() == 1) {
-      op             = constant_op;
-      double d       = *params.begin();
-      uint64_t words = *(reinterpret_cast<uint64_t*>(&d));
-      p.back()       = static_cast<uint32_t>(words & 0x00000000FFFFFFFF);
+      op       = constant_op;
+      double d = *params.begin();
+      uint64_t words;
+      std::memcpy(&words, &d, sizeof(uint64_t));
+      p.back() = static_cast<uint32_t>(words & 0x00000000FFFFFFFF);
       p.push_back(static_cast<uint32_t>((words >> 32) & 0x00000000FFFFFFFF));
     }
 
