@@ -67,7 +67,7 @@ namespace engine {
         VULKAN_HPP_DEFAULT_DISPATCHER.init(dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
 
         // Get a Vulkan instance
-        const vk::ApplicationInfo app_info("VisualMesh", 0, "", 0, VK_MAKE_VERSION(1, 0, 0));
+        const vk::ApplicationInfo app_info("VisualMesh", 0, "", 0, VK_MAKE_VERSION(1, 3, 0));
         const vk::InstanceCreateInfo instance_info(vk::InstanceCreateFlags(), &app_info);
 
         throw_vk_error(vk::createInstance(&instance_info, nullptr, &instance.instance),
