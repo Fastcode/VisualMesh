@@ -2,10 +2,10 @@
 
 import os
 import tensorflow as tf
-from training.model import VisualMeshModel
-from training.dataset import VisualMeshDataset
-from training.metrics import ClassPrecision, ClassRecall
-from training.callbacks import MeshImages
+from .model import VisualMeshModel
+from .dataset import VisualMeshDataset
+from .metrics import ClassPrecision, ClassRecall
+from .callbacks import MeshImages
 
 
 # Convert a dataset into a format that will be accepted by keras fit
@@ -33,15 +33,11 @@ def _prepare_dataset(args):
 # Train the network
 def train(config, output_path):
 
-  # Use all the GPUs
-  # mirrored_strategy = tf.distribute.MirroredStrategy()
-  # with mirrored_strategy.scope():
-
   # Get the training dataset
   training_dataset = VisualMeshDataset(
     input_files=config.dataset.training,
     classes=config.network.classes,
-    geometry=config.geometry,
+    model=config.model,
     batch_size=config.training.batch_size,
     prefetch=tf.data.experimental.AUTOTUNE,
     variants=config.training.variants,
@@ -55,7 +51,7 @@ def train(config, output_path):
   validation_dataset = VisualMeshDataset(
     input_files=config.dataset.validation,
     classes=config.network.classes,
-    geometry=config.geometry,
+    model=config.model,
     batch_size=config.training.validation.batch_size,
     prefetch=tf.data.experimental.AUTOTUNE,
     variants={},
@@ -99,7 +95,7 @@ def train(config, output_path):
         output_path,
         config.dataset.validation,
         config.network.classes,
-        config.geometry,
+        config.model,
         config.training.validation.progress_images,
         [c[1] for c in config.network.classes],
       ),

@@ -15,7 +15,7 @@ from training.dataset import VisualMeshDataset
 
 class MeshImages(tf.keras.callbacks.Callback):
 
-  def __init__(self, output_path, dataset_path, classes, geometry, progress_images, colours):
+  def __init__(self, output_path, dataset_path, classes, model, progress_images, colours):
 
     self.colours = colours
     self.writer = tf.summary.create_file_writer(os.path.join(output_path, 'images'))
@@ -24,7 +24,7 @@ class MeshImages(tf.keras.callbacks.Callback):
     for d in VisualMeshDataset(
       input_files=dataset_path,
       classes=classes,
-      geometry=geometry,
+      model=model,
       batch_size=progress_images,
       prefetch=tf.data.experimental.AUTOTUNE,
       variants={},

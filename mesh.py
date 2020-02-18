@@ -3,6 +3,8 @@
 import argparse
 import os
 
+import yaml
+
 import training.training as training
 
 # import training.testing as testing
@@ -57,7 +59,7 @@ if __name__ == "__main__":
 
   # Load our yaml file and convert it to an object
   with open(args.config) as f:
-    config = yaml.load(f)
+    config = yaml.safe_load(f)
     config = Config(**config)
 
   output_path = "output" if args.output_path is None else args.output_path
