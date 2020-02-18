@@ -501,8 +501,8 @@ namespace engine {
           case EQUISOLID: projection_kernel = project_equisolid; break;
         }
 
-        // Calculate the coefficents for performing a distortion to give to the engine
-        vec4<Scalar> ik = inverse_coefficents(lens.k);
+        // Calculate the coefficients for performing a distortion to give to the engine
+        vec4<Scalar> ik = inverse_coefficients(lens.k);
 
         // Load the arguments
         cl_mem arg;

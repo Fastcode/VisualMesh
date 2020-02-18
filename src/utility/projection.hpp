@@ -60,10 +60,10 @@ namespace rectilinear {
 }  // namespace rectilinear
 
 /**
- * @brief Calculates polynomial coefficents that approximate the inverse distortion
+ * @brief Calculates polynomial coefficients that approximate the inverse distortion
  *
  * @details
- *  These coefficents are based on math from the paper
+ *  These coefficients are based on math from the paper
  *  An Exact Formula for Calculating Inverse Radial Lens Distortions
  *  https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4934233/pdf/sensors-16-00807.pdf
  *  These terms have been stripped back to only include k1 and k2 and only uses the first 4 terms
@@ -72,12 +72,12 @@ namespace rectilinear {
  *
  * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
  *
- * @param k the forward coefficents that go from a distorted image to an undistorted one
+ * @param k the forward coefficients that go from a distorted image to an undistorted one
  *
- * @return the inverse coefficents that go from an undistorted image to a distorted one
+ * @return the inverse coefficients that go from an undistorted image to a distorted one
  */
 template <typename Scalar>
-inline vec4<Scalar> inverse_coefficents(const vec2<Scalar>& k) {
+inline vec4<Scalar> inverse_coefficients(const vec2<Scalar>& k) {
   return vec4<Scalar>{{
     -k[0],
     Scalar(3.0) * (k[0] * k[0]) - k[1],
@@ -87,7 +87,7 @@ inline vec4<Scalar> inverse_coefficents(const vec2<Scalar>& k) {
 }
 
 /**
- * @brief Undistorts radial distortion using the provided distortion coefficents
+ * @brief Undistorts radial distortion using the provided distortion coefficients
  *
  * @details
  *  Given a radial distance from the optical centre, this applies a polynomial distortion model in order to approximate
@@ -97,7 +97,7 @@ inline vec4<Scalar> inverse_coefficents(const vec2<Scalar>& k) {
  * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
  *
  * @param r the radial distance from the optical centre
- * @param k the distortion coefficents to use for undistortion
+ * @param k the distortion coefficients to use for undistortion
  *
  * @return the undistorted radial distance from the optical centre
  */
@@ -109,7 +109,7 @@ inline Scalar distort(const Scalar& r, const vec2<Scalar>& k) {
   // These terms have been stripped back to only include k1 and k2 and only uses the first 4 terms
   // if more are needed in the future go and get them from the original paper
   // TODO if performance ever becomes an issue, this can be precomputed for the same k values
-  const vec4<Scalar> ik = inverse_coefficents(k);
+  const vec4<Scalar> ik = inverse_coefficients(k);
   return r
          * (1.0                                                  //
             + ik[0] * (r * r)                                    //
@@ -120,7 +120,7 @@ inline Scalar distort(const Scalar& r, const vec2<Scalar>& k) {
 }
 
 /**
- * @brief Undistorts radial distortion using the provided distortion coefficents
+ * @brief Undistorts radial distortion using the provided distortion coefficients
  *
  * @details
  *  Given a radial distance from the optical centre, this applies a polynomial distortion model in order to approximate
@@ -130,7 +130,7 @@ inline Scalar distort(const Scalar& r, const vec2<Scalar>& k) {
  * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
  *
  * @param r the radial distance from the optical centre
- * @param k the distortion coefficents to use for undistortion
+ * @param k the distortion coefficients to use for undistortion
  *
  * @return the undistorted radial distance from the optical centre
  */
