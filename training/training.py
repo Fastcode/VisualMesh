@@ -58,11 +58,15 @@ def train(config, output_path):
   ).build().map(_prepare_dataset)
 
   # Build up the list of metrics we want to track
-  metrics = [tf.metrics.CategoricalCrossentropy(), tf.metrics.Precision(), tf.metrics.Recall()]
+  metrics = [
+    tf.metrics.CategoricalCrossentropy(),
+    tf.metrics.Precision(name="metrics/global_precision"),
+    tf.metrics.Recall(name="metrics/global_recall")
+  ]
 
   for i, k in enumerate(config.network.classes):
-    metrics.append(ClassPrecision(i, name='{}_precision'.format(k[0])))
-    metrics.append(ClassRecall(i, name='{}_recall'.format(k[0])))
+    metrics.append(ClassPrecision(i, name='metrics/{}_precision'.format(k[0])))
+    metrics.append(ClassRecall(i, name='metrics/{}_recall'.format(k[0])))
 
   # Define the model
   model = VisualMeshModel(

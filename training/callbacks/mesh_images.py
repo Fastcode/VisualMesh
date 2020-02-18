@@ -80,7 +80,7 @@ class MeshImages(tf.keras.callbacks.Callback):
     data.seek(0)
 
     # Convert the image from raw format into a height*width*3
-    data = np.reshape(np.fromstring(data.read(), dtype=np.uint8), [height, width, 4])[:, :, :3]
+    data = tf.reshape(tf.io.decode_raw(data.read(), tf.uint8), (height, width, 4))[:, :, :3]
 
     return (img_hash, data)
 
@@ -114,4 +114,4 @@ class MeshImages(tf.keras.callbacks.Callback):
 
     with self.writer.as_default():
       # Write the images
-      tf.summary.image('mesh/{}'.format(i), images, step=epoch, max_outputs=images.shape[0])
+      tf.summary.image('images', images, step=epoch, max_outputs=images.shape[0])

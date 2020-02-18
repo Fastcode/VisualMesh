@@ -2,6 +2,7 @@
 
 import math
 import os
+import re
 
 import tensorflow as tf
 
@@ -28,6 +29,9 @@ class VisualMeshDataset:
     self.intersection_tolerance = model.geometry.intersection_tolerance
     self.prefetch = prefetch
     self._variants = variants
+
+    # The number of neighbours is given in the name of the mesh type
+    self.n_neighbours = int(re.search(r'\d+$', self.mesh_type).group()) + 1
 
   def _load_example(self, proto):
     example = tf.io.parse_single_example(
@@ -229,6 +233,10 @@ class VisualMeshDataset:
       # Project the visual mesh for this example
       X, Y, G, px = self._project_mesh(example)
 
+      # We actually do know the shape of G but tensorflow makes it a little hard to do
+      # We reshape here to ensure the size is known
+      G = tf.reshape(G, (-1, self.n_neighbours))
+
       # Apply any visual augmentations we may want
       if 'image' in self._variants:
         X = self._apply_variants(X)
@@ -258,7 +266,7 @@ class VisualMeshDataset:
     # Add on the null point for X and G
     # This is a hack 5 is number of neighbours + 1
     Xs.append(tf.constant([[-1.0, -1.0, -1.0]], dtype=tf.float32))
-    Gs.append(tf.fill([1, 5], n_elems))
+    Gs.append(tf.fill([1, self.n_neighbours], n_elems))
 
     X = tf.concat(Xs, axis=0)
     Y = tf.concat(Ys, axis=0)
