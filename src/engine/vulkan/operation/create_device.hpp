@@ -178,10 +178,13 @@ namespace engine {
           std::cout << "Device Properties:" << std::endl;
           std::cout << "------------------" << std::endl;
           std::cout << "    Device Name...: " << props.deviceName << std::endl;
-          std::cout << "    API Version...: " << props.apiVersion << std::endl;
-          std::cout << "    Driver Version: " << props.driverVersion << std::endl;
-          std::cout << "    Vendor ID.....: " << props.vendorID << std::endl;
-          std::cout << "    Device ID.....: " << props.deviceID << std::endl;
+          std::cout << "    API Version...: " << VK_VERSION_MAJOR(props.apiVersion) << "."
+                    << VK_VERSION_MINOR(props.apiVersion) << "." << VK_VERSION_PATCH(props.apiVersion) << std::endl;
+          std::cout << "    Driver Version: " << VK_VERSION_MAJOR(props.driverVersion) << "."
+                    << VK_VERSION_MINOR(props.driverVersion) << "." << VK_VERSION_PATCH(props.driverVersion)
+                    << std::endl;
+          std::cout << "    Vendor ID.....: 0x" << std::hex << props.vendorID << std::endl;
+          std::cout << "    Device ID.....: 0x" << std::hex << props.deviceID << std::endl;
           std::cout << "    Device Type...: ";
           switch (props.deviceType) {
             case vk::PhysicalDeviceType::eIntegratedGpu: std::cout << "Integrated GPU" << std::endl; break;
