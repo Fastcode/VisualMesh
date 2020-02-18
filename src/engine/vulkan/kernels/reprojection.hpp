@@ -83,6 +83,13 @@ namespace engine {
         uint32_t global_id = program.add_variable(uvec3_ptr, spv::StorageClass::Input);
         program.add_builtin_decoration(global_id, spv::BuiltIn::GlobalInvocationId);
 
+        // Index 0 is used in every member_access call
+        uint32_t idx0 = program.add_constant(uint_type, {0u});
+
+        // Define the WorkgroupSize constant
+        uint32_t workgroup_size = program.add_constant(uvec3, {idx0, idx0, idx0}, 1, true);
+        program.add_builtin_decoration(workgroup_size, spv::BuiltIn::WorkgroupSize);
+
         // Prepare the points, indices, Rco, f, dimensions, centre, and out variables
         uint32_t points_array  = program.add_array_type(fvec4);
         uint32_t points_struct = program.add_struct({points_array});
@@ -143,9 +150,6 @@ namespace engine {
         // Descriptor Set 0: {points_ptr, indices_ptr, Rco_ptr, f_ptr, centre_ptr, k_ptr, dimensions_ptr, out_ptr}
         program.create_descriptor_set(
           {points_ptr, indices_ptr, Rco_ptr, f_ptr, centre_ptr, k_ptr, dimensions_ptr, out_ptr});
-
-        // Index 0 is used in every member_access call
-        uint32_t idx0 = program.add_constant(uint_type, {0u});
 
         program.begin_entry_point(kernel_name, {global_id});
         // idx = get_global_id(0);

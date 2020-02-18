@@ -325,6 +325,13 @@ namespace engine {
         uint32_t global_id = program.add_variable(uvec3_ptr, spv::StorageClass::Input);
         program.add_builtin_decoration(global_id, spv::BuiltIn::GlobalInvocationId);
 
+        // Index 0 is used in every member_access call
+        uint32_t idx0 = program.add_constant(uint_type, {0u});
+
+        // Define the WorkgroupSize constant
+        uint32_t workgroup_size = program.add_constant(uvec3, {idx0, idx0, idx0}, 1, true);
+        program.add_builtin_decoration(workgroup_size, spv::BuiltIn::WorkgroupSize);
+
         // Prepare the descriptor set variables.
         // Prepare the image sampler variables.
         uint32_t sampler_ptr    = program.add_pointer(sampler_id, spv::StorageClass::UniformConstant);
@@ -359,9 +366,6 @@ namespace engine {
 
         // Descriptor Set 1: {image, coordinates, network}
         program.create_descriptor_set({image_ptr, coords_ptr, network_ptr});
-
-        // Index 0 is used in every member_access call
-        uint32_t idx0 = program.add_constant(uint_type, {0u});
 
         // Create the "read_GRBG_image_to_network" entry point.
         program.begin_entry_point("load_GRBG_image", {global_id});
