@@ -71,6 +71,16 @@ if(OpenCL_FOUND)
   target_link_libraries(libvisualmesh INTERFACE ${OpenCL_LIBRARIES})
 endif(OpenCL_FOUND)
 
+# Add this directory so we can find the FindSPIRV.cmake
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
+
+find_package(SPIRV)
+find_package(Vulkan)
+if(SPIRV_FOUND AND Vulkan_FOUND)
+  target_link_libraries(libvisualmesh INTERFACE Vulkan::Vulkan SPIRV::SPIRV)
+  target_compile_definitions(libvisualmesh INTERFACE -DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC)
+endif(SPIRV_FOUND AND Vulkan_FOUND)
+
 if(TOP_LEVEL_PROJECT)
   # Build the tensorflow op for training
   option(BUILD_TENSORFLOW_OP "Build the tensorflow op used for training" ON)
@@ -100,6 +110,9 @@ if(TOP_LEVEL_PROJECT)
     find_package(OpenCV REQUIRED core highgui imgproc)
     find_package(YAML-CPP REQUIRED)
     find_package(OpenCL REQUIRED)
+
+    set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+    set(THREADS_PREFER_PTHREAD_FLAG TRUE)
     find_package(Threads REQUIRED)
 
     add_executable(classified "example/classified.cpp" ${hdr})
@@ -115,13 +128,20 @@ if(TOP_LEVEL_PROJECT)
 
     add_executable(mesh_types "example/mesh_types.cpp" ${hdr})
     target_compile_options(mesh_types PRIVATE -march=native -mtune=native)
+    target_compile_definitions(mesh_types PRIVATE -DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC)
     set_target_properties(mesh_types PROPERTIES CXX_STANDARD 14)
     target_include_directories(mesh_types SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
     target_include_directories(mesh_types SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
     target_include_directories(mesh_types PRIVATE ${PROJECT_SOURCE_DIR}/src)
     target_include_directories(mesh_types PRIVATE ${PROJECT_BINARY_DIR}/src)
     target_link_libraries(
-      mesh_types ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES} Threads::Threads
+      mesh_types
+      ${OpenCL_LIBRARIES}
+      ${OpenCV_LIBS}
+      ${fmt_LIBRARIES}
+      ${YAML_CPP_LIBRARIES}
+      Threads::Threads
+      ${CMAKE_DL_LIBS}
     )
 
     add_executable(benchmark "example/benchmark.cpp" ${hdr})
