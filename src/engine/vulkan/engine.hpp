@@ -78,8 +78,14 @@ namespace engine {
         operation::create_device(operation::DeviceType::GPU, instance, true);
         VULKAN_HPP_DEFAULT_DISPATCHER.init(instance.device);
 
-        instance.compute_queue  = instance.device.getQueue(instance.compute_queue_family, 0);
-        instance.transfer_queue = instance.device.getQueue(instance.transfer_queue_family, 0);
+        instance.compute_queue = instance.device.getQueue(instance.compute_queue_family, 0);
+
+        if (instance.compute_queue_family == instance.transfer_queue_family) {
+          instance.transfer_queue = instance.compute_queue;
+        }
+        else {
+          instance.transfer_queue = instance.device.getQueue(instance.transfer_queue_family, 0);
+        }
 
         // Created the projection kernel sources and programs
         std::vector<uint32_t> equidistant_reprojection_source =
