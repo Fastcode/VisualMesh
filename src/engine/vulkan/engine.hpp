@@ -290,31 +290,9 @@ namespace engine {
 
         std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
         std::vector<int> indices;
-        std::pair<vk::Buffer, vk::DeviceMemory> vk_pixels;
-        vk::Fence projected;
+        std::vector<vec2<Scalar>> pixels;
 
-        std::tie(neighbourhood, indices, vk_pixels, projected) = do_project(mesh, Hoc, lens);
-
-        // Wait for computation to finish
-        // waitForFences can block for up to some number of nanoseconds (we have chosen 1e9 === 1s)
-        vk::Result res = instance.device.waitForFences(1, &projected, true, static_cast<uint64_t>(1e9));
-        while (res != vk::Result::eSuccess) {
-          if (res == vk::Result::eErrorDeviceLost) {
-            throw_vk_error(res, "Lost device while waiting for reprojection to finish");
-          }
-          res = instance.device.waitForFences(1, &projected, true, static_cast<uint64_t>(1e9));
-        }
-
-        // Read the pixels off the buffer
-        std::vector<vec2<Scalar>> pixels(indices.size());
-        Scalar* pixels_payload = reinterpret_cast<Scalar*>(
-          instance.device.mapMemory(vk_pixels.second, 0, sizeof(vec2<Scalar>) * indices.size()));
-        size_t index = 0;
-        for (auto& pixel : pixels) {
-          pixel = {pixels_payload[index + 0], pixels_payload[index + 1]};
-          index += 2;
-        }
-        instance.device.unmapMemory(vk_pixels.second);
+        std::tie(neighbourhood, indices, pixels) = do_project(mesh, Hoc, lens);
 
         return ProjectedMesh<Scalar, N_NEIGHBOURS>{std::move(pixels), std::move(neighbourhood), std::move(indices)};
       }
@@ -553,10 +531,7 @@ namespace engine {
 
     private:
       template <template <typename> class Model>
-      std::tuple<std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>>,
-                 std::vector<int>,
-                 std::pair<vk::Buffer, vk::DeviceMemory>,
-                 vk::Fence>
+      std::tuple<std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>>, std::vector<int>, std::vector<vec2<Scalar>>>
         do_project(const Mesh<Scalar, Model>& mesh, const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
         static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
@@ -702,10 +677,8 @@ namespace engine {
 
         // No point processing if we have no points, return an empty mesh
         if (points == 0) {
-          return std::make_tuple(std::vector<std::array<int, N_NEIGHBOURS>>(),
-                                 std::vector<int>(),
-                                 std::pair<vk::Buffer, vk::DeviceMemory>(),
-                                 vk::Fence());
+          return std::make_tuple(
+            std::vector<std::array<int, N_NEIGHBOURS>>(), std::vector<int>(), std::vector<vec2<Scalar>>());
         }
 
         // Build up our list of indices for OpenCL
@@ -765,10 +738,8 @@ namespace engine {
           default:
             throw_vk_error(vk::Result::eErrorFormatNotSupported,
                            "Requested lens projection is not currently supported.");
-            return std::make_tuple(std::vector<std::array<int, N_NEIGHBOURS>>(),
-                                   std::vector<int>(),
-                                   std::pair<vk::Buffer, vk::DeviceMemory>(),
-                                   vk::Fence());
+            return std::make_tuple(
+              std::vector<std::array<int, N_NEIGHBOURS>>(), std::vector<int>(), std::vector<vec2<Scalar>>());
         }
 
         // Create a descriptor pool
@@ -851,11 +822,31 @@ namespace engine {
         // Fill in the final offscreen point which connects only to itself
         local_neighbourhood[points].fill(points);
 
+        // Wait for computation to finish
+        // waitForFences can block for up to some number of nanoseconds (we have chosen 1e9 === 1s)
+        vk::Result res = instance.device.waitForFences(1, &reprojection_complete, true, static_cast<uint64_t>(1e9));
+        while (res != vk::Result::eSuccess) {
+          if (res == vk::Result::eErrorDeviceLost) {
+            throw_vk_error(res, "Lost device while waiting for reprojection to finish");
+          }
+          res = instance.device.waitForFences(1, &reprojection_complete, true, static_cast<uint64_t>(1e9));
+        }
+
+        // Read the pixels off the buffer
+        std::vector<vec2<Scalar>> pixels(indices.size());
+        Scalar* pixels_payload = reinterpret_cast<Scalar*>(
+          instance.device.mapMemory(vk_pixel_coordinates.second, 0, sizeof(vec2<Scalar>) * indices.size()));
+        size_t index = 0;
+        for (auto& pixel : pixels) {
+          pixel = {pixels_payload[index + 0], pixels_payload[index + 1]};
+          index += 2;
+        }
+        instance.device.unmapMemory(vk_pixel_coordinates.second);
+
         // Return what we calculated
         return std::make_tuple(std::move(local_neighbourhood),  // CPU buffer
                                std::move(indices),              // CPU buffer
-                               vk_pixel_coordinates,            // GPU buffer
-                               reprojection_complete);          // GPU event
+                               std::move(pixels));              // Projected pixels
       }
 
       // cl::mem get_image_memory(vec2<int> dimensions, uint32_t format) const {
