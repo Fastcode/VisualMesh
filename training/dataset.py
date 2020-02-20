@@ -6,10 +6,16 @@ import re
 
 import tensorflow as tf
 
-# Load the visual mesh op
-op_file = os.path.join(os.path.dirname(__file__), "visualmesh_op.so")
-if os.path.isfile(op_file):
-    VisualMesh = tf.load_op_library(op_file).visual_mesh
+# If we are in docker look for the visual mesh op in /visualmesh/training/visualmesh_op.so
+if (
+    os.path.exists("/.dockerenv")
+    or os.path.isfile("/proc/self/cgroup")
+    and any("docker" in line for line in open("/proc/self/cgroup"))
+) and os.path.isfile("/visualmesh/training/visualmesh_op.so"):
+    VisualMesh = tf.load_op_library("/visualmesh/training/visualmesh_op.so").visual_mesh
+# Otherwise check to see if we built it and it should be right next to this file
+elif os.path.isfile(os.path.join(os.path.dirname(__file__), "visualmesh_op.so")):
+    VisualMesh = tf.load_op_library(os.path.join(os.path.dirname(__file__), "visualmesh_op.so")).visual_mesh
 else:
     raise Exception("Please build the tensorflow visual mesh op before running")
 

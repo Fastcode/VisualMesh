@@ -25,7 +25,6 @@
 #include <utility>
 #include <vector>
 
-#include "../example/ArrayPrint.hpp"
 #include "lens.hpp"
 #include "node.hpp"
 #include "utility/cone.hpp"

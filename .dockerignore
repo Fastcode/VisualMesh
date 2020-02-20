@@ -1,0 +1,7 @@
+# Ignore everything
+*
+
+# Except for the files related to building the tensorflow op
+!CMakeLists.txt
+!src/*
+!cmake/*
