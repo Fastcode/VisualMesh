@@ -3,4 +3,5 @@ numpy
 opencv-python
 pyyaml
 tensorflow
+tensorflow-addons
 tqdm
