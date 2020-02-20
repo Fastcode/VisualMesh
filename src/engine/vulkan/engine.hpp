@@ -68,8 +68,9 @@ namespace engine {
                   dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
 
                 // Get a Vulkan instance
-                const vk::ApplicationInfo app_info("VisualMesh", 0, "", 0, VK_MAKE_VERSION(1, 3, 0));
-                const vk::InstanceCreateInfo instance_info(vk::InstanceCreateFlags(), &app_info);
+                const vk::ApplicationInfo app_info("VisualMesh", 0, "", 0, VK_MAKE_VERSION(1, 1, 0));
+                const vk::InstanceCreateInfo instance_info(
+                  vk::InstanceCreateFlags(), &app_info, 0, nullptr, 0, nullptr);
 
                 throw_vk_error(vk::createInstance(&instance_info, nullptr, &instance.instance),
                                "Error creating the Vulkan instance");
@@ -825,7 +826,8 @@ namespace engine {
 
                 vk::Fence reprojection_complete = instance.device.createFence(vk::FenceCreateInfo());
                 vk::SubmitInfo submit_info(0, nullptr, nullptr, 1, &command_buffer, 0, nullptr);
-                instance.compute_queue.submit(1, &submit_info, reprojection_complete);
+                throw_vk_error(instance.compute_queue.submit(1, &submit_info, reprojection_complete),
+                               "Failed to submit reprojection queue");
 
                 // This can happen on the CPU while the OpenCL device is busy
                 // Build the reverse lookup map where the offscreen point is one past the end

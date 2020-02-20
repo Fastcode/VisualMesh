@@ -182,16 +182,18 @@ namespace engine {
                     vk::PhysicalDeviceProperties props = best_physical_device.getProperties();
                     std::cout << "Device Properties:" << std::endl;
                     std::cout << "------------------" << std::endl;
-                    std::cout << "    Device Name...: " << props.deviceName << std::endl;
-                    std::cout << "    API Version...: " << VK_VERSION_MAJOR(props.apiVersion) << "."
+                    std::cout << "    Device Name......................: " << props.deviceName << std::endl;
+                    std::cout << "    API Version......................: " << VK_VERSION_MAJOR(props.apiVersion) << "."
                               << VK_VERSION_MINOR(props.apiVersion) << "." << VK_VERSION_PATCH(props.apiVersion)
                               << std::endl;
-                    std::cout << "    Driver Version: " << VK_VERSION_MAJOR(props.driverVersion) << "."
-                              << VK_VERSION_MINOR(props.driverVersion) << "." << VK_VERSION_PATCH(props.driverVersion)
+                    std::cout << "    Driver Version...................: " << VK_VERSION_MAJOR(props.driverVersion)
+                              << "." << VK_VERSION_MINOR(props.driverVersion) << "."
+                              << VK_VERSION_PATCH(props.driverVersion) << std::endl;
+                    std::cout << "    Vendor ID........................: 0x" << std::hex << props.vendorID << std::dec
                               << std::endl;
-                    std::cout << "    Vendor ID.....: 0x" << std::hex << props.vendorID << std::endl;
-                    std::cout << "    Device ID.....: 0x" << std::hex << props.deviceID << std::endl;
-                    std::cout << "    Device Type...: ";
+                    std::cout << "    Device ID........................: 0x" << std::hex << props.deviceID << std::dec
+                              << std::endl;
+                    std::cout << "    Device Type......................: ";
                     switch (props.deviceType) {
                         case vk::PhysicalDeviceType::eIntegratedGpu: std::cout << "Integrated GPU" << std::endl; break;
                         case vk::PhysicalDeviceType::eDiscreteGpu: std::cout << "Discrete GPU" << std::endl; break;
@@ -200,7 +202,7 @@ namespace engine {
                         case vk::PhysicalDeviceType::eOther: std::cout << "Other device" << std::endl; break;
                         default: std::cout << "Unknown device" << std::endl; break;
                     }
-                    std::cout << "    Max Heap Size.: ";
+                    std::cout << "    Max Heap Size....................: ";
                     // TB
                     if (max_heap_size > uint32_t(1e12)) {
                         std::cout << std::setprecision(2) << (double(max_heap_size) / double(1e12)) << " TB"
@@ -219,6 +221,16 @@ namespace engine {
                     else {
                         std::cout << std::setprecision(2) << max_heap_size << " B" << std::endl;
                     }
+                    std::cout << "    Max Compute Workgroup Count......: " << std::endl;
+                    std::cout << "        X: " << props.limits.maxComputeWorkGroupCount[0] << std::endl;
+                    std::cout << "        Y: " << props.limits.maxComputeWorkGroupCount[1] << std::endl;
+                    std::cout << "        Z: " << props.limits.maxComputeWorkGroupCount[2] << std::endl;
+                    std::cout << "    Max Compute Workgroup Size.......: " << std::endl;
+                    std::cout << "        X: " << props.limits.maxComputeWorkGroupSize[0] << std::endl;
+                    std::cout << "        Y: " << props.limits.maxComputeWorkGroupSize[1] << std::endl;
+                    std::cout << "        Z: " << props.limits.maxComputeWorkGroupSize[2] << std::endl;
+                    std::cout << "    Max Compute Workgroup Invocations: "
+                              << props.limits.maxComputeWorkGroupInvocations << std::endl;
                 }
 
                 instance.phys_device           = best_physical_device;
@@ -239,8 +251,14 @@ namespace engine {
                         vk::DeviceQueueCreateFlags(), instance.compute_queue_family, 1, &queue_priority),
                       vk::DeviceQueueCreateInfo(
                         vk::DeviceQueueCreateFlags(), instance.transfer_queue_family, 1, &queue_priority)};
-                    vk::DeviceCreateInfo device_create_info(
-                      vk::DeviceCreateFlags(), queue_create_infos.size(), queue_create_infos.data());
+                    vk::DeviceCreateInfo device_create_info(vk::DeviceCreateFlags(),
+                                                            queue_create_infos.size(),
+                                                            queue_create_infos.data(),
+                                                            0,
+                                                            nullptr,
+                                                            0,
+                                                            nullptr,
+                                                            nullptr);
                     instance.device = instance.phys_device.createDevice(device_create_info);
                 }
             }
