@@ -54,28 +54,28 @@ REGISTER_OP("VisualMesh")
   .Output("pixels: T")
   .Output("neighbours: int32")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-    // nx2 points on image, and n+1xG neighbours (including off screen point)
-    c->set_output(0, c->MakeShape({c->kUnknownDim, 2}));
-    c->set_output(1, c->MakeShape({c->kUnknownDim, c->kUnknownDim}));
-    return tensorflow::Status::OK();
+      // nx2 points on image, and n+1xG neighbours (including off screen point)
+      c->set_output(0, c->MakeShape({c->kUnknownDim, 2}));
+      c->set_output(1, c->MakeShape({c->kUnknownDim, c->kUnknownDim}));
+      return tensorflow::Status::OK();
   });
 
 enum Args {
-  DIMENSIONS             = 0,
-  PROJECTION             = 1,
-  FOCAL_LENGTH           = 2,
-  LENS_CENTRE            = 3,
-  LENS_DISTORTION        = 4,
-  FIELD_OF_VIEW          = 5,
-  ROC                    = 6,
-  HEIGHT                 = 7,
-  MODEL                  = 8,
-  CACHED_MESHES          = 9,
-  MAX_DISTANCE           = 10,
-  GEOMETRY               = 11,
-  RADIUS                 = 12,
-  N_INTERSECTIONS        = 13,
-  INTERSECTION_TOLERANCE = 14
+    DIMENSIONS             = 0,
+    PROJECTION             = 1,
+    FOCAL_LENGTH           = 2,
+    LENS_CENTRE            = 3,
+    LENS_DISTORTION        = 4,
+    FIELD_OF_VIEW          = 5,
+    ROC                    = 6,
+    HEIGHT                 = 7,
+    MODEL                  = 8,
+    CACHED_MESHES          = 9,
+    MAX_DISTANCE           = 10,
+    GEOMETRY               = 11,
+    RADIUS                 = 12,
+    N_INTERSECTIONS        = 13,
+    INTERSECTION_TOLERANCE = 14
 };
 
 /**
@@ -94,7 +94,7 @@ enum Args {
  */
 template <typename Scalar, template <typename> class Shape>
 Scalar mesh_k_error(const Shape<Scalar>& shape, const Scalar& h_0, const Scalar& h_1, const Scalar& k) {
-  return std::abs(k - k * shape.k(h_0, h_1));
+    return std::abs(k - k * shape.k(h_0, h_1));
 }
 
 /**
@@ -122,29 +122,29 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> find_mesh(
   const Scalar& t,
   const Scalar& d) {
 
-  // Nothing in the map!
-  if (meshes.empty()) { return nullptr; }
+    // Nothing in the map!
+    if (meshes.empty()) { return nullptr; }
 
-  // Find the best mesh we have available
-  auto best_it      = meshes.begin();
-  Scalar best_error = std::numeric_limits<Scalar>::max();
-  for (auto it = meshes.begin(); it != meshes.end(); ++it) {
-    auto error = mesh_k_error(shape, (*it)->h, h, k);
-    if (d == (*it)->max_distance && error < best_error) {
-      best_error = error;
-      best_it    = it;
+    // Find the best mesh we have available
+    auto best_it      = meshes.begin();
+    Scalar best_error = std::numeric_limits<Scalar>::max();
+    for (auto it = meshes.begin(); it != meshes.end(); ++it) {
+        auto error = mesh_k_error(shape, (*it)->h, h, k);
+        if (d == (*it)->max_distance && error < best_error) {
+            best_error = error;
+            best_it    = it;
+        }
     }
-  }
 
-  // If it was good enough return it, otherwise return null
-  if (best_error <= t) {
-    // Swap it to the top of the list so we can keep somewhat of which items are most used
-    std::iter_swap(meshes.begin(), best_it);
-    return *best_it;
-  }
-  else {
-    return nullptr;
-  }
+    // If it was good enough return it, otherwise return null
+    if (best_error <= t) {
+        // Swap it to the top of the list so we can keep somewhat of which items are most used
+        std::iter_swap(meshes.begin(), best_it);
+        return *best_it;
+    }
+    else {
+        return nullptr;
+    }
 }
 
 /**
@@ -177,41 +177,42 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> get_mesh(const Shape<Scalar>& s
                                                           const int32_t& cached_meshes,
                                                           const Scalar& max_distance) {
 
-  // Static map of heights to meshes
-  static std::vector<std::shared_ptr<visualmesh::Mesh<Scalar, Model>>> meshes;
-  static std::mutex mesh_mutex;
+    // Static map of heights to meshes
+    static std::vector<std::shared_ptr<visualmesh::Mesh<Scalar, Model>>> meshes;
+    static std::mutex mesh_mutex;
 
-  // Find and return an element if one is appropriate
-  /* mutex scope */ {
-    std::lock_guard<std::mutex> lock(mesh_mutex);
+    // Find and return an element if one is appropriate
+    /* mutex scope */ {
+        std::lock_guard<std::mutex> lock(mesh_mutex);
 
-    // If we found an acceptable mesh return it
-    auto mesh = find_mesh(meshes, shape, height, n_intersections, intersection_tolerance, max_distance);
-    if (mesh != nullptr) { return mesh; }
-  }
-
-  // We couldn't find an appropriate mesh, make a new one but don't hold the mutex while we do so others can still query
-  auto new_mesh = std::make_shared<visualmesh::Mesh<Scalar, Model>>(shape, height, n_intersections, max_distance);
-
-  /* mutex scope */ {
-    std::lock_guard<std::mutex> lock(mesh_mutex);
-
-    // Check again for an acceptable mesh in case someone else made one too
-    auto mesh = find_mesh(meshes, shape, height, n_intersections, intersection_tolerance, max_distance);
-    if (mesh != nullptr) { return mesh; }
-    // Otherwise add the one we made to the list
-    else {
-
-      // Only cache a fixed number of meshes so remove the old ones
-      while (static_cast<int32_t>(meshes.size()) > cached_meshes) {
-        meshes.pop_back();
-      }
-
-      // Add our new mesh to the cache and return
-      meshes.push_back(new_mesh);
-      return new_mesh;
+        // If we found an acceptable mesh return it
+        auto mesh = find_mesh(meshes, shape, height, n_intersections, intersection_tolerance, max_distance);
+        if (mesh != nullptr) { return mesh; }
     }
-  }
+
+    // We couldn't find an appropriate mesh, make a new one but don't hold the mutex while we do so others can still
+    // query
+    auto new_mesh = std::make_shared<visualmesh::Mesh<Scalar, Model>>(shape, height, n_intersections, max_distance);
+
+    /* mutex scope */ {
+        std::lock_guard<std::mutex> lock(mesh_mutex);
+
+        // Check again for an acceptable mesh in case someone else made one too
+        auto mesh = find_mesh(meshes, shape, height, n_intersections, intersection_tolerance, max_distance);
+        if (mesh != nullptr) { return mesh; }
+        // Otherwise add the one we made to the list
+        else {
+
+            // Only cache a fixed number of meshes so remove the old ones
+            while (static_cast<int32_t>(meshes.size()) > cached_meshes) {
+                meshes.pop_back();
+            }
+
+            // Add our new mesh to the cache and return
+            meshes.push_back(new_mesh);
+            return new_mesh;
+        }
+    }
 }
 
 /**
@@ -227,189 +228,191 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> get_mesh(const Shape<Scalar>& s
 template <typename T, typename U>
 class VisualMeshOp : public tensorflow::OpKernel {
 private:
-  template <template <typename> class Model>
-  void ComputeModel(tensorflow::OpKernelContext* context) {
+    template <template <typename> class Model>
+    void ComputeModel(tensorflow::OpKernelContext* context) {
 
-    // Check that the shape of each of the inputs is valid
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsVector(context->input(Args::DIMENSIONS).shape())
-                  && context->input(Args::DIMENSIONS).shape().dim_size(0) == 2,
-                tensorflow::errors::InvalidArgument("The image dimensions must be a 2d vector of [y_size, x_size]"));
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::FOCAL_LENGTH).shape()),
-                tensorflow::errors::InvalidArgument("The focal length must be a scalar"));
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsVector(context->input(Args::LENS_CENTRE).shape())
-                  && context->input(Args::LENS_CENTRE).shape().dim_size(0) == 2,
-                tensorflow::errors::InvalidArgument("The lens centre must be a 2d vector of [y_size, x_size]"));
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsVector(context->input(Args::LENS_DISTORTION).shape())
-                  && context->input(Args::LENS_DISTORTION).shape().dim_size(0) == 2,
-                tensorflow::errors::InvalidArgument("The lens distortion must be a 2d vector of [y_size, x_size]"));
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::FIELD_OF_VIEW).shape()),
-                tensorflow::errors::InvalidArgument("The field of view must be a scalar"));
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsSquareMatrix(context->input(Args::ROC).shape())
-                  && context->input(Args::ROC).shape().dim_size(0) == 3,
-                tensorflow::errors::InvalidArgument("Roc must be a 3x3 matrix"));
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::HEIGHT).shape()),
-                tensorflow::errors::InvalidArgument("The height must be a scalar"));
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::N_INTERSECTIONS).shape()),
-                tensorflow::errors::InvalidArgument("The number of intersections must be a scalar"));
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::CACHED_MESHES).shape()),
-                tensorflow::errors::InvalidArgument("The number cached meshes must be a scalar"));
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::INTERSECTION_TOLERANCE).shape()),
-                tensorflow::errors::InvalidArgument("The intersection tolerance must be a scalar"));
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::MAX_DISTANCE).shape()),
-                tensorflow::errors::InvalidArgument("The maximum distance must be a scalar"));
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
-                tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::RADIUS).shape()),
-                tensorflow::errors::InvalidArgument("The radius must be a scalar"));
+        // Check that the shape of each of the inputs is valid
+        OP_REQUIRES(
+          context,
+          tensorflow::TensorShapeUtils::IsVector(context->input(Args::DIMENSIONS).shape())
+            && context->input(Args::DIMENSIONS).shape().dim_size(0) == 2,
+          tensorflow::errors::InvalidArgument("The image dimensions must be a 2d vector of [y_size, x_size]"));
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::FOCAL_LENGTH).shape()),
+                    tensorflow::errors::InvalidArgument("The focal length must be a scalar"));
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsVector(context->input(Args::LENS_CENTRE).shape())
+                      && context->input(Args::LENS_CENTRE).shape().dim_size(0) == 2,
+                    tensorflow::errors::InvalidArgument("The lens centre must be a 2d vector of [y_size, x_size]"));
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsVector(context->input(Args::LENS_DISTORTION).shape())
+                      && context->input(Args::LENS_DISTORTION).shape().dim_size(0) == 2,
+                    tensorflow::errors::InvalidArgument("The lens distortion must be a 2d vector of [y_size, x_size]"));
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::FIELD_OF_VIEW).shape()),
+                    tensorflow::errors::InvalidArgument("The field of view must be a scalar"));
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsSquareMatrix(context->input(Args::ROC).shape())
+                      && context->input(Args::ROC).shape().dim_size(0) == 3,
+                    tensorflow::errors::InvalidArgument("Roc must be a 3x3 matrix"));
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::HEIGHT).shape()),
+                    tensorflow::errors::InvalidArgument("The height must be a scalar"));
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::N_INTERSECTIONS).shape()),
+                    tensorflow::errors::InvalidArgument("The number of intersections must be a scalar"));
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::CACHED_MESHES).shape()),
+                    tensorflow::errors::InvalidArgument("The number cached meshes must be a scalar"));
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::INTERSECTION_TOLERANCE).shape()),
+                    tensorflow::errors::InvalidArgument("The intersection tolerance must be a scalar"));
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::MAX_DISTANCE).shape()),
+                    tensorflow::errors::InvalidArgument("The maximum distance must be a scalar"));
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
+                    tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::RADIUS).shape()),
+                    tensorflow::errors::InvalidArgument("The radius must be a scalar"));
 
-    // Extract information from our input tensors, flip x and y as tensorflow has them reversed compared to us
-    auto image_dimensions                = context->input(Args::DIMENSIONS).vec<U>();
-    visualmesh::vec2<int32_t> dimensions = {{int32_t(image_dimensions(1)), int32_t(image_dimensions(0))}};
-    std::string projection               = *context->input(Args::PROJECTION).flat<tensorflow::string>().data();
-    T focal_length                       = context->input(Args::FOCAL_LENGTH).scalar<T>()(0);
-    auto lens_centre                     = context->input(Args::LENS_CENTRE).flat<T>();
-    auto lens_distortion                 = context->input(Args::LENS_DISTORTION).flat<T>();
-    T fov                                = context->input(Args::FIELD_OF_VIEW).scalar<T>()(0);
-    auto tRoc                            = context->input(Args::ROC).matrix<T>();
-    T height                             = context->input(Args::HEIGHT).scalar<T>()(0);
-    T max_distance                       = context->input(Args::MAX_DISTANCE).scalar<T>()(0);
-    T n_intersections                    = context->input(Args::N_INTERSECTIONS).scalar<T>()(0);
-    tensorflow::int32 cached_meshes      = context->input(Args::N_INTERSECTIONS).scalar<tensorflow::int32>()(0);
-    T intersection_tolerance             = context->input(Args::INTERSECTION_TOLERANCE).scalar<T>()(0);
-    std::string geometry                 = *context->input(Args::GEOMETRY).flat<tensorflow::string>().data();
-    T radius                             = context->input(Args::RADIUS).scalar<T>()(0);
+        // Extract information from our input tensors, flip x and y as tensorflow has them reversed compared to us
+        auto image_dimensions                = context->input(Args::DIMENSIONS).vec<U>();
+        visualmesh::vec2<int32_t> dimensions = {{int32_t(image_dimensions(1)), int32_t(image_dimensions(0))}};
+        std::string projection               = *context->input(Args::PROJECTION).flat<tensorflow::string>().data();
+        T focal_length                       = context->input(Args::FOCAL_LENGTH).scalar<T>()(0);
+        auto lens_centre                     = context->input(Args::LENS_CENTRE).flat<T>();
+        auto lens_distortion                 = context->input(Args::LENS_DISTORTION).flat<T>();
+        T fov                                = context->input(Args::FIELD_OF_VIEW).scalar<T>()(0);
+        auto tRoc                            = context->input(Args::ROC).matrix<T>();
+        T height                             = context->input(Args::HEIGHT).scalar<T>()(0);
+        T max_distance                       = context->input(Args::MAX_DISTANCE).scalar<T>()(0);
+        T n_intersections                    = context->input(Args::N_INTERSECTIONS).scalar<T>()(0);
+        tensorflow::int32 cached_meshes      = context->input(Args::N_INTERSECTIONS).scalar<tensorflow::int32>()(0);
+        T intersection_tolerance             = context->input(Args::INTERSECTION_TOLERANCE).scalar<T>()(0);
+        std::string geometry                 = *context->input(Args::GEOMETRY).flat<tensorflow::string>().data();
+        T radius                             = context->input(Args::RADIUS).scalar<T>()(0);
 
-    // Perform some runtime checks on the actual values to make sure they make sense
-    OP_REQUIRES(context,
-                projection == "EQUISOLID" || projection == "EQUIDISTANT" || projection == "RECTILINEAR",
-                tensorflow::errors::InvalidArgument("Projection must be one of EQUISOLID, EQUIDISTANT or RECTILINEAR"));
-    OP_REQUIRES(context,
-                geometry == "SPHERE" || geometry == "CIRCLE",
-                tensorflow::errors::InvalidArgument("Geometry must be one of SPHERE or CIRCLE"));
+        // Perform some runtime checks on the actual values to make sure they make sense
+        OP_REQUIRES(
+          context,
+          projection == "EQUISOLID" || projection == "EQUIDISTANT" || projection == "RECTILINEAR",
+          tensorflow::errors::InvalidArgument("Projection must be one of EQUISOLID, EQUIDISTANT or RECTILINEAR"));
+        OP_REQUIRES(context,
+                    geometry == "SPHERE" || geometry == "CIRCLE",
+                    tensorflow::errors::InvalidArgument("Geometry must be one of SPHERE or CIRCLE"));
 
-    // Create our transformation matrix
-    visualmesh::mat4<T> Hoc = {{
-      visualmesh::vec4<T>{tRoc(0, 0), tRoc(0, 1), tRoc(0, 2), 0},
-      visualmesh::vec4<T>{tRoc(1, 0), tRoc(1, 1), tRoc(1, 2), 0},
-      visualmesh::vec4<T>{tRoc(2, 0), tRoc(2, 1), tRoc(2, 2), height},
-      visualmesh::vec4<T>{0, 0, 0, 1},
-    }};
+        // Create our transformation matrix
+        visualmesh::mat4<T> Hoc = {{
+          visualmesh::vec4<T>{tRoc(0, 0), tRoc(0, 1), tRoc(0, 2), 0},
+          visualmesh::vec4<T>{tRoc(1, 0), tRoc(1, 1), tRoc(1, 2), 0},
+          visualmesh::vec4<T>{tRoc(2, 0), tRoc(2, 1), tRoc(2, 2), height},
+          visualmesh::vec4<T>{0, 0, 0, 1},
+        }};
 
-    // Create our lens
-    visualmesh::Lens<T> lens;
-    lens.dimensions   = dimensions;
-    lens.focal_length = focal_length;
-    lens.centre       = {{lens_centre(1), lens_centre(0)}};  // Swap from tf coordinates to our coordinates
-    lens.k            = {{lens_distortion(0), lens_distortion(1)}};
-    lens.fov          = fov;
-    if (projection == "EQUISOLID") {
-      lens.projection = visualmesh::EQUISOLID;  //
+        // Create our lens
+        visualmesh::Lens<T> lens;
+        lens.dimensions   = dimensions;
+        lens.focal_length = focal_length;
+        lens.centre       = {{lens_centre(1), lens_centre(0)}};  // Swap from tf coordinates to our coordinates
+        lens.k            = {{lens_distortion(0), lens_distortion(1)}};
+        lens.fov          = fov;
+        if (projection == "EQUISOLID") {
+            lens.projection = visualmesh::EQUISOLID;  //
+        }
+        else if (projection == "EQUIDISTANT") {
+            lens.projection = visualmesh::EQUIDISTANT;
+        }
+        else if (projection == "RECTILINEAR") {
+            lens.projection = visualmesh::RECTILINEAR;
+        }
+
+        // Project the mesh using our engine and shape
+        visualmesh::engine::cpu::Engine<T> engine;
+        visualmesh::ProjectedMesh<T, Model<T>::N_NEIGHBOURS> projected;
+
+        if (geometry == "SPHERE") {
+            visualmesh::geometry::Sphere<T> shape(radius);
+            std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Sphere>(
+              shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
+            projected = engine.project(*mesh, Hoc, lens);
+        }
+        else if (geometry == "CIRCLE") {
+            visualmesh::geometry::Circle<T> shape(radius);
+            std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Circle>(
+              shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
+            projected = engine.project(*mesh, Hoc, lens);
+        }
+
+        // Get the interesting things out of the projected mesh
+        const auto& px            = projected.pixel_coordinates;
+        const auto& neighbourhood = projected.neighbourhood;
+
+        // Fill in our tensorflow output matrix
+        tensorflow::Tensor* coordinates = nullptr;
+        tensorflow::TensorShape coords_shape;
+        coords_shape.AddDim(px.size());
+        coords_shape.AddDim(2);
+        OP_REQUIRES_OK(context, context->allocate_output(0, coords_shape, &coordinates));
+
+        // Copy across our pixel coordinates remembering to reverse the order from x,y to y,x
+        auto c = coordinates->matrix<T>();
+        for (size_t i = 0; i < px.size(); ++i) {
+            // Swap x and y here since tensorflow expects them reversed
+            const auto& p = px[i];
+            c(i, 0)       = p[1];
+            c(i, 1)       = p[0];
+        }
+
+        // Build our tensorflow neighbourhood graph
+        tensorflow::Tensor* neighbours = nullptr;
+        tensorflow::TensorShape neighbours_shape;
+        neighbours_shape.AddDim(neighbourhood.size());
+        neighbours_shape.AddDim(Model<T>::N_NEIGHBOURS + 1);
+        OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
+
+        // Copy across our neighbourhood graph, adding in a point for itself
+        auto n = neighbours->matrix<U>();
+        for (unsigned int i = 0; i < neighbourhood.size(); ++i) {
+            // Get our old neighbours from original output
+            const auto& m = neighbourhood[i];
+            // First point is ourself
+            n(i, 0) = i;
+            for (unsigned int j = 0; j < neighbourhood[i].size(); ++j) {
+                n(i, j + 1) = m[j];
+            }
+        }
     }
-    else if (projection == "EQUIDISTANT") {
-      lens.projection = visualmesh::EQUIDISTANT;
-    }
-    else if (projection == "RECTILINEAR") {
-      lens.projection = visualmesh::RECTILINEAR;
-    }
-
-    // Project the mesh using our engine and shape
-    visualmesh::engine::cpu::Engine<T> engine;
-    visualmesh::ProjectedMesh<T, Model<T>::N_NEIGHBOURS> projected;
-
-    if (geometry == "SPHERE") {
-      visualmesh::geometry::Sphere<T> shape(radius);
-      std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Sphere>(
-        shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
-      projected = engine.project(*mesh, Hoc, lens);
-    }
-    else if (geometry == "CIRCLE") {
-      visualmesh::geometry::Circle<T> shape(radius);
-      std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Circle>(
-        shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
-      projected = engine.project(*mesh, Hoc, lens);
-    }
-
-    // Get the interesting things out of the projected mesh
-    const auto& px            = projected.pixel_coordinates;
-    const auto& neighbourhood = projected.neighbourhood;
-
-    // Fill in our tensorflow output matrix
-    tensorflow::Tensor* coordinates = nullptr;
-    tensorflow::TensorShape coords_shape;
-    coords_shape.AddDim(px.size());
-    coords_shape.AddDim(2);
-    OP_REQUIRES_OK(context, context->allocate_output(0, coords_shape, &coordinates));
-
-    // Copy across our pixel coordinates remembering to reverse the order from x,y to y,x
-    auto c = coordinates->matrix<T>();
-    for (size_t i = 0; i < px.size(); ++i) {
-      // Swap x and y here since tensorflow expects them reversed
-      const auto& p = px[i];
-      c(i, 0)       = p[1];
-      c(i, 1)       = p[0];
-    }
-
-    // Build our tensorflow neighbourhood graph
-    tensorflow::Tensor* neighbours = nullptr;
-    tensorflow::TensorShape neighbours_shape;
-    neighbours_shape.AddDim(neighbourhood.size());
-    neighbours_shape.AddDim(Model<T>::N_NEIGHBOURS + 1);
-    OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
-
-    // Copy across our neighbourhood graph, adding in a point for itself
-    auto n = neighbours->matrix<U>();
-    for (unsigned int i = 0; i < neighbourhood.size(); ++i) {
-      // Get our old neighbours from original output
-      const auto& m = neighbourhood[i];
-      // First point is ourself
-      n(i, 0) = i;
-      for (unsigned int j = 0; j < neighbourhood[i].size(); ++j) {
-        n(i, j + 1) = m[j];
-      }
-    }
-  }
 
 public:
-  explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
+    explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
 
-  void Compute(tensorflow::OpKernelContext* context) override {
+    void Compute(tensorflow::OpKernelContext* context) override {
 
-    // Check that the model is a string
-    OP_REQUIRES(context,
-                tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
-                tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
+        // Check that the model is a string
+        OP_REQUIRES(context,
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
+                    tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
 
-    // Grab the Visual Mesh model we are using
-    std::string model = *context->input(Args::MODEL).flat<tensorflow::string>().data();
+        // Grab the Visual Mesh model we are using
+        std::string model = *context->input(Args::MODEL).flat<tensorflow::string>().data();
 
-    // clang-format off
+        // clang-format off
     if (model == "RING6") { ComputeModel<visualmesh::model::Ring6>(context); }
     else if (model == "RING4") { ComputeModel<visualmesh::model::Ring4>(context); }
     else if (model == "RADIAL8") { ComputeModel<visualmesh::model::Radial8>(context); }
     else if (model == "RADIAL6") { ComputeModel<visualmesh::model::Radial6>(context); }
     else if (model == "RADIAL4") { ComputeModel<visualmesh::model::Radial4>(context); }
     else if (model == "XGRID4") { ComputeModel<visualmesh::model::XGrid4>(context); }
-    // clang-format on
-    else {
-      OP_REQUIRES(
-        context,
-        false,
-        tensorflow::errors::InvalidArgument("The provided Visual Mesh model was not one of the known models"));
+        // clang-format on
+        else {
+            OP_REQUIRES(
+              context,
+              false,
+              tensorflow::errors::InvalidArgument("The provided Visual Mesh model was not one of the known models"));
+        }
     }
-  }
 };
 
 // Register a version for all the combinations of float/double and int32/int64

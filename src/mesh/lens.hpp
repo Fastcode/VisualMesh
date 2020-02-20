@@ -34,21 +34,21 @@ enum LensProjection { RECTILINEAR, EQUISOLID, EQUIDISTANT };
  */
 template <typename Scalar>
 struct Lens {
-  /// The dimensions of the image
-  std::array<int, 2> dimensions;
-  /// The projection that this image is using
-  LensProjection projection;
-  /// The focal length of the camera, normalised to the image width
-  Scalar focal_length;
-  /// The offset required to move the centre of the lens to the centre of the image
-  std::array<Scalar, 2> centre;
-  /// The distortion parameters for the camera model
-  std::array<Scalar, 2> k;
-  /// The field of view of the camera measured in radians
-  /// This field of view is used to cut off sections of the image that the lens does not project for (think the black
-  /// sections on a fisheye camera). If there are no black sections on the image this should be set to the diagonal
-  /// field of view of the lens.
-  Scalar fov;
+    /// The dimensions of the image
+    std::array<int, 2> dimensions;
+    /// The projection that this image is using
+    LensProjection projection;
+    /// The focal length of the camera, normalised to the image width
+    Scalar focal_length;
+    /// The offset required to move the centre of the lens to the centre of the image
+    std::array<Scalar, 2> centre;
+    /// The distortion parameters for the camera model
+    std::array<Scalar, 2> k;
+    /// The field of view of the camera measured in radians
+    /// This field of view is used to cut off sections of the image that the lens does not project for (think the black
+    /// sections on a fisheye camera). If there are no black sections on the image this should be set to the diagonal
+    /// field of view of the lens.
+    Scalar fov;
 };
 
 }  // namespace visualmesh

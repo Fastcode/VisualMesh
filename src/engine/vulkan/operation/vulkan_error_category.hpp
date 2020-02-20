@@ -28,59 +28,60 @@ struct is_error_condition_enum<vk::Result> : public true_type {};
 
 namespace visualmesh {
 namespace engine {
-  namespace vulkan {
-    namespace operation {
+    namespace vulkan {
+        namespace operation {
 
-      class vulkan_error_category_t : public std::error_category {
-      public:
-        virtual const char* name() const noexcept;
+            class vulkan_error_category_t : public std::error_category {
+            public:
+                virtual const char* name() const noexcept;
 
-        virtual std::error_condition default_error_condition(int code) const noexcept;
+                virtual std::error_condition default_error_condition(int code) const noexcept;
 
-        virtual bool equivalent(const std::error_code& code, int condition) const noexcept;
-        bool equivalent(const std::error_code& code, const vk::Result& condition) const noexcept;
+                virtual bool equivalent(const std::error_code& code, int condition) const noexcept;
+                bool equivalent(const std::error_code& code, const vk::Result& condition) const noexcept;
 
-        virtual std::string message(int code) const noexcept;
-        std::string message(const vk::Result& code) const noexcept;
-      };
+                virtual std::string message(int code) const noexcept;
+                std::string message(const vk::Result& code) const noexcept;
+            };
 
-      inline const std::error_category& vulkan_error_category() {
-        static vulkan_error_category_t instance;
-        return instance;
-      }
+            inline const std::error_category& vulkan_error_category() {
+                static vulkan_error_category_t instance;
+                return instance;
+            }
 
-      inline std::error_condition make_error_condition(const vk::Result& e) {
-        return std::error_condition(static_cast<int>(e), vulkan_error_category());
-      }
+            inline std::error_condition make_error_condition(const vk::Result& e) {
+                return std::error_condition(static_cast<int>(e), vulkan_error_category());
+            }
 
-      const char* vulkan_error_category_t::name() const noexcept {
-        return "vulkan_error_category";
-      }
+            const char* vulkan_error_category_t::name() const noexcept {
+                return "vulkan_error_category";
+            }
 
-      std::error_condition vulkan_error_category_t::default_error_condition(int code) const noexcept {
-        return std::error_condition(static_cast<vk::Result>(code));
-      }
+            std::error_condition vulkan_error_category_t::default_error_condition(int code) const noexcept {
+                return std::error_condition(static_cast<vk::Result>(code));
+            }
 
-      bool vulkan_error_category_t::equivalent(const std::error_code& code, int condition) const noexcept {
-        return *this == code.category() && static_cast<int>(default_error_condition(code.value()).value()) == condition;
-      }
+            bool vulkan_error_category_t::equivalent(const std::error_code& code, int condition) const noexcept {
+                return *this == code.category()
+                       && static_cast<int>(default_error_condition(code.value()).value()) == condition;
+            }
 
-      bool vulkan_error_category_t::equivalent(const std::error_code& code, const vk::Result& condition) const
-        noexcept {
-        return *this == code.category()
-               && static_cast<vk::Result>(default_error_condition(code.value()).value()) == condition;
-      }
+            bool vulkan_error_category_t::equivalent(const std::error_code& code, const vk::Result& condition) const
+              noexcept {
+                return *this == code.category()
+                       && static_cast<vk::Result>(default_error_condition(code.value()).value()) == condition;
+            }
 
-      std::string vulkan_error_category_t::message(const vk::Result& code) const noexcept {
-        return vk::to_string(code);
-      }
+            std::string vulkan_error_category_t::message(const vk::Result& code) const noexcept {
+                return vk::to_string(code);
+            }
 
-      std::string vulkan_error_category_t::message(int code) const noexcept {
-        return message(static_cast<vk::Result>(code));
-      }
+            std::string vulkan_error_category_t::message(int code) const noexcept {
+                return message(static_cast<vk::Result>(code));
+            }
 
-    }  // namespace operation
-  }    // namespace vulkan
+        }  // namespace operation
+    }      // namespace vulkan
 }  // namespace engine
 }  // namespace visualmesh
 

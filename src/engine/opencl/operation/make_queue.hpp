@@ -22,29 +22,29 @@
 
 namespace visualmesh {
 namespace engine {
-  namespace opencl {
-    namespace operation {
+    namespace opencl {
+        namespace operation {
 
-      /**
-       * @brief Make an OpenCL command queue
-       *
-       * @param context the context to make the queue for
-       * @param device  the device to make the queue for
-       *
-       * @return a reference counted tracker of a command queue
-       */
-      inline cl::command_queue make_queue(cl_context context, cl_device_id device) {
-        cl_command_queue queue;
-        cl_int error;
-        // Use out of order execution if we can
-        queue = ::clCreateCommandQueue(context, device, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &error);
-        if (error == CL_INVALID_VALUE) { queue = ::clCreateCommandQueue(context, device, 0, &error); }
-        throw_cl_error(error, "Error creating the OpenCL command queue");
-        return cl::command_queue(queue, ::clReleaseCommandQueue);
-      }
+            /**
+             * @brief Make an OpenCL command queue
+             *
+             * @param context the context to make the queue for
+             * @param device  the device to make the queue for
+             *
+             * @return a reference counted tracker of a command queue
+             */
+            inline cl::command_queue make_queue(cl_context context, cl_device_id device) {
+                cl_command_queue queue;
+                cl_int error;
+                // Use out of order execution if we can
+                queue = ::clCreateCommandQueue(context, device, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &error);
+                if (error == CL_INVALID_VALUE) { queue = ::clCreateCommandQueue(context, device, 0, &error); }
+                throw_cl_error(error, "Error creating the OpenCL command queue");
+                return cl::command_queue(queue, ::clReleaseCommandQueue);
+            }
 
-    }  // namespace operation
-  }    // namespace opencl
+        }  // namespace operation
+    }      // namespace opencl
 }  // namespace engine
 }  // namespace visualmesh
 

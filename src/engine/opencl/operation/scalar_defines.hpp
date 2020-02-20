@@ -22,39 +22,39 @@
 
 namespace visualmesh {
 namespace engine {
-  namespace opencl {
-    namespace operation {
+    namespace opencl {
+        namespace operation {
 
-      /**
-       * @brief Get the scalar defines for single precision floating point
-       *
-       * @return a string containing the defines that are needed if the Scalar type is float
-       */
-      inline constexpr auto get_scalar_defines(float) {
-        return "#define Scalar float\n"
-               "#define Scalar2 float2\n"
-               "#define Scalar3 float3\n"
-               "#define Scalar4 float4\n"
-               "#define Scalar8 float8\n"
-               "#define Scalar16 float16\n";
-      }
+            /**
+             * @brief Get the scalar defines for single precision floating point
+             *
+             * @return a string containing the defines that are needed if the Scalar type is float
+             */
+            inline constexpr auto get_scalar_defines(float) {
+                return "#define Scalar float\n"
+                       "#define Scalar2 float2\n"
+                       "#define Scalar3 float3\n"
+                       "#define Scalar4 float4\n"
+                       "#define Scalar8 float8\n"
+                       "#define Scalar16 float16\n";
+            }
 
-      /**
-       * @brief Get the scalar defines for double precision floating point
-       *
-       * @return a string containing the defines that are needed if the Scalar type is double
-       */
-      inline constexpr auto get_scalar_defines(double) {
-        return "#define Scalar double\n"
-               "#define Scalar2 double2\n"
-               "#define Scalar3 double3\n"
-               "#define Scalar4 double4\n"
-               "#define Scalar8 double8\n"
-               "#define Scalar16 double16\n";
-      }
+            /**
+             * @brief Get the scalar defines for double precision floating point
+             *
+             * @return a string containing the defines that are needed if the Scalar type is double
+             */
+            inline constexpr auto get_scalar_defines(double) {
+                return "#define Scalar double\n"
+                       "#define Scalar2 double2\n"
+                       "#define Scalar3 double3\n"
+                       "#define Scalar4 double4\n"
+                       "#define Scalar8 double8\n"
+                       "#define Scalar16 double16\n";
+            }
 
-    }  // namespace operation
-  }    // namespace opencl
+        }  // namespace operation
+    }      // namespace opencl
 }  // namespace engine
 }  // namespace visualmesh
 

@@ -32,12 +32,12 @@ namespace visualmesh {
 template <typename Scalar, size_t Neighbours>
 struct ProjectedMesh {
 
-  /// The pixel coordinates (x,y) of the points projected from the visual mesh
-  std::vector<std::array<Scalar, 2>> pixel_coordinates;
-  /// The index graph giving the locations of the neighbours of each point
-  std::vector<std::array<int, Neighbours>> neighbourhood;
-  /// The original indicies of these points in the visual mesh
-  std::vector<int> global_indices;
+    /// The pixel coordinates (x,y) of the points projected from the visual mesh
+    std::vector<std::array<Scalar, 2>> pixel_coordinates;
+    /// The index graph giving the locations of the neighbours of each point
+    std::vector<std::array<int, Neighbours>> neighbourhood;
+    /// The original indicies of these points in the visual mesh
+    std::vector<int> global_indices;
 };
 
 }  // namespace visualmesh

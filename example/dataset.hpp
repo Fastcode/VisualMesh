@@ -33,61 +33,62 @@
 
 template <typename Scalar>
 struct dataset_element {
-  std::string number;
-  cv::Mat image;
-  visualmesh::Lens<Scalar> lens;
-  visualmesh::mat4<Scalar> Hoc;
+    std::string number;
+    cv::Mat image;
+    visualmesh::Lens<Scalar> lens;
+    visualmesh::mat4<Scalar> Hoc;
 };
 
 template <typename Scalar>
 std::vector<dataset_element<Scalar>> load_dataset(const std::string& path) {
 
-  auto dir = ::opendir(path.c_str());
+    auto dir = ::opendir(path.c_str());
 
-  if (dir != nullptr) {
-    std::vector<dataset_element<Scalar>> dataset;
-    for (dirent* ent = readdir(dir); ent != nullptr; ent = readdir(dir)) {
-      auto file = std::string(ent->d_name);
+    if (dir != nullptr) {
+        std::vector<dataset_element<Scalar>> dataset;
+        for (dirent* ent = readdir(dir); ent != nullptr; ent = readdir(dir)) {
+            auto file = std::string(ent->d_name);
 
-      if (file.substr(0, 4) == "lens" && !(ent->d_type & DT_DIR)) {
+            if (file.substr(0, 4) == "lens" && !(ent->d_type & DT_DIR)) {
 
-        dataset_element<Scalar> element;
+                dataset_element<Scalar> element;
 
-        // Extract the number so we can find the other files
-        element.number         = file.substr(4, 7);
-        element.image          = cv::imread(path + "/image" + element.number + ".jpg");
-        YAML::Node lens        = YAML::LoadFile(path + "/" + file);
-        std::string projection = lens["projection"].as<std::string>();
+                // Extract the number so we can find the other files
+                element.number         = file.substr(4, 7);
+                element.image          = cv::imread(path + "/image" + element.number + ".jpg");
+                YAML::Node lens        = YAML::LoadFile(path + "/" + file);
+                std::string projection = lens["projection"].as<std::string>();
 
-        // Convert the image from BGR to BGRA
-        cv::cvtColor(element.image, element.image, cv::COLOR_BGR2BGRA);
+                // Convert the image from BGR to BGRA
+                cv::cvtColor(element.image, element.image, cv::COLOR_BGR2BGRA);
 
-        // Load the lens parameters
-        element.lens.projection =
-          projection == "RECTILINEAR"
-            ? visualmesh::RECTILINEAR
-            : projection == "EQUIDISTANT"
-                ? visualmesh::EQUIDISTANT
-                : projection == "EQUISOLID" ? visualmesh::EQUISOLID : static_cast<visualmesh::LensProjection>(-1);
+                // Load the lens parameters
+                element.lens.projection = projection == "RECTILINEAR"
+                                            ? visualmesh::RECTILINEAR
+                                            : projection == "EQUIDISTANT"
+                                                ? visualmesh::EQUIDISTANT
+                                                : projection == "EQUISOLID"
+                                                    ? visualmesh::EQUISOLID
+                                                    : static_cast<visualmesh::LensProjection>(-1);
 
-        element.lens.dimensions   = lens["dimensions"].as<visualmesh::vec2<int>>();
-        element.lens.focal_length = lens["focal_length"].as<Scalar>();
-        element.lens.centre       = lens["centre"].as<visualmesh::vec2<Scalar>>();
-        element.lens.k            = lens["k"].as<visualmesh::vec2<Scalar>>();
-        element.lens.fov          = lens["fov"].as<Scalar>();
+                element.lens.dimensions   = lens["dimensions"].as<visualmesh::vec2<int>>();
+                element.lens.focal_length = lens["focal_length"].as<Scalar>();
+                element.lens.centre       = lens["centre"].as<visualmesh::vec2<Scalar>>();
+                element.lens.k            = lens["k"].as<visualmesh::vec2<Scalar>>();
+                element.lens.fov          = lens["fov"].as<Scalar>();
 
-        // Load the Hoc matrix
-        element.Hoc = lens["Hoc"].as<visualmesh::mat4<Scalar>>();
+                // Load the Hoc matrix
+                element.Hoc = lens["Hoc"].as<visualmesh::mat4<Scalar>>();
 
-        dataset.push_back(element);
-      }
+                dataset.push_back(element);
+            }
+        }
+        ::closedir(dir);
+        return dataset;
     }
-    ::closedir(dir);
-    return dataset;
-  }
-  else {
-    throw std::system_error(errno, std::system_category(), "Failed to open directory " + path);
-  }
+    else {
+        throw std::system_error(errno, std::system_category(), "Failed to open directory " + path);
+    }
 }
 
 #endif  // EXAMPLE_DATASET_HPP

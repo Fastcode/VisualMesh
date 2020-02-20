@@ -24,39 +24,39 @@
 namespace visualmesh {
 
 namespace equidistant {
-  template <typename Scalar>
-  inline Scalar r(const Scalar& theta, const Scalar& f) {
-    return f * theta;
-  }
+    template <typename Scalar>
+    inline Scalar r(const Scalar& theta, const Scalar& f) {
+        return f * theta;
+    }
 
-  template <typename Scalar>
-  inline Scalar theta(const Scalar& r, const Scalar& f) {
-    return r / f;
-  }
+    template <typename Scalar>
+    inline Scalar theta(const Scalar& r, const Scalar& f) {
+        return r / f;
+    }
 }  // namespace equidistant
 
 namespace equisolid {
-  template <typename Scalar>
-  inline Scalar r(const Scalar& theta, const Scalar& f) {
-    return Scalar(2.0) * f * std::sin(theta * Scalar(0.5));
-  }
+    template <typename Scalar>
+    inline Scalar r(const Scalar& theta, const Scalar& f) {
+        return Scalar(2.0) * f * std::sin(theta * Scalar(0.5));
+    }
 
-  template <typename Scalar>
-  inline Scalar theta(const Scalar& r, const Scalar& f) {
-    return Scalar(2.0) * std::asin(r / (Scalar(2.0) * f));
-  }
+    template <typename Scalar>
+    inline Scalar theta(const Scalar& r, const Scalar& f) {
+        return Scalar(2.0) * std::asin(r / (Scalar(2.0) * f));
+    }
 }  // namespace equisolid
 
 namespace rectilinear {
-  template <typename Scalar>
-  inline Scalar r(const Scalar& theta, const Scalar& f) {
-    return f * std::tan(theta);
-  }
+    template <typename Scalar>
+    inline Scalar r(const Scalar& theta, const Scalar& f) {
+        return f * std::tan(theta);
+    }
 
-  template <typename Scalar>
-  inline Scalar theta(const Scalar& r, const Scalar& f) {
-    return std::atan(r / f);
-  }
+    template <typename Scalar>
+    inline Scalar theta(const Scalar& r, const Scalar& f) {
+        return std::atan(r / f);
+    }
 }  // namespace rectilinear
 
 /**
@@ -78,12 +78,12 @@ namespace rectilinear {
  */
 template <typename Scalar>
 inline vec4<Scalar> inverse_coefficients(const vec2<Scalar>& k) {
-  return vec4<Scalar>{{
-    -k[0],
-    Scalar(3.0) * (k[0] * k[0]) - k[1],
-    Scalar(-12.0) * (k[0] * k[0]) * k[0] + Scalar(8.0) * k[0] * k[1],
-    Scalar(55.0) * (k[0] * k[0]) * (k[0] * k[0]) - Scalar(55.0) * (k[0] * k[0]) * k[1] + Scalar(5.0) * (k[1] * k[1]),
-  }};
+    return vec4<Scalar>{{
+      -k[0],
+      Scalar(3.0) * (k[0] * k[0]) - k[1],
+      Scalar(-12.0) * (k[0] * k[0]) * k[0] + Scalar(8.0) * k[0] * k[1],
+      Scalar(55.0) * (k[0] * k[0]) * (k[0] * k[0]) - Scalar(55.0) * (k[0] * k[0]) * k[1] + Scalar(5.0) * (k[1] * k[1]),
+    }};
 }
 
 /**
@@ -103,20 +103,20 @@ inline vec4<Scalar> inverse_coefficients(const vec2<Scalar>& k) {
  */
 template <typename Scalar>
 inline Scalar distort(const Scalar& r, const vec2<Scalar>& k) {
-  // Uses the math from the paper
-  // An Exact Formula for Calculating Inverse Radial Lens Distortions
-  // https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4934233/pdf/sensors-16-00807.pdf
-  // These terms have been stripped back to only include k1 and k2 and only uses the first 4 terms
-  // if more are needed in the future go and get them from the original paper
-  // TODO if performance ever becomes an issue, this can be precomputed for the same k values
-  const vec4<Scalar> ik = inverse_coefficients(k);
-  return r
-         * (1.0                                                  //
-            + ik[0] * (r * r)                                    //
-            + ik[1] * ((r * r) * (r * r))                        //
-            + ik[2] * ((r * r) * (r * r)) * (r * r)              //
-            + ik[3] * ((r * r) * (r * r)) * ((r * r) * (r * r))  //
-         );
+    // Uses the math from the paper
+    // An Exact Formula for Calculating Inverse Radial Lens Distortions
+    // https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4934233/pdf/sensors-16-00807.pdf
+    // These terms have been stripped back to only include k1 and k2 and only uses the first 4 terms
+    // if more are needed in the future go and get them from the original paper
+    // TODO if performance ever becomes an issue, this can be precomputed for the same k values
+    const vec4<Scalar> ik = inverse_coefficients(k);
+    return r
+           * (1.0                                                  //
+              + ik[0] * (r * r)                                    //
+              + ik[1] * ((r * r) * (r * r))                        //
+              + ik[2] * ((r * r) * (r * r)) * (r * r)              //
+              + ik[3] * ((r * r) * (r * r)) * ((r * r) * (r * r))  //
+           );
 }
 
 /**
@@ -136,10 +136,10 @@ inline Scalar distort(const Scalar& r, const vec2<Scalar>& k) {
  */
 template <typename Scalar>
 inline Scalar undistort(const Scalar& r, const vec2<Scalar>& k) {
-  // These parenthesis are important as they allow the compiler to optimise further
-  // Since floating point multiplication is not commutative r * r * r * r != (r * r) * (r * r)
-  // This means that the first needs 3 multiplication operations while the second needs only 2
-  return r * (1.0 + k[0] * (r * r) + k[1] * ((r * r) * (r * r)) + k[2] * ((r * r) * (r * r)) * (r * r));
+    // These parenthesis are important as they allow the compiler to optimise further
+    // Since floating point multiplication is not commutative r * r * r * r != (r * r) * (r * r)
+    // This means that the first needs 3 multiplication operations while the second needs only 2
+    return r * (1.0 + k[0] * (r * r) + k[1] * ((r * r) * (r * r)) + k[2] * ((r * r) * (r * r)) * (r * r));
 }
 
 /**
@@ -162,28 +162,28 @@ inline Scalar undistort(const Scalar& r, const vec2<Scalar>& k) {
 template <typename Scalar>
 vec2<Scalar> project(const vec3<Scalar>& ray, const Lens<Scalar>& lens) {
 
-  // Perform the projection math
-  const Scalar& f         = lens.focal_length;
-  const Scalar theta      = std::acos(ray[0]);
-  const Scalar rsin_theta = Scalar(1) / std::sqrt(Scalar(1) - ray[0] * ray[0]);
-  Scalar r_u;
-  switch (lens.projection) {
-    case RECTILINEAR: r_u = rectilinear::r(theta, f); break;
-    case EQUISOLID: r_u = equisolid::r(theta, f); break;
-    case EQUIDISTANT: r_u = equidistant::r(theta, f); break;
-    default: throw std::runtime_error("Cannot project: Unknown lens type"); break;
-  }
-  const Scalar r_d = distort(r_u, lens.k);
+    // Perform the projection math
+    const Scalar& f         = lens.focal_length;
+    const Scalar theta      = std::acos(ray[0]);
+    const Scalar rsin_theta = Scalar(1) / std::sqrt(Scalar(1) - ray[0] * ray[0]);
+    Scalar r_u;
+    switch (lens.projection) {
+        case RECTILINEAR: r_u = rectilinear::r(theta, f); break;
+        case EQUISOLID: r_u = equisolid::r(theta, f); break;
+        case EQUIDISTANT: r_u = equidistant::r(theta, f); break;
+        default: throw std::runtime_error("Cannot project: Unknown lens type"); break;
+    }
+    const Scalar r_d = distort(r_u, lens.k);
 
-  // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
-  // Sometimes x is greater than one due to floating point error, this almost certainly means that we are facing
-  // directly forward
-  vec2<Scalar> screen = ray[0] >= 1 ? vec2<Scalar>{{Scalar(0.0), Scalar(0.0)}}
-                                    : vec2<Scalar>{{r_d * ray[1] * rsin_theta, r_d * ray[2] * rsin_theta}};
+    // Work out our pixel coordinates as a 0 centred image with x to the left and y up (screen space)
+    // Sometimes x is greater than one due to floating point error, this almost certainly means that we are facing
+    // directly forward
+    vec2<Scalar> screen = ray[0] >= 1 ? vec2<Scalar>{{Scalar(0.0), Scalar(0.0)}}
+                                      : vec2<Scalar>{{r_d * ray[1] * rsin_theta, r_d * ray[2] * rsin_theta}};
 
-  // Apply our offset to move into image space (0 at top left, x to the right, y down)
-  // Then apply the offset to the centre of our lens
-  return subtract(subtract(multiply(cast<Scalar>(lens.dimensions), Scalar(0.5)), screen), lens.centre);
+    // Apply our offset to move into image space (0 at top left, x to the right, y down)
+    // Then apply the offset to the centre of our lens
+    return subtract(subtract(multiply(cast<Scalar>(lens.dimensions), Scalar(0.5)), screen), lens.centre);
 }
 
 /**
@@ -204,23 +204,23 @@ vec2<Scalar> project(const vec3<Scalar>& ray, const Lens<Scalar>& lens) {
 template <typename Scalar>
 vec3<Scalar> unproject(const vec2<Scalar>& px, const Lens<Scalar>& lens) {
 
-  // Transform to centre of the screen:
-  vec2<Scalar> screen = subtract(multiply(cast<Scalar>(lens.dimensions), Scalar(0.5)), add(px, lens.centre));
+    // Transform to centre of the screen:
+    vec2<Scalar> screen = subtract(multiply(cast<Scalar>(lens.dimensions), Scalar(0.5)), add(px, lens.centre));
 
-  // Perform the unprojection math
-  const Scalar& f  = lens.focal_length;
-  const Scalar r_d = norm(screen);
-  const Scalar r_u = undistort(r_d, lens.k);
-  Scalar theta;
-  switch (lens.projection) {
-    case RECTILINEAR: theta = rectilinear::theta(r_u, f); break;
-    case EQUISOLID: theta = equisolid::theta(r_u, f); break;
-    case EQUIDISTANT: theta = equidistant::theta(r_u, f); break;
-    default: throw std::runtime_error("Cannot project: Unknown lens type"); break;
-  }
-  const Scalar sin_theta = std::sin(theta);
+    // Perform the unprojection math
+    const Scalar& f  = lens.focal_length;
+    const Scalar r_d = norm(screen);
+    const Scalar r_u = undistort(r_d, lens.k);
+    Scalar theta;
+    switch (lens.projection) {
+        case RECTILINEAR: theta = rectilinear::theta(r_u, f); break;
+        case EQUISOLID: theta = equisolid::theta(r_u, f); break;
+        case EQUIDISTANT: theta = equidistant::theta(r_u, f); break;
+        default: throw std::runtime_error("Cannot project: Unknown lens type"); break;
+    }
+    const Scalar sin_theta = std::sin(theta);
 
-  return vec3<Scalar>{{std::cos(theta), sin_theta * screen[0] / r_d, sin_theta * screen[1] / r_d}};
+    return vec3<Scalar>{{std::cos(theta), sin_theta * screen[0] / r_d, sin_theta * screen[1] / r_d}};
 }
 
 }  // namespace visualmesh

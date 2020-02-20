@@ -30,7 +30,7 @@ namespace visualmesh {
  * @return the uint32_t representing this four character code
  */
 inline constexpr uint32_t fourcc(const char (&code)[5]) {
-  return uint32_t(code[0] | (code[1] << 8) | (code[2] << 16) | (code[3] << 24));
+    return uint32_t(code[0] | (code[1] << 8) | (code[2] << 16) | (code[3] << 24));
 }
 
 /**
@@ -40,7 +40,7 @@ inline constexpr uint32_t fourcc(const char (&code)[5]) {
  * @return std::string
  */
 inline std::string fourcc_text(const uint32_t& code) {
-  return std::string({char(code & 0xFF), char(code >> 8 & 0xFF), char(code >> 16 & 0xFF), char(code >> 24 & 0xFF)});
+    return std::string({char(code & 0xFF), char(code >> 8 & 0xFF), char(code >> 16 & 0xFF), char(code >> 24 & 0xFF)});
 }
 
 }  // namespace visualmesh

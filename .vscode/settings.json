@@ -1,7 +1,7 @@
 {
-    "python.formatting.provider": "yapf",
+    "python.formatting.provider": "black",
     "editor.formatOnSave": true,
-    "editor.tabSize": 2,
+    "editor.tabSize": 4,
     "editor.insertSpaces": true,
     "files.insertFinalNewline": true,
     "files.trimFinalNewlines": true,

@@ -25,19 +25,21 @@
 
 namespace visualmesh {
 namespace engine {
-  namespace vulkan {
+    namespace vulkan {
 
-    /**
-     * @brief A shorthand function to throw an Vulkan system error if the error code is not success
-     *
-     * @param code  the error code to check and throw
-     * @param msg   the message to attach to the exception if it is thrown
-     */
-    void throw_vk_error(const vk::Result& code, const std::string& msg) {
-      if (code != vk::Result::eSuccess) { throw std::system_error(int(code), operation::vulkan_error_category(), msg); }
-    }
+        /**
+         * @brief A shorthand function to throw an Vulkan system error if the error code is not success
+         *
+         * @param code  the error code to check and throw
+         * @param msg   the message to attach to the exception if it is thrown
+         */
+        void throw_vk_error(const vk::Result& code, const std::string& msg) {
+            if (code != vk::Result::eSuccess) {
+                throw std::system_error(int(code), operation::vulkan_error_category(), msg);
+            }
+        }
 
-  }  // namespace vulkan
+    }  // namespace vulkan
 }  // namespace engine
 }  // namespace visualmesh
 

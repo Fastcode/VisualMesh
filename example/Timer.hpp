@@ -27,29 +27,29 @@
  */
 class Timer {
 public:
-  std::chrono::steady_clock::time_point t;
+    std::chrono::steady_clock::time_point t;
 
-  Timer() : t(std::chrono::steady_clock::now()) {}
+    Timer() : t(std::chrono::steady_clock::now()) {}
 
-  template <size_t N>
-  inline void measure(const char (&c)[N]) {
+    template <size_t N>
+    inline void measure(const char (&c)[N]) {
 
-    // Work out how long it took
-    auto end = std::chrono::steady_clock::now();
-    auto val = end - t;
-    auto v   = std::chrono::duration_cast<std::chrono::duration<uint64_t, std::micro>>(val).count();
+        // Work out how long it took
+        auto end = std::chrono::steady_clock::now();
+        auto val = end - t;
+        auto v   = std::chrono::duration_cast<std::chrono::duration<uint64_t, std::micro>>(val).count();
 
-    // Print out how many microseconds
-    std::cout << c << " " << v << "µs" << std::endl;
+        // Print out how many microseconds
+        std::cout << c << " " << v << "µs" << std::endl;
 
-    // Restart the timer
-    t = std::chrono::steady_clock::now();
-  }
+        // Restart the timer
+        t = std::chrono::steady_clock::now();
+    }
 
-  inline void reset() {
-    // Restart the timer
-    t = std::chrono::steady_clock::now();
-  }
+    inline void reset() {
+        // Restart the timer
+        t = std::chrono::steady_clock::now();
+    }
 };
 
 #endif  // TIMER_HPP

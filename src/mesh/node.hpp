@@ -38,10 +38,10 @@ namespace visualmesh {
  */
 template <typename Scalar, size_t Neighbours>
 struct Node {
-  /// The unit vector in the direction for this node
-  vec3<Scalar> ray;
-  /// Absolute indices to the linked nodes ordered L, TL, TR, R, BR, BL (clockwise)
-  std::array<int, Neighbours> neighbours;
+    /// The unit vector in the direction for this node
+    vec3<Scalar> ray;
+    /// Absolute indices to the linked nodes ordered L, TL, TR, R, BR, BL (clockwise)
+    std::array<int, Neighbours> neighbours;
 };
 
 }  // namespace visualmesh

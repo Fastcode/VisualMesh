@@ -40,12 +40,12 @@ using mat4 = std::array<vec4<Scalar>, 4>;
  */
 template <typename OutScalar, typename InScalar, std::size_t L, std::size_t... I>
 inline std::array<OutScalar, L> cast(const std::array<InScalar, L>& a, const std::index_sequence<I...>&) {
-  return {{static_cast<OutScalar>(a[I])...}};
+    return {{static_cast<OutScalar>(a[I])...}};
 }
 
 template <typename OutScalar, typename InScalar, std::size_t L>
 inline std::array<OutScalar, L> cast(const std::array<InScalar, L>& a) {
-  return cast<OutScalar>(a, std::make_index_sequence<L>());
+    return cast<OutScalar>(a, std::make_index_sequence<L>());
 }
 
 /**
@@ -53,12 +53,12 @@ inline std::array<OutScalar, L> cast(const std::array<InScalar, L>& a) {
  */
 template <std::size_t S, typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, S> head(const std::array<Scalar, L>& a, const std::index_sequence<I...>&) {
-  return {{a[I]...}};
+    return {{a[I]...}};
 }
 
 template <std::size_t S, typename Scalar, std::size_t L>
 inline std::enable_if_t<(S < L), std::array<Scalar, S>> head(const std::array<Scalar, L>& a) {
-  return head<S>(a, std::make_index_sequence<S>());
+    return head<S>(a, std::make_index_sequence<S>());
 }
 
 /**
@@ -68,12 +68,12 @@ template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a,
                                       const Scalar& b,
                                       const std::index_sequence<I...>&) {
-  return {{(a[I] - b)...}};
+    return {{(a[I] - b)...}};
 }
 
 template <typename Scalar, std::size_t L>
 inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const Scalar& b) {
-  return subtract(a, b, std::make_index_sequence<L>());
+    return subtract(a, b, std::make_index_sequence<L>());
 }
 
 /**
@@ -83,12 +83,12 @@ template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a,
                                       const std::array<Scalar, L>& b,
                                       const std::index_sequence<I...>&) {
-  return {{(a[I] - b[I])...}};
+    return {{(a[I] - b[I])...}};
 }
 
 template <typename Scalar, std::size_t L>
 inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
-  return subtract(a, b, std::make_index_sequence<L>());
+    return subtract(a, b, std::make_index_sequence<L>());
 }
 
 /**
@@ -96,12 +96,12 @@ inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const std:
  */
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const Scalar& b, const std::index_sequence<I...>&) {
-  return {{(a[I] + b)...}};
+    return {{(a[I] + b)...}};
 }
 
 template <typename Scalar, std::size_t L>
 inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const Scalar& b) {
-  return add(a, b, std::make_index_sequence<L>());
+    return add(a, b, std::make_index_sequence<L>());
 }
 
 /**
@@ -111,12 +111,12 @@ template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> add(const std::array<Scalar, L>& a,
                                  const std::array<Scalar, L>& b,
                                  const std::index_sequence<I...>&) {
-  return {{(a[I] + b[I])...}};
+    return {{(a[I] + b[I])...}};
 }
 
 template <typename Scalar, std::size_t L>
 inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
-  return add(a, b, std::make_index_sequence<L>());
+    return add(a, b, std::make_index_sequence<L>());
 }
 
 /**
@@ -126,12 +126,12 @@ template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
                                       const Scalar& s,
                                       const std::index_sequence<I...>&) {
-  return {{(a[I] * s)...}};
+    return {{(a[I] * s)...}};
 }
 
 template <typename Scalar, std::size_t L>
 inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a, const Scalar& s) {
-  return multiply(a, s, std::make_index_sequence<L>());
+    return multiply(a, s, std::make_index_sequence<L>());
 }
 
 /**
@@ -141,12 +141,12 @@ template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
                                       const std::array<Scalar, L>& b,
                                       const std::index_sequence<I...>&) {
-  return {{(a[I] * b[I])...}};
+    return {{(a[I] * b[I])...}};
 }
 
 template <typename Scalar, std::size_t L>
 inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
-  return multiply(a, b, std::make_index_sequence<L>());
+    return multiply(a, b, std::make_index_sequence<L>());
 }
 
 /**
@@ -157,21 +157,21 @@ struct Dot;
 
 template <typename Scalar, std::size_t L>
 struct Dot<std::array<Scalar, L>, 0> {
-  static inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
-    return a[0] * b[0];
-  }
+    static inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+        return a[0] * b[0];
+    }
 };
 
 template <typename Scalar, std::size_t L, std::size_t I>
 struct Dot<std::array<Scalar, L>, I> {
-  static inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
-    return a[I] * b[I] + Dot<std::array<Scalar, L>, I - 1>::dot(a, b);
-  }
+    static inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
+        return a[I] * b[I] + Dot<std::array<Scalar, L>, I - 1>::dot(a, b);
+    }
 };
 
 template <typename Scalar, std::size_t L>
 inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b) {
-  return Dot<std::array<Scalar, L>, L - 1>::dot(a, b);
+    return Dot<std::array<Scalar, L>, L - 1>::dot(a, b);
 }
 
 /**
@@ -179,7 +179,7 @@ inline Scalar dot(const std::array<Scalar, L>& a, const std::array<Scalar, L>& b
  */
 template <typename Scalar, std::size_t L>
 inline Scalar norm(const std::array<Scalar, L>& a) {
-  return std::sqrt(dot(a, a));
+    return std::sqrt(dot(a, a));
 }
 
 /**
@@ -187,8 +187,8 @@ inline Scalar norm(const std::array<Scalar, L>& a) {
  */
 template <typename Scalar, std::size_t L>
 inline std::array<Scalar, L> normalise(const std::array<Scalar, L>& a) {
-  const Scalar len = Scalar(1.0) / norm(a);
-  return multiply(a, len);
+    const Scalar len = Scalar(1.0) / norm(a);
+    return multiply(a, len);
 }
 
 /**
@@ -196,11 +196,11 @@ inline std::array<Scalar, L> normalise(const std::array<Scalar, L>& a) {
  */
 template <typename Scalar>
 inline vec3<Scalar> cross(const vec3<Scalar>& a, const vec3<Scalar>& b) {
-  return {{
-    a[1] * b[2] - a[2] * b[1],  // x
-    a[2] * b[0] - a[0] * b[2],  // y
-    a[0] * b[1] - a[1] * b[0]   // z
-  }};
+    return {{
+      a[1] * b[2] - a[2] * b[1],  // x
+      a[2] * b[0] - a[0] * b[2],  // y
+      a[0] * b[1] - a[1] * b[0]   // z
+    }};
 }
 
 /**
@@ -209,19 +209,19 @@ inline vec3<Scalar> cross(const vec3<Scalar>& a, const vec3<Scalar>& b) {
 template <std::size_t S, std::size_t T, typename Scalar, std::size_t L, std::size_t M, std::size_t... I>
 inline std::array<std::array<Scalar, T>, S> block(const std::array<std::array<Scalar, M>, L>& a,
                                                   const std::index_sequence<I...>&) {
-  return {{head<T>(a[I])...}};
+    return {{head<T>(a[I])...}};
 }
 
 template <std::size_t S, std::size_t T, typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<std::array<Scalar, T>, S> block(const std::array<std::array<Scalar, T>, L>& a,
                                                   const std::index_sequence<I...>&) {
-  return {{a[I]...}};
+    return {{a[I]...}};
 }
 
 template <std::size_t S, std::size_t T, typename Scalar, std::size_t L, std::size_t M>
 inline std::enable_if_t<(S <= L && T < M) || (S < L && T <= M), std::array<std::array<Scalar, T>, S>> block(
   const std::array<std::array<Scalar, M>, L>& a) {
-  return block<S, T>(a, std::make_index_sequence<S>());
+    return block<S, T>(a, std::make_index_sequence<S>());
 }
 
 /**
@@ -230,18 +230,18 @@ inline std::enable_if_t<(S <= L && T < M) || (S < L && T <= M), std::array<std::
 template <std::size_t X, typename Scalar, std::size_t L, std::size_t M, std::size_t... Y>
 inline std::array<Scalar, M> transpose_vector(const std::array<std::array<Scalar, L>, M>& mat,
                                               const std::index_sequence<Y...>&) {
-  return {{mat[Y][X]...}};
+    return {{mat[Y][X]...}};
 }
 
 template <typename Scalar, std::size_t L, std::size_t M, std::size_t... X>
 inline std::array<std::array<Scalar, L>, L> transpose(const std::array<std::array<Scalar, L>, M>& mat,
                                                       const std::index_sequence<X...>&) {
-  return {{transpose_vector<X>(mat, std::make_index_sequence<M>())...}};
+    return {{transpose_vector<X>(mat, std::make_index_sequence<M>())...}};
 }
 
 template <typename Scalar, std::size_t L, std::size_t M>
 inline std::array<std::array<Scalar, M>, L> transpose(const std::array<std::array<Scalar, L>, M>& mat) {
-  return transpose(mat, std::make_index_sequence<L>());
+    return transpose(mat, std::make_index_sequence<L>());
 }
 
 
@@ -251,7 +251,7 @@ inline std::array<std::array<Scalar, M>, L> transpose(const std::array<std::arra
  */
 template <typename Scalar>
 inline vec3<Scalar> multiply(const mat3<Scalar>& a, const vec3<Scalar>& b) {
-  return vec3<Scalar>{{dot(a[0], b), dot(a[1], b), dot(a[2], b)}};
+    return vec3<Scalar>{{dot(a[0], b), dot(a[1], b), dot(a[2], b)}};
 }
 
 /**
@@ -260,28 +260,28 @@ inline vec3<Scalar> multiply(const mat3<Scalar>& a, const vec3<Scalar>& b) {
 template <typename Scalar>
 inline mat3<Scalar> invert(const mat3<Scalar>& m) {
 
-  // computes the inverse of a matrix m
-  const Scalar det = (m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2]) -  //
-                      m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +  //
-                      m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]));  //
+    // computes the inverse of a matrix m
+    const Scalar det = (m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2]) -  //
+                        m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +  //
+                        m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]));  //
 
-  // Matrix is not invertible
-  if (det == 0) {
-    const Scalar nan = std::numeric_limits<Scalar>::quiet_NaN();
-    return {vec3<Scalar>{nan, nan, nan}, vec3<Scalar>{nan, nan, nan}, vec3<Scalar>{nan, nan, nan}};
-  }
+    // Matrix is not invertible
+    if (det == 0) {
+        const Scalar nan = std::numeric_limits<Scalar>::quiet_NaN();
+        return {vec3<Scalar>{nan, nan, nan}, vec3<Scalar>{nan, nan, nan}, vec3<Scalar>{nan, nan, nan}};
+    }
 
-  const Scalar idet = Scalar(1) / det;
+    const Scalar idet = Scalar(1) / det;
 
-  return {vec3<Scalar>{(m[1][1] * m[2][2] - m[2][1] * m[1][2]) * idet,
-                       (m[0][2] * m[2][1] - m[0][1] * m[2][2]) * idet,
-                       (m[0][1] * m[1][2] - m[0][2] * m[1][1]) * idet},
-          vec3<Scalar>{(m[1][2] * m[2][0] - m[1][0] * m[2][2]) * idet,
-                       (m[0][0] * m[2][2] - m[0][2] * m[2][0]) * idet,
-                       (m[1][0] * m[0][2] - m[0][0] * m[1][2]) * idet},
-          vec3<Scalar>{(m[1][0] * m[2][1] - m[2][0] * m[1][1]) * idet,
-                       (m[2][0] * m[0][1] - m[0][0] * m[2][1]) * idet,
-                       (m[0][0] * m[1][1] - m[1][0] * m[0][1]) * idet}};
+    return {vec3<Scalar>{(m[1][1] * m[2][2] - m[2][1] * m[1][2]) * idet,
+                         (m[0][2] * m[2][1] - m[0][1] * m[2][2]) * idet,
+                         (m[0][1] * m[1][2] - m[0][2] * m[1][1]) * idet},
+            vec3<Scalar>{(m[1][2] * m[2][0] - m[1][0] * m[2][2]) * idet,
+                         (m[0][0] * m[2][2] - m[0][2] * m[2][0]) * idet,
+                         (m[1][0] * m[0][2] - m[0][0] * m[1][2]) * idet},
+            vec3<Scalar>{(m[1][0] * m[2][1] - m[2][0] * m[1][1]) * idet,
+                         (m[2][0] * m[0][1] - m[0][0] * m[2][1]) * idet,
+                         (m[0][0] * m[1][1] - m[1][0] * m[0][1]) * idet}};
 }
 }  // namespace visualmesh
 

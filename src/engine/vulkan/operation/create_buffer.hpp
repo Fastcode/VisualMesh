@@ -22,45 +22,46 @@
 
 namespace visualmesh {
 namespace engine {
-  namespace vulkan {
-    namespace operation {
-      inline std::pair<vk::Buffer, vk::DeviceMemory> create_buffer(const vk::PhysicalDevice& phyiscal_device,
-                                                                   const vk::Device& device,
-                                                                   const vk::DeviceSize& size,
-                                                                   const vk::BufferUsageFlags& usage,
-                                                                   const vk::SharingMode& sharing,
-                                                                   const std::vector<uint32_t>& queues,
-                                                                   const vk::MemoryPropertyFlags& properties) {
+    namespace vulkan {
+        namespace operation {
+            inline std::pair<vk::Buffer, vk::DeviceMemory> create_buffer(const vk::PhysicalDevice& phyiscal_device,
+                                                                         const vk::Device& device,
+                                                                         const vk::DeviceSize& size,
+                                                                         const vk::BufferUsageFlags& usage,
+                                                                         const vk::SharingMode& sharing,
+                                                                         const std::vector<uint32_t>& queues,
+                                                                         const vk::MemoryPropertyFlags& properties) {
 
-        // Create the buffer
-        vk::Buffer buffer = device.createBuffer(
-          vk::BufferCreateInfo(vk::BufferCreateFlags(), size, usage, sharing, queues.size(), queues.data()));
+                // Create the buffer
+                vk::Buffer buffer = device.createBuffer(
+                  vk::BufferCreateInfo(vk::BufferCreateFlags(), size, usage, sharing, queues.size(), queues.data()));
 
-        // Get properties of the physical device memory
-        vk::PhysicalDeviceMemoryProperties memory_properties = phyiscal_device.getMemoryProperties();
-        vk::MemoryRequirements memory_requirements           = device.getBufferMemoryRequirements(buffer);
-        vk::MemoryAllocateInfo allocInfo(memory_requirements.size);
+                // Get properties of the physical device memory
+                vk::PhysicalDeviceMemoryProperties memory_properties = phyiscal_device.getMemoryProperties();
+                vk::MemoryRequirements memory_requirements           = device.getBufferMemoryRequirements(buffer);
+                vk::MemoryAllocateInfo allocInfo(memory_requirements.size);
 
-        // Vulkan devices can have multiple different types of memory
-        // Each memory type can have different properties and sizes, so we need to find one that suits our purposes
-        for (uint32_t i = 0; i < memory_properties.memoryTypeCount; i++) {
-          if ((memory_requirements.memoryTypeBits & (1 << i))
-              && (memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
-            allocInfo.memoryTypeIndex = i;
-            break;
-          }
-        }
+                // Vulkan devices can have multiple different types of memory
+                // Each memory type can have different properties and sizes, so we need to find one that suits our
+                // purposes
+                for (uint32_t i = 0; i < memory_properties.memoryTypeCount; i++) {
+                    if ((memory_requirements.memoryTypeBits & (1 << i))
+                        && (memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
+                        allocInfo.memoryTypeIndex = i;
+                        break;
+                    }
+                }
 
-        // Allocate memory for the buffer on the device
-        vk::DeviceMemory memory = device.allocateMemory(allocInfo);
+                // Allocate memory for the buffer on the device
+                vk::DeviceMemory memory = device.allocateMemory(allocInfo);
 
-        // Attach the allocated device memory to it
-        device.bindBufferMemory(buffer, memory, 0);
+                // Attach the allocated device memory to it
+                device.bindBufferMemory(buffer, memory, 0);
 
-        return std::make_pair(buffer, memory);
-      }
-    }  // namespace operation
-  }    // namespace vulkan
+                return std::make_pair(buffer, memory);
+            }
+        }  // namespace operation
+    }      // namespace vulkan
 }  // namespace engine
 }  // namespace visualmesh
 

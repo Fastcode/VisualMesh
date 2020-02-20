@@ -30,34 +30,34 @@ void draw(const std::string& window,
           const visualmesh::ClassifiedMesh<Scalar, N_NEIGHBOURS>& mesh,
           const std::vector<cv::Scalar>& colours) {
 
-  const auto& classifications   = mesh.classifications;
-  const auto& pixel_coordinates = mesh.pixel_coordinates;
-  const auto& neighbourhood     = mesh.neighbourhood;
-  const size_t num_classes      = colours.size();
+    const auto& classifications   = mesh.classifications;
+    const auto& pixel_coordinates = mesh.pixel_coordinates;
+    const auto& neighbourhood     = mesh.neighbourhood;
+    const size_t num_classes      = colours.size();
 
-  cv::Mat scratch = image.clone();
+    cv::Mat scratch = image.clone();
 
-  for (unsigned int i = 0; i < pixel_coordinates.size(); ++i) {
-    cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
+    for (unsigned int i = 0; i < pixel_coordinates.size(); ++i) {
+        cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
 
-    // Work out what colour based on mixing
-    const Scalar* cl = classifications.data() + (i * num_classes);
-    cv::Scalar colour(0, 0, 0);
+        // Work out what colour based on mixing
+        const Scalar* cl = classifications.data() + (i * num_classes);
+        cv::Scalar colour(0, 0, 0);
 
-    for (unsigned int i = 0; i < colours.size(); ++i) {
-      colour += colours[i] * cl[i];
+        for (unsigned int i = 0; i < colours.size(); ++i) {
+            colour += colours[i] * cl[i];
+        }
+
+        for (const auto& n : neighbourhood[i]) {
+            if (n < static_cast<int>(pixel_coordinates.size())) {
+                cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
+                cv::Point p2x = p1 + ((p2 - p1) * 0.5);
+                cv::line(scratch, p1, p2x, colour, 1);
+            }
+        }
     }
 
-    for (const auto& n : neighbourhood[i]) {
-      if (n < static_cast<int>(pixel_coordinates.size())) {
-        cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
-        cv::Point p2x = p1 + ((p2 - p1) * 0.5);
-        cv::line(scratch, p1, p2x, colour, 1);
-      }
-    }
-  }
-
-  cv::imshow(window, scratch);
+    cv::imshow(window, scratch);
 }
 
 
@@ -67,24 +67,24 @@ void draw(const std::string& window,
           const visualmesh::ProjectedMesh<Scalar, N_NEIGHBOURS>& mesh,
           const cv::Scalar& colour) {
 
-  const auto& pixel_coordinates = mesh.pixel_coordinates;
-  const auto& neighbourhood     = mesh.neighbourhood;
+    const auto& pixel_coordinates = mesh.pixel_coordinates;
+    const auto& neighbourhood     = mesh.neighbourhood;
 
-  cv::Mat scratch = image.clone();
+    cv::Mat scratch = image.clone();
 
-  for (unsigned int i = 0; i < pixel_coordinates.size(); ++i) {
-    cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
+    for (unsigned int i = 0; i < pixel_coordinates.size(); ++i) {
+        cv::Point p1(pixel_coordinates[i][0], pixel_coordinates[i][1]);
 
-    for (const auto& n : neighbourhood[i]) {
-      if (n < static_cast<int>(pixel_coordinates.size())) {
-        cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
-        cv::Point p2x = p1 + ((p2 - p1) * 0.5);
-        cv::line(scratch, p1, p2x, colour, 1, cv::LINE_AA);
-      }
+        for (const auto& n : neighbourhood[i]) {
+            if (n < static_cast<int>(pixel_coordinates.size())) {
+                cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
+                cv::Point p2x = p1 + ((p2 - p1) * 0.5);
+                cv::line(scratch, p1, p2x, colour, 1, cv::LINE_AA);
+            }
+        }
     }
-  }
 
-  cv::imshow(window, scratch);
+    cv::imshow(window, scratch);
 }
 
 #endif  // EXAMPLE_DRAW_HPP

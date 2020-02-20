@@ -20,9 +20,9 @@
 
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #if defined(__APPLE__) || defined(__MACOSX)
-#  include <OpenCL/opencl.h>
+#    include <OpenCL/opencl.h>
 #else
-#  include <CL/opencl.h>
+#    include <CL/opencl.h>
 #endif  // !__APPLE__
 
 #include <memory>
@@ -33,37 +33,37 @@
 
 namespace visualmesh {
 namespace engine {
-  namespace opencl {
+    namespace opencl {
 
-    /**
-     * @brief A shorthand function to throw an OpenCL system error if the error code is not success
-     *
-     * @param code  the error code to check and throw
-     * @param msg   the message to attach to the exception if it is thrown
-     */
-    void throw_cl_error(const cl_int& code, const std::string& msg) {
-      if (code != CL_SUCCESS) { throw std::system_error(code, operation::opencl_error_category(), msg); }
-    }
-
-    namespace cl {
-      template <typename T>
-      struct opencl_wrapper : public std::shared_ptr<std::remove_pointer_t<T>> {
-        using std::shared_ptr<std::remove_pointer_t<T>>::shared_ptr;
-
-        operator T() const {
-          return this->get();
+        /**
+         * @brief A shorthand function to throw an OpenCL system error if the error code is not success
+         *
+         * @param code  the error code to check and throw
+         * @param msg   the message to attach to the exception if it is thrown
+         */
+        void throw_cl_error(const cl_int& code, const std::string& msg) {
+            if (code != CL_SUCCESS) { throw std::system_error(code, operation::opencl_error_category(), msg); }
         }
-      };
 
-      using command_queue = opencl_wrapper<::cl_command_queue>;
-      using context       = opencl_wrapper<::cl_context>;
-      using event         = opencl_wrapper<::cl_event>;
-      using kernel        = opencl_wrapper<::cl_kernel>;
-      using mem           = opencl_wrapper<::cl_mem>;
-      using program       = opencl_wrapper<::cl_program>;
-    }  // namespace cl
+        namespace cl {
+            template <typename T>
+            struct opencl_wrapper : public std::shared_ptr<std::remove_pointer_t<T>> {
+                using std::shared_ptr<std::remove_pointer_t<T>>::shared_ptr;
 
-  }  // namespace opencl
+                operator T() const {
+                    return this->get();
+                }
+            };
+
+            using command_queue = opencl_wrapper<::cl_command_queue>;
+            using context       = opencl_wrapper<::cl_context>;
+            using event         = opencl_wrapper<::cl_event>;
+            using kernel        = opencl_wrapper<::cl_kernel>;
+            using mem           = opencl_wrapper<::cl_mem>;
+            using program       = opencl_wrapper<::cl_program>;
+        }  // namespace cl
+
+    }  // namespace opencl
 }  // namespace engine
 }  // namespace visualmesh
 
