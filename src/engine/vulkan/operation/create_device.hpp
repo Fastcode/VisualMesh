@@ -231,6 +231,26 @@ namespace engine {
                     std::cout << "        Z: " << props.limits.maxComputeWorkGroupSize[2] << std::endl;
                     std::cout << "    Max Compute Workgroup Invocations: "
                               << props.limits.maxComputeWorkGroupInvocations << std::endl;
+                    std::cout << "    Max Compute Shared Memory........: ";
+                    // TB
+                    uint32_t shared_mem_size = props.limits.maxComputeSharedMemorySize;
+                    if (shared_mem_size > uint32_t(1e12)) {
+                        std::cout << std::setprecision(2) << (double(shared_mem_size) / double(1e12)) << " TB"
+                                  << std::endl;
+                    }
+                    // GB
+                    else if (shared_mem_size > uint32_t(1e9)) {
+                        std::cout << std::setprecision(2) << (double(shared_mem_size) / double(1e9)) << " GB"
+                                  << std::endl;
+                    }
+                    // MB
+                    else if (shared_mem_size > uint32_t(1e6)) {
+                        std::cout << std::setprecision(2) << (double(shared_mem_size) / double(1e6)) << " MB"
+                                  << std::endl;
+                    }
+                    else {
+                        std::cout << std::setprecision(2) << max_heap_size << " B" << std::endl;
+                    }
                 }
 
                 instance.phys_device           = best_physical_device;
