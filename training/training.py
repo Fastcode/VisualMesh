@@ -74,9 +74,10 @@ def train(config, output_path):
         tf.metrics.Recall(name="metrics/global_recall"),
     ]
 
+    # Class specific metrics
     for i, k in enumerate(config.network.classes):
-        metrics.append(ClassPrecision(i, name="metrics/{}_precision".format(k[0])))
-        metrics.append(ClassRecall(i, name="metrics/{}_recall".format(k[0])))
+        metrics.append(ClassPrecision("metrics/{}_precision".format(k[0]), i, len(config.network.classes)))
+        metrics.append(ClassRecall("metrics/{}_recall".format(k[0]), i, len(config.network.classes)))
 
     # Define the model
     model = VisualMeshModel(
