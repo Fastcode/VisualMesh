@@ -218,6 +218,11 @@ namespace engine {
                         std::cout << std::setprecision(2) << (double(max_heap_size) / double(1e6)) << " MB"
                                   << std::endl;
                     }
+                    // KB
+                    else if (max_heap_size > uint32_t(1e3)) {
+                        std::cout << std::setprecision(2) << (double(max_heap_size) / double(1e3)) << " KB"
+                                  << std::endl;
+                    }
                     else {
                         std::cout << std::setprecision(2) << max_heap_size << " B" << std::endl;
                     }
@@ -248,8 +253,13 @@ namespace engine {
                         std::cout << std::setprecision(2) << (double(shared_mem_size) / double(1e6)) << " MB"
                                   << std::endl;
                     }
+                    // KB
+                    else if (shared_mem_size > uint32_t(1e3)) {
+                        std::cout << std::setprecision(2) << (double(shared_mem_size) / double(1e3)) << " KB"
+                                  << std::endl;
+                    }
                     else {
-                        std::cout << std::setprecision(2) << max_heap_size << " B" << std::endl;
+                        std::cout << std::setprecision(2) << shared_mem_size << " B" << std::endl;
                     }
                 }
 
