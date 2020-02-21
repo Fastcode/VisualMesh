@@ -1086,6 +1086,9 @@ private:
         entry_point.insert(entry_point.end(), name.begin(), name.end());
         entry_point.insert(entry_point.end(), interface.begin(), interface.end());
         operation(entry_points, spv::Op::OpEntryPoint, entry_point);
+        operation(entry_points,
+                  spv::Op::OpExecutionMode,
+                  {entry_point_id, static_cast<uint32_t>(spv::ExecutionMode::LocalSize), 1, 1, 1});
     }
 
     uint32_t add_function_type(const std::initializer_list<uint32_t>& params) {
