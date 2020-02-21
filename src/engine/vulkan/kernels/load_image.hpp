@@ -340,10 +340,6 @@ namespace engine {
                 // Index 0 is used in every member_access call
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
 
-                // Define the WorkgroupSize constant
-                uint32_t workgroup_size = program.add_constant(uvec3, {idx0, idx0, idx0}, 1, true);
-                program.add_builtin_decoration(workgroup_size, spv::BuiltIn::WorkgroupSize);
-
                 // Prepare the descriptor set variables.
                 // Prepare the image sampler variables.
                 uint32_t sampler_ptr    = program.add_pointer(sampler_id, spv::StorageClass::UniformConstant);

@@ -18,10 +18,15 @@
 #ifndef VISUALMESH_ENGINE_VULKAN_OPERATION_FIND_DEVICE_HPP
 #define VISUALMESH_ENGINE_VULKAN_OPERATION_FIND_DEVICE_HPP
 
+extern "C" {
+#include <vulkan/vulkan.h>
+}
+
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <vector>
-#include <vulkan/vulkan.hpp>
 
 #include "wrapper.hpp"
 
@@ -29,135 +34,146 @@ namespace visualmesh {
 namespace engine {
     namespace vulkan {
         namespace operation {
-            vk::Result get_best_transfer_queue(const vk::PhysicalDevice& device, uint32_t& queue_family) {
-                std::vector<vk::QueueFamilyProperties> queue_props = device.getQueueFamilyProperties();
+            VkResult get_best_transfer_queue(const VkPhysicalDevice& physical_device, uint32_t& queueFamilyIndex) {
+                uint32_t queueFamilyPropertiesCount = 0;
+                vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queueFamilyPropertiesCount, 0);
+
+                std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyPropertiesCount);
+
+                vkGetPhysicalDeviceQueueFamilyProperties(
+                  physical_device, &queueFamilyPropertiesCount, queueFamilyProperties.data());
 
                 // first try and find a queue that has just the transfer bit set
-                for (queue_family = 0; queue_family < queue_props.size(); queue_family++) {
+                for (uint32_t i = 0; i < queueFamilyPropertiesCount; i++) {
                     // mask out the sparse binding bit that we aren't caring about (yet!)
-                    const vk::QueueFlags masked_flags =
-                      ~vk::QueueFlagBits::eSparseBinding & queue_props[queue_family].queueFlags;
+                    const VkQueueFlags maskedFlags =
+                      (~VK_QUEUE_SPARSE_BINDING_BIT & queueFamilyProperties[i].queueFlags);
 
-                    if (!((vk::QueueFlags(vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute) & masked_flags))
-                        && (vk::QueueFlagBits::eTransfer & masked_flags)) {
-                        return vk::Result::eSuccess;
+                    if (!((VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT) & maskedFlags)
+                        && (VK_QUEUE_TRANSFER_BIT & maskedFlags)) {
+                        queueFamilyIndex = i;
+                        return VK_SUCCESS;
                     }
                 }
 
                 // otherwise we'll prefer using a compute-only queue,
                 // remember that having compute on the queue implicitly enables transfer!
-                for (queue_family = 0; queue_family < queue_props.size(); queue_family++) {
+                for (uint32_t i = 0; i < queueFamilyPropertiesCount; i++) {
                     // mask out the sparse binding bit that we aren't caring about (yet!)
-                    const vk::QueueFlags masked_flags =
-                      ~vk::QueueFlagBits::eSparseBinding & queue_props[queue_family].queueFlags;
+                    const VkQueueFlags maskedFlags =
+                      (~VK_QUEUE_SPARSE_BINDING_BIT & queueFamilyProperties[i].queueFlags);
 
-                    if (!(vk::QueueFlagBits::eGraphics & masked_flags)
-                        && (vk::QueueFlagBits::eCompute & masked_flags)) {
-                        return vk::Result::eSuccess;
+                    if (!(VK_QUEUE_GRAPHICS_BIT & maskedFlags) && (VK_QUEUE_COMPUTE_BIT & maskedFlags)) {
+                        queueFamilyIndex = i;
+                        return VK_SUCCESS;
                     }
                 }
 
                 // lastly get any queue that'll work for us (graphics, compute or transfer bit set)
-                for (queue_family = 0; queue_family < queue_props.size(); queue_family++) {
+                for (uint32_t i = 0; i < queueFamilyPropertiesCount; i++) {
                     // mask out the sparse binding bit that we aren't caring about (yet!)
-                    const vk::QueueFlags masked_flags =
-                      ~vk::QueueFlagBits::eSparseBinding & queue_props[queue_family].queueFlags;
+                    const VkQueueFlags maskedFlags =
+                      (~VK_QUEUE_SPARSE_BINDING_BIT & queueFamilyProperties[i].queueFlags);
 
-                    if (vk::QueueFlags(vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute
-                                       | vk::QueueFlagBits::eTransfer)
-                        & masked_flags) {
-                        return vk::Result::eSuccess;
+                    if ((VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT) & maskedFlags) {
+                        queueFamilyIndex = i;
+                        return VK_SUCCESS;
                     }
                 }
 
-                queue_family = 0;
-                return vk::Result::eErrorInitializationFailed;
+                return VK_ERROR_INITIALIZATION_FAILED;
             }
 
-            vk::Result get_best_compute_queue(const vk::PhysicalDevice& device, uint32_t& queue_family) {
-                std::vector<vk::QueueFamilyProperties> queue_props = device.getQueueFamilyProperties();
+            VkResult get_best_compute_queue(const VkPhysicalDevice& physical_device, uint32_t& queueFamilyIndex) {
+                uint32_t queueFamilyPropertiesCount = 0;
+                vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queueFamilyPropertiesCount, 0);
+
+                std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyPropertiesCount);
+
+                vkGetPhysicalDeviceQueueFamilyProperties(
+                  physical_device, &queueFamilyPropertiesCount, queueFamilyProperties.data());
 
                 // first try and find a queue that has just the compute bit set
-                for (queue_family = 0; queue_family < queue_props.size(); queue_family++) {
+                for (uint32_t i = 0; i < queueFamilyPropertiesCount; i++) {
                     // mask out the sparse binding bit that we aren't caring about (yet!) and the transfer bit
-                    const vk::QueueFlags masked_flags =
-                      vk::QueueFlags(~vk::QueueFlagBits::eSparseBinding | ~vk::QueueFlagBits::eTransfer)
-                      & queue_props[queue_family].queueFlags;
+                    const VkQueueFlags maskedFlags =
+                      (~(VK_QUEUE_TRANSFER_BIT | VK_QUEUE_SPARSE_BINDING_BIT) & queueFamilyProperties[i].queueFlags);
 
-                    if (!(vk::QueueFlagBits::eGraphics & masked_flags)) { return vk::Result::eSuccess; }
+                    if (!(VK_QUEUE_GRAPHICS_BIT & maskedFlags) && (VK_QUEUE_COMPUTE_BIT & maskedFlags)) {
+                        queueFamilyIndex = i;
+                        return VK_SUCCESS;
+                    }
                 }
 
                 // lastly get any queue that'll work for us
-                for (queue_family = 0; queue_family < queue_props.size(); queue_family++) {
+                for (uint32_t i = 0; i < queueFamilyPropertiesCount; i++) {
                     // mask out the sparse binding bit that we aren't caring about (yet!) and the transfer bit
-                    const vk::QueueFlags masked_flags =
-                      vk::QueueFlags(~vk::QueueFlagBits::eSparseBinding | ~vk::QueueFlagBits::eTransfer)
-                      & queue_props[queue_family].queueFlags;
+                    const VkQueueFlags maskedFlags =
+                      (~(VK_QUEUE_TRANSFER_BIT | VK_QUEUE_SPARSE_BINDING_BIT) & queueFamilyProperties[i].queueFlags);
 
-                    if (vk::QueueFlagBits::eCompute & masked_flags) { return vk::Result::eSuccess; }
+                    if (VK_QUEUE_COMPUTE_BIT & maskedFlags) {
+                        queueFamilyIndex = i;
+                        return VK_SUCCESS;
+                    }
                 }
 
-                queue_family = 0;
-                return vk::Result::eErrorInitializationFailed;
+                return VK_ERROR_INITIALIZATION_FAILED;
             }
 
-            enum class DeviceType { CPU, GPU, INTEGRATED_GPU, DISCRETE_GPU, VIRTUAL_GPU, ANY };
-
-            struct VulkanInstance {
-                vk::Instance instance;
-                vk::PhysicalDevice phys_device;
-                vk::Device device;
-                uint32_t compute_queue_family;
-                uint32_t transfer_queue_family;
-                vk::Queue compute_queue;
-                vk::Queue transfer_queue;
-            };
-
-            void create_device(const DeviceType& wanted_device_type, VulkanInstance& instance, bool verbose = false) {
-                auto compare_device_type = [wanted_device_type](const vk::PhysicalDeviceType& device_type) {
+            void create_device(const DeviceType& wanted_device_type, VulkanContext& context, bool verbose = false) {
+                auto compare_device_type = [wanted_device_type](const VkPhysicalDeviceType& device_type) {
                     switch (wanted_device_type) {
-                        case DeviceType::CPU: return device_type == vk::PhysicalDeviceType::eCpu;
+                        case DeviceType::CPU: return device_type == VK_PHYSICAL_DEVICE_TYPE_CPU;
                         case DeviceType::GPU:
-                            return (device_type == vk::PhysicalDeviceType::eIntegratedGpu
-                                    || device_type == vk::PhysicalDeviceType::eDiscreteGpu
-                                    || device_type == vk::PhysicalDeviceType::eVirtualGpu);
-                        case DeviceType::INTEGRATED_GPU: return device_type == vk::PhysicalDeviceType::eIntegratedGpu;
-                        case DeviceType::DISCRETE_GPU: return device_type == vk::PhysicalDeviceType::eDiscreteGpu;
-                        case DeviceType::VIRTUAL_GPU: return device_type == vk::PhysicalDeviceType::eVirtualGpu;
+                            return (device_type == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
+                                    || device_type == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+                                    || device_type == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU);
+                        case DeviceType::INTEGRATED_GPU: return device_type == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
+                        case DeviceType::DISCRETE_GPU: return device_type == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+                        case DeviceType::VIRTUAL_GPU: return device_type == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU;
                         case DeviceType::ANY: return true;
                         default: return false;
                     }
                 };
 
                 // Find a suitable device
-                std::vector<vk::PhysicalDevice> physical_devices = instance.instance.enumeratePhysicalDevices();
-                uint32_t best_compute_queue_family               = std::numeric_limits<uint32_t>::max();
-                uint32_t best_transfer_queue_family              = std::numeric_limits<uint32_t>::max();
-                uint32_t max_heap_size                           = 0;
-                vk::PhysicalDevice best_physical_device;
+                uint32_t physical_device_count = 0;
+                throw_vk_error(vkEnumeratePhysicalDevices(context.instance, &physical_device_count, 0),
+                               "Failed to get physical device count");
+                std::vector<VkPhysicalDevice> physical_devices(physical_device_count);
+                throw_vk_error(
+                  vkEnumeratePhysicalDevices(context.instance, &physical_device_count, physical_devices.data()),
+                  "Failed to enumerate physical devices");
+
+                uint32_t best_compute_queue_family  = std::numeric_limits<uint32_t>::max();
+                uint32_t best_transfer_queue_family = std::numeric_limits<uint32_t>::max();
+                uint32_t max_heap_size              = 0;
+                VkPhysicalDevice best_physical_device;
 
                 for (const auto& physical_device : physical_devices) {
                     // Only consider GPU devices
-                    vk::PhysicalDeviceProperties props = physical_device.getProperties();
+                    VkPhysicalDeviceProperties props;
+                    vkGetPhysicalDeviceProperties(physical_device, &props);
                     if (compare_device_type(props.deviceType)) {
                         uint32_t compute_queue_family;
                         uint32_t transfer_queue_family;
-                        vk::Result compute_result  = get_best_compute_queue(physical_device, compute_queue_family);
-                        vk::Result transfer_result = get_best_transfer_queue(physical_device, transfer_queue_family);
+                        VkResult compute_result  = get_best_compute_queue(physical_device, compute_queue_family);
+                        VkResult transfer_result = get_best_transfer_queue(physical_device, transfer_queue_family);
 
-                        if ((compute_result == vk::Result::eSuccess) && (transfer_result == vk::Result::eSuccess)) {
+                        if ((compute_result == VK_SUCCESS) && (transfer_result == VK_SUCCESS)) {
                             // We have a device with the right capabilites, now make sure we have the one with the most
                             // local memory Doesn't seem to be possible to find one with the most number of parallel
                             // compute units? Therefore, more memory == better device?
-                            vk::PhysicalDeviceMemoryProperties mem_props = physical_device.getMemoryProperties();
-                            std::vector<vk::MemoryHeap> heaps(mem_props.memoryHeaps,
-                                                              mem_props.memoryHeaps + mem_props.memoryHeapCount);
+                            VkPhysicalDeviceMemoryProperties mem_props;
+                            vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);
+                            std::vector<VkMemoryHeap> heaps(mem_props.memoryHeaps,
+                                                            mem_props.memoryHeaps + mem_props.memoryHeapCount);
 
-                            uint32_t heap_size = 0;
+                            VkDeviceSize heap_size = 0;
                             for (const auto& heap : heaps) {
-                                if (heap.flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
+                                if (heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
                                     // Device local heap, should be size of total GPU VRAM.
-                                    if (heap.size > heap_size) { heap_size = heap.size; }
+                                    heap_size = std::max(heap.size, heap_size);
                                 }
                             }
 
@@ -174,12 +190,13 @@ namespace engine {
                 // Make sure we found a device
                 if ((best_compute_queue_family == std::numeric_limits<uint32_t>::max())
                     || (best_transfer_queue_family == std::numeric_limits<uint32_t>::max())) {
-                    throw_vk_error(vk::Result::eErrorInitializationFailed, "Failed to find a suitable Vulkan device");
+                    throw_vk_error(VK_ERROR_INITIALIZATION_FAILED, "Failed to find a suitable physical device");
                 }
 
                 // Display device information
                 if (verbose) {
-                    vk::PhysicalDeviceProperties props = best_physical_device.getProperties();
+                    VkPhysicalDeviceProperties props;
+                    vkGetPhysicalDeviceProperties(best_physical_device, &props);
                     std::cout << "Device Properties:" << std::endl;
                     std::cout << "------------------" << std::endl;
                     std::cout << "    Device Name......................: " << props.deviceName << std::endl;
@@ -195,11 +212,11 @@ namespace engine {
                               << std::endl;
                     std::cout << "    Device Type......................: ";
                     switch (props.deviceType) {
-                        case vk::PhysicalDeviceType::eIntegratedGpu: std::cout << "Integrated GPU" << std::endl; break;
-                        case vk::PhysicalDeviceType::eDiscreteGpu: std::cout << "Discrete GPU" << std::endl; break;
-                        case vk::PhysicalDeviceType::eVirtualGpu: std::cout << "Virtual GPU" << std::endl; break;
-                        case vk::PhysicalDeviceType::eCpu: std::cout << "CPU" << std::endl; break;
-                        case vk::PhysicalDeviceType::eOther: std::cout << "Other device" << std::endl; break;
+                        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: std::cout << "Integrated GPU" << std::endl; break;
+                        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: std::cout << "Discrete GPU" << std::endl; break;
+                        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: std::cout << "Virtual GPU" << std::endl; break;
+                        case VK_PHYSICAL_DEVICE_TYPE_CPU: std::cout << "CPU" << std::endl; break;
+                        case VK_PHYSICAL_DEVICE_TYPE_OTHER: std::cout << "Other device" << std::endl; break;
                         default: std::cout << "Unknown device" << std::endl; break;
                     }
                     std::cout << "    Max Heap Size....................: ";
@@ -263,34 +280,48 @@ namespace engine {
                     }
                 }
 
-                instance.phys_device           = best_physical_device;
-                instance.compute_queue_family  = best_compute_queue_family;
-                instance.transfer_queue_family = best_transfer_queue_family;
+                context.phys_device           = best_physical_device;
+                context.compute_queue_family  = best_compute_queue_family;
+                context.transfer_queue_family = best_transfer_queue_family;
 
                 // Create device and queues
                 float queue_priority = 1.0f;
-                if (instance.compute_queue_family == instance.transfer_queue_family) {
-                    vk::DeviceQueueCreateInfo queue_create_infos(
-                      vk::DeviceQueueCreateFlags(), instance.compute_queue_family, 1, &queue_priority);
-                    vk::DeviceCreateInfo device_create_info(vk::DeviceCreateFlags(), 1, &queue_create_infos);
-                    instance.device = instance.phys_device.createDevice(device_create_info);
+                std::array<VkDeviceQueueCreateInfo, 2> queue_create_info;
+                queue_create_info[0] = {
+                  VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, 0, 0, context.compute_queue_family, 1, &queue_priority};
+                queue_create_info[1] = {
+                  VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, 0, 0, context.transfer_queue_family, 1, &queue_priority};
+                VkDeviceCreateInfo device_create_info;
+
+                if (context.compute_queue_family == context.transfer_queue_family) {
+                    device_create_info = {VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+                                          0,
+                                          0,
+                                          1,
+                                          queue_create_info.data(),
+                                          0,
+                                          nullptr,
+                                          0,
+                                          nullptr,
+                                          nullptr};
                 }
                 else {
-                    std::array<vk::DeviceQueueCreateInfo, 2> queue_create_infos = {
-                      vk::DeviceQueueCreateInfo(
-                        vk::DeviceQueueCreateFlags(), instance.compute_queue_family, 1, &queue_priority),
-                      vk::DeviceQueueCreateInfo(
-                        vk::DeviceQueueCreateFlags(), instance.transfer_queue_family, 1, &queue_priority)};
-                    vk::DeviceCreateInfo device_create_info(vk::DeviceCreateFlags(),
-                                                            queue_create_infos.size(),
-                                                            queue_create_infos.data(),
-                                                            0,
-                                                            nullptr,
-                                                            0,
-                                                            nullptr,
-                                                            nullptr);
-                    instance.device = instance.phys_device.createDevice(device_create_info);
+                    device_create_info = {VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+                                          0,
+                                          0,
+                                          2,
+                                          queue_create_info.data(),
+                                          0,
+                                          nullptr,
+                                          0,
+                                          nullptr,
+                                          nullptr};
                 }
+
+                VkDevice device;
+                throw_vk_error(vkCreateDevice(context.phys_device, &device_create_info, nullptr, &device),
+                               "Failed to create device");
+                context.device = vk::device(device, [](auto p) { vkDestroyDevice(p, nullptr); });
             }
         }  // namespace operation
     }      // namespace vulkan

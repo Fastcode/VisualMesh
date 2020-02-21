@@ -62,32 +62,19 @@ namespace engine {
              * @param structure the network structure to use classification
              */
             Engine(const network_structure_t<Scalar>& structure = {}) : max_width(4) {
-
-                // Create the dynamic loader
-                VULKAN_HPP_DEFAULT_DISPATCHER.init(
-                  dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
-
                 // Get a Vulkan instance
-                const vk::ApplicationInfo app_info("VisualMesh", 0, "", 0, VK_MAKE_VERSION(1, 1, 0));
-                const vk::InstanceCreateInfo instance_info(
-                  vk::InstanceCreateFlags(), &app_info, 0, nullptr, 0, nullptr);
+                const VkApplicationInfo app_info = {
+                  VK_STRUCTURE_TYPE_APPLICATION_INFO, 0, "VisualMesh", 0, "", 0, VK_MAKE_VERSION(1, 1, 0)};
 
-                throw_vk_error(vk::createInstance(&instance_info, nullptr, &instance.instance),
-                               "Error creating the Vulkan instance");
-                VULKAN_HPP_DEFAULT_DISPATCHER.init(instance.instance);
+                const VkInstanceCreateInfo instance_info = {
+                  VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, 0, 0, &app_info, 0, 0, 0, 0};
+
+                VkInstance instance;
+                throw_vk_error(vkCreateInstance(&instance_info, 0, &instance), "Failed to create instance");
+                context.instance = vk::instance(instance, [](auto p) { vkDestroyInstance(p, nullptr); });
 
                 // Create the Vulkan instance and find the best devices and queues
-                operation::create_device(operation::DeviceType::GPU, instance, true);
-                VULKAN_HPP_DEFAULT_DISPATCHER.init(instance.device);
-
-                instance.compute_queue = instance.device.getQueue(instance.compute_queue_family, 0);
-
-                if (instance.compute_queue_family == instance.transfer_queue_family) {
-                    instance.transfer_queue = instance.compute_queue;
-                }
-                else {
-                    instance.transfer_queue = instance.device.getQueue(instance.transfer_queue_family, 0);
-                }
+                operation::create_device(DeviceType::GPU, context, true);
 
                 // Created the projection kernel sources and programs
                 std::vector<uint32_t> equidistant_reprojection_source =
@@ -97,188 +84,336 @@ namespace engine {
                 std::vector<uint32_t> rectilinear_reprojection_source =
                   kernels::build_reprojection<Scalar>("project_rectilinear", kernels::rectilinear_reprojection<Scalar>);
 
-                vk::ShaderModule equidistant_reprojection_program = instance.device.createShaderModule(
-                  vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(),
-                                             equidistant_reprojection_source.size() * sizeof(uint32_t),
-                                             equidistant_reprojection_source.data()));
-                vk::ShaderModule equisolid_reprojection_program = instance.device.createShaderModule(
-                  vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(),
-                                             equisolid_reprojection_source.size() * sizeof(uint32_t),
-                                             equisolid_reprojection_source.data()));
-                vk::ShaderModule rectilinear_reprojection_program = instance.device.createShaderModule(
-                  vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(),
-                                             rectilinear_reprojection_source.size() * sizeof(uint32_t),
-                                             rectilinear_reprojection_source.data()));
+                VkShaderModuleCreateInfo equidistant_reprojection_info = {
+                  VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                  0,
+                  0,
+                  static_cast<uint32_t>(equidistant_reprojection_source.size()) * sizeof(uint32_t),
+                  equidistant_reprojection_source.data()};
+                VkShaderModuleCreateInfo equisolid_reprojection_info = {
+                  VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                  0,
+                  0,
+                  static_cast<uint32_t>(equisolid_reprojection_source.size()) * sizeof(uint32_t),
+                  equisolid_reprojection_source.data()};
+                VkShaderModuleCreateInfo rectilinear_reprojection_info = {
+                  VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                  0,
+                  0,
+                  static_cast<uint32_t>(rectilinear_reprojection_source.size()) * sizeof(uint32_t),
+                  rectilinear_reprojection_source.data()};
+
+                VkShaderModule equidistant_reprojection_program;
+                VkShaderModule equisolid_reprojection_program;
+                VkShaderModule rectilinear_reprojection_program;
+
+                throw_vk_error(
+                  vkCreateShaderModule(
+                    context.device, &equidistant_reprojection_info, nullptr, &equidistant_reprojection_program),
+                  "Failed to create equidistant_reprojection shader module");
+                throw_vk_error(
+                  vkCreateShaderModule(
+                    context.device, &equisolid_reprojection_info, nullptr, &equisolid_reprojection_program),
+                  "Failed to create equisolid_reprojection shader module");
+                throw_vk_error(
+                  vkCreateShaderModule(
+                    context.device, &rectilinear_reprojection_info, nullptr, &rectilinear_reprojection_program),
+                  "Failed to create rectilinear_reprojection shader module");
 
                 // Create the descriptor set for the reprojection programs
                 // All reprojection programs have the same descriptor set
                 // Descriptor Set 0: {points_ptr, indices_ptr, Rco_ptr, f_ptr, centre_ptr, k_ptr, dimensions_ptr,
                 // out_ptr}
-                std::vector<vk::DescriptorSetLayoutBinding> reprojection_bindings;
-                reprojection_bindings.emplace_back(
-                  0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr);
-                reprojection_bindings.emplace_back(
-                  1, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr);
-                reprojection_bindings.emplace_back(
-                  2, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr);
-                reprojection_bindings.emplace_back(
-                  3, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr);
-                reprojection_bindings.emplace_back(
-                  4, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr);
-                reprojection_bindings.emplace_back(
-                  5, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr);
-                reprojection_bindings.emplace_back(
-                  6, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr);
-                reprojection_bindings.emplace_back(
-                  7, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr);
+                std::array<VkDescriptorSetLayoutBinding, 8> reprojection_bindings;
+                reprojection_bindings[0] = {
+                  0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
+                reprojection_bindings[1] = {
+                  1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
+                reprojection_bindings[2] = {
+                  2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
+                reprojection_bindings[3] = {
+                  3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
+                reprojection_bindings[4] = {
+                  4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
+                reprojection_bindings[5] = {
+                  5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
+                reprojection_bindings[6] = {
+                  6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
+                reprojection_bindings[7] = {
+                  7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
 
-                reprojection_descriptor_layout =
-                  instance.device.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo(
-                    vk::DescriptorSetLayoutCreateFlags(), reprojection_bindings.size(), reprojection_bindings.data()));
+                VkDescriptorSetLayoutCreateInfo reprojection_descriptor_set_layout_create_info = {
+                  VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+                  0,
+                  0,
+                  static_cast<uint32_t>(reprojection_bindings.size()),
+                  reprojection_bindings.data()};
 
-                reprojection_pipeline_layout = instance.device.createPipelineLayout(vk::PipelineLayoutCreateInfo(
-                  vk::PipelineLayoutCreateFlags(), 1, &reprojection_descriptor_layout, 0, nullptr));
+                throw_vk_error(vkCreateDescriptorSetLayout(context.device,
+                                                           &reprojection_descriptor_set_layout_create_info,
+                                                           0,
+                                                           &reprojection_descriptor_layout),
+                               "Failed to create reprojection descriptor set layout");
 
-                project_equidistant = instance.device.createComputePipeline(
-                  vk::PipelineCache(),
-                  vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(),
-                                                vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(),
-                                                                                  vk::ShaderStageFlagBits::eCompute,
-                                                                                  equidistant_reprojection_program,
-                                                                                  "project_equidistant"),
-                                                reprojection_pipeline_layout));
+                VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
+                  VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, 0, 0, 1, &reprojection_descriptor_layout, 0, nullptr};
 
-                project_equisolid = instance.device.createComputePipeline(
-                  vk::PipelineCache(),
-                  vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(),
-                                                vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(),
-                                                                                  vk::ShaderStageFlagBits::eCompute,
-                                                                                  equisolid_reprojection_program,
-                                                                                  "project_equisolid"),
-                                                reprojection_pipeline_layout));
+                throw_vk_error(vkCreatePipelineLayout(
+                                 context.device, &pipeline_layout_create_info, 0, &reprojection_pipeline_layout),
+                               "Failed to create reprojection pipeline layout");
 
-                project_rectilinear = instance.device.createComputePipeline(
-                  vk::PipelineCache(),
-                  vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(),
-                                                vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(),
-                                                                                  vk::ShaderStageFlagBits::eCompute,
-                                                                                  rectilinear_reprojection_program,
-                                                                                  "project_rectilinear"),
-                                                reprojection_pipeline_layout));
+                VkComputePipelineCreateInfo equidistant_pipeline_create_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   equidistant_reprojection_program,
+                   "project_equidistant",
+                   0},
+                  reprojection_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(vkCreateComputePipelines(
+                                 context.device, 0, 1, &equidistant_pipeline_create_info, 0, &project_equidistant),
+                               "Failed to create equidistant reprojection pipeline");
+
+                VkComputePipelineCreateInfo equisolid_pipeline_create_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   equisolid_reprojection_program,
+                   "project_equisolid",
+                   0},
+                  reprojection_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(vkCreateComputePipelines(
+                                 context.device, 0, 1, &equisolid_pipeline_create_info, 0, &project_equisolid),
+                               "Failed to create equisolid reprojection pipeline");
+
+                VkComputePipelineCreateInfo rectilinear_pipeline_create_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   rectilinear_reprojection_program,
+                   "project_rectilinear",
+                   0},
+                  reprojection_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(vkCreateComputePipelines(
+                                 context.device, 0, 1, &rectilinear_pipeline_create_info, 0, &project_rectilinear),
+                               "Failed to create rectilinear reprojection pipeline");
 
                 // Created the load_image kernel source and program
-                std::vector<uint32_t> load_image_source = kernels::load_image<Scalar>();
+                std::vector<uint32_t> load_image_source  = kernels::load_image<Scalar>();
+                VkShaderModuleCreateInfo load_image_info = {
+                  VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                  0,
+                  0,
+                  static_cast<uint32_t>(load_image_source.size()) * sizeof(uint32_t),
+                  load_image_source.data()};
 
-                vk::ShaderModule load_image_program = instance.device.createShaderModule(
-                  vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(),
-                                             load_image_source.size() * sizeof(uint32_t),
-                                             load_image_source.data()));
+                VkShaderModule load_image_program;
+                throw_vk_error(vkCreateShaderModule(context.device, &load_image_info, nullptr, &load_image_program),
+                               "Failed to create load_image shader module");
 
                 // Create the descriptor sets for the load_image program
                 // Descriptor Set 0: {bayer_sampler, interp_sampler}
-                std::vector<std::vector<vk::DescriptorSetLayoutBinding>> load_image_bindings;
-                vk::Sampler bayer_sampler =
-                  instance.device.createSampler(vk::SamplerCreateInfo(vk::SamplerCreateFlags(),
-                                                                      vk::Filter::eNearest,
-                                                                      vk::Filter::eNearest,
-                                                                      vk::SamplerMipmapMode::eNearest,
-                                                                      vk::SamplerAddressMode::eClampToBorder,
-                                                                      vk::SamplerAddressMode::eClampToBorder,
-                                                                      vk::SamplerAddressMode::eClampToBorder,
-                                                                      0.0f,
-                                                                      false,
-                                                                      0.0f,
-                                                                      false,
-                                                                      vk::CompareOp::eNever,
-                                                                      0.0f,
-                                                                      0.0f,
-                                                                      vk::BorderColor::eFloatTransparentBlack,
-                                                                      false));
-                vk::Sampler interp_sampler =
-                  instance.device.createSampler(vk::SamplerCreateInfo(vk::SamplerCreateFlags(),
-                                                                      vk::Filter::eLinear,
-                                                                      vk::Filter::eLinear,
-                                                                      vk::SamplerMipmapMode::eLinear,
-                                                                      vk::SamplerAddressMode::eClampToBorder,
-                                                                      vk::SamplerAddressMode::eClampToBorder,
-                                                                      vk::SamplerAddressMode::eClampToBorder,
-                                                                      0.0f,
-                                                                      false,
-                                                                      0.0f,
-                                                                      false,
-                                                                      vk::CompareOp::eNever,
-                                                                      0.0f,
-                                                                      0.0f,
-                                                                      vk::BorderColor::eFloatTransparentBlack,
-                                                                      false));
-                load_image_bindings.emplace_back();
-                load_image_bindings.back().emplace_back(
-                  0, vk::DescriptorType::eSampler, 1, vk::ShaderStageFlagBits::eAll, &bayer_sampler);
-                load_image_bindings.back().emplace_back(
-                  1, vk::DescriptorType::eSampler, 1, vk::ShaderStageFlagBits::eAll, &interp_sampler);
+                VkSamplerCreateInfo bayer_sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+                                                          0,
+                                                          0,
+                                                          VK_FILTER_NEAREST,
+                                                          VK_FILTER_NEAREST,
+                                                          VK_SAMPLER_MIPMAP_MODE_NEAREST,
+                                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                          0.0f,
+                                                          VK_FALSE,
+                                                          0.0f,
+                                                          VK_FALSE,
+                                                          VK_COMPARE_OP_NEVER,
+                                                          0.0f,
+                                                          0.0f,
+                                                          VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
+                                                          VK_FALSE};
+                VkSampler bayer_sampler;
+                throw_vk_error(vkCreateSampler(context.device, &bayer_sampler_info, nullptr, &bayer_sampler),
+                               "Failed to create bayer sampler");
+                VkSamplerCreateInfo interp_sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+                                                           0,
+                                                           0,
+                                                           VK_FILTER_LINEAR,
+                                                           VK_FILTER_LINEAR,
+                                                           VK_SAMPLER_MIPMAP_MODE_LINEAR,
+                                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                           0.0f,
+                                                           VK_FALSE,
+                                                           0.0f,
+                                                           VK_FALSE,
+                                                           VK_COMPARE_OP_NEVER,
+                                                           0.0f,
+                                                           0.0f,
+                                                           VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
+                                                           VK_FALSE};
+                VkSampler interp_sampler;
+                throw_vk_error(vkCreateSampler(context.device, &interp_sampler_info, nullptr, &interp_sampler),
+                               "Failed to create interp sampler");
+
+                std::array<VkDescriptorSetLayoutBinding, 2> load_image_sampler_bindings{
+                  VkDescriptorSetLayoutBinding{
+                    0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &bayer_sampler},
+                  VkDescriptorSetLayoutBinding{
+                    1, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &interp_sampler}};
 
                 // Descriptor Set 1: {image, coordinates, network}
-                load_image_bindings.emplace_back();
-                load_image_bindings.back().emplace_back(
-                  0, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eAll, nullptr);
-                load_image_bindings.back().emplace_back(
-                  1, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr);
-                load_image_bindings.back().emplace_back(
-                  2, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr);
+                std::array<VkDescriptorSetLayoutBinding, 3> load_image_bindings = {
+                  VkDescriptorSetLayoutBinding{
+                    0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                  VkDescriptorSetLayoutBinding{
+                    1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                  VkDescriptorSetLayoutBinding{
+                    2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
 
-                load_image_descriptor_layout = {
-                  instance.device.createDescriptorSetLayout(
-                    vk::DescriptorSetLayoutCreateInfo(vk::DescriptorSetLayoutCreateFlags(),
-                                                      load_image_bindings[0].size(),
-                                                      load_image_bindings[0].data())),
-                  instance.device.createDescriptorSetLayout(
-                    vk::DescriptorSetLayoutCreateInfo(vk::DescriptorSetLayoutCreateFlags(),
-                                                      load_image_bindings[1].size(),
-                                                      load_image_bindings[1].data()))};
+                VkDescriptorSetLayoutCreateInfo load_image_sampler_descriptor_set_layout_create_info = {
+                  VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+                  0,
+                  0,
+                  static_cast<uint32_t>(load_image_sampler_bindings.size()),
+                  load_image_sampler_bindings.data()};
+                throw_vk_error(vkCreateDescriptorSetLayout(context.device,
+                                                           &load_image_sampler_descriptor_set_layout_create_info,
+                                                           0,
+                                                           &load_image_descriptor_layout[0]),
+                               "Failed to create load_image sampler descriptor set layout");
 
-                load_image_pipeline_layout = instance.device.createPipelineLayout(vk::PipelineLayoutCreateInfo(
-                  vk::PipelineLayoutCreateFlags(), 2, load_image_descriptor_layout.data(), 0, nullptr));
+                VkDescriptorSetLayoutCreateInfo load_image_descriptor_set_layout_create_info = {
+                  VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+                  0,
+                  0,
+                  static_cast<uint32_t>(load_image_bindings.size()),
+                  load_image_bindings.data()};
+                throw_vk_error(
+                  vkCreateDescriptorSetLayout(
+                    context.device, &load_image_descriptor_set_layout_create_info, 0, &load_image_descriptor_layout[1]),
+                  "Failed to create load_image descriptor set layout");
 
-                load_GRBG_image = instance.device.createComputePipeline(
-                  vk::PipelineCache(),
-                  vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(),
-                                                vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(),
-                                                                                  vk::ShaderStageFlagBits::eCompute,
-                                                                                  load_image_program,
-                                                                                  "load_GRBG_image"),
-                                                load_image_pipeline_layout));
-                load_RGGB_image = instance.device.createComputePipeline(
-                  vk::PipelineCache(),
-                  vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(),
-                                                vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(),
-                                                                                  vk::ShaderStageFlagBits::eCompute,
-                                                                                  load_image_program,
-                                                                                  "load_RGGB_image"),
-                                                load_image_pipeline_layout));
-                load_GBRG_image = instance.device.createComputePipeline(
-                  vk::PipelineCache(),
-                  vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(),
-                                                vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(),
-                                                                                  vk::ShaderStageFlagBits::eCompute,
-                                                                                  load_image_program,
-                                                                                  "load_GBRG_image"),
-                                                load_image_pipeline_layout));
-                load_BGGR_image = instance.device.createComputePipeline(
-                  vk::PipelineCache(),
-                  vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(),
-                                                vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(),
-                                                                                  vk::ShaderStageFlagBits::eCompute,
-                                                                                  load_image_program,
-                                                                                  "load_BGGR_image"),
-                                                load_image_pipeline_layout));
-                load_RGBA_image = instance.device.createComputePipeline(
-                  vk::PipelineCache(),
-                  vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(),
-                                                vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(),
-                                                                                  vk::ShaderStageFlagBits::eCompute,
-                                                                                  load_image_program,
-                                                                                  "load_RGBA_image"),
-                                                load_image_pipeline_layout));
+                VkPipelineLayoutCreateInfo load_image_pipeline_layout_info = {
+                  VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+                  0,
+                  0,
+                  static_cast<uint32_t>(load_image_descriptor_layout.size()),
+                  load_image_descriptor_layout.data(),
+                  0,
+                  0};
+
+                throw_vk_error(vkCreatePipelineLayout(
+                                 context.device, &load_image_pipeline_layout_info, 0, &load_image_pipeline_layout),
+                               "Failed to create load_image pipeline layout");
+
+                VkComputePipelineCreateInfo load_GRBG_image_pipeline_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   load_image_program,
+                   "load_GRBG_image",
+                   0},
+                  load_image_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(
+                  vkCreateComputePipelines(context.device, 0, 1, &load_GRBG_image_pipeline_info, 0, &load_GRBG_image),
+                  "Failed to create load_GRBG_image pipeline");
+
+                VkComputePipelineCreateInfo load_RGGB_image_pipeline_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   load_image_program,
+                   "load_RGGB_image",
+                   0},
+                  load_image_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(
+                  vkCreateComputePipelines(context.device, 0, 1, &load_RGGB_image_pipeline_info, 0, &load_RGGB_image),
+                  "Failed to create load_RGGB_image pipeline");
+
+                VkComputePipelineCreateInfo load_GBRG_image_pipeline_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   load_image_program,
+                   "load_GBRG_image",
+                   0},
+                  load_image_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(
+                  vkCreateComputePipelines(context.device, 0, 1, &load_GBRG_image_pipeline_info, 0, &load_GBRG_image),
+                  "Failed to create load_GBRG_image pipeline");
+
+                VkComputePipelineCreateInfo load_BGGR_image_pipeline_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   load_image_program,
+                   "load_BGGR_image",
+                   0},
+                  load_image_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(
+                  vkCreateComputePipelines(context.device, 0, 1, &load_BGGR_image_pipeline_info, 0, &load_BGGR_image),
+                  "Failed to create load_BGGR_image pipeline");
+
+                VkComputePipelineCreateInfo load_RGBA_image_pipeline_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   load_image_program,
+                   "load_RGBA_image",
+                   0},
+                  load_image_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(
+                  vkCreateComputePipelines(context.device, 0, 1, &load_RGBA_image_pipeline_info, 0, &load_RGBA_image),
+                  "Failed to create load_RGBA_image pipeline");
 
                 // Work out what the widest network layer is
                 max_width = 4;
@@ -559,130 +694,117 @@ namespace engine {
                 auto ranges = mesh.lookup(Hoc, lens);
 
                 // Transfer Rco to the device
-                std::pair<vk::Buffer, vk::DeviceMemory> vk_rco = operation::create_buffer(
-                  instance.phys_device,
-                  instance.device,
-                  sizeof(vec4<Scalar>) * 4,
-                  vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eStorageBuffer,
-                  vk::SharingMode::eExclusive,
-                  {instance.transfer_queue_family},
-                  vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible
-                    | vk::MemoryPropertyFlagBits::eHostCoherent);
+                std::pair<vk::buffer, vk::device_memory> vk_rco =
+                  operation::create_buffer(context,
+                                           sizeof(vec4<Scalar>) * sizeof(Scalar),
+                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                           VK_SHARING_MODE_EXCLUSIVE,
+                                           {context.transfer_queue_family},
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-                Scalar* rco_payload =
-                  reinterpret_cast<Scalar*>(instance.device.mapMemory(vk_rco.second, 0, sizeof(vec4<Scalar>) * 4));
-                for (size_t i = 0, index = 0; i < 3; ++i, index += 4) {
-                    rco_payload[index + 0] = Hoc[0][i];
-                    rco_payload[index + 1] = Hoc[1][i];
-                    rco_payload[index + 2] = Hoc[2][i];
-                    rco_payload[index + 3] = Scalar(0);
-                }
-                rco_payload[12] = rco_payload[13] = rco_payload[14] = Scalar(0);
-                rco_payload[15]                                     = Scalar(1);
-                instance.device.unmapMemory(vk_rco.second);
+                operation::map_memory<Scalar>(context, VK_WHOLE_SIZE, vk_rco.second, [&Hoc](Scalar* payload) {
+                    for (size_t i = 0, index = 0; i < 3; ++i, index += 4) {
+                        payload[index + 0] = Hoc[0][i];
+                        payload[index + 1] = Hoc[1][i];
+                        payload[index + 2] = Hoc[2][i];
+                        payload[index + 3] = Scalar(0);
+                    }
+                    payload[12] = payload[13] = payload[14] = Scalar(0);
+                    payload[15]                             = Scalar(1);
+                });
 
                 // Transfer f to the device
-                std::pair<vk::Buffer, vk::DeviceMemory> vk_f = operation::create_buffer(
-                  instance.phys_device,
-                  instance.device,
-                  sizeof(Scalar),
-                  vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eStorageBuffer,
-                  vk::SharingMode::eExclusive,
-                  {instance.transfer_queue_family},
-                  vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible
-                    | vk::MemoryPropertyFlagBits::eHostCoherent);
+                std::pair<vk::buffer, vk::device_memory> vk_f =
+                  operation::create_buffer(context,
+                                           sizeof(Scalar),
+                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                           VK_SHARING_MODE_EXCLUSIVE,
+                                           {context.transfer_queue_family},
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-                Scalar* f_payload =
-                  reinterpret_cast<Scalar*>(instance.device.mapMemory(vk_f.second, 0, sizeof(Scalar)));
-                f_payload[0] = lens.focal_length;
-                instance.device.unmapMemory(vk_f.second);
+                operation::map_memory<Scalar>(
+                  context, VK_WHOLE_SIZE, vk_f.second, [&lens](Scalar* payload) { payload[0] = lens.focal_length; });
 
                 // Transfer centre to the device
-                std::pair<vk::Buffer, vk::DeviceMemory> vk_centre = operation::create_buffer(
-                  instance.phys_device,
-                  instance.device,
-                  sizeof(vec2<Scalar>),
-                  vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eStorageBuffer,
-                  vk::SharingMode::eExclusive,
-                  {instance.transfer_queue_family},
-                  vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible
-                    | vk::MemoryPropertyFlagBits::eHostCoherent);
+                std::pair<vk::buffer, vk::device_memory> vk_centre =
+                  operation::create_buffer(context,
+                                           sizeof(vec2<Scalar>),
+                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                           VK_SHARING_MODE_EXCLUSIVE,
+                                           {context.transfer_queue_family},
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-                Scalar* centre_payload =
-                  reinterpret_cast<Scalar*>(instance.device.mapMemory(vk_centre.second, 0, sizeof(vec2<Scalar>)));
-                centre_payload[0] = lens.centre[0];
-                centre_payload[1] = lens.centre[1];
-                instance.device.unmapMemory(vk_centre.second);
+                operation::map_memory<Scalar>(context, VK_WHOLE_SIZE, vk_centre.second, [&lens](Scalar* payload) {
+                    payload[0] = lens.centre[0];
+                    payload[1] = lens.centre[1];
+                });
 
                 // Calculate the coefficients for performing a distortion to give to the engine
                 vec4<Scalar> ik = inverse_coefficients(lens.k);
 
                 // Transfer k to the device
-                std::pair<vk::Buffer, vk::DeviceMemory> vk_k = operation::create_buffer(
-                  instance.phys_device,
-                  instance.device,
-                  sizeof(vec4<Scalar>),
-                  vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eStorageBuffer,
-                  vk::SharingMode::eExclusive,
-                  {instance.transfer_queue_family},
-                  vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible
-                    | vk::MemoryPropertyFlagBits::eHostCoherent);
+                std::pair<vk::buffer, vk::device_memory> vk_k =
+                  operation::create_buffer(context,
+                                           sizeof(vec4<Scalar>),
+                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                           VK_SHARING_MODE_EXCLUSIVE,
+                                           {context.transfer_queue_family},
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-                Scalar* k_payload =
-                  reinterpret_cast<Scalar*>(instance.device.mapMemory(vk_k.second, 0, sizeof(vec4<Scalar>)));
-                k_payload[0] = ik[0];
-                k_payload[1] = ik[1];
-                k_payload[2] = ik[2];
-                k_payload[3] = ik[3];
-                instance.device.unmapMemory(vk_k.second);
+                operation::map_memory<Scalar>(context, VK_WHOLE_SIZE, vk_k.second, [&ik](Scalar* payload) {
+                    payload[0] = ik[0];
+                    payload[1] = ik[1];
+                    payload[2] = ik[2];
+                    payload[3] = ik[3];
+                });
 
                 // Transfer dimensions to the device
-                std::pair<vk::Buffer, vk::DeviceMemory> vk_dimensions = operation::create_buffer(
-                  instance.phys_device,
-                  instance.device,
-                  sizeof(vec2<int>),
-                  vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eStorageBuffer,
-                  vk::SharingMode::eExclusive,
-                  {instance.transfer_queue_family},
-                  vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible
-                    | vk::MemoryPropertyFlagBits::eHostCoherent);
+                std::pair<vk::buffer, vk::device_memory> vk_dimensions =
+                  operation::create_buffer(context,
+                                           sizeof(vec2<int>),
+                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                           VK_SHARING_MODE_EXCLUSIVE,
+                                           {context.transfer_queue_family},
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-                int* dimensions_payload =
-                  reinterpret_cast<int*>(instance.device.mapMemory(vk_dimensions.second, 0, sizeof(vec2<int>)));
-                dimensions_payload[0] = lens.dimensions[0];
-                dimensions_payload[1] = lens.dimensions[1];
-                instance.device.unmapMemory(vk_dimensions.second);
+                operation::map_memory<int>(context, VK_WHOLE_SIZE, vk_dimensions.second, [&lens](int* payload) {
+                    payload[0] = lens.dimensions[0];
+                    payload[1] = lens.dimensions[1];
+                });
 
                 // Convenience variables
                 const auto& nodes = mesh.nodes;
 
                 // Upload our visual mesh unit vectors if we have to
-                std::pair<vk::Buffer, vk::DeviceMemory> vk_points;
+                std::pair<vk::buffer, vk::device_memory> vk_points;
 
                 auto device_mesh = device_points_cache.find(&mesh);
                 if (device_mesh == device_points_cache.end()) {
-                    vk_points = operation::create_buffer(
-                      instance.phys_device,
-                      instance.device,
-                      sizeof(vec4<Scalar>) * mesh.nodes.size(),
-                      vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eStorageBuffer,
-                      vk::SharingMode::eExclusive,
-                      {instance.transfer_queue_family},
-                      vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible
-                        | vk::MemoryPropertyFlagBits::eHostCoherent);
+                    vk_points = operation::create_buffer(context,
+                                                         sizeof(vec4<Scalar>) * mesh.nodes.size(),
+                                                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                                         VK_SHARING_MODE_EXCLUSIVE,
+                                                         {context.transfer_queue_family},
+                                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                                                           | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                                           | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
                     // Write the points buffer to the device and cache it
-                    Scalar* points_payload = reinterpret_cast<Scalar*>(
-                      instance.device.mapMemory(vk_points.second, 0, sizeof(vec4<Scalar>) * mesh.nodes.size()));
-                    size_t index = 0;
-                    for (const auto& n : mesh.nodes) {
-                        points_payload[index + 0] = Scalar(n.ray[0]);
-                        points_payload[index + 1] = Scalar(n.ray[1]);
-                        points_payload[index + 2] = Scalar(n.ray[2]);
-                        points_payload[index + 3] = Scalar(0);
-                        index += 4;
-                    }
-                    instance.device.unmapMemory(vk_points.second);
+                    operation::map_memory<Scalar>(context, VK_WHOLE_SIZE, vk_points.second, [&mesh](Scalar* payload) {
+                        size_t index = 0;
+                        for (const auto& n : mesh.nodes) {
+                            payload[index + 0] = Scalar(n.ray[0]);
+                            payload[index + 1] = Scalar(n.ray[1]);
+                            payload[index + 2] = Scalar(n.ray[2]);
+                            payload[index + 3] = Scalar(0);
+                            index += 4;
+                        }
+                    });
 
                     // Cache for future runs
                     device_points_cache[&mesh] = vk_points;
@@ -714,43 +836,40 @@ namespace engine {
                 }
 
                 // Create buffer for indices map
-                std::pair<vk::Buffer, vk::DeviceMemory> vk_indices_map = operation::create_buffer(
-                  instance.phys_device,
-                  instance.device,
-                  sizeof(int) * points,
-                  vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eStorageBuffer,
-                  vk::SharingMode::eExclusive,
-                  {instance.transfer_queue_family},
-                  vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible
-                    | vk::MemoryPropertyFlagBits::eHostCoherent);
+                std::pair<vk::buffer, vk::device_memory> vk_indices =
+                  operation::create_buffer(context,
+                                           sizeof(int) * points,
+                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                           VK_SHARING_MODE_EXCLUSIVE,
+                                           {context.transfer_queue_family},
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
                 // Create output buffer for pixel_coordinates
-                std::pair<vk::Buffer, vk::DeviceMemory> vk_pixel_coordinates = operation::create_buffer(
-                  instance.phys_device,
-                  instance.device,
-                  sizeof(vec2<Scalar>) * points,
-                  vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eStorageBuffer,
-                  vk::SharingMode::eExclusive,
-                  {instance.transfer_queue_family},
-                  vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible
-                    | vk::MemoryPropertyFlagBits::eHostCoherent);
+                std::pair<vk::buffer, vk::device_memory> vk_pixel_coordinates =
+                  operation::create_buffer(context,
+                                           sizeof(vec2<Scalar>) * points,
+                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                           VK_SHARING_MODE_EXCLUSIVE,
+                                           {context.transfer_queue_family},
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
                 // Upload our indices map
-                int* indices_payload = reinterpret_cast<int*>(
-                  instance.device.mapMemory(vk_indices_map.second, 0, sizeof(int) * indices.size()));
-                size_t count = 0;
-                for (const auto& index : indices) {
-                    indices_payload[count] = index;
-                    count++;
-                }
-                instance.device.unmapMemory(vk_indices_map.second);
+                operation::map_memory<int>(context, VK_WHOLE_SIZE, vk_indices.second, [&indices](int* payload) {
+                    size_t count = 0;
+                    for (const auto& index : indices) {
+                        payload[count] = index;
+                        count++;
+                    }
+                });
 
                 // --------------------------------------------------
                 // At this point the point and the indices should be
                 // uploaded since both device memories are coherent
                 // --------------------------------------------------
 
-                vk::Pipeline reprojection_pipeline;
+                VkPipeline reprojection_pipeline;
 
                 // Select a projection kernel
                 switch (lens.projection) {
@@ -758,7 +877,7 @@ namespace engine {
                     case EQUIDISTANT: reprojection_pipeline = project_equidistant; break;
                     case EQUISOLID: reprojection_pipeline = project_equisolid; break;
                     default:
-                        throw_vk_error(vk::Result::eErrorFormatNotSupported,
+                        throw_vk_error(VK_ERROR_FORMAT_NOT_SUPPORTED,
                                        "Requested lens projection is not currently supported.");
                         return std::make_tuple(std::vector<std::array<int, N_NEIGHBOURS>>(),
                                                std::vector<int>(),
@@ -768,66 +887,159 @@ namespace engine {
                 // Create a descriptor pool
                 // Descriptor Set 0: {points_ptr, indices_ptr, Rco_ptr, f_ptr, centre_ptr, k_ptr, dimensions_ptr,
                 // out_ptr}
-                vk::DescriptorPoolSize descriptor_pool_size(vk::DescriptorType::eStorageBuffer, 8);
-                vk::DescriptorPool descriptor_pool = instance.device.createDescriptorPool(
-                  vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlags(), 1, 1, &descriptor_pool_size));
+                VkDescriptorPoolSize descriptor_pool_size = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 8};
+
+                VkDescriptorPoolCreateInfo descriptor_pool_info = {
+                  VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, 0, 0, 1, 1, &descriptor_pool_size};
+
+                VkDescriptorPool descriptor_pool;
+                throw_vk_error(vkCreateDescriptorPool(context.device, &descriptor_pool_info, 0, &descriptor_pool),
+                               "Failed to create descriptor pool");
 
                 // Allocate the descriptor set
-                vk::DescriptorSet descriptor_set = instance.device
-                                                     .allocateDescriptorSets(vk::DescriptorSetAllocateInfo(
-                                                       descriptor_pool, 1, &reprojection_descriptor_layout))
-                                                     .back();
+                VkDescriptorSetAllocateInfo descriptor_set_alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+                                                                         0,
+                                                                         descriptor_pool,
+                                                                         1,
+                                                                         &reprojection_descriptor_layout};
+
+                VkDescriptorSet descriptor_set;
+                throw_vk_error(vkAllocateDescriptorSets(context.device, &descriptor_set_alloc_info, &descriptor_set),
+                               "Failed to allocate descriptor set");
 
                 // Load the arguments
-                std::vector<vk::WriteDescriptorSet> write_descriptors;
-                vk::DescriptorBufferInfo buffer_info(vk_points.first, 0, VK_WHOLE_SIZE);
-                write_descriptors.emplace_back(
-                  descriptor_set, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &buffer_info, nullptr);
-                buffer_info = vk::DescriptorBufferInfo(vk_indices_map.first, 0, VK_WHOLE_SIZE);
-                write_descriptors.emplace_back(
-                  descriptor_set, 1, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &buffer_info, nullptr);
-                buffer_info = vk::DescriptorBufferInfo(vk_rco.first, 0, VK_WHOLE_SIZE);
-                write_descriptors.emplace_back(
-                  descriptor_set, 2, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &buffer_info, nullptr);
-                buffer_info = vk::DescriptorBufferInfo(vk_f.first, 0, VK_WHOLE_SIZE);
-                write_descriptors.emplace_back(
-                  descriptor_set, 3, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &buffer_info, nullptr);
-                buffer_info = vk::DescriptorBufferInfo(vk_centre.first, 0, VK_WHOLE_SIZE);
-                write_descriptors.emplace_back(
-                  descriptor_set, 4, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &buffer_info, nullptr);
-                buffer_info = vk::DescriptorBufferInfo(vk_k.first, 0, VK_WHOLE_SIZE);
-                write_descriptors.emplace_back(
-                  descriptor_set, 5, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &buffer_info, nullptr);
-                buffer_info = vk::DescriptorBufferInfo(vk_dimensions.first, 0, VK_WHOLE_SIZE);
-                write_descriptors.emplace_back(
-                  descriptor_set, 6, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &buffer_info, nullptr);
-                buffer_info = vk::DescriptorBufferInfo(vk_pixel_coordinates.first, 0, VK_WHOLE_SIZE);
-                write_descriptors.emplace_back(
-                  descriptor_set, 7, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &buffer_info, nullptr);
+                std::array<VkWriteDescriptorSet, 8> write_descriptors;
+                VkDescriptorBufferInfo buffer_info = {vk_points.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[0]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                        0,
+                                        descriptor_set,
+                                        0,
+                                        0,
+                                        1,
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                        0,
+                                        &buffer_info,
+                                        nullptr};
+                buffer_info                        = {vk_indices.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[1]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                        0,
+                                        descriptor_set,
+                                        1,
+                                        0,
+                                        1,
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                        0,
+                                        &buffer_info,
+                                        nullptr};
+                buffer_info                        = {vk_rco.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[2]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                        0,
+                                        descriptor_set,
+                                        2,
+                                        0,
+                                        1,
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                        0,
+                                        &buffer_info,
+                                        nullptr};
+                buffer_info                        = {vk_f.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[3]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                        0,
+                                        descriptor_set,
+                                        3,
+                                        0,
+                                        1,
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                        0,
+                                        &buffer_info,
+                                        nullptr};
+                buffer_info                        = {vk_centre.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[4]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                        0,
+                                        descriptor_set,
+                                        4,
+                                        0,
+                                        1,
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                        0,
+                                        &buffer_info,
+                                        nullptr};
+                buffer_info                        = {vk_k.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[5]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                        0,
+                                        descriptor_set,
+                                        5,
+                                        0,
+                                        1,
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                        0,
+                                        &buffer_info,
+                                        nullptr};
+                buffer_info                        = {vk_dimensions.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[6]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                        0,
+                                        descriptor_set,
+                                        6,
+                                        0,
+                                        1,
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                        0,
+                                        &buffer_info,
+                                        nullptr};
+                buffer_info                        = {vk_pixel_coordinates.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[7]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                        0,
+                                        descriptor_set,
+                                        7,
+                                        0,
+                                        1,
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                        0,
+                                        &buffer_info,
+                                        nullptr};
 
-                instance.device.updateDescriptorSets(write_descriptors.size(), write_descriptors.data(), 0, nullptr);
+                vkUpdateDescriptorSets(context.device, write_descriptors.size(), write_descriptors.data(), 0, nullptr);
 
                 // Project!
-                vk::CommandPool command_pool = instance.device.createCommandPool(
-                  vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eTransient, instance.compute_queue_family));
+                VkCommandPoolCreateInfo command_pool_create_info = {
+                  VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, 0, 0, context.compute_queue_family};
+                VkCommandPool command_pool;
+                throw_vk_error(vkCreateCommandPool(context.device, &command_pool_create_info, 0, &command_pool),
+                               "Failed to create a command pool");
 
-                vk::CommandBuffer command_buffer = instance.device
-                                                     .allocateCommandBuffers(vk::CommandBufferAllocateInfo(
-                                                       command_pool, vk::CommandBufferLevel::ePrimary, 1))
-                                                     .back();
+                VkCommandBufferAllocateInfo command_buffer_alloc_info = {
+                  VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, 0, command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1};
 
-                command_buffer.begin(
-                  vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
-                command_buffer.bindPipeline(vk::PipelineBindPoint::eCompute, reprojection_pipeline);
-                command_buffer.bindDescriptorSets(
-                  vk::PipelineBindPoint::eCompute, reprojection_pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
-                command_buffer.dispatch(static_cast<uint32_t>(points), 1, 1);
-                command_buffer.end();
+                VkCommandBuffer command_buffer;
+                throw_vk_error(vkAllocateCommandBuffers(context.device, &command_buffer_alloc_info, &command_buffer),
+                               "Failed to allocate a command buffer");
 
-                vk::Fence reprojection_complete = instance.device.createFence(vk::FenceCreateInfo());
-                vk::SubmitInfo submit_info(0, nullptr, nullptr, 1, &command_buffer, 0, nullptr);
-                throw_vk_error(instance.compute_queue.submit(1, &submit_info, reprojection_complete),
-                               "Failed to submit reprojection queue");
+                VkCommandBufferBeginInfo command_buffer_begin_info = {
+                  VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, 0, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, 0};
+
+                throw_vk_error(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info),
+                               "Failed to begin a command buffer");
+
+                vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, reprojection_pipeline);
+
+                vkCmdBindDescriptorSets(command_buffer,
+                                        VK_PIPELINE_BIND_POINT_COMPUTE,
+                                        reprojection_pipeline_layout,
+                                        0,
+                                        1,
+                                        &descriptor_set,
+                                        0,
+                                        nullptr);
+
+                vkCmdDispatch(command_buffer, static_cast<int32_t>(points), 1, 1);
+
+                throw_vk_error(vkEndCommandBuffer(command_buffer), "Failed to end command buffer");
+
+                VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO, 0, 0, 0, 0, 1, &command_buffer, 0, 0};
+
+                VkQueue compute_queue;
+                vkGetDeviceQueue(context.device, context.compute_queue_family, 0, &compute_queue);
+                throw_vk_error(vkQueueSubmit(compute_queue, 1, &submit_info, 0), "Failed to submit reprojection queue");
 
                 // This can happen on the CPU while the OpenCL device is busy
                 // Build the reverse lookup map where the offscreen point is one past the end
@@ -849,26 +1061,18 @@ namespace engine {
                 local_neighbourhood[points].fill(points);
 
                 // Wait for computation to finish
-                // waitForFences can block for up to some number of nanoseconds (we have chosen 1e9 === 1s)
-                vk::Result res =
-                  instance.device.waitForFences(1, &reprojection_complete, true, static_cast<uint64_t>(1e9));
-                while (res != vk::Result::eSuccess) {
-                    if (res == vk::Result::eErrorDeviceLost) {
-                        throw_vk_error(res, "Lost device while waiting for reprojection to finish");
-                    }
-                    res = instance.device.waitForFences(1, &reprojection_complete, true, static_cast<uint64_t>(1e9));
-                }
+                throw_vk_error(vkQueueWaitIdle(compute_queue), "Failed waiting for reprojection queue to finish");
 
                 // Read the pixels off the buffer
                 std::vector<vec2<Scalar>> pixels(indices.size());
-                Scalar* pixels_payload = reinterpret_cast<Scalar*>(
-                  instance.device.mapMemory(vk_pixel_coordinates.second, 0, sizeof(vec2<Scalar>) * indices.size()));
-                size_t index = 0;
-                for (auto& pixel : pixels) {
-                    pixel = {pixels_payload[index + 0], pixels_payload[index + 1]};
-                    index += 2;
-                }
-                instance.device.unmapMemory(vk_pixel_coordinates.second);
+                operation::map_memory<Scalar>(
+                  context, VK_WHOLE_SIZE, vk_pixel_coordinates.second, [&pixels](Scalar* payload) {
+                      size_t index = 0;
+                      for (auto& pixel : pixels) {
+                          pixel = {payload[index + 0], payload[index + 1]};
+                          index += 2;
+                      }
+                  });
 
                 // Return what we calculated
                 return std::make_tuple(std::move(local_neighbourhood),  // CPU buffer
@@ -941,35 +1145,32 @@ namespace engine {
             //   return neighbourhood_memory.memory;
             // }
 
-            /// Vulkan dynamic loader
-            vk::DynamicLoader dl;
-
             /// Vulkan instance
-            operation::VulkanInstance instance;
+            VulkanContext context;
 
             /// DescriptorSetLayout for the reprojection kernels
-            vk::DescriptorSetLayout reprojection_descriptor_layout;
+            VkDescriptorSetLayout reprojection_descriptor_layout;
             /// PipelineLayout for the reprojection kernels
-            vk::PipelineLayout reprojection_pipeline_layout;
+            VkPipelineLayout reprojection_pipeline_layout;
             /// Kernel for projecting rays to pixels using an equidistant projection
-            vk::Pipeline project_equidistant;
+            VkPipeline project_equidistant;
             /// Kernel for projecting rays to pixels using an equisolid projection
-            vk::Pipeline project_equisolid;
+            VkPipeline project_equisolid;
             /// Kernel for projecting rays to pixels using a rectilinear projection
-            vk::Pipeline project_rectilinear;
+            VkPipeline project_rectilinear;
 
             /// DescriptorSetLayouts for the load_image kernel
-            std::array<vk::DescriptorSetLayout, 2> load_image_descriptor_layout;
+            std::array<VkDescriptorSetLayout, 2> load_image_descriptor_layout;
             /// PipelineLayout for the load_image kernel
-            vk::PipelineLayout load_image_pipeline_layout;
+            VkPipelineLayout load_image_pipeline_layout;
             /// Kernel for reading projected pixel coordinates from an image into the network input layer
-            vk::Pipeline load_GRBG_image;
-            vk::Pipeline load_RGGB_image;
-            vk::Pipeline load_GBRG_image;
-            vk::Pipeline load_BGGR_image;
-            vk::Pipeline load_RGBA_image;
+            VkPipeline load_GRBG_image;
+            VkPipeline load_RGGB_image;
+            VkPipeline load_GBRG_image;
+            VkPipeline load_BGGR_image;
+            VkPipeline load_RGBA_image;
             /// A list of kernels to run in sequence to run the network
-            std::vector<std::pair<vk::Pipeline, size_t>> conv_layers;
+            std::vector<std::pair<VkPipeline, size_t>> conv_layers;
 
             // mutable struct {
             //   vec2<int> dimensions = {0, 0};
@@ -991,7 +1192,7 @@ namespace engine {
             size_t max_width;
 
             // Cache of opencl buffers from mesh objects
-            mutable std::map<const void*, std::pair<vk::Buffer, vk::DeviceMemory>> device_points_cache;
+            mutable std::map<const void*, std::pair<vk::buffer, vk::device_memory>> device_points_cache;
         };  // namespace vulkan
 
     }  // namespace vulkan

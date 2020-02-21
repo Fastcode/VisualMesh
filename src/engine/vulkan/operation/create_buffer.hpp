@@ -18,45 +18,77 @@
 #ifndef VISUALMESH_ENGINE_VULKAN_OPERATION_CREATE_BUFFER_HPP
 #define VISUALMESH_ENGINE_VULKAN_OPERATION_CREATE_BUFFER_HPP
 
-#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan.h>
+
+#include "wrapper.hpp"
 
 namespace visualmesh {
 namespace engine {
     namespace vulkan {
         namespace operation {
-            inline std::pair<vk::Buffer, vk::DeviceMemory> create_buffer(const vk::PhysicalDevice& phyiscal_device,
-                                                                         const vk::Device& device,
-                                                                         const vk::DeviceSize& size,
-                                                                         const vk::BufferUsageFlags& usage,
-                                                                         const vk::SharingMode& sharing,
-                                                                         const std::vector<uint32_t>& queues,
-                                                                         const vk::MemoryPropertyFlags& properties) {
+            template <typename Scalar, typename MapFunc>
+            inline void map_memory(const VulkanContext& context,
+                                   const size_t& size,
+                                   const vk::device_memory& mem,
+                                   MapFunc&& map) {
+                Scalar* payload;
+                throw_vk_error(vkMapMemory(context.device, mem, 0, size, 0, (void**) &payload),
+                               "Failed to host map rco device memory");
+                map(payload);
+                vkUnmapMemory(context.device, mem);
+            }
+
+            inline std::pair<vk::buffer, vk::device_memory> create_buffer(const VulkanContext& context,
+                                                                          const VkDeviceSize& size,
+                                                                          const VkBufferUsageFlags& usage,
+                                                                          const VkSharingMode& sharing,
+                                                                          const std::vector<uint32_t>& queues,
+                                                                          const VkMemoryPropertyFlags& properties) {
 
                 // Create the buffer
-                vk::Buffer buffer = device.createBuffer(
-                  vk::BufferCreateInfo(vk::BufferCreateFlags(), size, usage, sharing, queues.size(), queues.data()));
+                VkBufferCreateInfo buffer_info = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                                                  0,
+                                                  0,
+                                                  size,
+                                                  usage,
+                                                  sharing,
+                                                  static_cast<uint32_t>(queues.size()),
+                                                  queues.data()};
+                VkBuffer buf;
+                throw_vk_error(vkCreateBuffer(context.device, &buffer_info, 0, &buf), "Failed to create buffer");
+                vk::buffer buffer(buf, [&context](auto p) { vkDestroyBuffer(context.device, p, nullptr); });
 
-                // Get properties of the physical device memory
-                vk::PhysicalDeviceMemoryProperties memory_properties = phyiscal_device.getMemoryProperties();
-                vk::MemoryRequirements memory_requirements           = device.getBufferMemoryRequirements(buffer);
-                vk::MemoryAllocateInfo allocInfo(memory_requirements.size);
+                VkPhysicalDeviceMemoryProperties mem_props;
+                vkGetPhysicalDeviceMemoryProperties(context.phys_device, &mem_props);
 
-                // Vulkan devices can have multiple different types of memory
-                // Each memory type can have different properties and sizes, so we need to find one that suits our
-                // purposes
-                for (uint32_t i = 0; i < memory_properties.memoryTypeCount; i++) {
-                    if ((memory_requirements.memoryTypeBits & (1 << i))
-                        && (memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
-                        allocInfo.memoryTypeIndex = i;
+                VkMemoryRequirements mem_requirements;
+                vkGetBufferMemoryRequirements(context.device, buffer, &mem_requirements);
+
+                // set memoryTypeIndex to an invalid entry in the properties.memoryTypes array
+                uint32_t heap_index = VK_MAX_MEMORY_TYPES;
+
+                for (uint32_t k = 0; k < mem_props.memoryTypeCount; k++) {
+                    if ((mem_requirements.memoryTypeBits & (1 << k))
+                        && ((mem_props.memoryTypes[k].propertyFlags & properties) == properties)
+                        && (size < mem_props.memoryHeaps[mem_props.memoryTypes[k].heapIndex].size)) {
+                        heap_index = k;
                         break;
                     }
                 }
 
-                // Allocate memory for the buffer on the device
-                vk::DeviceMemory memory = device.allocateMemory(allocInfo);
+                throw_vk_error(heap_index == VK_MAX_MEMORY_TYPES ? VK_ERROR_OUT_OF_DEVICE_MEMORY : VK_SUCCESS,
+                               "Failed to find enough allocatable device memory");
+
+                VkMemoryAllocateInfo memoryAllocateInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, 0, size, heap_index};
+
+                VkDeviceMemory mem;
+                throw_vk_error(vkAllocateMemory(context.device, &memoryAllocateInfo, 0, &mem),
+                               "Failed to allocate memory on the device");
+                vk::device_memory memory(mem, [&context](auto p) { vkFreeMemory(context.device, p, nullptr); });
 
                 // Attach the allocated device memory to it
-                device.bindBufferMemory(buffer, memory, 0);
+                throw_vk_error(vkBindBufferMemory(context.device, buffer, memory, 0),
+                               "Failed to bind buffer to device memory");
 
                 return std::make_pair(buffer, memory);
             }

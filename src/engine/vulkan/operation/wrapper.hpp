@@ -18,8 +18,12 @@
 #ifndef VISUALMESH_ENGINE_VULKAN_OPERATION_WRAPPER_HPP
 #define VISUALMESH_ENGINE_VULKAN_OPERATION_WRAPPER_HPP
 
+extern "C" {
+#include <vulkan/vulkan.h>
+}
+
+#include <memory>
 #include <string>
-#include <vulkan/vulkan.hpp>
 
 #include "vulkan_error_category.hpp"
 
@@ -33,12 +37,35 @@ namespace engine {
          * @param code  the error code to check and throw
          * @param msg   the message to attach to the exception if it is thrown
          */
-        void throw_vk_error(const vk::Result& code, const std::string& msg) {
-            if (code != vk::Result::eSuccess) {
-                throw std::system_error(int(code), operation::vulkan_error_category(), msg);
-            }
+        void throw_vk_error(const VkResult& code, const std::string& msg) {
+            if (code != VK_SUCCESS) { throw std::system_error(code, operation::vulkan_error_category(), msg); }
         }
 
+        namespace vk {
+            template <typename T>
+            struct vulkan_wrapper : public std::shared_ptr<std::remove_pointer_t<T>> {
+                using std::shared_ptr<std::remove_pointer_t<T>>::shared_ptr;
+
+                operator T() const {
+                    return this->get();
+                }
+            };
+
+            using instance      = vulkan_wrapper<::VkInstance>;
+            using device        = vulkan_wrapper<::VkDevice>;
+            using buffer        = vulkan_wrapper<::VkBuffer>;
+            using device_memory = vulkan_wrapper<::VkDeviceMemory>;
+        }  // namespace vk
+
+        enum class DeviceType { CPU, GPU, INTEGRATED_GPU, DISCRETE_GPU, VIRTUAL_GPU, ANY };
+
+        struct VulkanContext {
+            vk::instance instance;
+            VkPhysicalDevice phys_device;
+            vk::device device;
+            uint32_t compute_queue_family;
+            uint32_t transfer_queue_family;
+        };
     }  // namespace vulkan
 }  // namespace engine
 }  // namespace visualmesh

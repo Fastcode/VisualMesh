@@ -77,7 +77,6 @@ find_package(SPIRV)
 find_package(Vulkan)
 if(SPIRV_FOUND AND Vulkan_FOUND)
     target_link_libraries(libvisualmesh INTERFACE Vulkan::Vulkan SPIRV::SPIRV)
-    target_compile_definitions(libvisualmesh INTERFACE -DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC)
 endif(SPIRV_FOUND AND Vulkan_FOUND)
 
 if(TOP_LEVEL_PROJECT)
@@ -122,7 +121,6 @@ if(TOP_LEVEL_PROJECT)
 
         add_executable(mesh_types "example/mesh_types.cpp" ${hdr})
         target_compile_options(mesh_types PRIVATE -march=native -mtune=native)
-        target_compile_definitions(mesh_types PRIVATE -DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC)
         set_target_properties(mesh_types PROPERTIES CXX_STANDARD 14)
         target_include_directories(mesh_types SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
         target_include_directories(mesh_types SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
@@ -131,11 +129,12 @@ if(TOP_LEVEL_PROJECT)
         target_link_libraries(
             mesh_types
             ${OpenCL_LIBRARIES}
+            Vulkan::Vulkan
+            SPIRV::SPIRV
             ${OpenCV_LIBS}
             ${fmt_LIBRARIES}
             ${YAML_CPP_LIBRARIES}
-            Threads::Threads
-            ${CMAKE_DL_LIBS})
+            Threads::Threads)
 
         add_executable(benchmark "example/benchmark.cpp" ${hdr})
         target_compile_options(benchmark PRIVATE -march=native -mtune=native)
