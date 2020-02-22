@@ -55,6 +55,8 @@ namespace engine {
             using device        = vulkan_wrapper<::VkDevice>;
             using buffer        = vulkan_wrapper<::VkBuffer>;
             using device_memory = vulkan_wrapper<::VkDeviceMemory>;
+            using sampler       = vulkan_wrapper<::VkSampler>;
+            using shader_module = vulkan_wrapper<::VkShaderModule>;
         }  // namespace vk
 
         enum class DeviceType { CPU, GPU, INTEGRATED_GPU, DISCRETE_GPU, VIRTUAL_GPU, ANY };

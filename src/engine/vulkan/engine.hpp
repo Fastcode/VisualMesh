@@ -103,22 +103,29 @@ namespace engine {
                   static_cast<uint32_t>(rectilinear_reprojection_source.size()) * sizeof(uint32_t),
                   rectilinear_reprojection_source.data()};
 
-                VkShaderModule equidistant_reprojection_program;
-                VkShaderModule equisolid_reprojection_program;
-                VkShaderModule rectilinear_reprojection_program;
+                VkShaderModule equidistant_reprojection_shader;
+                VkShaderModule equisolid_reprojection_shader;
+                VkShaderModule rectilinear_reprojection_shader;
 
                 throw_vk_error(
                   vkCreateShaderModule(
-                    context.device, &equidistant_reprojection_info, nullptr, &equidistant_reprojection_program),
+                    context.device, &equidistant_reprojection_info, nullptr, &equidistant_reprojection_shader),
                   "Failed to create equidistant_reprojection shader module");
+                throw_vk_error(vkCreateShaderModule(
+                                 context.device, &equisolid_reprojection_info, nullptr, &equisolid_reprojection_shader),
+                               "Failed to create equisolid_reprojection shader module");
                 throw_vk_error(
                   vkCreateShaderModule(
-                    context.device, &equisolid_reprojection_info, nullptr, &equisolid_reprojection_program),
-                  "Failed to create equisolid_reprojection shader module");
-                throw_vk_error(
-                  vkCreateShaderModule(
-                    context.device, &rectilinear_reprojection_info, nullptr, &rectilinear_reprojection_program),
+                    context.device, &rectilinear_reprojection_info, nullptr, &rectilinear_reprojection_shader),
                   "Failed to create rectilinear_reprojection shader module");
+                equidistant_reprojection_program = vk::shader_module(equidistant_reprojection_shader, [this](auto p) {
+                    vkDestroyShaderModule(context.device, p, nullptr);
+                });
+                equisolid_reprojection_program   = vk::shader_module(
+                  equisolid_reprojection_shader, [this](auto p) { vkDestroyShaderModule(context.device, p, nullptr); });
+                rectilinear_reprojection_program = vk::shader_module(rectilinear_reprojection_shader, [this](auto p) {
+                    vkDestroyShaderModule(context.device, p, nullptr);
+                });
 
                 // Create the descriptor set for the reprojection programs
                 // All reprojection programs have the same descriptor set
@@ -258,26 +265,37 @@ namespace engine {
                   static_cast<uint32_t>(load_RGBA_image_source.size()) * sizeof(uint32_t),
                   load_RGBA_image_source.data()};
 
-                VkShaderModule load_GRBG_image_program;
+                VkShaderModule load_GRBG_image_shader;
                 throw_vk_error(
-                  vkCreateShaderModule(context.device, &load_GRBG_image_info, nullptr, &load_GRBG_image_program),
+                  vkCreateShaderModule(context.device, &load_GRBG_image_info, nullptr, &load_GRBG_image_shader),
                   "Failed to create load_image shader module");
-                VkShaderModule load_RGGB_image_program;
+                VkShaderModule load_RGGB_image_shader;
                 throw_vk_error(
-                  vkCreateShaderModule(context.device, &load_RGGB_image_info, nullptr, &load_RGGB_image_program),
+                  vkCreateShaderModule(context.device, &load_RGGB_image_info, nullptr, &load_RGGB_image_shader),
                   "Failed to create load_image shader module");
-                VkShaderModule load_GBRG_image_program;
+                VkShaderModule load_GBRG_image_shader;
                 throw_vk_error(
-                  vkCreateShaderModule(context.device, &load_GBRG_image_info, nullptr, &load_GBRG_image_program),
+                  vkCreateShaderModule(context.device, &load_GBRG_image_info, nullptr, &load_GBRG_image_shader),
                   "Failed to create load_image shader module");
-                VkShaderModule load_BGGR_image_program;
+                VkShaderModule load_BGGR_image_shader;
                 throw_vk_error(
-                  vkCreateShaderModule(context.device, &load_BGGR_image_info, nullptr, &load_BGGR_image_program),
+                  vkCreateShaderModule(context.device, &load_BGGR_image_info, nullptr, &load_BGGR_image_shader),
                   "Failed to create load_image shader module");
-                VkShaderModule load_RGBA_image_program;
+                VkShaderModule load_RGBA_image_shader;
                 throw_vk_error(
-                  vkCreateShaderModule(context.device, &load_RGBA_image_info, nullptr, &load_RGBA_image_program),
+                  vkCreateShaderModule(context.device, &load_RGBA_image_info, nullptr, &load_RGBA_image_shader),
                   "Failed to create load_image shader module");
+
+                load_GRBG_image_program = vk::shader_module(
+                  load_GRBG_image_shader, [this](auto p) { vkDestroyShaderModule(context.device, p, nullptr); });
+                load_RGGB_image_program = vk::shader_module(
+                  load_RGGB_image_shader, [this](auto p) { vkDestroyShaderModule(context.device, p, nullptr); });
+                load_GBRG_image_program = vk::shader_module(
+                  load_GBRG_image_shader, [this](auto p) { vkDestroyShaderModule(context.device, p, nullptr); });
+                load_BGGR_image_program = vk::shader_module(
+                  load_BGGR_image_shader, [this](auto p) { vkDestroyShaderModule(context.device, p, nullptr); });
+                load_RGBA_image_program = vk::shader_module(
+                  load_RGBA_image_shader, [this](auto p) { vkDestroyShaderModule(context.device, p, nullptr); });
 
                 // Create the descriptor sets for the load_image program
                 // Descriptor Set 0: {bayer_sampler, interp_sampler}
@@ -299,8 +317,8 @@ namespace engine {
                                                           0.0f,
                                                           VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
                                                           VK_FALSE};
-                VkSampler bayer_sampler;
-                throw_vk_error(vkCreateSampler(context.device, &bayer_sampler_info, nullptr, &bayer_sampler),
+                VkSampler bsampler;
+                throw_vk_error(vkCreateSampler(context.device, &bayer_sampler_info, nullptr, &bsampler),
                                "Failed to create bayer sampler");
                 VkSamplerCreateInfo interp_sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
                                                            0,
@@ -320,15 +338,19 @@ namespace engine {
                                                            0.0f,
                                                            VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
                                                            VK_FALSE};
-                VkSampler interp_sampler;
-                throw_vk_error(vkCreateSampler(context.device, &interp_sampler_info, nullptr, &interp_sampler),
+                VkSampler isampler;
+                throw_vk_error(vkCreateSampler(context.device, &interp_sampler_info, nullptr, &isampler),
                                "Failed to create interp sampler");
 
                 std::array<VkDescriptorSetLayoutBinding, 2> load_image_sampler_bindings{
                   VkDescriptorSetLayoutBinding{
-                    0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &bayer_sampler},
+                    0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &bsampler},
                   VkDescriptorSetLayoutBinding{
-                    1, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &interp_sampler}};
+                    1, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &isampler}};
+
+                bayer_sampler = vk::sampler(bsampler, [this](auto p) { vkDestroySampler(context.device, p, nullptr); });
+                interp_sampler =
+                  vk::sampler(isampler, [this](auto p) { vkDestroySampler(context.device, p, nullptr); });
 
                 // Descriptor Set 1: {image, coordinates, network}
                 std::array<VkDescriptorSetLayoutBinding, 3> load_image_bindings = {
@@ -470,6 +492,22 @@ namespace engine {
                 for (const auto& k : conv_layers) {
                     max_width = std::max(max_width, k.second);
                 }
+            }
+
+            ~Engine() {
+                vkDestroyDescriptorSetLayout(context.device, reprojection_descriptor_layout, nullptr);
+                vkDestroyPipelineLayout(context.device, reprojection_pipeline_layout, nullptr);
+                vkDestroyPipeline(context.device, project_equidistant, nullptr);
+                vkDestroyPipeline(context.device, project_equisolid, nullptr);
+                vkDestroyPipeline(context.device, project_rectilinear, nullptr);
+                vkDestroyPipelineLayout(context.device, load_image_pipeline_layout, nullptr);
+                // vkDestroyPipeline(context.device, load_GRBG_image, nullptr);
+                // vkDestroyPipeline(context.device, load_RGGB_image, nullptr);
+                // vkDestroyPipeline(context.device, load_GBRG_image, nullptr);
+                // vkDestroyPipeline(context.device, load_BGGR_image, nullptr);
+                // vkDestroyPipeline(context.device, load_RGBA_image, nullptr);
+                vkDestroyDescriptorSetLayout(context.device, load_image_descriptor_layout[0], nullptr);
+                vkDestroyDescriptorSetLayout(context.device, load_image_descriptor_layout[1], nullptr);
             }
 
             /**
@@ -1132,6 +1170,10 @@ namespace engine {
                       }
                   });
 
+                // Clean up
+                vkDestroyCommandPool(context.device, command_pool, nullptr);
+                vkDestroyDescriptorPool(context.device, descriptor_pool, nullptr);
+
                 // Return what we calculated
                 return std::make_tuple(std::move(local_neighbourhood),  // CPU buffer
                                        std::move(indices),              // CPU buffer
@@ -1210,6 +1252,12 @@ namespace engine {
             VkDescriptorSetLayout reprojection_descriptor_layout;
             /// PipelineLayout for the reprojection kernels
             VkPipelineLayout reprojection_pipeline_layout;
+            /// Shader module for projecting rays to pixels using an equidistant projection
+            vk::shader_module equidistant_reprojection_program;
+            /// Shader module for projecting rays to pixels using an equisolid projection
+            vk::shader_module equisolid_reprojection_program;
+            /// Shader module for projecting rays to pixels using a rectilinear projection
+            vk::shader_module rectilinear_reprojection_program;
             /// Kernel for projecting rays to pixels using an equidistant projection
             VkPipeline project_equidistant;
             /// Kernel for projecting rays to pixels using an equisolid projection
@@ -1221,6 +1269,15 @@ namespace engine {
             std::array<VkDescriptorSetLayout, 2> load_image_descriptor_layout;
             /// PipelineLayout for the load_image kernel
             VkPipelineLayout load_image_pipeline_layout;
+            /// Samplers for the load image kernels
+            vk::sampler bayer_sampler;
+            vk::sampler interp_sampler;
+            /// Shader modules for reading projected pixel coordinates from an image into the network input layer
+            vk::shader_module load_GRBG_image_program;
+            vk::shader_module load_RGGB_image_program;
+            vk::shader_module load_GBRG_image_program;
+            vk::shader_module load_BGGR_image_program;
+            vk::shader_module load_RGBA_image_program;
             /// Kernel for reading projected pixel coordinates from an image into the network input layer
             VkPipeline load_GRBG_image;
             VkPipeline load_RGGB_image;
