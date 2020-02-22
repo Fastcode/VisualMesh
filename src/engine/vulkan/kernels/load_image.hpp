@@ -27,37 +27,13 @@ namespace engine {
     namespace vulkan {
         namespace kernels {
 
-            template <typename Scalar>
-            inline std::vector<uint32_t> load_image() {
-                // Initialise the program.
-                Program::Config config;
-                config.enable_glsl_extensions = true;
-                config.enable_float64         = ((sizeof(Scalar) == 8) && std::is_floating_point<Scalar>::value);
-                config.address_model          = spv::AddressingModel::Logical;
-                config.memory_model           = spv::MemoryModel::GLSL450;
-                Program program(config);
-
-                // Add the standard types.
-                // uint32_t void_type  = program.add_type(spv::Op::OpTypeVoid, {});
-                uint32_t uint_type  = program.add_type(spv::Op::OpTypeInt, {32, 0});
-                uint32_t float_type = program.add_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)});
-                uint32_t uvec2      = program.add_vec_type(spv::Op::OpTypeInt, {32, 0}, 2);
-                uint32_t uvec3      = program.add_vec_type(spv::Op::OpTypeInt, {32, 0}, 3);
-                uint32_t fvec2      = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 2);
-                uint32_t fvec3      = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 3);
-                uint32_t fvec4      = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 4);
-
-                uint32_t uint_ptr  = program.add_pointer(uint_type, spv::StorageClass::Input);
-                uint32_t uvec3_ptr = program.add_pointer(uvec3, spv::StorageClass::Input);
-                uint32_t fvec2_ptr = program.add_pointer(fvec2, spv::StorageClass::StorageBuffer);
-                uint32_t fvec4_ptr = program.add_pointer(fvec4, spv::StorageClass::StorageBuffer);
-
-                // Define image and sampler types.
-                uint32_t image_id = program.add_image_type(
-                  float_type, spv::Dim::Dim2D, false, false, false, true, spv::ImageFormat::Rgba8);
-                uint32_t sampler_id       = program.add_sampler_type();
-                uint32_t sampled_image_id = program.add_sampled_image_type(image_id);
-
+            inline uint32_t fetch_function(Program& program,
+                                           const uint32_t& float_type,
+                                           const uint32_t& image_id,
+                                           const uint32_t& sampler_id,
+                                           const uint32_t& sampled_image_id,
+                                           const uint32_t& fvec2,
+                                           const uint32_t& fvec4) {
                 // Create the "fetch" function.
                 // Sample image "params[1]" using the sampler "params[2]" at position "params[3]" and return the first
                 // component
@@ -68,12 +44,21 @@ namespace engine {
                   float_type, program.sample_image(params[1], params[2], sampled_image_id, params[3], fvec4), 0));
                 program.end_function();
 
-                // Keep a handle to the function ID so we can call the function.
-                uint32_t fetch_func = params[0];
+                return params[0];
+            }
 
-                // Create the "bayer_to_rgb" function.
+            template <typename Scalar>
+            inline uint32_t bayer_to_rgb_function(Program& program,
+                                                  const uint32_t& float_type,
+                                                  const uint32_t& image_id,
+                                                  const uint32_t& sampler_id,
+                                                  const uint32_t& fvec2,
+                                                  const uint32_t& uvec2,
+                                                  const uint32_t& fvec3,
+                                                  const uint32_t& fvec4,
+                                                  const uint32_t& fetch_func) {
                 // http://graphics.cs.williams.edu/papers/BayerJGT09/
-                params = program.begin_function(
+                auto params = program.begin_function(
                   "bayer_to_rgb", {fvec4, image_id, sampler_id, fvec2, fvec2}, spv::FunctionControlMask::Pure);
 
                 // Define some constants.
@@ -330,15 +315,207 @@ namespace engine {
                       fvec4, {PATTERN_y, PATTERN_x, C, program.add_constant(float_type, {Scalar(1.0)})}))));
                 program.end_function();
 
-                // Keep a handle to the function ID so we can call the function.
-                uint32_t bayer_to_rgb_func = params[0];
+                return params[0];
+            }
+
+            template <typename Scalar>
+            inline void load_GRBG_image(Program& program,
+                                        const uint32_t& bayer_to_rgb_func,
+                                        const uint32_t& global_id,
+                                        const uint32_t& uint_type,
+                                        const uint32_t& uint_ptr,
+                                        const uint32_t& fvec4,
+                                        const uint32_t& fvec4_ptr,
+                                        const uint32_t& fvec2,
+                                        const uint32_t& fvec2_ptr,
+                                        const uint32_t& network_ptr,
+                                        const uint32_t& image_ptr,
+                                        const uint32_t& image_id,
+                                        const uint32_t& bayer_sampler,
+                                        const uint32_t& sampler_id,
+                                        const uint32_t&,
+                                        const uint32_t& coords_ptr) {
+                uint32_t idx0 = program.add_constant(uint_type, {0u});
+                program.begin_entry_point("load_GRBG_image", {global_id});
+                uint32_t idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
+                program.store_variable(
+                  program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
+                  program.call_function(
+                    bayer_to_rgb_func,
+                    fvec4,
+                    {program.load_variable(image_ptr, image_id),
+                     program.load_variable(bayer_sampler, sampler_id),
+                     program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
+                     program.add_constant(fvec2, {Scalar(1.0), Scalar(0.0)})}));
+                program.return_function();
+                program.end_function();
+            }
+
+            template <typename Scalar>
+            inline void load_RGGB_image(Program& program,
+                                        const uint32_t& bayer_to_rgb_func,
+                                        const uint32_t& global_id,
+                                        const uint32_t& uint_type,
+                                        const uint32_t& uint_ptr,
+                                        const uint32_t& fvec4,
+                                        const uint32_t& fvec4_ptr,
+                                        const uint32_t& fvec2,
+                                        const uint32_t& fvec2_ptr,
+                                        const uint32_t& network_ptr,
+                                        const uint32_t& image_ptr,
+                                        const uint32_t& image_id,
+                                        const uint32_t& bayer_sampler,
+                                        const uint32_t& sampler_id,
+                                        const uint32_t&,
+                                        const uint32_t& coords_ptr) {
+                uint32_t idx0 = program.add_constant(uint_type, {0u});
+                program.begin_entry_point("load_RGGB_image", {global_id});
+                uint32_t idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
+                program.store_variable(
+                  program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
+                  program.call_function(
+                    bayer_to_rgb_func,
+                    fvec4,
+                    {program.load_variable(image_ptr, image_id),
+                     program.load_variable(bayer_sampler, sampler_id),
+                     program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
+                     program.add_constant(fvec2, {Scalar(0.0), Scalar(0.0)})}));
+                program.return_function();
+                program.end_function();
+            }
+
+            template <typename Scalar>
+            inline void load_GBRG_image(Program& program,
+                                        const uint32_t& bayer_to_rgb_func,
+                                        const uint32_t& global_id,
+                                        const uint32_t& uint_type,
+                                        const uint32_t& uint_ptr,
+                                        const uint32_t& fvec4,
+                                        const uint32_t& fvec4_ptr,
+                                        const uint32_t& fvec2,
+                                        const uint32_t& fvec2_ptr,
+                                        const uint32_t& network_ptr,
+                                        const uint32_t& image_ptr,
+                                        const uint32_t& image_id,
+                                        const uint32_t& bayer_sampler,
+                                        const uint32_t& sampler_id,
+                                        const uint32_t&,
+                                        const uint32_t& coords_ptr) {
+                uint32_t idx0 = program.add_constant(uint_type, {0u});
+                program.begin_entry_point("load_GBRG_image", {global_id});
+                uint32_t idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
+                program.store_variable(
+                  program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
+                  program.call_function(
+                    bayer_to_rgb_func,
+                    fvec4,
+                    {program.load_variable(image_ptr, image_id),
+                     program.load_variable(bayer_sampler, sampler_id),
+                     program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
+                     program.add_constant(fvec2, {Scalar(0.0), Scalar(1.0)})}));
+                program.return_function();
+                program.end_function();
+            }
+
+            template <typename Scalar>
+            inline void load_BGGR_image(Program& program,
+                                        const uint32_t& bayer_to_rgb_func,
+                                        const uint32_t& global_id,
+                                        const uint32_t& uint_type,
+                                        const uint32_t& uint_ptr,
+                                        const uint32_t& fvec4,
+                                        const uint32_t& fvec4_ptr,
+                                        const uint32_t& fvec2,
+                                        const uint32_t& fvec2_ptr,
+                                        const uint32_t& network_ptr,
+                                        const uint32_t& image_ptr,
+                                        const uint32_t& image_id,
+                                        const uint32_t& bayer_sampler,
+                                        const uint32_t& sampler_id,
+                                        const uint32_t&,
+                                        const uint32_t& coords_ptr) {
+                uint32_t idx0 = program.add_constant(uint_type, {0u});
+                program.begin_entry_point("load_BGGR_image", {global_id});
+                uint32_t idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
+                program.store_variable(
+                  program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
+                  program.call_function(
+                    bayer_to_rgb_func,
+                    fvec4,
+                    {program.load_variable(image_ptr, image_id),
+                     program.load_variable(bayer_sampler, sampler_id),
+                     program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
+                     program.add_constant(fvec2, {Scalar(1.0), Scalar(1.0)})}));
+                program.return_function();
+                program.end_function();
+            }
+
+            template <typename Scalar>
+            inline void load_RGBA_image(Program& program,
+                                        const uint32_t&,
+                                        const uint32_t& global_id,
+                                        const uint32_t& uint_type,
+                                        const uint32_t& uint_ptr,
+                                        const uint32_t& fvec4,
+                                        const uint32_t& fvec4_ptr,
+                                        const uint32_t& fvec2,
+                                        const uint32_t& fvec2_ptr,
+                                        const uint32_t& network_ptr,
+                                        const uint32_t& image_ptr,
+                                        const uint32_t& image_id,
+                                        const uint32_t& interp_sampler,
+                                        const uint32_t& sampler_id,
+                                        const uint32_t& sampled_image_id,
+                                        const uint32_t& coords_ptr) {
+                uint32_t idx0 = program.add_constant(uint_type, {0u});
+                program.begin_entry_point("load_RGBA_image", {global_id});
+                uint32_t idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
+                program.store_variable(
+                  program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
+                  program.sample_image(
+                    program.load_variable(image_ptr, image_id),
+                    program.load_variable(interp_sampler, sampler_id),
+                    sampled_image_id,
+                    program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
+                    fvec4));
+                program.return_function();
+                program.end_function();
+            }
+
+            template <typename Scalar, typename LoadImageFunc>
+            inline std::vector<uint32_t> load_image(const bool& is_bayer, LoadImageFunc&& load_image_func) {
+                // Initialise the program.
+                Program::Config config;
+                config.enable_glsl_extensions = true;
+                config.enable_float64         = ((sizeof(Scalar) == 8) && std::is_floating_point<Scalar>::value);
+                config.address_model          = spv::AddressingModel::Logical;
+                config.memory_model           = spv::MemoryModel::GLSL450;
+                Program program(config);
+
+                // Add the standard types.
+                // uint32_t void_type  = program.add_type(spv::Op::OpTypeVoid, {});
+                uint32_t uint_type  = program.add_type(spv::Op::OpTypeInt, {32, 0});
+                uint32_t float_type = program.add_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)});
+                uint32_t uvec2      = program.add_vec_type(spv::Op::OpTypeInt, {32, 0}, 2);
+                uint32_t uvec3      = program.add_vec_type(spv::Op::OpTypeInt, {32, 0}, 3);
+                uint32_t fvec2      = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 2);
+                uint32_t fvec3      = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 3);
+                uint32_t fvec4      = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 4);
+
+                uint32_t uint_ptr  = program.add_pointer(uint_type, spv::StorageClass::Input);
+                uint32_t uvec3_ptr = program.add_pointer(uvec3, spv::StorageClass::Input);
+                uint32_t fvec2_ptr = program.add_pointer(fvec2, spv::StorageClass::StorageBuffer);
+                uint32_t fvec4_ptr = program.add_pointer(fvec4, spv::StorageClass::StorageBuffer);
+
+                // Define image and sampler types.
+                uint32_t image_id = program.add_image_type(
+                  float_type, spv::Dim::Dim2D, false, false, false, true, spv::ImageFormat::Rgba8);
+                uint32_t sampler_id       = program.add_sampler_type();
+                uint32_t sampled_image_id = program.add_sampled_image_type(image_id);
 
                 // Define the GlobalInvocationID (for get_global_id(0))
                 uint32_t global_id = program.add_variable(uvec3_ptr, spv::StorageClass::Input);
                 program.add_builtin_decoration(global_id, spv::BuiltIn::GlobalInvocationId);
-
-                // Index 0 is used in every member_access call
-                uint32_t idx0 = program.add_constant(uint_type, {0u});
 
                 // Prepare the descriptor set variables.
                 // Prepare the image sampler variables.
@@ -377,79 +554,30 @@ namespace engine {
                 // Descriptor Set 1: {image, coordinates, network}
                 program.create_descriptor_set({image_ptr, coords_ptr, network_ptr});
 
-                // Create the "read_GRBG_image_to_network" entry point.
-                program.begin_entry_point("load_GRBG_image", {global_id});
-                uint32_t idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
-                program.store_variable(
-                  program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
-                  program.call_function(
-                    bayer_to_rgb_func,
-                    fvec4,
-                    {program.load_variable(image_ptr, image_id),
-                     program.load_variable(bayer_sampler, sampler_id),
-                     program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
-                     program.add_constant(fvec2, {Scalar(1.0), Scalar(0.0)})}));
-                program.return_function();
-                program.end_function();
+                // Create the "fetch" function
+                uint32_t fetch_func =
+                  fetch_function(program, float_type, image_id, sampler_id, sampled_image_id, fvec2, fvec4);
 
-                // Create the "read_RGGB_image_to_network" entry point.
-                program.begin_entry_point("load_RGGB_image", {global_id});
-                idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
-                program.store_variable(
-                  program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
-                  program.call_function(
-                    bayer_to_rgb_func,
-                    fvec4,
-                    {program.load_variable(image_ptr, image_id),
-                     program.load_variable(bayer_sampler, sampler_id),
-                     program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
-                     program.add_constant(fvec2, {Scalar(0.0), Scalar(0.0)})}));
-                program.return_function();
-                program.end_function();
+                // Create the "bayer_to_rgb" function.
+                uint32_t bayer_to_rgb_func = bayer_to_rgb_function<Scalar>(
+                  program, float_type, image_id, sampler_id, fvec2, uvec2, fvec3, fvec4, fetch_func);
 
-                // Create the "read_GBRG_image_to_network" entry point.
-                program.begin_entry_point("load_GBRG_image", {global_id});
-                idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
-                program.store_variable(
-                  program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
-                  program.call_function(
-                    bayer_to_rgb_func,
-                    fvec4,
-                    {program.load_variable(image_ptr, image_id),
-                     program.load_variable(bayer_sampler, sampler_id),
-                     program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
-                     program.add_constant(fvec2, {Scalar(0.0), Scalar(1.0)})}));
-                program.return_function();
-                program.end_function();
-
-                // Create the "read_BGGR_image_to_network" entry point.
-                program.begin_entry_point("load_BGGR_image", {global_id});
-                idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
-                program.store_variable(
-                  program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
-                  program.call_function(
-                    bayer_to_rgb_func,
-                    fvec4,
-                    {program.load_variable(image_ptr, image_id),
-                     program.load_variable(bayer_sampler, sampler_id),
-                     program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
-                     program.add_constant(fvec2, {Scalar(1.0), Scalar(1.0)})}));
-                program.return_function();
-                program.end_function();
-
-                // Create the "read_RGBA_image_to_network" entry point.
-                program.begin_entry_point("load_RGBA_image", {global_id});
-                idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
-                program.store_variable(
-                  program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
-                  program.sample_image(
-                    program.load_variable(image_ptr, image_id),
-                    program.load_variable(interp_sampler, sampler_id),
-                    sampled_image_id,
-                    program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
-                    fvec4));
-                program.return_function();
-                program.end_function();
+                load_image_func(program,
+                                bayer_to_rgb_func,
+                                global_id,
+                                uint_type,
+                                uint_ptr,
+                                fvec4,
+                                fvec4_ptr,
+                                fvec2,
+                                fvec2_ptr,
+                                network_ptr,
+                                image_ptr,
+                                image_id,
+                                is_bayer ? bayer_sampler : interp_sampler,
+                                sampler_id,
+                                sampled_image_id,
+                                coords_ptr);
 
                 return program.build();
             }
