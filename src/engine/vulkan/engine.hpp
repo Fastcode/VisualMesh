@@ -763,6 +763,7 @@ namespace engine {
                     payload[12] = payload[13] = payload[14] = Scalar(0);
                     payload[15]                             = Scalar(1);
                 });
+                operation::bind_buffer(context, vk_rco.first, vk_rco.second, 0);
 
                 // Transfer f to the device
                 std::pair<vk::buffer, vk::device_memory> vk_f =
@@ -776,6 +777,7 @@ namespace engine {
 
                 operation::map_memory<Scalar>(
                   context, VK_WHOLE_SIZE, vk_f.second, [&lens](Scalar* payload) { payload[0] = lens.focal_length; });
+                operation::bind_buffer(context, vk_f.first, vk_f.second, 0);
 
                 // Transfer centre to the device
                 std::pair<vk::buffer, vk::device_memory> vk_centre =
@@ -791,6 +793,7 @@ namespace engine {
                     payload[0] = lens.centre[0];
                     payload[1] = lens.centre[1];
                 });
+                operation::bind_buffer(context, vk_centre.first, vk_centre.second, 0);
 
                 // Calculate the coefficients for performing a distortion to give to the engine
                 vec4<Scalar> ik = inverse_coefficients(lens.k);
@@ -811,6 +814,7 @@ namespace engine {
                     payload[2] = ik[2];
                     payload[3] = ik[3];
                 });
+                operation::bind_buffer(context, vk_k.first, vk_k.second, 0);
 
                 // Transfer dimensions to the device
                 std::pair<vk::buffer, vk::device_memory> vk_dimensions =
@@ -826,6 +830,7 @@ namespace engine {
                     payload[0] = lens.dimensions[0];
                     payload[1] = lens.dimensions[1];
                 });
+                operation::bind_buffer(context, vk_dimensions.first, vk_dimensions.second, 0);
 
                 // Convenience variables
                 const auto& nodes = mesh.nodes;
@@ -855,6 +860,7 @@ namespace engine {
                             index += 4;
                         }
                     });
+                    operation::bind_buffer(context, vk_points.first, vk_points.second, 0);
 
                     // Cache for future runs
                     device_points_cache[&mesh] = vk_points;
@@ -894,6 +900,7 @@ namespace engine {
                                            {context.transfer_queue_family},
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                operation::bind_buffer(context, vk_indices.first, vk_indices.second, 0);
 
                 // Create output buffer for pixel_coordinates
                 std::pair<vk::buffer, vk::device_memory> vk_pixel_coordinates =
@@ -904,6 +911,7 @@ namespace engine {
                                            {context.transfer_queue_family},
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                operation::bind_buffer(context, vk_pixel_coordinates.first, vk_pixel_coordinates.second, 0);
 
                 // Upload our indices map
                 operation::map_memory<int>(context, VK_WHOLE_SIZE, vk_indices.second, [&indices](int* payload) {

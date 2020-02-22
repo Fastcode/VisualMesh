@@ -86,11 +86,16 @@ namespace engine {
                                "Failed to allocate memory on the device");
                 vk::device_memory memory(mem, [&context](auto p) { vkFreeMemory(context.device, p, nullptr); });
 
-                // Attach the allocated device memory to it
-                throw_vk_error(vkBindBufferMemory(context.device, buffer, memory, 0),
-                               "Failed to bind buffer to device memory");
-
                 return std::make_pair(buffer, memory);
+            }
+
+            inline void bind_buffer(const VulkanContext& context,
+                                    const vk::buffer& buffer,
+                                    const vk::device_memory& memory,
+                                    const uint32_t offset) {
+                // Attach the allocated device memory to it
+                throw_vk_error(vkBindBufferMemory(context.device, buffer, memory, offset),
+                               "Failed to bind buffer to device memory");
             }
         }  // namespace operation
     }      // namespace vulkan
