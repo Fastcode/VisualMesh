@@ -791,16 +791,13 @@ namespace engine {
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-                operation::map_memory<Scalar>(context, VK_WHOLE_SIZE, vk_rco.second, [&Hoc](Scalar* payload) {
-                    for (size_t i = 0, index = 0; i < 3; ++i, index += 4) {
-                        payload[index + 0] = Hoc[0][i];
-                        payload[index + 1] = Hoc[1][i];
-                        payload[index + 2] = Hoc[2][i];
-                        payload[index + 3] = Scalar(0);
-                    }
-                    payload[12] = payload[13] = payload[14] = Scalar(0);
-                    payload[15]                             = Scalar(1);
-                });
+                operation::map_memory<vec4<Scalar>>(
+                  context, VK_WHOLE_SIZE, vk_rco.second, [&Hoc](vec4<Scalar>* payload) {
+                      for (size_t index = 0; index < 3; ++index) {
+                          payload[index] = vec4<Scalar>{Hoc[0][index], Hoc[1][index], Hoc[2][index], Scalar(0)};
+                      }
+                      payload[4] = vec4<Scalar>{Scalar(0), Scalar(0), Scalar(0), Scalar(1)};
+                  });
                 operation::bind_buffer(context, vk_rco.first, vk_rco.second, 0);
 
                 // Transfer f to the device
@@ -827,10 +824,10 @@ namespace engine {
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-                operation::map_memory<Scalar>(context, VK_WHOLE_SIZE, vk_centre.second, [&lens](Scalar* payload) {
-                    payload[0] = lens.centre[0];
-                    payload[1] = lens.centre[1];
-                });
+                operation::map_memory<vec2<Scalar>>(
+                  context, VK_WHOLE_SIZE, vk_centre.second, [&lens](vec2<Scalar>* payload) {
+                      payload[0] = lens.centre;
+                  });
                 operation::bind_buffer(context, vk_centre.first, vk_centre.second, 0);
 
                 // Calculate the coefficients for performing a distortion to give to the engine
@@ -846,12 +843,8 @@ namespace engine {
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-                operation::map_memory<Scalar>(context, VK_WHOLE_SIZE, vk_k.second, [&ik](Scalar* payload) {
-                    payload[0] = ik[0];
-                    payload[1] = ik[1];
-                    payload[2] = ik[2];
-                    payload[3] = ik[3];
-                });
+                operation::map_memory<vec4<Scalar>>(
+                  context, VK_WHOLE_SIZE, vk_k.second, [&ik](vec4<Scalar>* payload) { payload[0] = ik; });
                 operation::bind_buffer(context, vk_k.first, vk_k.second, 0);
 
                 // Transfer dimensions to the device
@@ -864,10 +857,10 @@ namespace engine {
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-                operation::map_memory<int>(context, VK_WHOLE_SIZE, vk_dimensions.second, [&lens](int* payload) {
-                    payload[0] = lens.dimensions[0];
-                    payload[1] = lens.dimensions[1];
-                });
+                operation::map_memory<vec2<int>>(
+                  context, VK_WHOLE_SIZE, vk_dimensions.second, [&lens](vec2<int>* payload) {
+                      payload[0] = lens.dimensions;
+                  });
                 operation::bind_buffer(context, vk_dimensions.first, vk_dimensions.second, 0);
 
                 // Convenience variables
@@ -888,16 +881,15 @@ namespace engine {
                                                            | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
                     // Write the points buffer to the device and cache it
-                    operation::map_memory<Scalar>(context, VK_WHOLE_SIZE, vk_points.second, [&mesh](Scalar* payload) {
-                        size_t index = 0;
-                        for (const auto& n : mesh.nodes) {
-                            payload[index + 0] = Scalar(n.ray[0]);
-                            payload[index + 1] = Scalar(n.ray[1]);
-                            payload[index + 2] = Scalar(n.ray[2]);
-                            payload[index + 3] = Scalar(0);
-                            index += 4;
-                        }
-                    });
+                    operation::map_memory<vec4<Scalar>>(
+                      context, VK_WHOLE_SIZE, vk_points.second, [&mesh](vec4<Scalar>* payload) {
+                          size_t index = 0;
+                          for (const auto& n : mesh.nodes) {
+                              payload[index] =
+                                vec4<Scalar>{Scalar(n.ray[0]), Scalar(n.ray[1]), Scalar(n.ray[2]), Scalar(0)};
+                              index++;
+                          }
+                      });
                     operation::bind_buffer(context, vk_points.first, vk_points.second, 0);
 
                     // Cache for future runs
@@ -1161,12 +1153,12 @@ namespace engine {
 
                 // Read the pixels off the buffer
                 std::vector<vec2<Scalar>> pixels(indices.size());
-                operation::map_memory<Scalar>(
-                  context, VK_WHOLE_SIZE, vk_pixel_coordinates.second, [&pixels](Scalar* payload) {
+                operation::map_memory<vec2<Scalar>>(
+                  context, VK_WHOLE_SIZE, vk_pixels.second, [&pixels](vec2<Scalar>* payload) {
                       size_t index = 0;
                       for (auto& pixel : pixels) {
-                          pixel = {payload[index + 0], payload[index + 1]};
-                          index += 2;
+                          pixel = payload[index];
+                          index++;
                       }
                   });
 
