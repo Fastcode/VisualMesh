@@ -3,6 +3,7 @@
 import os
 
 import tensorflow as tf
+import tensorflow_addons as tfa
 
 from .callbacks import MeshImages
 from .dataset import VisualMeshDataset
@@ -85,8 +86,22 @@ def train(config, output_path):
         n_classes=len(config.network.classes),
         activation=config.network.activation_fn,
     )
+
+    # Setup the optimiser
+    if config.training.optimiser.type == "Adam":
+        optimiser = tf.optimizers.Adam(learning_rate=float(config.training.optimiser.learning_rate))
+    elif config.training.optimiser.type == "Ranger":
+        optimiser = tfa.optimizers.Lookahead(
+            tfa.optimizers.RectifiedAdam(learning_rate=float(config.training.optimiser.learning_rate)),
+            sync_period=int(config.training.optimiser.sync_period),
+            slow_step_size=float(config.training.optimiser.slow_step_size),
+        )
+    else:
+        raise RuntimeError("Unknown optimiser type" + config.training.optimiser)
+
+    # Compile the model
     model.compile(
-        optimizer=tf.optimizers.Adam(), loss=tf.losses.CategoricalCrossentropy(), metrics=metrics,
+        optimizer=optimiser, loss=tf.losses.CategoricalCrossentropy(), metrics=metrics,
     )
 
     # Find the latest checkpoint file

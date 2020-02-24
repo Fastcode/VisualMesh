@@ -13,7 +13,7 @@ model:
   # The type of model that we are using to generate the Visual Mesh
   mesh:
     # The type of Visual Mesh we are generating
-    type: RADIAL6
+    type: RING6
     # How many distinct meshes to cache before dropping old ones
     cached_meshes: 100
     # The maximum distance the Visual Mesh will be projected for. This should be slightly further than the most distant
@@ -69,7 +69,17 @@ training:
   # Number of batches to consider an epoch, if None then it is the length of the input dataset
   batches_per_epoch: 1000
   # Number of epochs to execute
-  epochs: 100
+  epochs: 500
+  # Optimiser settings
+  optimiser:
+    type: Ranger
+    learning_rate: 1e-3
+    sync_period: 6
+    slow_step_size: 0.5
+
+  # optimiser:
+  #   type: Adam
+  #   learning_rate: 1e-3
 
   # Settings for the validation step of the network.
   validation:
