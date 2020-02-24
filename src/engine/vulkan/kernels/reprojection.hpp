@@ -143,10 +143,11 @@ namespace engine {
                 program.add_member_decoration(k_struct, 0, spv::Decoration::Offset, {0});
                 program.add_member_decoration(out_struct, 0, spv::Decoration::Offset, {0});
 
-                uint32_t stride16_decoration = program.add_decoration_group(spv::Decoration::ArrayStride, {16});
-                program.add_group_decoration(stride16_decoration, {points_array, indices_array});
+                uint32_t stride16_decoration =
+                  program.add_decoration_group(spv::Decoration::ArrayStride, {4 * sizeof(Scalar)});
+                program.add_group_decoration(stride16_decoration, {points_array, Rco_array});
                 program.add_decoration(indices_array, spv::Decoration::ArrayStride, {4});
-                program.add_decoration(out_array, spv::Decoration::ArrayStride, {8});
+                program.add_decoration(out_array, spv::Decoration::ArrayStride, {2 * sizeof(Scalar)});
 
                 // Create the descriptor set.
                 // Descriptor Set 0: {points_ptr, indices_ptr, Rco_ptr, f_ptr, centre_ptr, k_ptr, dimensions_ptr,
