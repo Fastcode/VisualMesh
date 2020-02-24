@@ -165,7 +165,15 @@ class VisualMeshDataset:
         W = tf.image.convert_image_dtype(Y[:, 3], tf.float32)  # Alpha channel
         cs = []
         for name, value in self.classes:
-            cs.append(tf.where(tf.reduce_all(input_tensor=tf.equal(Y[:, :3], [value]), axis=-1), 1.0, 0.0))
+            cs.append(
+                tf.where(
+                    tf.logical_and(
+                        tf.reduce_all(input_tensor=tf.equal(Y[:, :3], [value]), axis=-1), tf.greater(W, 0.0)
+                    ),
+                    1.0,
+                    0.0,
+                )
+            )
         Y = tf.stack(cs, axis=-1)
 
         return Y, W
