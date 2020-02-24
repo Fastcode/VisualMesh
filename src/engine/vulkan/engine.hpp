@@ -74,7 +74,7 @@ namespace engine {
                 context.instance = vk::instance(instance, [](auto p) { vkDestroyInstance(p, nullptr); });
 
                 // Create the Vulkan instance and find the best devices and queues
-                operation::create_device(DeviceType::GPU, context, true);
+                operation::create_device(DeviceType::GPU, context, false);
 
                 // Created the projection kernel sources and programs
                 std::vector<uint32_t> equidistant_reprojection_source =
