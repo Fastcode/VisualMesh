@@ -29,19 +29,19 @@ namespace engine {
 
             inline uint32_t fetch_function(Program& program,
                                            const uint32_t& float_type,
-                                           const uint32_t& image_id,
-                                           const uint32_t& sampler_id,
-                                           const uint32_t& sampled_image_id,
+                                           const uint32_t& image_type,
+                                           const uint32_t& sampler_type,
+                                           const uint32_t& sampled_image_type,
                                            const uint32_t& fvec2,
                                            const uint32_t& fvec4) {
                 // Create the "fetch" function.
                 // Sample image "params[1]" using the sampler "params[2]" at position "params[3]" and return the first
                 // component
                 auto params = program.begin_function("fetch",
-                                                     {float_type, image_id, sampler_id, fvec2},
+                                                     {float_type, image_type, sampler_type, fvec2},
                                                      spv::FunctionControlMask::Pure | spv::FunctionControlMask::Inline);
                 program.return_function(program.vector_component(
-                  float_type, program.sample_image(params[1], params[2], sampled_image_id, params[3], fvec4), 0));
+                  float_type, program.sample_image(params[1], params[2], sampled_image_type, params[3], fvec4), 0));
                 program.end_function();
 
                 return params[0];
@@ -50,8 +50,8 @@ namespace engine {
             template <typename Scalar>
             inline uint32_t bayer_to_rgb_function(Program& program,
                                                   const uint32_t& float_type,
-                                                  const uint32_t& image_id,
-                                                  const uint32_t& sampler_id,
+                                                  const uint32_t& image_type,
+                                                  const uint32_t& sampler_type,
                                                   const uint32_t& fvec2,
                                                   const uint32_t& uvec2,
                                                   const uint32_t& fvec3,
@@ -59,7 +59,7 @@ namespace engine {
                                                   const uint32_t& fetch_func) {
                 // http://graphics.cs.williams.edu/papers/BayerJGT09/
                 auto params = program.begin_function(
-                  "bayer_to_rgb", {fvec4, image_id, sampler_id, fvec2, fvec2}, spv::FunctionControlMask::Pure);
+                  "bayer_to_rgb", {fvec4, image_type, sampler_type, fvec2, fvec2}, spv::FunctionControlMask::Pure);
 
                 // Define some constants.
                 uint32_t offsets = program.add_constant(fvec4, {Scalar(-2.0), Scalar(-1.0), Scalar(1.0), Scalar(2.0)});
@@ -330,9 +330,9 @@ namespace engine {
                                         const uint32_t& fvec2_ptr,
                                         const uint32_t& network_ptr,
                                         const uint32_t& image_ptr,
-                                        const uint32_t& image_id,
+                                        const uint32_t& image_type,
                                         const uint32_t& bayer_sampler,
-                                        const uint32_t& sampler_id,
+                                        const uint32_t& sampler_type,
                                         const uint32_t&,
                                         const uint32_t& coords_ptr) {
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
@@ -343,8 +343,8 @@ namespace engine {
                   program.call_function(
                     bayer_to_rgb_func,
                     fvec4,
-                    {program.load_variable(image_ptr, image_id),
-                     program.load_variable(bayer_sampler, sampler_id),
+                    {program.load_variable(image_ptr, image_type),
+                     program.load_variable(bayer_sampler, sampler_type),
                      program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                      program.add_constant(fvec2, {Scalar(1.0), Scalar(0.0)})}));
                 program.return_function();
@@ -363,9 +363,9 @@ namespace engine {
                                         const uint32_t& fvec2_ptr,
                                         const uint32_t& network_ptr,
                                         const uint32_t& image_ptr,
-                                        const uint32_t& image_id,
+                                        const uint32_t& image_type,
                                         const uint32_t& bayer_sampler,
-                                        const uint32_t& sampler_id,
+                                        const uint32_t& sampler_type,
                                         const uint32_t&,
                                         const uint32_t& coords_ptr) {
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
@@ -376,8 +376,8 @@ namespace engine {
                   program.call_function(
                     bayer_to_rgb_func,
                     fvec4,
-                    {program.load_variable(image_ptr, image_id),
-                     program.load_variable(bayer_sampler, sampler_id),
+                    {program.load_variable(image_ptr, image_type),
+                     program.load_variable(bayer_sampler, sampler_type),
                      program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                      program.add_constant(fvec2, {Scalar(0.0), Scalar(0.0)})}));
                 program.return_function();
@@ -396,9 +396,9 @@ namespace engine {
                                         const uint32_t& fvec2_ptr,
                                         const uint32_t& network_ptr,
                                         const uint32_t& image_ptr,
-                                        const uint32_t& image_id,
+                                        const uint32_t& image_type,
                                         const uint32_t& bayer_sampler,
-                                        const uint32_t& sampler_id,
+                                        const uint32_t& sampler_type,
                                         const uint32_t&,
                                         const uint32_t& coords_ptr) {
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
@@ -409,8 +409,8 @@ namespace engine {
                   program.call_function(
                     bayer_to_rgb_func,
                     fvec4,
-                    {program.load_variable(image_ptr, image_id),
-                     program.load_variable(bayer_sampler, sampler_id),
+                    {program.load_variable(image_ptr, image_type),
+                     program.load_variable(bayer_sampler, sampler_type),
                      program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                      program.add_constant(fvec2, {Scalar(0.0), Scalar(1.0)})}));
                 program.return_function();
@@ -429,9 +429,9 @@ namespace engine {
                                         const uint32_t& fvec2_ptr,
                                         const uint32_t& network_ptr,
                                         const uint32_t& image_ptr,
-                                        const uint32_t& image_id,
+                                        const uint32_t& image_type,
                                         const uint32_t& bayer_sampler,
-                                        const uint32_t& sampler_id,
+                                        const uint32_t& sampler_type,
                                         const uint32_t&,
                                         const uint32_t& coords_ptr) {
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
@@ -442,8 +442,8 @@ namespace engine {
                   program.call_function(
                     bayer_to_rgb_func,
                     fvec4,
-                    {program.load_variable(image_ptr, image_id),
-                     program.load_variable(bayer_sampler, sampler_id),
+                    {program.load_variable(image_ptr, image_type),
+                     program.load_variable(bayer_sampler, sampler_type),
                      program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                      program.add_constant(fvec2, {Scalar(1.0), Scalar(1.0)})}));
                 program.return_function();
@@ -462,10 +462,10 @@ namespace engine {
                                         const uint32_t& fvec2_ptr,
                                         const uint32_t& network_ptr,
                                         const uint32_t& image_ptr,
-                                        const uint32_t& image_id,
+                                        const uint32_t& image_type,
                                         const uint32_t& interp_sampler,
-                                        const uint32_t& sampler_id,
-                                        const uint32_t& sampled_image_id,
+                                        const uint32_t& sampler_type,
+                                        const uint32_t& sampled_image_type,
                                         const uint32_t& coords_ptr) {
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
                 program.begin_entry_point("load_RGBA_image", {global_id});
@@ -473,9 +473,9 @@ namespace engine {
                 program.store_variable(
                   program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
                   program.sample_image(
-                    program.load_variable(image_ptr, image_id),
-                    program.load_variable(interp_sampler, sampler_id),
-                    sampled_image_id,
+                    program.load_variable(image_ptr, image_type),
+                    program.load_variable(interp_sampler, sampler_type),
+                    sampled_image_type,
                     program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                     fvec4));
                 program.return_function();
@@ -483,7 +483,7 @@ namespace engine {
             }
 
             template <typename Scalar, typename LoadImageFunc>
-            inline std::vector<uint32_t> load_image(const bool& is_bayer, LoadImageFunc&& load_image_func) {
+            inline std::vector<uint32_t> load_image(LoadImageFunc&& load_image_func) {
                 // Initialise the program.
                 Program::Config config;
                 config.enable_glsl_extensions = true;
@@ -508,10 +508,10 @@ namespace engine {
                 uint32_t fvec4_ptr = program.add_pointer(fvec4, spv::StorageClass::StorageBuffer);
 
                 // Define image and sampler types.
-                uint32_t image_id = program.add_image_type(
+                uint32_t image_type = program.add_image_type(
                   float_type, spv::Dim::Dim2D, false, false, false, true, spv::ImageFormat::Rgba8);
-                uint32_t sampler_id       = program.add_sampler_type();
-                uint32_t sampled_image_id = program.add_sampled_image_type(image_id);
+                uint32_t sampler_type       = program.add_sampler_type();
+                uint32_t sampled_image_type = program.add_sampled_image_type(image_type);
 
                 // Define the GlobalInvocationID (for get_global_id(0))
                 uint32_t global_id = program.add_variable(uvec3_ptr, spv::StorageClass::Input);
@@ -519,13 +519,14 @@ namespace engine {
 
                 // Prepare the descriptor set variables.
                 // Prepare the image sampler variables.
-                uint32_t sampler_ptr    = program.add_pointer(sampler_id, spv::StorageClass::UniformConstant);
-                uint32_t bayer_sampler  = program.add_variable(sampler_ptr, spv::StorageClass::UniformConstant);
-                uint32_t interp_sampler = program.add_variable(sampler_ptr, spv::StorageClass::UniformConstant);
+                uint32_t sampler_ptr =
+                  program.add_variable(program.add_pointer(sampler_type, spv::StorageClass::UniformConstant),
+                                       spv::StorageClass::UniformConstant);
 
                 // Prepare the image, coordinates array, and network array variables.
-                uint32_t image_ptr = program.add_variable(program.add_pointer(image_id, spv::StorageClass::Image),
-                                                          spv::StorageClass::Image);
+                uint32_t image_ptr =
+                  program.add_variable(program.add_pointer(image_type, spv::StorageClass::UniformConstant),
+                                       spv::StorageClass::UniformConstant);
 
                 uint32_t coords_array  = program.add_array_type(fvec2);
                 uint32_t coords_struct = program.add_struct({coords_array});
@@ -542,25 +543,22 @@ namespace engine {
                 // Decorate the structs and their members.
                 uint32_t block_decoration = program.add_decoration_group(spv::Decoration::Block);
                 program.add_group_decoration(block_decoration, {coords_struct, network_struct});
-                program.add_decoration(coords_array, spv::Decoration::ArrayStride, {8});
+                program.add_decoration(coords_array, spv::Decoration::ArrayStride, {2 * sizeof(Scalar)});
                 program.add_member_decoration(coords_struct, 0, spv::Decoration::Offset, {0});
-                program.add_decoration(network_array, spv::Decoration::ArrayStride, {16});
+                program.add_decoration(network_array, spv::Decoration::ArrayStride, {4 * sizeof(Scalar)});
                 program.add_member_decoration(network_struct, 0, spv::Decoration::Offset, {0});
 
                 // Create the descriptor sets.
-                // Descriptor Set 0: {bayer_sampler, interp_sampler}
-                program.create_descriptor_set({bayer_sampler, interp_sampler});
-
-                // Descriptor Set 1: {image, coordinates, network}
-                program.create_descriptor_set({image_ptr, coords_ptr, network_ptr});
+                // Descriptor Set 0: {sampler, image, coordinates, network}
+                program.create_descriptor_set({sampler_ptr, image_ptr, coords_ptr, network_ptr});
 
                 // Create the "fetch" function
                 uint32_t fetch_func =
-                  fetch_function(program, float_type, image_id, sampler_id, sampled_image_id, fvec2, fvec4);
+                  fetch_function(program, float_type, image_type, sampler_type, sampled_image_type, fvec2, fvec4);
 
                 // Create the "bayer_to_rgb" function.
                 uint32_t bayer_to_rgb_func = bayer_to_rgb_function<Scalar>(
-                  program, float_type, image_id, sampler_id, fvec2, uvec2, fvec3, fvec4, fetch_func);
+                  program, float_type, image_type, sampler_type, fvec2, uvec2, fvec3, fvec4, fetch_func);
 
                 load_image_func(program,
                                 bayer_to_rgb_func,
@@ -573,10 +571,10 @@ namespace engine {
                                 fvec2_ptr,
                                 network_ptr,
                                 image_ptr,
-                                image_id,
-                                is_bayer ? bayer_sampler : interp_sampler,
-                                sampler_id,
-                                sampled_image_id,
+                                image_type,
+                                sampler_ptr,
+                                sampler_type,
+                                sampled_image_type,
                                 coords_ptr);
 
                 return program.build();

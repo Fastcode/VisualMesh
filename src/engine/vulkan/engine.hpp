@@ -225,15 +225,15 @@ namespace engine {
 
                 // Created the load_image kernel source and program
                 std::vector<uint32_t> load_GRBG_image_source =
-                  kernels::load_image<Scalar>(true, kernels::load_GRBG_image<Scalar>);
+                  kernels::load_image<Scalar>(kernels::load_GRBG_image<Scalar>);
                 std::vector<uint32_t> load_RGGB_image_source =
-                  kernels::load_image<Scalar>(true, kernels::load_RGGB_image<Scalar>);
+                  kernels::load_image<Scalar>(kernels::load_RGGB_image<Scalar>);
                 std::vector<uint32_t> load_GBRG_image_source =
-                  kernels::load_image<Scalar>(true, kernels::load_GBRG_image<Scalar>);
+                  kernels::load_image<Scalar>(kernels::load_GBRG_image<Scalar>);
                 std::vector<uint32_t> load_BGGR_image_source =
-                  kernels::load_image<Scalar>(true, kernels::load_BGGR_image<Scalar>);
+                  kernels::load_image<Scalar>(kernels::load_BGGR_image<Scalar>);
                 std::vector<uint32_t> load_RGBA_image_source =
-                  kernels::load_image<Scalar>(true, kernels::load_RGBA_image<Scalar>);
+                  kernels::load_image<Scalar>(kernels::load_RGBA_image<Scalar>);
                 VkShaderModuleCreateInfo load_GRBG_image_info = {
                   VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                   0,
@@ -298,9 +298,9 @@ namespace engine {
                   load_RGBA_image_shader, [this](auto p) { vkDestroyShaderModule(context.device, p, nullptr); });
 
                 // Create the descriptor sets for the load_image program
-                // Descriptor Set 0: {bayer_sampler, interp_sampler}
+                // Descriptor Set 0: {bayer_sampler, interp_sampler, image, coordinates, network}
                 VkSamplerCreateInfo bayer_sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-                                                          0,
+                                                          nullptr,
                                                           0,
                                                           VK_FILTER_NEAREST,
                                                           VK_FILTER_NEAREST,
@@ -321,7 +321,7 @@ namespace engine {
                 throw_vk_error(vkCreateSampler(context.device, &bayer_sampler_info, nullptr, &bsampler),
                                "Failed to create bayer sampler");
                 VkSamplerCreateInfo interp_sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-                                                           0,
+                                                           nullptr,
                                                            0,
                                                            VK_FILTER_LINEAR,
                                                            VK_FILTER_LINEAR,
@@ -342,150 +342,125 @@ namespace engine {
                 throw_vk_error(vkCreateSampler(context.device, &interp_sampler_info, nullptr, &isampler),
                                "Failed to create interp sampler");
 
-                std::array<VkDescriptorSetLayoutBinding, 2> load_image_sampler_bindings{
-                  VkDescriptorSetLayoutBinding{
-                    0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &bsampler},
-                  VkDescriptorSetLayoutBinding{
-                    1, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &isampler}};
-
                 bayer_sampler = vk::sampler(bsampler, [this](auto p) { vkDestroySampler(context.device, p, nullptr); });
                 interp_sampler =
                   vk::sampler(isampler, [this](auto p) { vkDestroySampler(context.device, p, nullptr); });
 
-                // Descriptor Set 1: {image, coordinates, network}
-                std::array<VkDescriptorSetLayoutBinding, 3> load_image_bindings = {
+                std::array<VkDescriptorSetLayoutBinding, 4> load_image_bindings{
+                  VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                   VkDescriptorSetLayoutBinding{
-                    0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                    1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                   VkDescriptorSetLayoutBinding{
-                    1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                    2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                   VkDescriptorSetLayoutBinding{
-                    2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+                    3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
 
-                VkDescriptorSetLayoutCreateInfo load_image_sampler_descriptor_set_layout_create_info = {
-                  VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-                  0,
-                  0,
-                  static_cast<uint32_t>(load_image_sampler_bindings.size()),
-                  load_image_sampler_bindings.data()};
-                throw_vk_error(vkCreateDescriptorSetLayout(context.device,
-                                                           &load_image_sampler_descriptor_set_layout_create_info,
-                                                           0,
-                                                           &load_image_descriptor_layout[0]),
-                               "Failed to create load_image sampler descriptor set layout");
-
-                VkDescriptorSetLayoutCreateInfo load_image_descriptor_set_layout_create_info = {
+                VkDescriptorSetLayoutCreateInfo load_image_descriptor_set_info = {
                   VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
                   0,
                   0,
                   static_cast<uint32_t>(load_image_bindings.size()),
                   load_image_bindings.data()};
-                throw_vk_error(
-                  vkCreateDescriptorSetLayout(
-                    context.device, &load_image_descriptor_set_layout_create_info, 0, &load_image_descriptor_layout[1]),
-                  "Failed to create load_image descriptor set layout");
+                throw_vk_error(vkCreateDescriptorSetLayout(
+                                 context.device, &load_image_descriptor_set_info, 0, &load_image_descriptor_layout),
+                               "Failed to create load_image descriptor set layout");
 
                 VkPipelineLayoutCreateInfo load_image_pipeline_layout_info = {
-                  VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-                  0,
-                  0,
-                  static_cast<uint32_t>(load_image_descriptor_layout.size()),
-                  load_image_descriptor_layout.data(),
-                  0,
-                  0};
+                  VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, 0, 0, 1, &load_image_descriptor_layout, 0, 0};
 
                 throw_vk_error(vkCreatePipelineLayout(
                                  context.device, &load_image_pipeline_layout_info, 0, &load_image_pipeline_layout),
                                "Failed to create load_image pipeline layout");
 
-                // VkComputePipelineCreateInfo load_GRBG_image_pipeline_info = {
-                //   VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-                //   0,
-                //   0,
-                //   {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                //    0,
-                //    0,
-                //    VK_SHADER_STAGE_COMPUTE_BIT,
-                //    load_GRBG_image_program,
-                //    "load_GRBG_image",
-                //    0},
-                //   load_image_pipeline_layout,
-                //   0,
-                //   0};
-                // throw_vk_error(
-                //   vkCreateComputePipelines(context.device, 0, 1, &load_GRBG_image_pipeline_info, 0,
-                //   &load_GRBG_image), "Failed to create load_GRBG_image pipeline");
+                VkComputePipelineCreateInfo load_GRBG_image_pipeline_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   load_GRBG_image_program,
+                   "load_GRBG_image",
+                   0},
+                  load_image_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(
+                  vkCreateComputePipelines(context.device, 0, 1, &load_GRBG_image_pipeline_info, 0, &load_GRBG_image),
+                  "Failed to create load_GRBG_image pipeline");
 
-                // VkComputePipelineCreateInfo load_RGGB_image_pipeline_info = {
-                //   VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-                //   0,
-                //   0,
-                //   {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                //    0,
-                //    0,
-                //    VK_SHADER_STAGE_COMPUTE_BIT,
-                //    load_RGGB_image_program,
-                //    "load_RGGB_image",
-                //    0},
-                //   load_image_pipeline_layout,
-                //   0,
-                //   0};
-                // throw_vk_error(
-                //   vkCreateComputePipelines(context.device, 0, 1, &load_RGGB_image_pipeline_info, 0,
-                //   &load_RGGB_image), "Failed to create load_RGGB_image pipeline");
+                VkComputePipelineCreateInfo load_RGGB_image_pipeline_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   load_RGGB_image_program,
+                   "load_RGGB_image",
+                   0},
+                  load_image_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(
+                  vkCreateComputePipelines(context.device, 0, 1, &load_RGGB_image_pipeline_info, 0, &load_RGGB_image),
+                  "Failed to create load_RGGB_image pipeline");
 
-                // VkComputePipelineCreateInfo load_GBRG_image_pipeline_info = {
-                //   VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-                //   0,
-                //   0,
-                //   {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                //    0,
-                //    0,
-                //    VK_SHADER_STAGE_COMPUTE_BIT,
-                //    load_GBRG_image_program,
-                //    "load_GBRG_image",
-                //    0},
-                //   load_image_pipeline_layout,
-                //   0,
-                //   0};
-                // throw_vk_error(
-                //   vkCreateComputePipelines(context.device, 0, 1, &load_GBRG_image_pipeline_info, 0,
-                //   &load_GBRG_image), "Failed to create load_GBRG_image pipeline");
+                VkComputePipelineCreateInfo load_GBRG_image_pipeline_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   load_GBRG_image_program,
+                   "load_GBRG_image",
+                   0},
+                  load_image_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(
+                  vkCreateComputePipelines(context.device, 0, 1, &load_GBRG_image_pipeline_info, 0, &load_GBRG_image),
+                  "Failed to create load_GBRG_image pipeline");
 
-                // VkComputePipelineCreateInfo load_BGGR_image_pipeline_info = {
-                //   VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-                //   0,
-                //   0,
-                //   {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                //    0,
-                //    0,
-                //    VK_SHADER_STAGE_COMPUTE_BIT,
-                //    load_BGGR_image_program,
-                //    "load_BGGR_image",
-                //    0},
-                //   load_image_pipeline_layout,
-                //   0,
-                //   0};
-                // throw_vk_error(
-                //   vkCreateComputePipelines(context.device, 0, 1, &load_BGGR_image_pipeline_info, 0,
-                //   &load_BGGR_image), "Failed to create load_BGGR_image pipeline");
+                VkComputePipelineCreateInfo load_BGGR_image_pipeline_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   load_BGGR_image_program,
+                   "load_BGGR_image",
+                   0},
+                  load_image_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(
+                  vkCreateComputePipelines(context.device, 0, 1, &load_BGGR_image_pipeline_info, 0, &load_BGGR_image),
+                  "Failed to create load_BGGR_image pipeline");
 
-                // VkComputePipelineCreateInfo load_RGBA_image_pipeline_info = {
-                //   VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-                //   0,
-                //   0,
-                //   {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                //    0,
-                //    0,
-                //    VK_SHADER_STAGE_COMPUTE_BIT,
-                //    load_RGBA_image_program,
-                //    "load_RGBA_image",
-                //    0},
-                //   load_image_pipeline_layout,
-                //   0,
-                //   0};
-                // throw_vk_error(
-                //   vkCreateComputePipelines(context.device, 0, 1, &load_RGBA_image_pipeline_info, 0,
-                //   &load_RGBA_image), "Failed to create load_RGBA_image pipeline");
+                VkComputePipelineCreateInfo load_RGBA_image_pipeline_info = {
+                  VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                  0,
+                  0,
+                  {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                   0,
+                   0,
+                   VK_SHADER_STAGE_COMPUTE_BIT,
+                   load_RGBA_image_program,
+                   "load_RGBA_image",
+                   0},
+                  load_image_pipeline_layout,
+                  0,
+                  0};
+                throw_vk_error(
+                  vkCreateComputePipelines(context.device, 0, 1, &load_RGBA_image_pipeline_info, 0, &load_RGBA_image),
+                  "Failed to create load_RGBA_image pipeline");
 
                 // Work out what the widest network layer is
                 max_width = 4;
@@ -501,13 +476,12 @@ namespace engine {
                 vkDestroyPipeline(context.device, project_equisolid, nullptr);
                 vkDestroyPipeline(context.device, project_rectilinear, nullptr);
                 vkDestroyPipelineLayout(context.device, load_image_pipeline_layout, nullptr);
-                // vkDestroyPipeline(context.device, load_GRBG_image, nullptr);
-                // vkDestroyPipeline(context.device, load_RGGB_image, nullptr);
-                // vkDestroyPipeline(context.device, load_GBRG_image, nullptr);
-                // vkDestroyPipeline(context.device, load_BGGR_image, nullptr);
-                // vkDestroyPipeline(context.device, load_RGBA_image, nullptr);
-                vkDestroyDescriptorSetLayout(context.device, load_image_descriptor_layout[0], nullptr);
-                vkDestroyDescriptorSetLayout(context.device, load_image_descriptor_layout[1], nullptr);
+                vkDestroyPipeline(context.device, load_GRBG_image, nullptr);
+                vkDestroyPipeline(context.device, load_RGGB_image, nullptr);
+                vkDestroyPipeline(context.device, load_GBRG_image, nullptr);
+                vkDestroyPipeline(context.device, load_BGGR_image, nullptr);
+                vkDestroyPipeline(context.device, load_RGBA_image, nullptr);
+                vkDestroyDescriptorSetLayout(context.device, load_image_descriptor_layout, nullptr);
             }
 
             /**
@@ -1258,7 +1232,7 @@ namespace engine {
             VkPipeline project_rectilinear;
 
             /// DescriptorSetLayouts for the load_image kernel
-            std::array<VkDescriptorSetLayout, 2> load_image_descriptor_layout;
+            VkDescriptorSetLayout load_image_descriptor_layout;
             /// PipelineLayout for the load_image kernel
             VkPipelineLayout load_image_pipeline_layout;
             /// Samplers for the load image kernels
