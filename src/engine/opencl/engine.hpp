@@ -237,6 +237,9 @@ namespace engine {
                 cl::event cl_pixels_loaded;
                 std::tie(neighbourhood, indices, cl_pixels, cl_pixels_loaded) = do_project(mesh, Hoc, lens);
 
+                // If there were no points, nothing to project
+                if (indices.empty()) { return ClassifiedMesh<Scalar, N_NEIGHBOURS>(); }
+
                 // This includes the offscreen point at the end
                 int n_points = neighbourhood.size();
 
@@ -430,12 +433,12 @@ namespace engine {
 
                 // Pack Rco into a Scalar16
                 // clang-format off
-        std::array<Scalar, 16> Rco{{
-            Hoc[0][0],     Hoc[1][0],   Hoc[2][0], Scalar(0.0),
-            Hoc[0][1],     Hoc[1][1],   Hoc[2][1], Scalar(0.0),
-            Hoc[0][2],     Hoc[1][2],   Hoc[2][2], Scalar(0.0),
-            Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(1.0)
-        }};
+                std::array<Scalar, 16> Rco{{
+                    Hoc[0][0],     Hoc[1][0],   Hoc[2][0], Scalar(0.0),
+                    Hoc[0][1],     Hoc[1][1],   Hoc[2][1], Scalar(0.0),
+                    Hoc[0][2],     Hoc[1][2],   Hoc[2][2], Scalar(0.0),
+                    Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(1.0)
+                }};
                 // clang-format on
 
                 // Convenience variables

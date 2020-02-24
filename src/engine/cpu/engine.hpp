@@ -187,6 +187,8 @@ namespace engine {
                 auto& neighbourhood                           = projected.neighbourhood;
                 unsigned int n_points                         = neighbourhood.size();
 
+                if (projected.global_indices.empty()) { return ClassifiedMesh<Scalar, N_NEIGHBOURS>(); }
+
                 // Based on the fourcc code, load the data from the image into input
                 input.reserve(n_points * 4);
                 const int R = ('R' == (format & 0xFF) ? 0 : 2);
