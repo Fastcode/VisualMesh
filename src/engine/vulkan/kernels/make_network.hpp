@@ -15,21 +15,22 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_VULKAN_OPERATION_MAKE_NETWORK_HPP
-#define VISUALMESH_VULKAN_OPERATION_MAKE_NETWORK_HPP
+#ifndef VISUALMESH_VULKAN_KERNELS_MAKE_NETWORK_HPP
+#define VISUALMESH_VULKAN_KERNELS_MAKE_NETWORK_HPP
 
 #include <iostream>
+#include <string>
 #include <utility>
 #include <vector>
 
+// #include "engine/vulkan/operation/wrapper.hpp"
 #include "mesh/network_structure.hpp"
 #include "utility/vulkan_compute.hpp"
-#include "wrapper.hpp"
 
 namespace visualmesh {
 namespace engine {
     namespace vulkan {
-        namespace operation {
+        namespace kernels {
 
             /**
              * @brief Given a network structure object generate the SPIRV source code for the kernels needed to execute
@@ -65,8 +66,53 @@ namespace engine {
                 uint32_t uvec3_ptr = program.add_pointer(uvec3, spv::StorageClass::Input);
                 uint32_t fvec4_ptr = program.add_pointer(fvec4, spv::StorageClass::StorageBuffer);
 
-                for (uint32_t conv_no = 0; conv_no < network.size(); ++conv_no) {
-                    auto& conv = network[conv_no];
+                // Define the GlobalInvocationID (for get_global_id(0))
+                uint32_t global_id = program.add_variable(uvec3_ptr, spv::StorageClass::Input);
+                program.add_builtin_decoration(global_id, spv::BuiltIn::GlobalInvocationId);
+
+                // Prepare the input/output/descriptor set variables
+                uint32_t neighbourhood_array  = program.add_array_type(uint_type);
+                uint32_t neighbourhood_struct = program.add_struct({neighbourhood_array});
+                uint32_t neighbourhood_ptr =
+                  program.add_variable(program.add_pointer(neighbourhood_struct, spv::StorageClass::StorageBuffer),
+                                       spv::StorageClass::StorageBuffer);
+
+                // The input layer is coming from the image, so the input is an fvec4
+                uint32_t input_layer_type = fvec4;
+                uint32_t input_array      = program.add_array_type(input_layer_type);
+                uint32_t input_struct     = program.add_struct({input_array});
+                uint32_t input_ptr =
+                  program.add_variable(program.add_pointer(input_struct, spv::StorageClass::StorageBuffer),
+                                       spv::StorageClass::StorageBuffer);
+
+                // Decorate the structs and their members.
+                uint32_t block_decoration = program.add_decoration_group(spv::Decoration::Block);
+                program.add_group_decoration(block_decoration, {neighbourhood_struct, input_struct});
+                program.add_member_decoration(neighbourhood_struct, 0, spv::Decoration::Offset, {0});
+                program.add_member_decoration(input_struct, 0, spv::Decoration::Offset, {0});
+
+                uint32_t stride16_decoration =
+                  program.add_decoration_group(spv::Decoration::ArrayStride, {4 * sizeof(Scalar)});
+                program.add_group_decoration(stride16_decoration, {input_array});
+                program.add_decoration(neighbourhood_array, spv::Decoration::ArrayStride, {4});
+
+                std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> outputs;
+
+                // Figure out the sizes/strides/types of the outputs of every layer so we can create a descriptor set
+                for (uint32_t conv_no = 0; conv_no < structure.size(); ++conv_no) {
+                    auto& conv = structure[conv_no];
+
+                    // The output dimension of our last bias vector
+                    uint32_t size   = conv.back().second.size();
+                    uint32_t stride = vector_type(size) ? size * sizeof(Scalar) : sizeof(Scalar);
+                    uint32_t type   = vector_type(size)
+                                      ? program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, size)
+                                      : program.add_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)});
+                    outputs.push_back(std::make_tuple(size, stride, type));
+                }
+
+                for (uint32_t conv_no = 0; conv_no < structure.size(); ++conv_no) {
+                    auto& conv = structure[conv_no];
 
                     // We need to work out the input and output sizes for our convolution
                     uint32_t conv_in_size;
@@ -76,62 +122,36 @@ namespace engine {
                     if (conv_no == 0) { conv_in_size = 4; }
                     else {
                         // The output dimension of our previous bias vector
-                        conv_in_size = network[conv_no - 1].back().second.size();
+                        conv_in_size = structure[conv_no - 1].back().second.size();
                     }
 
                     // The output dimension of our last bias vector
                     conv_out_size = conv.back().second.size();
 
-                    // Define the GlobalInvocationID (for get_global_id(0))
-                    uint32_t global_id = program.add_variable(uvec3_ptr, spv::StorageClass::Input);
-                    program.add_builtin_decoration(global_id, spv::BuiltIn::GlobalInvocationId);
-
-                    // Prepare the points, indices, Rco, f, dimensions, centre, and out variables
-                    uint32_t neighbourhood_array  = program.add_array_type(uint_type);
-                    uint32_t neighbourhood_struct = program.add_struct({neighbourhood_array});
-                    uint32_t neighbourhood_ptr =
-                      program.add_variable(program.add_pointer(neighbourhood_struct, spv::StorageClass::StorageBuffer),
-                                           spv::StorageClass::StorageBuffer);
-
-                    // The input layer is coming from the image, so the input is an fvec4
-                    uint32_t input_layer_type = fvec4;
-                    uint32_t input_array      = program.add_array_type(input_layer_type);
-                    uint32_t input_struct     = program.add_struct({input_array});
-                    uint32_t input_ptr =
-                      program.add_variable(program.add_pointer(input_struct, spv::StorageClass::StorageBuffer),
-                                           spv::StorageClass::StorageBuffer);
-
                     uint32_t output_layer_type;
                     if (vector_type(conv_out_size)) {
                         output_layer_type = program.add_name(
                           program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, conv_out_size),
-                          fmt::format("float{}", conv_out_size));
+                          "float" + std::to_string(conv_out_size));
                     }
                     else {
                         output_layer_type =
                           program.add_name(program.add_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}),
-                                           fmt::format("float{}", conv_out_size));
+                                           "float" + std::to_string(conv_out_size));
                     }
                     uint32_t output_array  = program.add_name(program.add_array_type(output_layer_type),
-                                                             fmt::format("float{}_array", conv_out_size));
-                    uint32_t output_struct = program.add_name(program.add_struct({output_array}),
-                                                              fmt::format("struct_float{}_array", conv_out_size));
-                    uint32_t output_ptr    = program.add_name(
+                                                             "float" + std::to_string(conv_out_size) + "_array");
+                    uint32_t output_struct = program.add_name(
+                      program.add_struct({output_array}), "struct_float" + std::to_string(conv_out_size) + "_array");
+                    uint32_t output_ptr = program.add_name(
                       program.add_variable(program.add_pointer(output_struct, spv::StorageClass::StorageBuffer),
                                            spv::StorageClass::StorageBuffer),
-                      fmt::format("struct_float{}_array_ptr", conv_out_size));
+                      "struct_float" + std::to_string(conv_out_size) + "_array_ptr");
 
                     // Decorate the structs and their members.
-                    uint32_t block_decoration = program.add_decoration_group(spv::Decoration::Block);
-                    program.add_group_decoration(block_decoration, {neighbourhood_struct, input_struct, output_struct});
-
-                    program.add_member_decoration(neighbourhood_struct, 0, spv::Decoration::Offset, {0});
-                    program.add_member_decoration(input_struct, 0, spv::Decoration::Offset, {0});
+                    program.add_group_decoration(block_decoration, {output_struct});
                     program.add_member_decoration(output_struct, 0, spv::Decoration::Offset, {0});
-
-                    uint32_t stride16_decoration = program.add_decoration_group(spv::Decoration::ArrayStride, {16});
-                    program.add_group_decoration(stride16_decoration, {input_array, output_array});
-                    program.add_decoration(neighbourhood_array, spv::Decoration::ArrayStride, {4});
+                    program.add_group_decoration(stride16_decoration, {output_array});
 
                     // Set up the descriptor set for all convolutional kernels
                     // Descriptor Set 0: {neighbourhood_ptr, input_ptr, output_ptr}
@@ -140,8 +160,8 @@ namespace engine {
                     // Index 0 is used in every member_access call
                     uint32_t idx0 = program.add_constant(uint_type, {0u});
 
-                    // Write our OpenCL kernel definition
-                    program.begin_entry_point(fmt::format("conv{}", conv_no), {global_id});
+                    // Write our Vulkan kernel definition
+                    program.begin_entry_point("conv" + std::to_string(conv_no), {global_id});
                     program.add_source_line(__FILE__, __LINE__, conv_no);
 
                     // Array storing the gathered data
@@ -308,7 +328,7 @@ namespace engine {
                         if (vector_type(vector_in_size)) {
                             layer_in_type =
                               program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, vector_in_size);
-                            program.add_name(layer_in_type, fmt::format("float{}", vector_in_size));
+                            program.add_name(layer_in_type, "float" + std::to_string(vector_in_size));
                         }
                         else {
                             layer_in_type = program.add_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)});
@@ -318,7 +338,7 @@ namespace engine {
                         if (vector_type(vector_out_size)) {
                             layer_out_type =
                               program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, vector_out_size);
-                            program.add_name(layer_out_type, fmt::format("float{}", vector_out_size));
+                            program.add_name(layer_out_type, "float" + std::to_string(vector_out_size));
                         }
                         else {
                             layer_out_type = program.add_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)});
@@ -331,8 +351,8 @@ namespace engine {
                             // complete result in advance
                             std::vector<std::vector<Scalar>> result(weights[0].size(),
                                                                     std::vector<Scalar>(weights.size()));
-                            for (std::vector<Scalar>::size_type i = 0; i < weights[0].size(); i++) {
-                                for (std::vector<Scalar>::size_type j = 0; j < weights.size(); j++) {
+                            for (size_t i = 0; i < weights[0].size(); i++) {
+                                for (size_t j = 0; j < weights.size(); j++) {
                                     result[i][j] = weights[j][i];
                                 }
                             }
@@ -424,7 +444,9 @@ namespace engine {
                             // vector_in x vector_out matrix
                             // vector_out_size colunms of layer_in_type
                             uint32_t mat_type = program.add_mat_type(layer_in_type, vector_out_size);
-                            program.add_name(mat_type, fmt::format("float{}x{}", vector_in_size, vector_out_size));
+                            program.add_name(
+                              mat_type,
+                              "float" + std::to_string(vector_in_size) + "x" + std::to_string(vector_out_size));
 
                             // Weights is a vector of rows, we need to extract the columns to populate our matrix
                             // Transpose our weights so that they are a vector of columns
@@ -549,7 +571,7 @@ namespace engine {
                           std::vector<Scalar>(vector_out_size, Scalar(1.6732632423543772848170429916717)));
 
                         // If this is not our last layer, apply selu
-                        if (conv_no + 1 < network.size() || layer_no + 1 < conv.size()) {
+                        if (conv_no + 1 < structure.size() || layer_no + 1 < conv.size()) {
                             if (vector_type(vector_out_size)) {
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
                                 // inX = lambda * select(alpha * exp(inX) - alpha, inX, inX > 0)
@@ -689,11 +711,11 @@ namespace engine {
                 }
 
                 return program.build();
-            }
+            }  // namespace kernels
 
-        }  // namespace operation
+        }  // namespace kernels
     }      // namespace vulkan
 }  // namespace engine
 }  // namespace visualmesh
 
-#endif  // VISUALMEVULKANNCL_OPERATION_MAKE_NETWORK_HPP
+#endif  // VISUALMEVULKANNCL_KERNELS_MAKE_NETWORK_HPP

@@ -16,6 +16,7 @@
 #include "draw.hpp"
 #include "engine/cpu/engine.hpp"
 #include "engine/opencl/engine.hpp"
+#include "engine/vulkan/engine.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/network_structure.hpp"
 #include "utility/fourcc.hpp"
@@ -70,6 +71,7 @@ int main() {
 
     visualmesh::engine::cpu::Engine<Scalar> cpu_engine(network);
     visualmesh::engine::opencl::Engine<Scalar> cl_engine(network);
+    visualmesh::engine::vulkan::Engine<Scalar> vk_engine(network);
     t.measure("Loaded engines");
 
     auto dataset = load_dataset<Scalar>(image_path);
@@ -89,6 +91,15 @@ int main() {
             auto classified =
               cl_engine(mesh, element.Hoc, element.lens, element.image.data, visualmesh::fourcc("BGRA"));
             t.measure("\tOpenCL Classified Mesh");
+            draw("Image", element.image, classified, colours);
+            if (char(cv::waitKey(0)) == 27) break;
+        }
+
+        {
+            t.reset();
+            auto classified =
+              vk_engine(mesh, element.Hoc, element.lens, element.image.data, visualmesh::fourcc("BGRA"));
+            t.measure("\tVulkan Classified Mesh");
             draw("Image", element.image, classified, colours);
             if (char(cv::waitKey(0)) == 27) break;
         }

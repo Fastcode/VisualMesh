@@ -116,8 +116,15 @@ if(TOP_LEVEL_PROJECT)
         target_include_directories(classified SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
         target_include_directories(classified PRIVATE ${PROJECT_SOURCE_DIR}/src)
         target_include_directories(classified PRIVATE ${PROJECT_BINARY_DIR}/src)
-        target_link_libraries(classified ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES}
-                              Threads::Threads)
+        target_link_libraries(
+            classified
+            ${OpenCL_LIBRARIES}
+            Vulkan::Vulkan
+            SPIRV::SPIRV
+            ${OpenCV_LIBS}
+            ${fmt_LIBRARIES}
+            ${YAML_CPP_LIBRARIES}
+            Threads::Threads)
 
         add_executable(mesh_types "example/mesh_types.cpp" ${hdr})
         target_compile_options(mesh_types PRIVATE -march=native -mtune=native)
@@ -143,8 +150,15 @@ if(TOP_LEVEL_PROJECT)
         target_include_directories(benchmark SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
         target_include_directories(benchmark PRIVATE ${PROJECT_SOURCE_DIR}/src)
         target_include_directories(benchmark PRIVATE ${PROJECT_BINARY_DIR}/src)
-        target_link_libraries(benchmark ${OpenCL_LIBRARIES} ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES}
-                              Threads::Threads)
+        target_link_libraries(
+            benchmark
+            ${OpenCL_LIBRARIES}
+            Vulkan::Vulkan
+            SPIRV::SPIRV
+            ${OpenCV_LIBS}
+            ${fmt_LIBRARIES}
+            ${YAML_CPP_LIBRARIES}
+            Threads::Threads)
 
         add_executable(mesh_quality "example/mesh_quality.cpp" ${hdr})
         target_compile_options(mesh_quality PRIVATE -march=native -mtune=native)
