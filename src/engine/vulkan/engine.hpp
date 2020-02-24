@@ -933,7 +933,7 @@ namespace engine {
                 operation::bind_buffer(context, vk_indices.first, vk_indices.second, 0);
 
                 // Create output buffer for pixel_coordinates
-                std::pair<vk::buffer, vk::device_memory> vk_pixel_coordinates =
+                std::pair<vk::buffer, vk::device_memory> vk_pixels =
                   operation::create_buffer(context,
                                            sizeof(vec2<Scalar>) * points,
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -941,7 +941,7 @@ namespace engine {
                                            {context.transfer_queue_family},
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-                operation::bind_buffer(context, vk_pixel_coordinates.first, vk_pixel_coordinates.second, 0);
+                operation::bind_buffer(context, vk_pixels.first, vk_pixels.second, 0);
 
                 // Upload our indices map
                 operation::map_memory<int>(context, VK_WHOLE_SIZE, vk_indices.second, [&indices](int* payload) {
@@ -997,8 +997,8 @@ namespace engine {
 
                 // Load the arguments
                 std::array<VkWriteDescriptorSet, 8> write_descriptors;
-                VkDescriptorBufferInfo buffer_info = {vk_points.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[0]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                VkDescriptorBufferInfo points_buffer_info     = {vk_points.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[0]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                         0,
                                         descriptor_set,
                                         0,
@@ -1006,10 +1006,10 @@ namespace engine {
                                         1,
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                         0,
-                                        &buffer_info,
+                                        &points_buffer_info,
                                         nullptr};
-                buffer_info                        = {vk_indices.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[1]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                VkDescriptorBufferInfo indices_buffer_info    = {vk_indices.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[1]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                         0,
                                         descriptor_set,
                                         1,
@@ -1017,10 +1017,10 @@ namespace engine {
                                         1,
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                         0,
-                                        &buffer_info,
+                                        &indices_buffer_info,
                                         nullptr};
-                buffer_info                        = {vk_rco.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[2]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                VkDescriptorBufferInfo rco_buffer_info        = {vk_rco.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[2]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                         0,
                                         descriptor_set,
                                         2,
@@ -1028,10 +1028,10 @@ namespace engine {
                                         1,
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                         0,
-                                        &buffer_info,
+                                        &rco_buffer_info,
                                         nullptr};
-                buffer_info                        = {vk_f.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[3]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                VkDescriptorBufferInfo f_buffer_info          = {vk_f.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[3]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                         0,
                                         descriptor_set,
                                         3,
@@ -1039,10 +1039,10 @@ namespace engine {
                                         1,
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                         0,
-                                        &buffer_info,
+                                        &f_buffer_info,
                                         nullptr};
-                buffer_info                        = {vk_centre.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[4]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                VkDescriptorBufferInfo centre_buffer_info     = {vk_centre.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[4]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                         0,
                                         descriptor_set,
                                         4,
@@ -1050,10 +1050,10 @@ namespace engine {
                                         1,
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                         0,
-                                        &buffer_info,
+                                        &centre_buffer_info,
                                         nullptr};
-                buffer_info                        = {vk_k.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[5]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                VkDescriptorBufferInfo k_buffer_info          = {vk_k.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[5]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                         0,
                                         descriptor_set,
                                         5,
@@ -1061,10 +1061,10 @@ namespace engine {
                                         1,
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                         0,
-                                        &buffer_info,
+                                        &k_buffer_info,
                                         nullptr};
-                buffer_info                        = {vk_dimensions.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[6]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                VkDescriptorBufferInfo dimensions_buffer_info = {vk_dimensions.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[6]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                         0,
                                         descriptor_set,
                                         6,
@@ -1072,10 +1072,10 @@ namespace engine {
                                         1,
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                         0,
-                                        &buffer_info,
+                                        &dimensions_buffer_info,
                                         nullptr};
-                buffer_info                        = {vk_pixel_coordinates.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[7]               = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                VkDescriptorBufferInfo pixels_buffer_info     = {vk_pixels.first, 0, VK_WHOLE_SIZE};
+                write_descriptors[7]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                         0,
                                         descriptor_set,
                                         7,
@@ -1083,7 +1083,7 @@ namespace engine {
                                         1,
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                         0,
-                                        &buffer_info,
+                                        &pixels_buffer_info,
                                         nullptr};
 
                 vkUpdateDescriptorSets(context.device, write_descriptors.size(), write_descriptors.data(), 0, nullptr);
