@@ -292,7 +292,12 @@ struct Program {
         spv::Op op                 = ((params.size() / word_size) > 1) ? composite_op : constant_op;
 
         std::vector<uint32_t> p = {type, 0};
-        p.insert(p.end(), params.begin(), params.end());
+        std::transform(params.begin(), params.end(), std::back_inserter(p), [&](uint32_t ui) -> uint32_t {
+            if (params.size() > 1) { return add_constant(add_type(spv::Op::OpTypeInt, {32, 0}), {ui}, 1, is_spec_op); }
+            else {
+                return ui;
+            }
+        });
         std::pair<bool, uint32_t> id = check_duplicate_declaration(constants, op, 2, p);
         if (!id.first) {
             p[1] = id.second;
@@ -310,8 +315,11 @@ struct Program {
         std::vector<uint32_t> p = {type, 0};
         std::transform(params.begin(), params.end(), std::back_inserter(p), [&](float f) -> uint32_t {
             uint32_t word;
-            std::memcpy(&word, &f, sizeof(uint32_t));
-            return add_constant(add_type(spv::Op::OpTypeFloat, {32}), {word}, 1, is_spec_op);
+            std::memcpy(&word, &f, sizeof(float));
+            if (params.size() > 1) { return add_constant(add_type(spv::Op::OpTypeFloat, {32}), {word}, 1, is_spec_op); }
+            else {
+                return word;
+            }
         });
 
         const spv::Op constant_op    = is_spec_op ? spv::Op::OpSpecConstant : spv::Op::OpConstant;
@@ -335,11 +343,16 @@ struct Program {
         std::transform(params.begin(), params.end(), std::back_inserter(p), [&](double d) -> uint32_t {
             uint64_t words;
             std::memcpy(&words, &d, sizeof(uint64_t));
-            return add_constant(add_type(spv::Op::OpTypeFloat, {64}),
-                                {static_cast<uint32_t>(words & 0x00000000FFFFFFFF),
-                                 static_cast<uint32_t>((words >> 32) & 0x00000000FFFFFFFF)},
-                                2,
-                                is_spec_op);
+            if (params.size() > 1) {
+                return add_constant(add_type(spv::Op::OpTypeFloat, {64}),
+                                    {static_cast<uint32_t>(words & 0x00000000FFFFFFFF),
+                                     static_cast<uint32_t>((words >> 32) & 0x00000000FFFFFFFF)},
+                                    2,
+                                    is_spec_op);
+            }
+            else {
+                return words;
+            }
         });
 
         // If we are creating a vector (composite) type then p should be correct as it is.
