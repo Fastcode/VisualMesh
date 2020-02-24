@@ -41,7 +41,7 @@ namespace engine {
                                                    const uint32_t& theta,
                                                    const uint32_t& return_type) {
                 return program.fmul(
-                  program.fmul(program.add_constant(return_type, {Scalar(2.0)}), f, return_type),
+                  program.fmul(program.add_constant(return_type, {Scalar(2)}), f, return_type),
                   program.sin(program.fmul(theta, program.add_constant(return_type, {Scalar(0.5)}), return_type),
                               return_type),
                   return_type);
@@ -184,10 +184,10 @@ namespace engine {
                 uint32_t theta = program.acos(ray_x, float_type);
 
                 // rsin_theta = rsqrt((Scalar)(1.0) - ray.x * ray.x);
-                uint32_t rsin_theta = program.rsqrt(program.fsub(program.add_constant(float_type, {Scalar(1.0)}),
-                                                                 program.fmul(ray_x, ray_x, float_type),
-                                                                 float_type),
-                                                    float_type);
+                uint32_t rsin_theta = program.rsqrt(
+                  program.fsub(
+                    program.add_constant(float_type, {Scalar(1)}), program.fmul(ray_x, ray_x, float_type), float_type),
+                  float_type);
 
                 // r_u       = f * theta;
                 uint32_t f   = program.load_variable(program.member_access(f_ptr, {idx0}, float_ptr), float_type);
@@ -213,7 +213,7 @@ namespace engine {
 
                 uint32_t r_d =
                   program.fmul(r_u,
-                               program.fadd(program.add_constant(float_type, {Scalar(1.0)}),
+                               program.fadd(program.add_constant(float_type, {Scalar(1)}),
                                             program.fadd(program.fmul(k_x, r_u_2, float_type),
                                                          program.fadd(program.fmul(k_y, r_u_4, float_type),
                                                                       program.fadd(program.fmul(k_z, r_u_6, float_type),
@@ -233,11 +233,11 @@ namespace engine {
 
                 // When the pixel is at (1,0,0) lots of NaNs show up
                 // screen = ray.x >= 1 ? (Scalar2)(0.0, 0.0) : screen;
-                uint32_t condition = program.fgeq(ray_x, program.add_constant(float_type, {Scalar(1.0)}));
+                uint32_t condition = program.fgeq(ray_x, program.add_constant(float_type, {Scalar(1)}));
                 uint32_t vec_condition =
                   program.create_vector(program.add_vec_type(spv::Op::OpTypeBool, {}, 2), {condition, condition});
                 screen =
-                  program.select(fvec2, vec_condition, program.add_constant(fvec2, {Scalar(0.0), Scalar(0.0)}), screen);
+                  program.select(fvec2, vec_condition, program.add_constant(fvec2, {Scalar(0), Scalar(0)}), screen);
 
                 // Apply our offset to move into image space (0 at top left, x to the right, y down)
                 // Then apply the offset to the centre of our lens
@@ -256,11 +256,11 @@ namespace engine {
                     uint_type),
                   float_type);
                 uint32_t image_x =
-                  program.fmul(program.fsub(dimensions_x, program.add_constant(float_type, {Scalar(1.0)}), float_type),
+                  program.fmul(program.fsub(dimensions_x, program.add_constant(float_type, {Scalar(1)}), float_type),
                                program.add_constant(float_type, {Scalar(0.5)}),
                                float_type);
                 uint32_t image_y =
-                  program.fmul(program.fsub(dimensions_y, program.add_constant(float_type, {Scalar(1.0)}), float_type),
+                  program.fmul(program.fsub(dimensions_y, program.add_constant(float_type, {Scalar(1)}), float_type),
                                program.add_constant(float_type, {Scalar(0.5)}),
                                float_type);
                 uint32_t image =
