@@ -3,13 +3,14 @@
 import os
 
 import tensorflow as tf
+
 import tensorflow_addons as tfa
 
 from .callbacks import MeshImages
 from .dataset import VisualMeshDataset
-from .metrics import ClassPrecision, ClassRecall
-from .model import VisualMeshModel
 from .loss import FocalLoss
+from .metrics import AveragePrecision, AverageRecall, ClassPrecision, ClassRecall
+from .model import VisualMeshModel
 
 
 # Convert a dataset into a format that will be accepted by keras fit
@@ -54,7 +55,10 @@ def train(config, output_path):
     )
 
     # Metrics that we want to track
-    metrics = []
+    metrics = [
+        AveragePrecision("metrics/average_precision", len(config.network.classes)),
+        AverageRecall("metrics/average_precision", len(config.network.classes)),
+    ]
     for i, k in enumerate(config.network.classes):
         metrics.append(ClassPrecision("metrics/{}_precision".format(k[0]), i, len(config.network.classes)))
         metrics.append(ClassRecall("metrics/{}_recall".format(k[0]), i, len(config.network.classes)))
