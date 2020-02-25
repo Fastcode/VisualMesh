@@ -57,7 +57,7 @@ def train(config, output_path):
     # Metrics that we want to track
     metrics = [
         AveragePrecision("metrics/average_precision", len(config.network.classes)),
-        AverageRecall("metrics/average_precision", len(config.network.classes)),
+        AverageRecall("metrics/average_recall", len(config.network.classes)),
     ]
     for i, k in enumerate(config.network.classes):
         metrics.append(ClassPrecision("metrics/{}_precision".format(k[0]), i, len(config.network.classes)))

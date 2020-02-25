@@ -11,7 +11,7 @@ class AverageRecall(ConfusionBase):
 
     def result(self):
         # True positives (predicted and labelled true)
-        tp = tf.cast(tf.linalg.diag(self.confusion), self.dtype)
+        tp = tf.cast(tf.linalg.diag_part(self.confusion), self.dtype)
         # For all predictions where idx was labelled
         tp_fn = tf.cast(tf.reduce_sum(self.confusion, axis=1), self.dtype)
 
