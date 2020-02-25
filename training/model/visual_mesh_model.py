@@ -19,7 +19,14 @@ class VisualMeshModel(tf.keras.Model):
 
             # Dense internal layers
             for units in c:
-                self.stages.append(tf.keras.layers.Dense(units=units, activation=activation))
+                self.stages.append(
+                    tf.keras.layers.Dense(
+                        units=units,
+                        activation=activation,
+                        kernel_initializer="lecun_normal",
+                        bias_initializer="lecun_normal",
+                    )
+                )
 
         # Final dense layer for the number of classes
         self.stages.append(
