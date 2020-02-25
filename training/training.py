@@ -9,28 +9,13 @@ from .callbacks import MeshImages
 from .dataset import VisualMeshDataset
 from .metrics import ClassPrecision, ClassRecall
 from .model import VisualMeshModel
+from .loss import FocalLoss
 
 
 # Convert a dataset into a format that will be accepted by keras fit
 def _prepare_dataset(args):
-
-    # The weights given for each value from the training data
-    W = tf.math.multiply(args["Y"], tf.expand_dims(args["W"], axis=-1))
-
-    # Balance the weights by class
-    class_weights = tf.math.reduce_sum(W, axis=0)
-    # Divide each class by how many samples there are (each col sums to 1)
-    W = tf.math.divide(W, class_weights)
-    # Sum across classes to remove the 0 values (weights by sample)
-    W = tf.math.reduce_sum(W, axis=-1)
-    # Normalise the weights by how many classes there are so the total weight sums to 1
-    W = tf.math.divide(W, tf.math.count_nonzero(class_weights, dtype=tf.float32))
-
-    # Make the average value be 1 for the batch
-    W = tf.math.multiply(W, tf.cast(tf.size(args["W"]), dtype=tf.float32))
-
     # Return in the format (x, y, weights)
-    return ((args["X"], args["G"]), args["Y"], W)
+    return ((args["X"], args["G"]), args["Y"])
 
 
 # Train the network
@@ -68,14 +53,8 @@ def train(config, output_path):
         .map(_prepare_dataset)
     )
 
-    # Build up the list of metrics we want to track
-    metrics = [
-        tf.metrics.CategoricalCrossentropy(),
-        tf.metrics.Precision(name="metrics/global_precision"),
-        tf.metrics.Recall(name="metrics/global_recall"),
-    ]
-
-    # Class specific metrics
+    # Metrics that we want to track
+    metrics = []
     for i, k in enumerate(config.network.classes):
         metrics.append(ClassPrecision("metrics/{}_precision".format(k[0]), i, len(config.network.classes)))
         metrics.append(ClassRecall("metrics/{}_recall".format(k[0]), i, len(config.network.classes)))
@@ -101,7 +80,7 @@ def train(config, output_path):
 
     # Compile the model
     model.compile(
-        optimizer=optimiser, loss=tf.losses.CategoricalCrossentropy(), metrics=metrics,
+        optimizer=optimiser, loss=FocalLoss(), metrics=metrics,
     )
 
     # Find the latest checkpoint file
