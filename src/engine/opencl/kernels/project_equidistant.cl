@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2019 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2020 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
