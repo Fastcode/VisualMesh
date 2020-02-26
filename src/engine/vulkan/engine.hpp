@@ -464,29 +464,12 @@ namespace engine {
                 // *** Network ***
                 // ***************
 
-                std::vector<uint32_t> conv_source = kernels::make_network<Scalar>(structure);
-                std::ofstream ofs;
-                ofs.open("conv.spv", std::ios::binary | std::ios::out);
-                ofs.write(reinterpret_cast<char*>(conv_source.data()), conv_source.size() * sizeof(uint32_t));
-                ofs.close();
-
-                VkShaderModuleCreateInfo conv_info = {VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                                                      0,
-                                                      0,
-                                                      static_cast<uint32_t>(conv_source.size()) * sizeof(uint32_t),
-                                                      conv_source.data()};
-                VkShaderModule conv_shader;
-                throw_vk_error(vkCreateShaderModule(context.device, &conv_info, nullptr, &conv_shader),
-                               "Failed to create conv shader module");
-                conv_program =
-                  vk::shader_module(conv_shader, [this](auto p) { vkDestroyShaderModule(context.device, p, nullptr); });
-
                 // Descriptor Set 0: {neighbourhood_ptr, input_ptr, output_ptr}
                 std::array<VkDescriptorSetLayoutBinding, 3> conv_bindings{
                   VkDescriptorSetLayoutBinding{
                     0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                   VkDescriptorSetLayoutBinding{
-                    1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                    1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                   VkDescriptorSetLayoutBinding{
                     2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
 
@@ -507,10 +490,27 @@ namespace engine {
                   vkCreatePipelineLayout(context.device, &conv_pipeline_layout_info, 0, &conv_pipeline_layout),
                   "Failed to create conv pipeline layout");
 
-                // Create pipelines for all of the kernels that were generated
-                for (unsigned int i = 0; i < structure.size(); ++i) {
-                    std::string kernel       = "conv" + std::to_string(i);
-                    unsigned int output_size = structure[i].back().second.size();
+                std::vector<std::pair<uint32_t, std::vector<uint32_t>>> conv_sources =
+                  kernels::make_network<Scalar>(structure);
+                std::ofstream ofs;
+                for (const auto& conv_source : conv_sources) {
+                    std::string kernel = "conv" + std::to_string(conv_source.first);
+                    ofs.open(kernel + ".spv", std::ios::binary | std::ios::out);
+                    ofs.write(reinterpret_cast<const char*>(conv_source.second.data()),
+                              conv_source.second.size() * sizeof(uint32_t));
+                    ofs.close();
+
+                    VkShaderModuleCreateInfo conv_info = {
+                      VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                      0,
+                      0,
+                      static_cast<uint32_t>(conv_source.second.size()) * sizeof(uint32_t),
+                      conv_source.second.data()};
+                    VkShaderModule conv_shader;
+                    throw_vk_error(vkCreateShaderModule(context.device, &conv_info, nullptr, &conv_shader),
+                                   "Failed to create conv shader module");
+                    conv_program.emplace_back(conv_shader,
+                                              [this](auto p) { vkDestroyShaderModule(context.device, p, nullptr); });
 
                     VkComputePipelineCreateInfo conv_pipeline_info = {
                       VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
@@ -520,7 +520,7 @@ namespace engine {
                        0,
                        0,
                        VK_SHADER_STAGE_COMPUTE_BIT,
-                       conv_program,
+                       conv_program.back(),
                        kernel.c_str(),
                        0},
                       conv_pipeline_layout,
@@ -529,7 +529,7 @@ namespace engine {
                     VkPipeline pipeline;
                     throw_vk_error(vkCreateComputePipelines(context.device, 0, 1, &conv_pipeline_info, 0, &pipeline),
                                    "Failed to create conv pipeline");
-                    conv_layers.emplace_back(pipeline, output_size);
+                    conv_layers.emplace_back(pipeline, structure[conv_source.first].back().second.size());
                 }
 
                 // Work out what the widest network layer is
@@ -1332,7 +1332,7 @@ namespace engine {
             /// PipelineLayout for the conv kernels
             VkPipelineLayout conv_pipeline_layout;
             /// Shader module for the network
-            vk::shader_module conv_program;
+            std::vector<vk::shader_module> conv_program;
             /// A list of kernels to run in sequence to run the network
             std::vector<std::pair<VkPipeline, size_t>> conv_layers;
 
