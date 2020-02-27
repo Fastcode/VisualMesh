@@ -53,7 +53,7 @@ void draw(const std::string& window,
             if (n < static_cast<int>(pixel_coordinates.size())) {
                 cv::Point p2(pixel_coordinates[n][0], pixel_coordinates[n][1]);
                 cv::Point p2x = p1 + ((p2 - p1) * 0.5);
-                cv::line(scratch, p1, p2x, colour, 1);
+                cv::line(scratch, p1, p2x, colour, 1, cv::LINE_AA);
             }
         }
     }
