@@ -210,6 +210,7 @@ vec3<Scalar> unproject(const vec2<Scalar>& px, const Lens<Scalar>& lens) {
     // Perform the unprojection math
     const Scalar& f  = lens.focal_length;
     const Scalar r_d = norm(screen);
+    if (r_d == 0) return {{1.0, 0.0, 0.0}};
     const Scalar r_u = undistort(r_d, lens.k);
     Scalar theta;
     switch (lens.projection) {

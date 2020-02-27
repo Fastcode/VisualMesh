@@ -46,8 +46,8 @@ class VisualMeshModel(tf.keras.Model):
             tf.keras.layers.Dense(
                 units=n_classes,
                 activation=tf.nn.softmax,
-                kernel_initializer="glorot_normal",
-                bias_initializer="glorot_normal",
+                kernel_initializer="lecun_normal",
+                bias_initializer="lecun_normal",
             )
         )
 

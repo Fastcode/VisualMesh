@@ -57,7 +57,7 @@ endforeach(cl ${cls})
 
 add_custom_target(visualmesh_sources DEPENDS ${hdr})
 
-# Define the VisualMesh library as header only but setup it's links
+# Define the VisualMesh library as header only but setup its links
 add_library(libvisualmesh INTERFACE)
 target_include_directories(libvisualmesh INTERFACE src)
 target_include_directories(libvisualmesh INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/src)
