@@ -58,8 +58,8 @@ network:
 testing:
   # How many raw elements to process at a time during testing
   batch_size: 200
-  # The number of bins to use when calculating the PR curve
-  num_bins: 1000
+  # The number of bins to use when calculating curves
+  n_bins: 1000
 
 # Settings to use when training the network
 training:

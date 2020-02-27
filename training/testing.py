@@ -125,7 +125,6 @@ def test(config, output_path):
     confusion = tf.Variable(tf.zeros(shape=(n_classes, n_classes), dtype=tf.int64))
     curves = [{"recall_threshold": [], "precision_threshold": [], "precision_recall": []} for i in range(n_classes)]
 
-    v = 0
     for e in tqdm(validation_dataset, dynamic_ncols=True, unit=" batches", leave=True, total=n_batches):
         # Run the predictions
         X = model.predict_on_batch((e["X"], e["G"]))
@@ -153,10 +152,6 @@ def test(config, output_path):
             curves[i]["precision_recall"].append(_reduce_curve(X_c, tpfp, n_bins, _recall, _precision))
             curves[i]["precision_threshold"].append(_reduce_curve(X_c, tpfp, n_bins, _threshold, _precision))
             curves[i]["recall_threshold"].append(_reduce_curve(X_c, tpfp, n_bins, _threshold, _recall))
-
-        v = v + 1
-        if v == 20:
-            break
 
     # Go through our output and calculate the metrics we can
     metrics = []
@@ -276,7 +271,3 @@ def test(config, output_path):
             )
 
             # Make curve images using matplotlib
-
-    import pdb
-
-    pdb.set_trace()
