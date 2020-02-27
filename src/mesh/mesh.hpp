@@ -171,7 +171,7 @@ private:
 
             bsp.push_back(BSP{
               std::make_pair(offset, static_cast<int>(std::distance(start, end))),
-              {{-2, -2}},
+              {{-1, -1}},
               cone,
             });
             bsp.front().children = {{
@@ -203,9 +203,8 @@ private:
             }
 
             // Work out the z and x values we need to split on
-            Scalar split_phi = std::cos((std::acos(min_phi) + std::acos(max_phi)) * 0.5);
-            Scalar split_theta =
-              std::cos((std::acos(std::max(min_theta, Scalar(-1))) + std::acos(std::min(max_theta, Scalar(1)))) * 0.5);
+            Scalar split_phi   = (min_phi + max_phi) * 0.5;
+            Scalar split_theta = (min_theta + max_theta) * 0.5;
 
             // Partition based on either phi or theta
             Iterator mid =
@@ -220,7 +219,7 @@ private:
             int elem = bsp.size();
             bsp.push_back(BSP{
               std::make_pair(offset, static_cast<int>(offset + std::distance(start, end))),
-              {{-2, -2}},
+              {{-1, -1}},
               cone,
             });
             bsp[elem].children = {{
