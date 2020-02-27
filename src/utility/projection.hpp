@@ -139,7 +139,7 @@ inline Scalar undistort(const Scalar& r, const vec2<Scalar>& k) {
     // These parenthesis are important as they allow the compiler to optimise further
     // Since floating point multiplication is not commutative r * r * r * r != (r * r) * (r * r)
     // This means that the first needs 3 multiplication operations while the second needs only 2
-    return r * (1.0 + k[0] * (r * r) + k[1] * ((r * r) * (r * r)) + k[2] * ((r * r) * (r * r)) * (r * r));
+    return r * (1.0 + k[0] * (r * r) + k[1] * ((r * r) * (r * r)));
 }
 
 /**
