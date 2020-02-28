@@ -151,12 +151,15 @@ namespace engine {
                                                                               const Lens<Scalar>& lens) const {
                 static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
+                // Perform the projection
                 std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
                 std::vector<int> indices;
                 cl::mem cl_pixels;
                 cl::event projected;
-
                 std::tie(neighbourhood, indices, cl_pixels, projected) = do_project(mesh, Hoc, lens);
+
+                // If we didn't get anything, nothing to return
+                if (indices.empty()) { return ProjectedMesh<Scalar, N_NEIGHBOURS>(); }
 
                 // Read the pixels off the buffer
                 std::vector<std::array<Scalar, 2>> pixels(indices.size());
