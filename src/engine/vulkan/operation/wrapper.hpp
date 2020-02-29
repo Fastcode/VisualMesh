@@ -51,12 +51,18 @@ namespace engine {
                 }
             };
 
-            using instance      = vulkan_wrapper<::VkInstance>;
-            using device        = vulkan_wrapper<::VkDevice>;
-            using buffer        = vulkan_wrapper<::VkBuffer>;
-            using device_memory = vulkan_wrapper<::VkDeviceMemory>;
-            using sampler       = vulkan_wrapper<::VkSampler>;
-            using shader_module = vulkan_wrapper<::VkShaderModule>;
+            using instance               = vulkan_wrapper<::VkInstance>;
+            using device                 = vulkan_wrapper<::VkDevice>;
+            using buffer                 = vulkan_wrapper<::VkBuffer>;
+            using device_memory          = vulkan_wrapper<::VkDeviceMemory>;
+            using sampler                = vulkan_wrapper<::VkSampler>;
+            using shader_module          = vulkan_wrapper<::VkShaderModule>;
+            using image                  = vulkan_wrapper<::VkImage>;
+            using descriptor_pool        = vulkan_wrapper<::VkDescriptorPool>;
+            using command_pool           = vulkan_wrapper<::VkCommandPool>;
+            using command_buffer         = vulkan_wrapper<::VkCommandBuffer>;
+            using semaphore              = vulkan_wrapper<::VkSemaphore>;
+            using descriptor_buffer_info = vulkan_wrapper<::VkDescriptorBufferInfo>;
         }  // namespace vk
 
         enum class DeviceType { CPU, GPU, INTEGRATED_GPU, DISCRETE_GPU, VIRTUAL_GPU, ANY };
@@ -67,6 +73,10 @@ namespace engine {
             vk::device device;
             uint32_t compute_queue_family;
             uint32_t transfer_queue_family;
+            VkQueue compute_queue;
+            VkQueue transfer_queue;
+            vk::command_pool compute_command_pool;
+            vk::command_pool transfer_command_pool;
         };
     }  // namespace vulkan
 }  // namespace engine

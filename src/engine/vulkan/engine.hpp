@@ -21,6 +21,7 @@
 #include <fstream>
 #include <iomanip>
 #include <numeric>
+#include <spirv/unified1/spirv.hpp11>
 #include <sstream>
 #include <tuple>
 
@@ -28,7 +29,10 @@
 #include "engine/vulkan/kernels/make_network.hpp"
 #include "engine/vulkan/kernels/reprojection.hpp"
 #include "engine/vulkan/operation/create_buffer.hpp"
+#include "engine/vulkan/operation/create_command_buffer.hpp"
+#include "engine/vulkan/operation/create_descriptor_set.hpp"
 #include "engine/vulkan/operation/create_device.hpp"
+#include "engine/vulkan/operation/create_image.hpp"
 #include "engine/vulkan/operation/vulkan_error_category.hpp"
 #include "engine/vulkan/operation/wrapper.hpp"
 #include "mesh/mesh.hpp"
@@ -73,6 +77,19 @@ namespace engine {
 
                 // Create the Vulkan instance and find the best devices and queues
                 operation::create_device(DeviceType::GPU, context, false);
+
+                // Create queues and command pools
+                vkGetDeviceQueue(context.device, context.compute_queue_family, 0, &context.compute_queue);
+                context.compute_command_pool = operation::create_command_pool(context, context.compute_queue_family);
+                if (context.compute_queue_family == context.transfer_queue_family) {
+                    context.transfer_queue        = context.compute_queue;
+                    context.transfer_command_pool = context.compute_command_pool;
+                }
+                else {
+                    vkGetDeviceQueue(context.device, context.transfer_queue_family, 0, &context.transfer_queue);
+                    context.transfer_command_pool =
+                      operation::create_command_pool(context, context.transfer_queue_family);
+                }
 
                 // Created the projection kernel sources and programs
                 std::vector<uint32_t> equidistant_reprojection_source =
@@ -223,15 +240,35 @@ namespace engine {
 
                 // Created the load_image kernel source and program
                 std::vector<uint32_t> load_GRBG_image_source =
-                  kernels::load_image<Scalar>(kernels::load_GRBG_image<Scalar>);
+                  kernels::load_image<Scalar>(kernels::load_GRBG_image<Scalar>,
+                                              spv::ImageFormat::R8ui,
+                                              spv::SamplerFilterMode::Nearest,
+                                              spv::SamplerAddressingMode::Clamp,
+                                              false);
                 std::vector<uint32_t> load_RGGB_image_source =
-                  kernels::load_image<Scalar>(kernels::load_RGGB_image<Scalar>);
+                  kernels::load_image<Scalar>(kernels::load_RGGB_image<Scalar>,
+                                              spv::ImageFormat::R8ui,
+                                              spv::SamplerFilterMode::Nearest,
+                                              spv::SamplerAddressingMode::Clamp,
+                                              false);
                 std::vector<uint32_t> load_GBRG_image_source =
-                  kernels::load_image<Scalar>(kernels::load_GBRG_image<Scalar>);
+                  kernels::load_image<Scalar>(kernels::load_GBRG_image<Scalar>,
+                                              spv::ImageFormat::R8ui,
+                                              spv::SamplerFilterMode::Nearest,
+                                              spv::SamplerAddressingMode::Clamp,
+                                              false);
                 std::vector<uint32_t> load_BGGR_image_source =
-                  kernels::load_image<Scalar>(kernels::load_BGGR_image<Scalar>);
+                  kernels::load_image<Scalar>(kernels::load_BGGR_image<Scalar>,
+                                              spv::ImageFormat::R8ui,
+                                              spv::SamplerFilterMode::Nearest,
+                                              spv::SamplerAddressingMode::Clamp,
+                                              false);
                 std::vector<uint32_t> load_RGBA_image_source =
-                  kernels::load_image<Scalar>(kernels::load_RGBA_image<Scalar>);
+                  kernels::load_image<Scalar>(kernels::load_RGBA_image<Scalar>,
+                                              spv::ImageFormat::Rgba8ui,
+                                              spv::SamplerFilterMode::Linear,
+                                              spv::SamplerAddressingMode::Clamp,
+                                              false);
                 VkShaderModuleCreateInfo load_GRBG_image_info = {
                   VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                   0,
@@ -296,66 +333,18 @@ namespace engine {
                   load_RGBA_image_shader, [this](auto p) { vkDestroyShaderModule(context.device, p, nullptr); });
 
                 // Create the descriptor sets for the load_image program
-                // Descriptor Set 0: {bayer_sampler, interp_sampler, image, coordinates, network}
-                VkSamplerCreateInfo bayer_sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-                                                          nullptr,
-                                                          0,
-                                                          VK_FILTER_NEAREST,
-                                                          VK_FILTER_NEAREST,
-                                                          VK_SAMPLER_MIPMAP_MODE_NEAREST,
-                                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                                                          0.0f,
-                                                          VK_FALSE,
-                                                          0.0f,
-                                                          VK_FALSE,
-                                                          VK_COMPARE_OP_NEVER,
-                                                          0.0f,
-                                                          0.0f,
-                                                          VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
-                                                          VK_FALSE};
-                VkSampler bsampler;
-                throw_vk_error(vkCreateSampler(context.device, &bayer_sampler_info, nullptr, &bsampler),
-                               "Failed to create bayer sampler");
-                VkSamplerCreateInfo interp_sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-                                                           nullptr,
-                                                           0,
-                                                           VK_FILTER_LINEAR,
-                                                           VK_FILTER_LINEAR,
-                                                           VK_SAMPLER_MIPMAP_MODE_LINEAR,
-                                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                                                           0.0f,
-                                                           VK_FALSE,
-                                                           0.0f,
-                                                           VK_FALSE,
-                                                           VK_COMPARE_OP_NEVER,
-                                                           0.0f,
-                                                           0.0f,
-                                                           VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
-                                                           VK_FALSE};
-                VkSampler isampler;
-                throw_vk_error(vkCreateSampler(context.device, &interp_sampler_info, nullptr, &isampler),
-                               "Failed to create interp sampler");
-
-                bayer_sampler = vk::sampler(bsampler, [this](auto p) { vkDestroySampler(context.device, p, nullptr); });
-                interp_sampler =
-                  vk::sampler(isampler, [this](auto p) { vkDestroySampler(context.device, p, nullptr); });
-
-                std::array<VkDescriptorSetLayoutBinding, 4> load_image_bindings{
-                  VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                // Descriptor Set 0: {image, coordinates, network}
+                std::array<VkDescriptorSetLayoutBinding, 3> load_image_bindings{
                   VkDescriptorSetLayoutBinding{
-                    1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                    0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                   VkDescriptorSetLayoutBinding{
-                    2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                    1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                   VkDescriptorSetLayoutBinding{
-                    3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+                    2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
 
                 VkDescriptorSetLayoutCreateInfo load_image_descriptor_set_info = {
                   VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-                  0,
+                  nullptr,
                   0,
                   static_cast<uint32_t>(load_image_bindings.size()),
                   load_image_bindings.data()};
@@ -372,10 +361,10 @@ namespace engine {
 
                 VkComputePipelineCreateInfo load_GRBG_image_pipeline_info = {
                   VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-                  0,
+                  nullptr,
                   0,
                   {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                   0,
+                   nullptr,
                    0,
                    VK_SHADER_STAGE_COMPUTE_BIT,
                    load_GRBG_image_program,
@@ -390,10 +379,10 @@ namespace engine {
 
                 VkComputePipelineCreateInfo load_RGGB_image_pipeline_info = {
                   VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-                  0,
+                  nullptr,
                   0,
                   {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                   0,
+                   nullptr,
                    0,
                    VK_SHADER_STAGE_COMPUTE_BIT,
                    load_RGGB_image_program,
@@ -408,10 +397,10 @@ namespace engine {
 
                 VkComputePipelineCreateInfo load_GBRG_image_pipeline_info = {
                   VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-                  0,
+                  nullptr,
                   0,
                   {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                   0,
+                   nullptr,
                    0,
                    VK_SHADER_STAGE_COMPUTE_BIT,
                    load_GBRG_image_program,
@@ -426,10 +415,10 @@ namespace engine {
 
                 VkComputePipelineCreateInfo load_BGGR_image_pipeline_info = {
                   VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-                  0,
+                  nullptr,
                   0,
                   {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                   0,
+                   nullptr,
                    0,
                    VK_SHADER_STAGE_COMPUTE_BIT,
                    load_BGGR_image_program,
@@ -444,10 +433,10 @@ namespace engine {
 
                 VkComputePipelineCreateInfo load_RGBA_image_pipeline_info = {
                   VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-                  0,
+                  nullptr,
                   0,
                   {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                   0,
+                   nullptr,
                    0,
                    VK_SHADER_STAGE_COMPUTE_BIT,
                    load_RGBA_image_program,
@@ -475,7 +464,7 @@ namespace engine {
 
                 VkDescriptorSetLayoutCreateInfo conv_descriptor_set_info = {
                   VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-                  0,
+                  nullptr,
                   0,
                   static_cast<uint32_t>(conv_bindings.size()),
                   conv_bindings.data()};
@@ -502,7 +491,7 @@ namespace engine {
 
                     VkShaderModuleCreateInfo conv_info = {
                       VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                      0,
+                      nullptr,
                       0,
                       static_cast<uint32_t>(conv_source.second.size()) * sizeof(uint32_t),
                       conv_source.second.data()};
@@ -514,10 +503,10 @@ namespace engine {
 
                     VkComputePipelineCreateInfo conv_pipeline_info = {
                       VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-                      0,
+                      nullptr,
                       0,
                       {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                       0,
+                       nullptr,
                        0,
                        VK_SHADER_STAGE_COMPUTE_BIT,
                        conv_program.back(),
@@ -579,9 +568,32 @@ namespace engine {
 
                 std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
                 std::vector<int> indices;
-                std::vector<vec2<Scalar>> pixels;
+                std::vector<vec2<Scalar>> vk_pixels;
+                std::vector<vk::semaphore> semaphores;
 
-                std::tie(neighbourhood, indices, pixels) = do_project(mesh, Hoc, lens);
+                std::tie(neighbourhood, indices, vk_pixels, semaphores) = do_project(mesh, Hoc, lens);
+
+                VkSemaphoreWaitInfo sem_wait_info = {VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+                                                     nullptr,
+                                                     0,
+                                                     semaphores.size(),
+                                                     semaphores.data(),
+                                                     std::vector<uint64_t>(semaphores.size(), 1)};
+                VkResult res;
+                for (uint32_t timeout_count = 0; timeout_count < 5; ++timeout_count) {
+                    res = vkWaitSemaphores(context.device, &sem_wait_info, static_cast<uint64_t>(1e3));
+                    if (res == VK_SUCCESS) { break; }
+                    else if (res == VK_ERROR_DEVICE_LOST) {
+                        throw_vk_error(VK_ERROR_DEVICE_LOST, "Lost device while waiting for reprojection to complete");
+                    }
+                }
+                if (res != VK_SUCCESS) { throw_vk_error(res, "Timed out waiting for reprojection to complete"); }
+
+                // Read the pixels off the buffer
+                std::vector<vec2<Scalar>> pixels(indices.size());
+                operation::map_memory<void>(context, VK_WHOLE_SIZE, vk_pixels.second, [&pixels](void* payload) {
+                    std::memcpy(pixels.data(), payload, pixels.size() * sizeof(vec2<Scalar>));
+                });
 
                 return ProjectedMesh<Scalar, N_NEIGHBOURS>{
                   std::move(pixels), std::move(neighbourhood), std::move(indices)};
@@ -624,74 +636,118 @@ namespace engine {
                                                                            const Lens<Scalar>& lens,
                                                                            const void* image,
                                                                            const uint32_t& format) const {
-                static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
-                return ClassifiedMesh<Scalar, N_NEIGHBOURS>();
+                return ClassifiedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS>();
+                // // Grab the image memory from the cache
+                // std::pair<vk::image, vk::device_memory> vk_image = get_image_memory(lens.dimensions, format);
+                // size_t image_size = lens.dimensions[0] * lens.dimensions[1] * get_image_depth(format);
+                // operation::map_memory<void>(
+                //   context, VK_WHOLE_SIZE, vk_image.second, [&image, &image_size](void* payload) {
+                //       std::memcpy(payload, image, image_size);
+                //   });
 
-                // cl_int error                         = CL_SUCCESS;
-
-                //// Grab the image memory from the cache
-                // cl::mem cl_image = get_image_memory(lens.dimensions, format);
-
-                //// Map our image into device memory
-                // std::array<size_t, 3> origin = {{0, 0, 0}};
-                // std::array<size_t, 3> region = {{size_t(lens.dimensions[0]), size_t(lens.dimensions[1]), 1}};
-
-                // cl::event cl_image_loaded;
-                // cl_event ev = nullptr;
-                // error = clEnqueueWriteImage(queue, cl_image, false, origin.data(), region.data(), 0, 0, image, 0,
-                // nullptr, &ev); if (ev) cl_image_loaded = cl::event(ev, ::clReleaseEvent); throw_cl_error(error,
-                // "Error mapping image onto device");
-
-                //// Project our visual mesh
+                // // Project our visual mesh
                 // std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
                 // std::vector<int> indices;
-                // cl::mem cl_pixels;
-                // cl::event cl_pixels_loaded;
-                // std::tie(neighbourhood, indices, cl_pixels, cl_pixels_loaded) = do_project(mesh, Hoc, lens);
+                // std::pair<vk::buffer, vk::device_memory> vk_pixels;
+                // std::vector<vk::semaphore> semaphores;
+                // std::tie(neighbourhood, indices, vk_pixels, semaphores) = do_project(mesh, Hoc, lens);
 
-                //// This includes the offscreen point at the end
+                // // This includes the offscreen point at the end
                 // int n_points = neighbourhood.size();
 
-                //// Get the neighbourhood memory from cache
-                // cl::mem cl_neighbourhood = get_neighbourhood_memory(n_points * N_NEIGHBOURS);
+                // // Get the neighbourhood memory from cache
+                // std::pair<vk::buffer, vk::device_memory> vk_neighbourhood =
+                //   get_neighbourhood_memory(n_points * N_NEIGHBOURS);
 
-                //// Upload the neighbourhood buffer
-                // cl::event cl_neighbourhood_loaded;
-                // ev    = nullptr;
-                // error = ::clEnqueueWriteBuffer(queue,
-                //                               cl_neighbourhood,
-                //                               false,
-                //                               0,
-                //                               n_points * sizeof(std::array<int, N_NEIGHBOURS>),
-                //                               neighbourhood.data(),
-                //                               0,
-                //                               nullptr,
-                //                               &ev);
-                // if (ev) cl_neighbourhood_loaded = cl::event(ev, ::clReleaseEvent);
-                // throw_cl_error(error, "Error writing neighbourhood points to the device");
+                // // Upload the neighbourhood buffer
+                // operation::map_memory<void>(
+                //   context, VK_WHOLE_SIZE, vk_neighbourhood.second, [&neighbourhood](void* payload) {
+                //       std::memcpy(payload, neighbourhood.data(), neighbourhood.size() * N_NEIGHBOURS * sizeof(int));
+                //   });
 
-                //// Grab our ping pong buffers from the cache
-                // auto cl_conv_buffers   = get_network_memory(max_width * n_points);
-                // cl::mem cl_conv_input  = cl_conv_buffers[0];
-                // cl::mem cl_conv_output = cl_conv_buffers[1];
+                // std::pair<vk::buffer, vk::device_memory> vk_sampler = operation::create_buffer(context, )
 
-                //// The offscreen point gets a value of -1.0 to make it easy to distinguish
-                // cl::event offscreen_fill_event;
-                // Scalar minus_one(-1.0);
-                // ev    = nullptr;
-                // error = ::clEnqueueFillBuffer(queue,
-                //                              cl_conv_input,
-                //                              &minus_one,
-                //                              sizeof(Scalar),
-                //                              (n_points - 1) * sizeof(std::array<Scalar, 4>),
-                //                              sizeof(std::array<Scalar, 4>),
-                //                              0,
-                //                              nullptr,
-                //                              &ev);
-                // if (ev) offscreen_fill_event = cl::event(ev, ::clReleaseEvent);
-                // throw_cl_error(error, "Error setting the offscreen pixel values");
+                //   // Read the pixels into the buffer
+                //   // Create a descriptor pool
+                //   // Descriptor Set 0: {sampler, image, coordinates, network}
+                //   std::vector<VkDescriptorPoolSize>
+                //     load_image_pool_size = {
+                //       VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLER, 1},
+                //       VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1},
+                //       VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2},
+                //     };
+                // vk::descriptor_pool load_image_pool = create_descriptor_pool(context, load_image_pool_size);
 
-                //// Read the pixels into the buffer
+                // // Allocate the descriptor set
+                // VkDescriptorSet descriptor_set =
+                //   create_descriptor_set(context, load_image_pool, {load_image_descriptor_layout}).back();
+
+                // // Load the arguments
+                // std::array<VkDescriptorBufferInfo, 8> buffer_infos = {
+                //   VkDescriptorBufferInfo{vk_points.first, 0, VK_WHOLE_SIZE},
+                //   VkDescriptorBufferInfo{vk_indices.first, 0, VK_WHOLE_SIZE},
+                //   VkDescriptorBufferInfo{vk_rco.first, 0, VK_WHOLE_SIZE},
+                //   VkDescriptorBufferInfo{vk_f.first, 0, VK_WHOLE_SIZE},
+                //   VkDescriptorBufferInfo{vk_centre.first, 0, VK_WHOLE_SIZE},
+                //   VkDescriptorBufferInfo{vk_k.first, 0, VK_WHOLE_SIZE},
+                //   VkDescriptorBufferInfo{vk_deimensions.first, 0, VK_WHOLE_SIZE},
+                //   VkDescriptorBufferInfo{vk_pixels.first, 0, VK_WHOLE_SIZE},
+                // };
+                // std::array<VkWriteDescriptorSet, 8> write_descriptors;
+                // for (size_t i = 0; i < buffer_infos.size(); ++i) {
+                //     write_descriptors[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                //                             nullptr,
+                //                             descriptor_set,
+                //                             0,
+                //                             0,
+                //                             1,
+                //                             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                //                             nullptr,
+                //                             &buffer_info[i],
+                //                             nullptr};
+                // }
+
+                // vkUpdateDescriptorSets(context.device, write_descriptors.size(), write_descriptors.data(), 0,
+                // nullptr);
+
+                // // Project!
+                // vk::command_buffer command_buffer = create_command_buffer(context, true);
+
+                // vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, reprojection_pipeline);
+
+                // vkCmdBindDescriptorSets(command_buffer,
+                //                         VK_PIPELINE_BIND_POINT_COMPUTE,
+                //                         reprojection_pipeline_layout,
+                //                         0,
+                //                         1,
+                //                         &descriptor_set,
+                //                         0,
+                //                         nullptr);
+
+                // vkCmdDispatch(command_buffer, static_cast<int32_t>(points), 1, 1);
+
+                // VkSemaphoreTypeCreateInfo sem_type_info = {
+                //   VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO, nullptr, VK_SEMAPHORE_TYPE_TIMELINE, 0};
+                // VkSemaphoreCreateInfo sem_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, &sem_type_info, 0};
+                // VkSemaphore sem;
+                // VkResult vkCreateSemaphore(context.device, &sem_info, nullptr, &sem);
+                // std::vector<vk::semaphore> semaphores = {
+                //   vk::semaphore(sem, [this](auto p) { vkDestroySemaphore(context.device, p, nullptr); })};
+                // submit_command_buffer(context.compute_queue, command_buffer, semaphores);
+
+                // // Grab our ping pong buffers from the cache
+                // std::pair<vk::buffer, vk::device_memory> vk_conv_input;
+                // std::pair<vk::buffer, vk::device_memory> vk_conv_output;
+                // std::tie(vk_conv_input, vk_conv_output) = get_network_memory(max_width * n_points);
+
+                // // The offscreen point gets a value of -1.0 to make it easy to distinguish
+                // operation::map_memory<void>(context, VK_WHOLE_SIZE, vk_conv_input.second, [&n_points](void* payload)
+                // {
+                //     Scalar minus_one(-1.0);
+                //     std::memcpy(payload + ((n_points - 1) * sizeof(vec4<Scalar>)), &minus_one, sizeof(Scalar));
+                // });
+
+
                 // cl::event img_load_event;
                 // cl::event network_complete;
 
@@ -712,42 +768,43 @@ namespace engine {
                 // size_t global_size[1]  = {size_t(n_points - 1)};  // -1 as we don't project the offscreen point
                 // cl_event event_list[2] = {cl_pixels_loaded, cl_image_loaded};
                 // ev                     = nullptr;
-                // error = ::clEnqueueNDRangeKernel(queue, load_image, 1, offset, global_size, nullptr, 2, event_list,
-                // &ev); if (ev) img_load_event = cl::event(ev, ::clReleaseEvent); throw_cl_error(error, "Error queueing
+                // error =
+                //   ::clEnqueueNDRangeKernel(queue, load_image, 1, offset, global_size, nullptr, 2, event_list, &ev);
+                // if (ev) img_load_event = cl::event(ev, ::clReleaseEvent); throw_cl_error(error, "Error queueing
                 // the image load kernel");
 
-                //// These events are required for our first convolution
+                // // These events are required for our first convolution
                 // std::vector<cl::event> events({img_load_event, offscreen_fill_event, cl_neighbourhood_loaded});
 
                 // for (auto& conv : conv_layers) {
-                //  cl_mem arg;
-                //  arg   = cl_neighbourhood;
-                //  error = ::clSetKernelArg(conv.first, 0, sizeof(arg), &arg);
-                //  throw_cl_error(error, "Error setting argument 0 for convolution kernel");
-                //  arg   = cl_conv_input;
-                //  error = ::clSetKernelArg(conv.first, 1, sizeof(arg), &arg);
-                //  throw_cl_error(error, "Error setting argument 1 for convolution kernel");
-                //  arg   = cl_conv_output;
-                //  error = ::clSetKernelArg(conv.first, 2, sizeof(arg), &arg);
-                //  throw_cl_error(error, "Error setting argument 2 for convolution kernel");
+                //     cl_mem arg;
+                //     arg   = cl_neighbourhood;
+                //     error = ::clSetKernelArg(conv.first, 0, sizeof(arg), &arg);
+                //     throw_cl_error(error, "Error setting argument 0 for convolution kernel");
+                //     arg   = cl_conv_input;
+                //     error = ::clSetKernelArg(conv.first, 1, sizeof(arg), &arg);
+                //     throw_cl_error(error, "Error setting argument 1 for convolution kernel");
+                //     arg   = cl_conv_output;
+                //     error = ::clSetKernelArg(conv.first, 2, sizeof(arg), &arg);
+                //     throw_cl_error(error, "Error setting argument 2 for convolution kernel");
 
-                //  size_t offset[1]      = {0};
-                //  size_t global_size[1] = {size_t(n_points)};
-                //  cl::event event;
-                //  ev = nullptr;
-                //  std::vector<cl_event> cl_events(events.begin(), events.end());
-                //  error = ::clEnqueueNDRangeKernel(
-                //    queue, conv.first, 1, offset, global_size, nullptr, cl_events.size(), cl_events.data(), &ev);
-                //  if (ev) event = cl::event(ev, ::clReleaseEvent);
-                //  throw_cl_error(error, "Error queueing convolution kernel");
+                //     size_t offset[1]      = {0};
+                //     size_t global_size[1] = {size_t(n_points)};
+                //     cl::event event;
+                //     ev = nullptr;
+                //     std::vector<cl_event> cl_events(events.begin(), events.end());
+                //     error = ::clEnqueueNDRangeKernel(
+                //       queue, conv.first, 1, offset, global_size, nullptr, cl_events.size(), cl_events.data(), &ev);
+                //     if (ev) event = cl::event(ev, ::clReleaseEvent);
+                //     throw_cl_error(error, "Error queueing convolution kernel");
 
-                //  // Convert our events into a vector of events and ping pong our buffers
-                //  events           = std::vector<cl::event>({event});
-                //  network_complete = event;
-                //  std::swap(cl_conv_input, cl_conv_output);
-                //}
+                //     // Convert our events into a vector of events and ping pong our buffers
+                //     events           = std::vector<cl::event>({event});
+                //     network_complete = event;
+                //     std::swap(cl_conv_input, cl_conv_output);
+                // }
 
-                //// Read the pixel coordinates off the device
+                // // Read the pixel coordinates off the device
                 // cl::event pixels_read;
                 // ev = nullptr;
                 // std::vector<std::array<Scalar, 2>> pixels(neighbourhood.size() - 1);
@@ -758,7 +815,7 @@ namespace engine {
                 // if (ev) pixels_read = cl::event(ev, ::clReleaseEvent);
                 // throw_cl_error(error, "Error reading projected pixels");
 
-                //// Read the classifications off the device (they'll be in input)
+                // // Read the classifications off the device (they'll be in input)
                 // cl::event classes_read;
                 // ev  = nullptr;
                 // iev = network_complete;
@@ -775,12 +832,12 @@ namespace engine {
                 // if (ev) classes_read = cl::event(ev, ::clReleaseEvent);
                 // throw_cl_error(error, "Error reading classified values");
 
-                //// Flush the queue to ensure all the commands have been issued
-                //::clFlush(queue);
+                // // Flush the queue to ensure all the commands have been issued
+                // ::clFlush(queue);
 
-                //// Wait for the chain to finish up to where we care about it
+                // // Wait for the chain to finish up to where we care about it
                 // cl_event end_events[2] = {pixels_read, classes_read};
-                //::clWaitForEvents(2, end_events);
+                // ::clWaitForEvents(2, end_events);
 
                 // return ClassifiedMesh<Scalar, N_NEIGHBOURS>{
                 //  std::move(pixels), std::move(neighbourhood), std::move(indices), std::move(classifications)};
@@ -824,7 +881,8 @@ namespace engine {
             template <template <typename> class Model>
             std::tuple<std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>>,
                        std::vector<int>,
-                       std::vector<vec2<Scalar>>>
+                       std::vector<vec2<Scalar>>,
+                       std::vector<vk::semaphore>>
               do_project(const Mesh<Scalar, Model>& mesh, const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
                 static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
@@ -994,12 +1052,8 @@ namespace engine {
                 operation::bind_buffer(context, vk_pixels.first, vk_pixels.second, 0);
 
                 // Upload our indices map
-                operation::map_memory<int>(context, VK_WHOLE_SIZE, vk_indices.second, [&indices](int* payload) {
-                    size_t count = 0;
-                    for (const auto& index : indices) {
-                        payload[count] = index;
-                        count++;
-                    }
+                operation::map_memory<void>(context, VK_WHOLE_SIZE, vk_indices.second, [&indices](void* payload) {
+                    std::memcpy(payload, indices.data(), indices.size() * sizeof(int));
                 });
 
                 // --------------------------------------------------
@@ -1025,138 +1079,43 @@ namespace engine {
                 // Create a descriptor pool
                 // Descriptor Set 0: {points_ptr, indices_ptr, Rco_ptr, f_ptr, centre_ptr, k_ptr, dimensions_ptr,
                 // out_ptr}
-                VkDescriptorPoolSize descriptor_pool_size = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 8};
-
-                VkDescriptorPoolCreateInfo descriptor_pool_info = {
-                  VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, 0, 0, 1, 1, &descriptor_pool_size};
-
-                VkDescriptorPool descriptor_pool;
-                throw_vk_error(vkCreateDescriptorPool(context.device, &descriptor_pool_info, 0, &descriptor_pool),
-                               "Failed to create descriptor pool");
+                std::vector<VkDescriptorPoolSize> descriptor_pool_size = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 8};
+                vk::descriptor_pool descriptor_pool = operation::create_descriptor_pool(context, descriptor_pool_size);
 
                 // Allocate the descriptor set
-                VkDescriptorSetAllocateInfo descriptor_set_alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-                                                                         0,
-                                                                         descriptor_pool,
-                                                                         1,
-                                                                         &reprojection_descriptor_layout};
-
-                VkDescriptorSet descriptor_set;
-                throw_vk_error(vkAllocateDescriptorSets(context.device, &descriptor_set_alloc_info, &descriptor_set),
-                               "Failed to allocate descriptor set");
+                VkDescriptorSet descriptor_set =
+                  operation::create_descriptor_set(context, descriptor_pool, {reprojection_descriptor_layout}).back();
 
                 // Load the arguments
+                std::array<VkDescriptorBufferInfo, 8> buffer_infos = {
+                  VkDescriptorBufferInfo{vk_points.first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{vk_indices.first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{vk_rco.first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{vk_f.first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{vk_centre.first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{vk_k.first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{vk_dimensions.first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{vk_pixels.first, 0, VK_WHOLE_SIZE},
+                };
                 std::array<VkWriteDescriptorSet, 8> write_descriptors;
-                VkDescriptorBufferInfo points_buffer_info     = {vk_points.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[0]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                        0,
-                                        descriptor_set,
-                                        0,
-                                        0,
-                                        1,
-                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                        0,
-                                        &points_buffer_info,
-                                        nullptr};
-                VkDescriptorBufferInfo indices_buffer_info    = {vk_indices.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[1]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                        0,
-                                        descriptor_set,
-                                        1,
-                                        0,
-                                        1,
-                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                        0,
-                                        &indices_buffer_info,
-                                        nullptr};
-                VkDescriptorBufferInfo rco_buffer_info        = {vk_rco.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[2]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                        0,
-                                        descriptor_set,
-                                        2,
-                                        0,
-                                        1,
-                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                        0,
-                                        &rco_buffer_info,
-                                        nullptr};
-                VkDescriptorBufferInfo f_buffer_info          = {vk_f.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[3]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                        0,
-                                        descriptor_set,
-                                        3,
-                                        0,
-                                        1,
-                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                        0,
-                                        &f_buffer_info,
-                                        nullptr};
-                VkDescriptorBufferInfo centre_buffer_info     = {vk_centre.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[4]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                        0,
-                                        descriptor_set,
-                                        4,
-                                        0,
-                                        1,
-                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                        0,
-                                        &centre_buffer_info,
-                                        nullptr};
-                VkDescriptorBufferInfo k_buffer_info          = {vk_k.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[5]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                        0,
-                                        descriptor_set,
-                                        5,
-                                        0,
-                                        1,
-                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                        0,
-                                        &k_buffer_info,
-                                        nullptr};
-                VkDescriptorBufferInfo dimensions_buffer_info = {vk_dimensions.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[6]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                        0,
-                                        descriptor_set,
-                                        6,
-                                        0,
-                                        1,
-                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                        0,
-                                        &dimensions_buffer_info,
-                                        nullptr};
-                VkDescriptorBufferInfo pixels_buffer_info     = {vk_pixels.first, 0, VK_WHOLE_SIZE};
-                write_descriptors[7]                          = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                        0,
-                                        descriptor_set,
-                                        7,
-                                        0,
-                                        1,
-                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                        0,
-                                        &pixels_buffer_info,
-                                        nullptr};
+                for (size_t i = 0; i < buffer_infos.size(); ++i) {
+                    write_descriptors[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                            nullptr,
+                                            descriptor_set,
+                                            0,
+                                            0,
+                                            1,
+                                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                            nullptr,
+                                            &buffer_infos[i],
+                                            nullptr};
+                }
 
                 vkUpdateDescriptorSets(context.device, write_descriptors.size(), write_descriptors.data(), 0, nullptr);
 
                 // Project!
-                VkCommandPoolCreateInfo command_pool_create_info = {
-                  VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, 0, 0, context.compute_queue_family};
-                VkCommandPool command_pool;
-                throw_vk_error(vkCreateCommandPool(context.device, &command_pool_create_info, 0, &command_pool),
-                               "Failed to create a command pool");
-
-                VkCommandBufferAllocateInfo command_buffer_alloc_info = {
-                  VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, 0, command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1};
-
-                VkCommandBuffer command_buffer;
-                throw_vk_error(vkAllocateCommandBuffers(context.device, &command_buffer_alloc_info, &command_buffer),
-                               "Failed to allocate a command buffer");
-
-                VkCommandBufferBeginInfo command_buffer_begin_info = {
-                  VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, 0, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, 0};
-
-                throw_vk_error(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info),
-                               "Failed to begin a command buffer");
+                vk::command_buffer command_buffer =
+                  operation::create_command_buffer(context, context.compute_command_pool, true);
 
                 vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, reprojection_pipeline);
 
@@ -1171,13 +1130,15 @@ namespace engine {
 
                 vkCmdDispatch(command_buffer, static_cast<int32_t>(points), 1, 1);
 
-                throw_vk_error(vkEndCommandBuffer(command_buffer), "Failed to end command buffer");
-
-                VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO, 0, 0, 0, 0, 1, &command_buffer, 0, 0};
-
-                VkQueue compute_queue;
-                vkGetDeviceQueue(context.device, context.compute_queue_family, 0, &compute_queue);
-                throw_vk_error(vkQueueSubmit(compute_queue, 1, &submit_info, 0), "Failed to submit reprojection queue");
+                VkSemaphoreTypeCreateInfo sem_type_info = {
+                  VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO, nullptr, VK_SEMAPHORE_TYPE_TIMELINE, 0};
+                VkSemaphoreCreateInfo sem_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, &sem_type_info, 0};
+                VkSemaphore sem;
+                throw_vk_error(vkCreateSemaphore(context.device, &sem_info, nullptr, &sem),
+                               "Failed to create reprojection semaphore");
+                std::vector<vk::semaphore> semaphores = {
+                  vk::semaphore(sem, [this](auto p) { vkDestroySemaphore(context.device, p, nullptr); })};
+                operation::submit_command_buffer(context.compute_queue, command_buffer, semaphores);
 
                 // This can happen on the CPU while the OpenCL device is busy
                 // Build the reverse lookup map where the offscreen point is one past the end
@@ -1198,94 +1159,111 @@ namespace engine {
                 // Fill in the final offscreen point which connects only to itself
                 local_neighbourhood[points].fill(points);
 
-                // Wait for computation to finish
-                throw_vk_error(vkQueueWaitIdle(compute_queue), "Failed waiting for reprojection queue to finish");
-
-                // Read the pixels off the buffer
-                std::vector<vec2<Scalar>> pixels(indices.size());
-                operation::map_memory<vec2<Scalar>>(
-                  context, VK_WHOLE_SIZE, vk_pixels.second, [&pixels](vec2<Scalar>* payload) {
-                      size_t index = 0;
-                      for (auto& pixel : pixels) {
-                          pixel = payload[index];
-                          index++;
-                      }
-                  });
-
-                // Clean up
-                vkDestroyCommandPool(context.device, command_pool, nullptr);
-                vkDestroyDescriptorPool(context.device, descriptor_pool, nullptr);
-
                 // Return what we calculated
                 return std::make_tuple(std::move(local_neighbourhood),  // CPU buffer
                                        std::move(indices),              // CPU buffer
-                                       std::move(pixels));              // Projected pixels
+                                       std::move(vk_pixels),            // Projected pixels
+                                       semaphores);                     // Semaphores to wait on
             }
 
-            // cl::mem get_image_memory(vec2<int> dimensions, uint32_t format) const {
+            uint32_t get_image_depth(const uint32_t& format) {
+                switch (format) {
+                    // Bayer
+                    case fourcc("GRBG"):
+                    case fourcc("RGGB"):
+                    case fourcc("GBRG"):
+                    case fourcc("BGGR"): return 1;
+                    case fourcc("BGRA"):
+                    case fourcc("RGBA"): return 4;
+                    // Oh no...
+                    default: throw std::runtime_error("Unsupported image format " + fourcc_text(format));
+                }
+                return 0;
+            }
 
-            //   // If our dimensions and format haven't changed from last time we can reuse the same memory location
-            //   if (dimensions != image_memory.dimensions || format != image_memory.format) {
-            //     cl_image_format fmt;
-            //     switch (format) {
-            //       // Bayer
-            //       case fourcc("GRBG"):
-            //       case fourcc("RGGB"):
-            //       case fourcc("GBRG"):
-            //       case fourcc("BGGR"): fmt = cl_image_format{CL_R, CL_UNORM_INT8}; break;
-            //       case fourcc("BGRA"): fmt = cl_image_format{CL_BGRA, CL_UNORM_INT8}; break;
-            //       case fourcc("RGBA"): fmt = cl_image_format{CL_RGBA, CL_UNORM_INT8}; break;
-            //       // Oh no...
-            //       default: throw std::runtime_error("Unsupported image format " + fourcc_text(format));
-            //     }
+            VkFormat get_image_format(const uint32_t& format) {
+                switch (format) {
+                    // Bayer
+                    case fourcc("GRBG"):
+                    case fourcc("RGGB"):
+                    case fourcc("GBRG"):
+                    case fourcc("BGGR"): format = VK_FORMAT_R8_UNORM; break;
+                    case fourcc("BGRA"): format = VK_FORMAT_B8G8R8A8_UNORM; break;
+                    case fourcc("RGBA"): format = VK_FORMAT_R8G8B8A8_UNORM; break;
+                    // Oh no...
+                    default: throw std::runtime_error("Unsupported image format " + fourcc_text(format));
+                }
+                return VK_FORMAT_UNDEFINED;
+            }
 
-            //     cl_image_desc desc = {
-            //       CL_MEM_OBJECT_IMAGE2D, size_t(dimensions[0]), size_t(dimensions[1]), 1, 1, 0, 0, 0, 0, nullptr};
+            std::pair<vk::image, vk::device_memory> get_image_memory(const vec2<int>& dimensions,
+                                                                     const uint32_t& format) const {
+                // If our dimensions and format haven't changed from last time we can reuse the same memory location
+                if (dimensions != image_memory.dimensions || format != image_memory.format) {
+                    VkFormat format   = get_image_format(format);
+                    VkExtent3D extent = {dimensions[0], dimensions[1], get_image_depth(format)};
 
-            //     // Create a buffer for our image
-            //     cl_int error;
-            //     cl::mem memory(::clCreateImage(context, CL_MEM_READ_ONLY, &fmt, &desc, nullptr, &error),
-            //                    ::clReleaseMemObject);
-            //     throw_cl_error(error, "Error creating image on device");
+                    image_memory.memory =
+                      operation::create_image(context,
+                                              extent,
+                                              format,
+                                              VK_IMAGE_USAGE_STORAGE_BIT,
+                                              VK_SHARING_MODE_EXCLUSIVE,
+                                              {context.transfer_queue_family},
+                                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                                | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                    operation::bind_image(context, image_memory.first, image_memory.second, 0);
 
-            //     // Update what we are caching
-            //     image_memory.dimensions = dimensions;
-            //     image_memory.format     = format;
-            //     image_memory.memory     = memory;
-            //   }
+                    // Update what we are caching
+                    image_memory.dimensions = dimensions;
+                    image_memory.format     = format;
+                }
 
-            //   // Return the cache
-            //   return image_memory.memory;
-            // }
+                // Return the cache
+                return image_memory.memory;
+            }
 
-            // std::array<cl::mem, 2> get_network_memory(const int& max_size) const {
-            //   if (network_memory.max_size < max_size) {
-            //     cl_int error;
-            //     network_memory.memory[0] =
-            //       cl::mem(::clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(Scalar) * max_size, nullptr, &error),
-            //               ::clReleaseMemObject);
-            //     throw_cl_error(error, "Error allocating ping pong buffer 1 on device");
-            //     network_memory.memory[1] =
-            //       cl::mem(::clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(Scalar) * max_size, nullptr, &error),
-            //               ::clReleaseMemObject);
-            //     network_memory.max_size = max_size;
-            //     throw_cl_error(error, "Error allocating ping pong buffer 2 on device");
-            //   }
-            //   return network_memory.memory;
-            // }
+            std::array<std::pair<vk::buffer, vk::device_memory>, 2> get_network_memory(const int& max_size) const {
+                if (network_memory.max_size < max_size) {
+                    network_memory.memory[0] = operation::create_buffer(context,
+                                                                        max_size * sizeof(Scalar),
+                                                                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                                                        VK_SHARING_MODE_EXCLUSIVE,
+                                                                        {context.transfer_queue_family},
+                                                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                                                                          | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                                                          | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                    network_memory.memory[1] = operation::create_buffer(context,
+                                                                        max_size * sizeof(Scalar),
+                                                                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                                                        VK_SHARING_MODE_EXCLUSIVE,
+                                                                        {context.transfer_queue_family},
+                                                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                                                                          | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                                                          | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-            // cl::mem get_neighbourhood_memory(const int& max_size) const {
+                    network_memory.max_size = max_size;
+                    operation::bind_buffer(context, network_memory[0].first, network_memory[0].second, 0);
+                    operation::bind_buffer(context, network_memory[1].first, network_memory[1].second, 0);
+                }
+                return network_memory.memory;
+            }
 
-            //   if (neighbourhood_memory.max_size < max_size) {
-            //     cl_int error;
-            //     neighbourhood_memory.memory =
-            //       cl::mem(::clCreateBuffer(context, CL_MEM_READ_WRITE, max_size * sizeof(int), nullptr, &error),
-            //               ::clReleaseMemObject);
-            //     throw_cl_error(error, "Error allocating neighbourhood buffer on device");
-            //     neighbourhood_memory.max_size = max_size;
-            //   }
-            //   return neighbourhood_memory.memory;
-            // }
+            std::pair<vk::buffer, vk::device_memory> get_neighbourhood_memory(const int& max_size) const {
+                if (neighbourhood_memory.max_size < max_size) {
+                    neighbourhood_memory.memory   = operation::create_buffer(context,
+                                                                           max_size * sizeof(int),
+                                                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                                                           VK_SHARING_MODE_EXCLUSIVE,
+                                                                           {context.transfer_queue_family},
+                                                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                                                                             | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                    neighbourhood_memory.max_size = max_size;
+                    operation::bind_buffer(context, neighbourhood_memory.first, neighbourhood_memory.second, 0);
+                }
+                return neighbourhood_memory.memory;
+            }
 
             /// Vulkan instance
             VulkanContext context;
@@ -1336,21 +1314,21 @@ namespace engine {
             /// A list of kernels to run in sequence to run the network
             std::vector<std::pair<VkPipeline, size_t>> conv_layers;
 
-            // mutable struct {
-            //   vec2<int> dimensions = {0, 0};
-            //   uint32_t format      = 0;
-            //   cl::mem memory;
-            // } image_memory;
+            mutable struct {
+                vec2<int> dimensions = {0, 0};
+                VkFormat format      = VK_FORMAT_UNDEFINED;
+                std::pair<vk::image, vk::device_memory> memory;
+            } image_memory;
 
-            // mutable struct {
-            //   int max_size = 0;
-            //   std::array<cl::mem, 2> memory;
-            // } network_memory;
+            mutable struct {
+                int max_size = 0;
+                std::array<std::pair<vk::buffer, vk::device_memory>, 2> memory;
+            } network_memory;
 
-            // mutable struct {
-            //   int max_size = 0;
-            //   cl::mem memory;
-            // } neighbourhood_memory;
+            mutable struct {
+                int max_size = 0;
+                std::pair<vk::buffer, vk::device_memory> memory;
+            } neighbourhood_memory;
 
             // The width of the maximumally wide layer in the network
             size_t max_width;

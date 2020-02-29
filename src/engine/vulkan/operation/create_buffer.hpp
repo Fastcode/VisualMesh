@@ -26,6 +26,7 @@ namespace visualmesh {
 namespace engine {
     namespace vulkan {
         namespace operation {
+
             template <typename Scalar, typename MapFunc>
             inline void map_memory(const VulkanContext& context,
                                    const size_t& size,
@@ -47,7 +48,7 @@ namespace engine {
 
                 // Create the buffer
                 VkBufferCreateInfo buffer_info = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-                                                  0,
+                                                  nullptr,
                                                   0,
                                                   size,
                                                   usage,

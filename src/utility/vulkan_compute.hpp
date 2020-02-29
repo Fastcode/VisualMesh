@@ -98,6 +98,9 @@ struct Program {
         // Uses the Shader Execution Model.
         operation(output, spv::Op::OpCapability, {static_cast<uint32_t>(spv::Capability::Shader)});
 
+        // Uses the Kernel Execution Model.
+        operation(output, spv::Op::OpCapability, {static_cast<uint32_t>(spv::Capability::Kernel)});
+
         // Uses extended image formats (like R8 = single 8-bit unsigned normalised integer channel)
         operation(output, spv::Op::OpCapability, {static_cast<uint32_t>(spv::Capability::StorageImageExtendedFormats)});
 
@@ -971,6 +974,23 @@ struct Program {
         // First add the sampler type
         std::pair<bool, uint32_t> id = check_duplicate_declaration(types, spv::Op::OpTypeSampler, 1, {0});
         if (!id.first) { operation(types, spv::Op::OpTypeSampler, {id.second}); }
+        return id.second;
+    }
+
+    uint32_t add_constant_sampler(const spv::SamplerAddressingMode& addressing_mode,
+                                  const spv::SamplerFilterMode& filter_mode,
+                                  const bool& normalised) {
+        // First add the sampler type
+        std::vector<uint32_t> params = {add_sampler_type(),
+                                        0,
+                                        static_cast<uint32_t>(addressing_mode),
+                                        normalised ? uint32_t(1) : uint32_t(0),
+                                        static_cast<uint32_t>(filter_mode)};
+        std::pair<bool, uint32_t> id = check_duplicate_declaration(constants, spv::Op::OpConstantSampler, 2, params);
+        if (!id.first) {
+            params[1] = id.second;
+            operation(types, spv::Op::OpConstantSampler, {params});
+        }
         return id.second;
     }
 
