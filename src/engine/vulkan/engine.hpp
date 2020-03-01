@@ -1138,7 +1138,7 @@ namespace engine {
                     operation::submit_command_buffer(context.compute_queue, reprojection_command_buffer, f(checkpoint));
                 });
 
-                // This can happen on the CPU while the OpenCL device is busy
+                // This can happen on the CPU while the Vulkan device is busy
                 // Build the reverse lookup map where the offscreen point is one past the end
                 std::vector<int> r_indices(nodes.size() + 1, points);
                 for (unsigned int i = 0; i < indices.size(); ++i) {
@@ -1353,9 +1353,9 @@ namespace engine {
             // The width of the maximumally wide layer in the network
             size_t max_width;
 
-            // Cache of opencl buffers from mesh objects
+            // Cache of Vulkan buffers from mesh objects
             mutable std::map<const void*, std::pair<vk::buffer, vk::device_memory>> device_points_cache;
-        };  // namespace vulkan
+        };
 
     }  // namespace vulkan
 }  // namespace engine
