@@ -24,6 +24,7 @@
 #include <spirv/unified1/spirv.hpp11>
 #include <sstream>
 #include <tuple>
+#include <type_traits>
 
 #include "engine/vulkan/kernels/load_image.hpp"
 #include "engine/vulkan/kernels/make_network.hpp"
@@ -40,6 +41,7 @@
 #include "mesh/projected_mesh.hpp"
 #include "utility/math.hpp"
 #include "utility/projection.hpp"
+#include "utility/static_if.hpp"
 
 namespace visualmesh {
 namespace engine {
@@ -549,20 +551,15 @@ namespace engine {
 
                 std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
                 std::vector<int> indices;
-                std::vector<vec2<Scalar>> vk_pixels;
-                std::vector<vk::semaphore> semaphores;
+                std::pair<vk::buffer, vk::device_memory> vk_pixels;
+                VkFence fence;
 
-                std::tie(neighbourhood, indices, vk_pixels, semaphores) = do_project(mesh, Hoc, lens);
+                std::tie(neighbourhood, indices, vk_pixels, fence) = do_project<Model, VkFence>(mesh, Hoc, lens);
 
-                VkSemaphoreWaitInfo sem_wait_info = {VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
-                                                     nullptr,
-                                                     0,
-                                                     semaphores.size(),
-                                                     semaphores.data(),
-                                                     std::vector<uint64_t>(semaphores.size(), 1)};
+                // Wait 1,000 * 1,000 nanoseconds = 1,000 * 1us = 1ms
                 VkResult res;
-                for (uint32_t timeout_count = 0; timeout_count < 5; ++timeout_count) {
-                    res = vkWaitSemaphores(context.device, &sem_wait_info, static_cast<uint64_t>(1e3));
+                for (uint32_t timeout_count = 0; timeout_count < 1000; ++timeout_count) {
+                    res = vkWaitForFences(context.device, 1, &fence, VK_TRUE, static_cast<uint64_t>(1e3));
                     if (res == VK_SUCCESS) { break; }
                     else if (res == VK_ERROR_DEVICE_LOST) {
                         throw_vk_error(VK_ERROR_DEVICE_LOST, "Lost device while waiting for reprojection to complete");
@@ -577,6 +574,7 @@ namespace engine {
                 });
 
                 // Perform cleanup
+                vkDestroyFence(context.device, fence, nullptr);
                 reprojection_buffers.clear();
 
                 return ProjectedMesh<Scalar, N_NEIGHBOURS>{
@@ -862,13 +860,20 @@ namespace engine {
             }
 
         private:
-            template <template <typename> class Model>
+            template <template <typename> class Model, typename CheckpointType>
             std::tuple<std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>>,
                        std::vector<int>,
-                       std::vector<vec2<Scalar>>,
-                       std::vector<vk::semaphore>>
+                       std::pair<vk::buffer, vk::device_memory>,
+                       CheckpointType>
               do_project(const Mesh<Scalar, Model>& mesh, const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
                 static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+
+                // We only support VkSemaphore and VkFence here.
+                // Use VkFence if the CPU will be waiting for the signal.
+                // Use VkSemaphore if the GPU will be waiting for the signal
+                static_assert(
+                  std::is_same<CheckpointType, VkSemaphore>::value || std::is_same<CheckpointType, VkFence>::value,
+                  "Unknown checkpoint type. Must be one of VkFence or VkSemaphore");
 
                 // Lookup the on screen ranges
                 auto ranges = mesh.lookup(Hoc, lens);
@@ -1011,8 +1016,10 @@ namespace engine {
 
                 // No point processing if we have no points, return an empty mesh
                 if (points == 0) {
-                    return std::make_tuple(
-                      std::vector<std::array<int, N_NEIGHBOURS>>(), std::vector<int>(), std::vector<vec2<Scalar>>());
+                    return std::make_tuple(std::vector<std::array<int, N_NEIGHBOURS>>(),
+                                           std::vector<int>(),
+                                           std::pair<vk::buffer, vk::device_memory>(),
+                                           CheckpointType());
                 }
 
                 // Build up our list of indices for OpenCL
@@ -1062,7 +1069,8 @@ namespace engine {
                                        "Requested lens projection is not currently supported.");
                         return std::make_tuple(std::vector<std::array<int, N_NEIGHBOURS>>(),
                                                std::vector<int>(),
-                                               std::vector<vec2<Scalar>>());
+                                               std::pair<vk::buffer, vk::device_memory>(),
+                                               CheckpointType());
                 }
 
                 // Create a descriptor pool
@@ -1119,15 +1127,19 @@ namespace engine {
 
                 vkCmdDispatch(command_buffer, static_cast<int32_t>(points), 1, 1);
 
-                VkSemaphoreTypeCreateInfo sem_type_info = {
-                  VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO, nullptr, VK_SEMAPHORE_TYPE_TIMELINE, 0};
-                VkSemaphoreCreateInfo sem_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, &sem_type_info, 0};
-                VkSemaphore sem;
-                throw_vk_error(vkCreateSemaphore(context.device, &sem_info, nullptr, &sem),
-                               "Failed to create reprojection semaphore");
-                std::vector<vk::semaphore> semaphores = {
-                  vk::semaphore(sem, [this](auto p) { vkDestroySemaphore(context.device, p, nullptr); })};
-                operation::submit_command_buffer(context.compute_queue, command_buffer, semaphores);
+                CheckpointType checkpoint;
+                static_if<std::is_same<CheckpointType, VkSemaphore>::value>([&](auto f) {
+                    VkSemaphoreCreateInfo semaphore_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0};
+                    throw_vk_error(vkCreateSemaphore(context.device, &semaphore_info, nullptr, &f(checkpoint)),
+                                   "Failed to create reprojection semaphore");
+                    operation::submit_command_buffer(
+                      context.compute_queue, reprojection_command_buffer, {f(checkpoint)});
+                }).else_([&](auto f) {
+                    VkFenceCreateInfo fence_info = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, 0};
+                    throw_vk_error(vkCreateFence(context.device, &fence_info, nullptr, &f(checkpoint)),
+                                   "Failed to create reprojection semaphore");
+                    operation::submit_command_buffer(context.compute_queue, reprojection_command_buffer, f(checkpoint));
+                });
 
                 // This can happen on the CPU while the OpenCL device is busy
                 // Build the reverse lookup map where the offscreen point is one past the end
@@ -1152,7 +1164,7 @@ namespace engine {
                 return std::make_tuple(std::move(local_neighbourhood),  // CPU buffer
                                        std::move(indices),              // CPU buffer
                                        std::move(vk_pixels),            // Projected pixels
-                                       semaphores);                     // Semaphores to wait on
+                                       std::move(checkpoint));          // Checkpoint to wait on
             }
 
             uint32_t get_image_depth(const uint32_t& format) {

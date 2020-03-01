@@ -57,7 +57,8 @@ namespace engine {
                 throw_vk_error(vkAllocateCommandBuffers(context.device, &alloc_info, &cmd_buf),
                                "Failed to allocate a command buffer");
                 vk::command_buffer command_buffer(cmd_buf, [&context, &command_pool](auto p) {
-                    vkFreeCommandBuffers(context.device, command_pool, 1, p);
+                    std::array<VkCommandBuffer, 1> p_arr = {p};
+                    vkFreeCommandBuffers(context.device, command_pool, p_arr.size(), p_arr.data());
                 });
 
                 VkCommandBufferBeginInfo begin_info = {
@@ -70,7 +71,7 @@ namespace engine {
 
             inline void submit_command_buffer(const VkQueue& queue,
                                               const vk::command_buffer& command_buffer,
-                                              const std::vector<vk::semaphore>& semaphores) {
+                                              const std::vector<VkSemaphore>& semaphores) {
                 throw_vk_error(vkEndCommandBuffer(command_buffer), "Failed to end command buffer");
 
                 std::array<VkCommandBuffer, 1> buf = {command_buffer};
@@ -84,7 +85,20 @@ namespace engine {
                                             static_cast<uint32_t>(semaphores.size()),
                                             semaphores.data()};
 
-                throw_vk_error(vkQueueSubmit(queue, 1, &submit_info, nullptr),
+                throw_vk_error(vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE),
+                               "Failed to submit command buffer to queue");
+            }
+
+            inline void submit_command_buffer(const VkQueue& queue,
+                                              const vk::command_buffer& command_buffer,
+                                              const VkFence& fence) {
+                throw_vk_error(vkEndCommandBuffer(command_buffer), "Failed to end command buffer");
+
+                std::array<VkCommandBuffer, 1> buf = {command_buffer};
+                VkSubmitInfo submit_info           = {
+                  VK_STRUCTURE_TYPE_SUBMIT_INFO, nullptr, 0, 0, 0, buf.size(), buf.data(), 0, nullptr};
+
+                throw_vk_error(vkQueueSubmit(queue, 1, &submit_info, fence),
                                "Failed to submit command buffer to queue");
             }
         }  // namespace operation
