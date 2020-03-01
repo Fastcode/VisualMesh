@@ -1093,10 +1093,10 @@ namespace engine {
                 };
                 std::array<VkWriteDescriptorSet, 8> write_descriptors;
                 for (size_t i = 0; i < buffer_infos.size(); ++i) {
-                    write_descriptors[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    write_descriptors[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                             nullptr,
                                             descriptor_set,
-                                            0,
+                                            static_cast<uint32_t>(i),
                                             0,
                                             1,
                                             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
