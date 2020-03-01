@@ -549,8 +549,9 @@ namespace engine {
                 program.add_member_decoration(network_struct, 0, spv::Decoration::Offset, {0});
 
                 // Create the descriptor sets.
-                // Descriptor Set 0: {sampler, image, coordinates, network}
-                program.create_descriptor_set({sampler_ptr, image_ptr, coords_ptr, network_ptr});
+                // Descriptor Set 0: {image+sampler, coordinates, network}
+                program.create_descriptor_set({sampler_ptr, image_ptr, coords_ptr, network_ptr},
+                                              {std::set<uint32_t>({0, 1})});
 
                 // Create the "fetch" function
                 uint32_t fetch_func =

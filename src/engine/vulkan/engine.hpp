@@ -240,6 +240,10 @@ namespace engine {
                                  context.device, 0, 1, &rectilinear_pipeline_create_info, 0, &project_rectilinear),
                                "Failed to create rectilinear reprojection pipeline");
 
+                // ******************
+                // *** LOAD_IMAGE ***
+                // ******************
+
                 // Created the load_image kernel source and program
                 std::vector<uint32_t> load_GRBG_image_source =
                   kernels::load_image<Scalar>(kernels::load_GRBG_image<Scalar>);
@@ -315,15 +319,63 @@ namespace engine {
                   load_RGBA_image_shader, [this](auto p) { vkDestroyShaderModule(context.device, p, nullptr); });
 
                 // Create the descriptor sets for the load_image program
-                // Descriptor Set 0: {image, coordinates, network}
-                std::array<VkDescriptorSetLayoutBinding, 4> load_image_bindings{
-                  VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                // Descriptor Set 0: {bayer_sampler, interp_sampler, image, coordinates, network}
+                VkSamplerCreateInfo bayer_sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+                                                          nullptr,
+                                                          0,
+                                                          VK_FILTER_NEAREST,
+                                                          VK_FILTER_NEAREST,
+                                                          VK_SAMPLER_MIPMAP_MODE_NEAREST,
+                                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                          0.0f,
+                                                          VK_FALSE,
+                                                          0.0f,
+                                                          VK_FALSE,
+                                                          VK_COMPARE_OP_NEVER,
+                                                          0.0f,
+                                                          0.0f,
+                                                          VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
+                                                          VK_FALSE};
+                VkSampler bsampler;
+                throw_vk_error(vkCreateSampler(context.device, &bayer_sampler_info, nullptr, &bsampler),
+                               "Failed to create bayer sampler");
+                VkSamplerCreateInfo interp_sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+                                                           nullptr,
+                                                           0,
+                                                           VK_FILTER_LINEAR,
+                                                           VK_FILTER_LINEAR,
+                                                           VK_SAMPLER_MIPMAP_MODE_LINEAR,
+                                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                           0.0f,
+                                                           VK_FALSE,
+                                                           0.0f,
+                                                           VK_FALSE,
+                                                           VK_COMPARE_OP_NEVER,
+                                                           0.0f,
+                                                           0.0f,
+                                                           VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
+                                                           VK_FALSE};
+                VkSampler isampler;
+                throw_vk_error(vkCreateSampler(context.device, &interp_sampler_info, nullptr, &isampler),
+                               "Failed to create interp sampler");
+
+                bayer_sampler = vk::sampler(bsampler, [this](auto p) { vkDestroySampler(context.device, p, nullptr); });
+                interp_sampler =
+                  vk::sampler(isampler, [this](auto p) { vkDestroySampler(context.device, p, nullptr); });
+
+                // Create the descriptor sets for the load_image program
+                // Descriptor Set 0: {image+sampler, coordinates, network}
+                std::array<VkDescriptorSetLayoutBinding, 3> load_image_bindings{
                   VkDescriptorSetLayoutBinding{
-                    1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                    0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                   VkDescriptorSetLayoutBinding{
-                    2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                    1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                   VkDescriptorSetLayoutBinding{
-                    3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+                    2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
 
                 VkDescriptorSetLayoutCreateInfo load_image_descriptor_set_info = {
                   VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
