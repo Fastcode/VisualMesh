@@ -332,6 +332,7 @@ namespace engine {
                                         const uint32_t& image_ptr,
                                         const uint32_t& image_type,
                                         const uint32_t& bayer_sampler,
+                                        const uint32_t& sampler_type,
                                         const uint32_t&,
                                         const uint32_t& coords_ptr) {
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
@@ -343,7 +344,7 @@ namespace engine {
                     bayer_to_rgb_func,
                     fvec4,
                     {program.load_variable(image_ptr, image_type),
-                     bayer_sampler,
+                     program.load_variable(bayer_sampler, sampler_type),
                      program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                      program.add_constant(fvec2, {Scalar(1.0), Scalar(0.0)})}));
                 program.return_function();
@@ -364,6 +365,7 @@ namespace engine {
                                         const uint32_t& image_ptr,
                                         const uint32_t& image_type,
                                         const uint32_t& bayer_sampler,
+                                        const uint32_t& sampler_type,
                                         const uint32_t&,
                                         const uint32_t& coords_ptr) {
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
@@ -375,7 +377,7 @@ namespace engine {
                     bayer_to_rgb_func,
                     fvec4,
                     {program.load_variable(image_ptr, image_type),
-                     bayer_sampler,
+                     program.load_variable(bayer_sampler, sampler_type),
                      program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                      program.add_constant(fvec2, {Scalar(0.0), Scalar(0.0)})}));
                 program.return_function();
@@ -396,6 +398,7 @@ namespace engine {
                                         const uint32_t& image_ptr,
                                         const uint32_t& image_type,
                                         const uint32_t& bayer_sampler,
+                                        const uint32_t& sampler_type,
                                         const uint32_t&,
                                         const uint32_t& coords_ptr) {
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
@@ -407,7 +410,7 @@ namespace engine {
                     bayer_to_rgb_func,
                     fvec4,
                     {program.load_variable(image_ptr, image_type),
-                     bayer_sampler,
+                     program.load_variable(bayer_sampler, sampler_type),
                      program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                      program.add_constant(fvec2, {Scalar(0.0), Scalar(1.0)})}));
                 program.return_function();
@@ -428,6 +431,7 @@ namespace engine {
                                         const uint32_t& image_ptr,
                                         const uint32_t& image_type,
                                         const uint32_t& bayer_sampler,
+                                        const uint32_t& sampler_type,
                                         const uint32_t&,
                                         const uint32_t& coords_ptr) {
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
@@ -439,7 +443,7 @@ namespace engine {
                     bayer_to_rgb_func,
                     fvec4,
                     {program.load_variable(image_ptr, image_type),
-                     bayer_sampler,
+                     program.load_variable(bayer_sampler, sampler_type),
                      program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                      program.add_constant(fvec2, {Scalar(1.0), Scalar(1.0)})}));
                 program.return_function();
@@ -460,6 +464,7 @@ namespace engine {
                                         const uint32_t& image_ptr,
                                         const uint32_t& image_type,
                                         const uint32_t& interp_sampler,
+                                        const uint32_t& sampler_type,
                                         const uint32_t& sampled_image_type,
                                         const uint32_t& coords_ptr) {
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
@@ -469,7 +474,7 @@ namespace engine {
                   program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
                   program.sample_image(
                     program.load_variable(image_ptr, image_type),
-                    interp_sampler,
+                    program.load_variable(interp_sampler, sampler_type),
                     sampled_image_type,
                     program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                     fvec4));
@@ -478,11 +483,7 @@ namespace engine {
             }
 
             template <typename Scalar, typename LoadImageFunc>
-            inline std::vector<uint32_t> load_image(LoadImageFunc&& load_image_func,
-                                                    const spv::ImageFormat& image_format,
-                                                    const spv::SamplerFilterMode& filter_mode,
-                                                    const spv::SamplerAddressingMode& addressing_mode,
-                                                    const bool& normalised) {
+            inline std::vector<uint32_t> load_image(LoadImageFunc&& load_image_func) {
                 // Initialise the program.
                 Program::Config config;
                 config.enable_glsl_extensions = true;
@@ -507,10 +508,9 @@ namespace engine {
                 uint32_t fvec4_ptr = program.add_pointer(fvec4, spv::StorageClass::StorageBuffer);
 
                 // Define image and sampler types.
-                uint32_t image_type =
-                  program.add_image_type(float_type, spv::Dim::Dim2D, false, false, false, true, image_format);
+                uint32_t image_type = program.add_image_type(
+                  float_type, spv::Dim::Dim2D, false, false, false, true, spv::ImageFormat::Rgba8);
                 uint32_t sampler_type       = program.add_sampler_type();
-                uint32_t constant_sampler   = program.add_constant_sampler(addressing_mode, filter_mode, normalised);
                 uint32_t sampled_image_type = program.add_sampled_image_type(image_type);
 
                 // Define the GlobalInvocationID (for get_global_id(0))
@@ -518,6 +518,11 @@ namespace engine {
                 program.add_builtin_decoration(global_id, spv::BuiltIn::GlobalInvocationId);
 
                 // Prepare the descriptor set variables.
+                // Prepare the image sampler variables.
+                uint32_t sampler_ptr =
+                  program.add_variable(program.add_pointer(sampler_type, spv::StorageClass::UniformConstant),
+                                       spv::StorageClass::UniformConstant);
+
                 // Prepare the image, coordinates array, and network array variables.
                 uint32_t image_ptr =
                   program.add_variable(program.add_pointer(image_type, spv::StorageClass::UniformConstant),
@@ -544,8 +549,8 @@ namespace engine {
                 program.add_member_decoration(network_struct, 0, spv::Decoration::Offset, {0});
 
                 // Create the descriptor sets.
-                // Descriptor Set 0: {image, coordinates, network}
-                program.create_descriptor_set({image_ptr, coords_ptr, network_ptr});
+                // Descriptor Set 0: {sampler, image, coordinates, network}
+                program.create_descriptor_set({sampler_ptr, image_ptr, coords_ptr, network_ptr});
 
                 // Create the "fetch" function
                 uint32_t fetch_func =
@@ -567,7 +572,8 @@ namespace engine {
                                 network_ptr,
                                 image_ptr,
                                 image_type,
-                                constant_sampler,
+                                sampler_ptr,
+                                sampler_type,
                                 sampled_image_type,
                                 coords_ptr);
 

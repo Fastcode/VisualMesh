@@ -240,35 +240,15 @@ namespace engine {
 
                 // Created the load_image kernel source and program
                 std::vector<uint32_t> load_GRBG_image_source =
-                  kernels::load_image<Scalar>(kernels::load_GRBG_image<Scalar>,
-                                              spv::ImageFormat::R8ui,
-                                              spv::SamplerFilterMode::Nearest,
-                                              spv::SamplerAddressingMode::Clamp,
-                                              false);
+                  kernels::load_image<Scalar>(kernels::load_GRBG_image<Scalar>);
                 std::vector<uint32_t> load_RGGB_image_source =
-                  kernels::load_image<Scalar>(kernels::load_RGGB_image<Scalar>,
-                                              spv::ImageFormat::R8ui,
-                                              spv::SamplerFilterMode::Nearest,
-                                              spv::SamplerAddressingMode::Clamp,
-                                              false);
+                  kernels::load_image<Scalar>(kernels::load_RGGB_image<Scalar>);
                 std::vector<uint32_t> load_GBRG_image_source =
-                  kernels::load_image<Scalar>(kernels::load_GBRG_image<Scalar>,
-                                              spv::ImageFormat::R8ui,
-                                              spv::SamplerFilterMode::Nearest,
-                                              spv::SamplerAddressingMode::Clamp,
-                                              false);
+                  kernels::load_image<Scalar>(kernels::load_GBRG_image<Scalar>);
                 std::vector<uint32_t> load_BGGR_image_source =
-                  kernels::load_image<Scalar>(kernels::load_BGGR_image<Scalar>,
-                                              spv::ImageFormat::R8ui,
-                                              spv::SamplerFilterMode::Nearest,
-                                              spv::SamplerAddressingMode::Clamp,
-                                              false);
+                  kernels::load_image<Scalar>(kernels::load_BGGR_image<Scalar>);
                 std::vector<uint32_t> load_RGBA_image_source =
-                  kernels::load_image<Scalar>(kernels::load_RGBA_image<Scalar>,
-                                              spv::ImageFormat::Rgba8ui,
-                                              spv::SamplerFilterMode::Linear,
-                                              spv::SamplerAddressingMode::Clamp,
-                                              false);
+                  kernels::load_image<Scalar>(kernels::load_RGBA_image<Scalar>);
                 VkShaderModuleCreateInfo load_GRBG_image_info = {
                   VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                   0,
@@ -334,13 +314,14 @@ namespace engine {
 
                 // Create the descriptor sets for the load_image program
                 // Descriptor Set 0: {image, coordinates, network}
-                std::array<VkDescriptorSetLayoutBinding, 3> load_image_bindings{
+                std::array<VkDescriptorSetLayoutBinding, 4> load_image_bindings{
+                  VkDescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                   VkDescriptorSetLayoutBinding{
-                    0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                    1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                   VkDescriptorSetLayoutBinding{
-                    1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                    2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                   VkDescriptorSetLayoutBinding{
-                    2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+                    3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
 
                 VkDescriptorSetLayoutCreateInfo load_image_descriptor_set_info = {
                   VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
