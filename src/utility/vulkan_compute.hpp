@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <set>
 #include <spirv/unified1/spirv.hpp11>
 #include <string>
 #include <system_error>
@@ -506,14 +507,77 @@ struct Program {
                   {symbol_id, static_cast<uint32_t>(spv::Decoration::BuiltIn), static_cast<uint32_t>(builtin)});
     }
 
-    void create_descriptor_set(const std::vector<uint32_t>& members) {
-        // Decorate each of the members with the appropriate descriptor set bindings.
-        for (uint32_t i = 0; i < static_cast<uint32_t>(members.size()); ++i) {
+    void create_descriptor_set(const std::vector<uint32_t>& members,
+                               const std::vector<std::set<uint32_t>>& combined_bindings = {}) {
+
+        // Sanity check combined bindings
+        if (combined_bindings.size() > 1) {
+            std::vector<uint32_t> result;
+            std::set_intersection(combined_bindings[0].begin(),
+                                  combined_bindings[0].end(),
+                                  combined_bindings[1].begin(),
+                                  combined_bindings[1].end(),
+                                  std::back_inserter(result));
+            std::vector<uint32_t> buffer;
+            for (size_t i = 2; i < combined_bindings.size(); ++i) {
+                buffer.clear();
+                std::set_intersection(result.begin(),
+                                      result.end(),
+                                      combined_bindings[i].begin(),
+                                      combined_bindings[i].end(),
+                                      std::back_inserter(buffer));
+                std::swap(result, buffer);
+            }
+
+            if (!result.empty()) { throw std::runtime_error("Repeated binding groups detected."); }
+        }
+
+        for (const auto& group : combined_bindings) {
+            for (const auto& member : group) {
+                if (member >= members.size()) {
+                    throw std::runtime_error("Binding group references a non=existent member.");
+                }
+            }
+        }
+
+        // Generate binding values for each member
+        std::vector<std::pair<uint32_t, uint32_t>> bindings;
+        uint32_t current_binding = 0;
+        for (size_t i = 0; i < members.size(); ++i) {
+            // Check to see if we have already handled this index
+            auto handled =
+              std::find_if(bindings.begin(), bindings.end(), [i](const std::pair<uint32_t, uint32_t>& element) {
+                  return element.first == i;
+              });
+            if (handled == bindings.end()) {
+                // Now check for a group binding
+                auto binding_group = std::find_if(
+                  combined_bindings.begin(), combined_bindings.end(), [i](const std::set<uint32_t>& element) {
+                      return element.find(i) != element.end();
+                  });
+                if (binding_group != combined_bindings.end()) {
+                    // We have a binding group, handle all elements of the binding group
+                    for (const auto& group_member : *binding_group) {
+                        bindings.emplace_back(group_member, current_binding);
+                    }
+                    current_binding++;
+                }
+                else {
+                    // No group binding for this member
+                    bindings.emplace_back(i, current_binding);
+                    current_binding++;
+                }
+            }
+        }
+
+        // Decorate each of the members with the appropriate descriptor set bindings
+        for (const auto& binding : bindings) {
             operation(decorations,
                       spv::Op::OpDecorate,
-                      {members[i], static_cast<uint32_t>(spv::Decoration::DescriptorSet), descriptor_sets});
-            operation(
-              decorations, spv::Op::OpDecorate, {members[i], static_cast<uint32_t>(spv::Decoration::Binding), i});
+                      {members[binding.first], static_cast<uint32_t>(spv::Decoration::DescriptorSet), descriptor_sets});
+            operation(decorations,
+                      spv::Op::OpDecorate,
+                      {members[binding.first], static_cast<uint32_t>(spv::Decoration::Binding), binding.second});
         }
 
         // Update descriptor sets counter.
