@@ -1223,7 +1223,7 @@ namespace engine {
                     throw_vk_error(vkCreateSemaphore(context.device, &semaphore_info, nullptr, &f(checkpoint)),
                                    "Failed to create reprojection semaphore");
                     operation::submit_command_buffer(
-                      context.compute_queue, reprojection_command_buffer, {f(checkpoint)});
+                      context.compute_queue, reprojection_command_buffer, {}, {f(checkpoint)});
                 }).else_([&](auto f) {
                     VkFenceCreateInfo fence_info = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, 0};
                     throw_vk_error(vkCreateFence(context.device, &fence_info, nullptr, &f(checkpoint)),

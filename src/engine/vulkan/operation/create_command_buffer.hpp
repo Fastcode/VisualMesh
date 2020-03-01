@@ -71,19 +71,20 @@ namespace engine {
 
             inline void submit_command_buffer(const VkQueue& queue,
                                               const vk::command_buffer& command_buffer,
-                                              const std::vector<VkSemaphore>& semaphores) {
+                                              const std::vector<VkSemaphore>& wait_semaphores,
+                                              const std::vector<VkSemaphore>& complete_semaphores) {
                 throw_vk_error(vkEndCommandBuffer(command_buffer), "Failed to end command buffer");
 
                 std::array<VkCommandBuffer, 1> buf = {command_buffer};
                 VkSubmitInfo submit_info           = {VK_STRUCTURE_TYPE_SUBMIT_INFO,
                                             nullptr,
-                                            0,
-                                            0,
-                                            0,
+                                            static_cast<uint32_t>(wait_semaphores.size()),
+                                            wait_semaphores.data(),
+                                            nullptr,
                                             buf.size(),
                                             buf.data(),
-                                            static_cast<uint32_t>(semaphores.size()),
-                                            semaphores.data()};
+                                            static_cast<uint32_t>(complete_semaphores.size()),
+                                            complete_semaphores.data()};
 
                 throw_vk_error(vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE),
                                "Failed to submit command buffer to queue");
