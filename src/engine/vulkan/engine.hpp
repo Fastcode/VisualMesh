@@ -65,7 +65,7 @@ namespace engine {
              *
              * @param structure the network structure to use classification
              */
-            Engine(const network_structure_t<Scalar>& structure = {}) : max_width(4) {
+            Engine(const network_structure_t<Scalar>& structure = {}, const bool& verbose = false) : max_width(4) {
                 // Get a Vulkan instance
                 const VkApplicationInfo app_info = {
                   VK_STRUCTURE_TYPE_APPLICATION_INFO, 0, "VisualMesh", 0, "", 0, VK_MAKE_VERSION(1, 1, 0)};
@@ -78,7 +78,7 @@ namespace engine {
                 context.instance = vk::instance(instance, [](auto p) { vkDestroyInstance(p, nullptr); });
 
                 // Create the Vulkan instance and find the best devices and queues
-                operation::create_device(DeviceType::GPU, context, false);
+                operation::create_device(DeviceType::GPU, context, verbose);
 
                 // Create queues and command pools
                 vkGetDeviceQueue(context.device, context.compute_queue_family, 0, &context.compute_queue);
@@ -100,6 +100,22 @@ namespace engine {
                   kernels::build_reprojection<Scalar>("project_equisolid", kernels::equisolid_reprojection<Scalar>);
                 std::vector<uint32_t> rectilinear_reprojection_source =
                   kernels::build_reprojection<Scalar>("project_rectilinear", kernels::rectilinear_reprojection<Scalar>);
+
+                if (verbose) {
+                    std::ofstream ofs;
+                    ofs.open("project_equidistant.spv", std::ios::binary | std::ios::out);
+                    ofs.write(reinterpret_cast<const char*>(equidistant_reprojection_source.data()),
+                              equidistant_reprojection_source.size() * sizeof(uint32_t));
+                    ofs.close();
+                    ofs.open("project_equisolid.spv", std::ios::binary | std::ios::out);
+                    ofs.write(reinterpret_cast<const char*>(equisolid_reprojection_source.data()),
+                              equisolid_reprojection_source.size() * sizeof(uint32_t));
+                    ofs.close();
+                    ofs.open("project_rectilinear.spv", std::ios::binary | std::ios::out);
+                    ofs.write(reinterpret_cast<const char*>(rectilinear_reprojection_source.data()),
+                              rectilinear_reprojection_source.size() * sizeof(uint32_t));
+                    ofs.close();
+                }
 
                 VkShaderModuleCreateInfo equidistant_reprojection_info = {
                   VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -255,6 +271,29 @@ namespace engine {
                   kernels::load_image<Scalar>(kernels::load_BGGR_image<Scalar>);
                 std::vector<uint32_t> load_RGBA_image_source =
                   kernels::load_image<Scalar>(kernels::load_RGBA_image<Scalar>);
+                if (verbose) {
+                    std::ofstream ofs;
+                    ofs.open("load_GRBG_image.spv", std::ios::binary | std::ios::out);
+                    ofs.write(reinterpret_cast<const char*>(load_GRBG_image_source.data()),
+                              load_GRBG_image_source.size() * sizeof(uint32_t));
+                    ofs.close();
+                    ofs.open("load_RGGB_image.spv", std::ios::binary | std::ios::out);
+                    ofs.write(reinterpret_cast<const char*>(load_RGGB_image_source.data()),
+                              load_RGGB_image_source.size() * sizeof(uint32_t));
+                    ofs.close();
+                    ofs.open("load_GBRG_image.spv", std::ios::binary | std::ios::out);
+                    ofs.write(reinterpret_cast<const char*>(load_GBRG_image_source.data()),
+                              load_GBRG_image_source.size() * sizeof(uint32_t));
+                    ofs.close();
+                    ofs.open("load_BGGR_image.spv", std::ios::binary | std::ios::out);
+                    ofs.write(reinterpret_cast<const char*>(load_BGGR_image_source.data()),
+                              load_BGGR_image_source.size() * sizeof(uint32_t));
+                    ofs.close();
+                    ofs.open("load_RGBA_image.spv", std::ios::binary | std::ios::out);
+                    ofs.write(reinterpret_cast<const char*>(load_RGBA_image_source.data()),
+                              load_RGBA_image_source.size() * sizeof(uint32_t));
+                    ofs.close();
+                }
                 VkShaderModuleCreateInfo load_GRBG_image_info = {
                   VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                   0,
@@ -516,13 +555,15 @@ namespace engine {
 
                 std::vector<std::pair<uint32_t, std::vector<uint32_t>>> conv_sources =
                   kernels::make_network<Scalar>(structure);
-                std::ofstream ofs;
                 for (const auto& conv_source : conv_sources) {
                     std::string kernel = "conv" + std::to_string(conv_source.first);
-                    ofs.open(kernel + ".spv", std::ios::binary | std::ios::out);
-                    ofs.write(reinterpret_cast<const char*>(conv_source.second.data()),
-                              conv_source.second.size() * sizeof(uint32_t));
-                    ofs.close();
+                    if (verbose) {
+                        std::ofstream ofs;
+                        ofs.open(kernel + ".spv", std::ios::binary | std::ios::out);
+                        ofs.write(reinterpret_cast<const char*>(conv_source.second.data()),
+                                  conv_source.second.size() * sizeof(uint32_t));
+                        ofs.close();
+                    }
 
                     VkShaderModuleCreateInfo conv_info = {
                       VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
