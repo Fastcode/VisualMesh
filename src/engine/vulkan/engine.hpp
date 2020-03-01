@@ -575,6 +575,8 @@ namespace engine {
 
                 // Perform cleanup
                 vkDestroyFence(context.device, fence, nullptr);
+                reprojection_command_buffer.reset();
+                reprojection_descriptor_pool.reset();
                 reprojection_buffers.clear();
 
                 return ProjectedMesh<Scalar, N_NEIGHBOURS>{
@@ -1076,12 +1078,15 @@ namespace engine {
                 // Create a descriptor pool
                 // Descriptor Set 0: {points_ptr, indices_ptr, Rco_ptr, f_ptr, centre_ptr, k_ptr, dimensions_ptr,
                 // out_ptr}
-                std::vector<VkDescriptorPoolSize> descriptor_pool_size = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 8};
-                vk::descriptor_pool descriptor_pool = operation::create_descriptor_pool(context, descriptor_pool_size);
+                std::vector<VkDescriptorPoolSize> descriptor_pool_size = {
+                  VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 8}};
+                reprojection_descriptor_pool = operation::create_descriptor_pool(context, descriptor_pool_size);
 
                 // Allocate the descriptor set
                 VkDescriptorSet descriptor_set =
-                  operation::create_descriptor_set(context, descriptor_pool, {reprojection_descriptor_layout}).back();
+                  operation::create_descriptor_set(
+                    context, reprojection_descriptor_pool, {reprojection_descriptor_layout})
+                    .back();
 
                 // Load the arguments
                 std::array<VkDescriptorBufferInfo, 8> buffer_infos = {
@@ -1111,12 +1116,12 @@ namespace engine {
                 vkUpdateDescriptorSets(context.device, write_descriptors.size(), write_descriptors.data(), 0, nullptr);
 
                 // Project!
-                vk::command_buffer command_buffer =
+                reprojection_command_buffer =
                   operation::create_command_buffer(context, context.compute_command_pool, true);
 
-                vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, reprojection_pipeline);
+                vkCmdBindPipeline(reprojection_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, reprojection_pipeline);
 
-                vkCmdBindDescriptorSets(command_buffer,
+                vkCmdBindDescriptorSets(reprojection_command_buffer,
                                         VK_PIPELINE_BIND_POINT_COMPUTE,
                                         reprojection_pipeline_layout,
                                         0,
@@ -1125,7 +1130,7 @@ namespace engine {
                                         0,
                                         nullptr);
 
-                vkCmdDispatch(command_buffer, static_cast<int32_t>(points), 1, 1);
+                vkCmdDispatch(reprojection_command_buffer, static_cast<int32_t>(points), 1, 1);
 
                 CheckpointType checkpoint;
                 static_if<std::is_same<CheckpointType, VkSemaphore>::value>([&](auto f) {
@@ -1300,7 +1305,10 @@ namespace engine {
             VkPipeline project_equisolid;
             /// Kernel for projecting rays to pixels using a rectilinear projection
             VkPipeline project_rectilinear;
-            /// Memory buufers for the reprojection pipelines
+            /// Reusable descriptor pool for the reprojection pipelines
+            mutable vk::descriptor_pool reprojection_descriptor_pool;
+            /// Reusable command buffer for the reprojection pipelines
+            mutable vk::command_buffer reprojection_command_buffer;
             /// Memory buffers for the reprojection pipelines
             mutable std::map<std::string, std::pair<vk::buffer, vk::device_memory>> reprojection_buffers;
 
