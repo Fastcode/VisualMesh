@@ -22,10 +22,8 @@ extern "C" {
 #include <vulkan/vulkan.h>
 }
 
-#include <algorithm>
 #include <iomanip>
 #include <iostream>
-#include <memory>
 #include <vector>
 
 #include "wrapper.hpp"
