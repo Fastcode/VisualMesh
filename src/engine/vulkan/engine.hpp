@@ -649,9 +649,9 @@ namespace engine {
 
                 std::tie(neighbourhood, indices, vk_pixels, fence) = do_project<Model, VkFence>(mesh, Hoc, lens);
 
-                // Wait 1,000 * 1,000 nanoseconds = 1,000 * 1us = 1ms
+                // Wait 10,000 * 1,000 nanoseconds = 10,000 * 1us = 10ms
                 VkResult res;
-                for (uint32_t timeout_count = 0; timeout_count < 1000; ++timeout_count) {
+                for (uint32_t timeout_count = 0; timeout_count < 10000; ++timeout_count) {
                     res = vkWaitForFences(context.device, 1, &fence, VK_TRUE, static_cast<uint64_t>(1e3));
                     if (res == VK_SUCCESS) { break; }
                     else if (res == VK_ERROR_DEVICE_LOST) {
