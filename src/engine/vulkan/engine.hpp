@@ -887,8 +887,7 @@ namespace engine {
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                            VK_SHARING_MODE_EXCLUSIVE,
                                            {context.transfer_queue_family},
-                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                 operation::map_memory<vec4<Scalar>>(
                   context, VK_WHOLE_SIZE, reprojection_buffers["vk_rco"].second, [&Hoc](vec4<Scalar>* payload) {
@@ -907,8 +906,7 @@ namespace engine {
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                            VK_SHARING_MODE_EXCLUSIVE,
                                            {context.transfer_queue_family},
-                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                 operation::map_memory<Scalar>(
                   context, VK_WHOLE_SIZE, reprojection_buffers["vk_f"].second, [&lens](Scalar* payload) {
@@ -924,8 +922,7 @@ namespace engine {
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                            VK_SHARING_MODE_EXCLUSIVE,
                                            {context.transfer_queue_family},
-                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                 operation::map_memory<vec2<Scalar>>(
                   context, VK_WHOLE_SIZE, reprojection_buffers["vk_centre"].second, [&lens](vec2<Scalar>* payload) {
@@ -944,8 +941,7 @@ namespace engine {
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                            VK_SHARING_MODE_EXCLUSIVE,
                                            {context.transfer_queue_family},
-                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                 operation::map_memory<vec4<Scalar>>(
                   context, VK_WHOLE_SIZE, reprojection_buffers["vk_k"].second, [&ik](vec4<Scalar>* payload) {
@@ -961,8 +957,7 @@ namespace engine {
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                            VK_SHARING_MODE_EXCLUSIVE,
                                            {context.transfer_queue_family},
-                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                 operation::map_memory<vec2<int>>(
                   context, VK_WHOLE_SIZE, reprojection_buffers["vk_dimensions"].second, [&lens](vec2<int>* payload) {
@@ -983,13 +978,11 @@ namespace engine {
                 if (device_mesh == device_points_cache.end()) {
                     vk_points = operation::create_buffer(
                       context,
-                                                         sizeof(vec4<Scalar>) * mesh.nodes.size(),
-                                                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                                         VK_SHARING_MODE_EXCLUSIVE,
-                                                         {context.transfer_queue_family},
-                                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-                                                           | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                                           | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                      sizeof(vec4<Scalar>) * mesh.nodes.size(),
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VK_SHARING_MODE_EXCLUSIVE,
+                      {context.transfer_queue_family},
+                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                     // Write the points buffer to the device and cache it
                     operation::map_memory<vec4<Scalar>>(
@@ -1050,8 +1043,7 @@ namespace engine {
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                            VK_SHARING_MODE_EXCLUSIVE,
                                            {context.transfer_queue_family},
-                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
                 operation::bind_buffer(context, vk_pixels.first, vk_pixels.second, 0);
 
                 // --------------------------------------------------
@@ -1209,15 +1201,14 @@ namespace engine {
                     VkFormat format   = get_image_format(format);
                     VkExtent3D extent = {dimensions[0], dimensions[1], get_image_depth(format)};
 
-                    image_memory.memory =
-                      operation::create_image(context,
-                                              extent,
-                                              format,
-                                              VK_IMAGE_USAGE_STORAGE_BIT,
-                                              VK_SHARING_MODE_EXCLUSIVE,
-                                              {context.transfer_queue_family},
-                                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                                | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                    image_memory.memory = operation::create_image(
+                      context,
+                      extent,
+                      format,
+                      VK_IMAGE_USAGE_STORAGE_BIT,
+                      VK_SHARING_MODE_EXCLUSIVE,
+                      {context.transfer_queue_family},
+                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
                     operation::bind_image(context, image_memory.first, image_memory.second, 0);
 
                     // Update what we are caching
@@ -1231,22 +1222,20 @@ namespace engine {
 
             std::array<std::pair<vk::buffer, vk::device_memory>, 2> get_network_memory(const int& max_size) const {
                 if (network_memory.max_size < max_size) {
-                    network_memory.memory[0] = operation::create_buffer(context,
-                                                                        max_size * sizeof(Scalar),
-                                                                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                                                        VK_SHARING_MODE_EXCLUSIVE,
-                                                                        {context.transfer_queue_family},
-                                                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-                                                                          | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                                                          | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-                    network_memory.memory[1] = operation::create_buffer(context,
-                                                                        max_size * sizeof(Scalar),
-                                                                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                                                        VK_SHARING_MODE_EXCLUSIVE,
-                                                                        {context.transfer_queue_family},
-                                                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-                                                                          | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                                                          | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                    network_memory.memory[0] = operation::create_buffer(
+                      context,
+                      max_size * sizeof(Scalar),
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VK_SHARING_MODE_EXCLUSIVE,
+                      {context.transfer_queue_family},
+                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                    network_memory.memory[1] = operation::create_buffer(
+                      context,
+                      max_size * sizeof(Scalar),
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VK_SHARING_MODE_EXCLUSIVE,
+                      {context.transfer_queue_family},
+                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                     network_memory.max_size = max_size;
                     operation::bind_buffer(context, network_memory[0].first, network_memory[0].second, 0);
@@ -1257,14 +1246,13 @@ namespace engine {
 
             std::pair<vk::buffer, vk::device_memory> get_neighbourhood_memory(const int& max_size) const {
                 if (neighbourhood_memory.max_size < max_size) {
-                    neighbourhood_memory.memory   = operation::create_buffer(context,
-                                                                           max_size * sizeof(int),
-                                                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                                                           VK_SHARING_MODE_EXCLUSIVE,
-                                                                           {context.transfer_queue_family},
-                                                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-                                                                             | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                    neighbourhood_memory.memory = operation::create_buffer(
+                      context,
+                      max_size * sizeof(int),
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VK_SHARING_MODE_EXCLUSIVE,
+                      {context.transfer_queue_family},
+                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
                     neighbourhood_memory.max_size = max_size;
                     operation::bind_buffer(context, neighbourhood_memory.first, neighbourhood_memory.second, 0);
                 }
