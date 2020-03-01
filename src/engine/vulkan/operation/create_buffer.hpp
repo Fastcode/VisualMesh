@@ -18,7 +18,11 @@
 #ifndef VISUALMESH_ENGINE_VULKAN_OPERATION_CREATE_BUFFER_HPP
 #define VISUALMESH_ENGINE_VULKAN_OPERATION_CREATE_BUFFER_HPP
 
+extern "C" {
 #include <vulkan/vulkan.h>
+}
+
+#include <vector>
 
 #include "wrapper.hpp"
 

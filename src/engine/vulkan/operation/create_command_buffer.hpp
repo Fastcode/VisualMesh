@@ -23,6 +23,7 @@ extern "C" {
 }
 
 #include <array>
+#include <vector>
 
 #include "wrapper.hpp"
 

@@ -22,6 +22,8 @@ extern "C" {
 #include <vulkan/vulkan.h>
 }
 
+#include <vector>
+
 #include "create_command_buffer.hpp"
 #include "wrapper.hpp"
 
