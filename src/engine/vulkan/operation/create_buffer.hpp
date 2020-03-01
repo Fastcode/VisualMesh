@@ -33,11 +33,12 @@ namespace engine {
 
             template <typename Scalar, typename MapFunc>
             inline void map_memory(const VulkanContext& context,
+                                   const size_t& offset,
                                    const size_t& size,
                                    const vk::device_memory& mem,
                                    MapFunc&& map) {
                 Scalar* payload;
-                throw_vk_error(vkMapMemory(context.device, mem, 0, size, 0, (void**) &payload),
+                throw_vk_error(vkMapMemory(context.device, mem, offset, size, 0, (void**) &payload),
                                "Failed to host map rco device memory");
                 map(payload);
                 vkUnmapMemory(context.device, mem);

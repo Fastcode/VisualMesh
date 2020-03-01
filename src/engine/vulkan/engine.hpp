@@ -662,7 +662,7 @@ namespace engine {
 
                 // Read the pixels off the buffer
                 std::vector<vec2<Scalar>> pixels(indices.size());
-                operation::map_memory<void>(context, VK_WHOLE_SIZE, vk_pixels.second, [&pixels](void* payload) {
+                operation::map_memory<void>(context, 0, VK_WHOLE_SIZE, vk_pixels.second, [&pixels](void* payload) {
                     std::memcpy(pixels.data(), payload, pixels.size() * sizeof(vec2<Scalar>));
                 });
 
@@ -983,7 +983,7 @@ namespace engine {
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                 operation::map_memory<vec4<Scalar>>(
-                  context, VK_WHOLE_SIZE, reprojection_buffers["vk_rco"].second, [&Hoc](vec4<Scalar>* payload) {
+                  context, 0, VK_WHOLE_SIZE, reprojection_buffers["vk_rco"].second, [&Hoc](vec4<Scalar>* payload) {
                       for (size_t index = 0; index < 3; ++index) {
                           payload[index] = vec4<Scalar>{Hoc[0][index], Hoc[1][index], Hoc[2][index], Scalar(0)};
                       }
@@ -1002,7 +1002,7 @@ namespace engine {
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                 operation::map_memory<Scalar>(
-                  context, VK_WHOLE_SIZE, reprojection_buffers["vk_f"].second, [&lens](Scalar* payload) {
+                  context, 0, VK_WHOLE_SIZE, reprojection_buffers["vk_f"].second, [&lens](Scalar* payload) {
                       payload[0] = lens.focal_length;
                   });
                 operation::bind_buffer(
@@ -1018,7 +1018,7 @@ namespace engine {
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                 operation::map_memory<vec2<Scalar>>(
-                  context, VK_WHOLE_SIZE, reprojection_buffers["vk_centre"].second, [&lens](vec2<Scalar>* payload) {
+                  context, 0, VK_WHOLE_SIZE, reprojection_buffers["vk_centre"].second, [&lens](vec2<Scalar>* payload) {
                       payload[0] = lens.centre;
                   });
                 operation::bind_buffer(
@@ -1037,7 +1037,7 @@ namespace engine {
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                 operation::map_memory<vec4<Scalar>>(
-                  context, VK_WHOLE_SIZE, reprojection_buffers["vk_k"].second, [&ik](vec4<Scalar>* payload) {
+                  context, 0, VK_WHOLE_SIZE, reprojection_buffers["vk_k"].second, [&ik](vec4<Scalar>* payload) {
                       payload[0] = ik;
                   });
                 operation::bind_buffer(
@@ -1053,7 +1053,7 @@ namespace engine {
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                 operation::map_memory<vec2<int>>(
-                  context, VK_WHOLE_SIZE, reprojection_buffers["vk_dimensions"].second, [&lens](vec2<int>* payload) {
+                  context, 0, VK_WHOLE_SIZE, reprojection_buffers["vk_dimensions"].second, [&lens](vec2<int>* payload) {
                       payload[0] = lens.dimensions;
                   });
                 operation::bind_buffer(context,
@@ -1079,7 +1079,7 @@ namespace engine {
 
                     // Write the points buffer to the device and cache it
                     operation::map_memory<vec4<Scalar>>(
-                      context, VK_WHOLE_SIZE, vk_points.second, [&mesh](vec4<Scalar>* payload) {
+                      context, 0, VK_WHOLE_SIZE, vk_points.second, [&mesh](vec4<Scalar>* payload) {
                           size_t index = 0;
                           for (const auto& n : mesh.nodes) {
                               payload[index] =
@@ -1125,7 +1125,7 @@ namespace engine {
 
                 // Upload our indices map
                 operation::map_memory<void>(
-                  context, points * sizeof(int), vk_indices.second, [&indices](void* payload) {
+                  context, 0, points * sizeof(int), vk_indices.second, [&indices](void* payload) {
                       std::memcpy(payload, indices.data(), indices.size() * sizeof(int));
                   });
 
