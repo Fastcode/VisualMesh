@@ -61,7 +61,6 @@ namespace engine {
             using descriptor_pool        = vulkan_wrapper<::VkDescriptorPool>;
             using command_pool           = vulkan_wrapper<::VkCommandPool>;
             using command_buffer         = vulkan_wrapper<::VkCommandBuffer>;
-            using semaphore              = vulkan_wrapper<::VkSemaphore>;
             using descriptor_buffer_info = vulkan_wrapper<::VkDescriptorBufferInfo>;
         }  // namespace vk
 
