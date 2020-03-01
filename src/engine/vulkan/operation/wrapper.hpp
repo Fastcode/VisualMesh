@@ -45,6 +45,7 @@ namespace engine {
             template <typename T>
             struct vulkan_wrapper : public std::shared_ptr<std::remove_pointer_t<T>> {
                 using std::shared_ptr<std::remove_pointer_t<T>>::shared_ptr;
+                using std::shared_ptr<std::remove_pointer_t<T>>::reset;
 
                 operator T() const {
                     return this->get();
