@@ -713,117 +713,122 @@ namespace engine {
                                                                            const Lens<Scalar>& lens,
                                                                            const void* image,
                                                                            const uint32_t& format) const {
+                static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+
+                // Project our visual mesh
+                std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
+                std::vector<int> indices;
+                std::pair<vk::buffer, vk::device_memory> vk_pixels;
+                VkSemaphore reprojection_semaphore;
+                std::tie(neighbourhood, indices, vk_pixels, reprojection_semaphore) =
+                  do_project<Model, VkSemaphore>(mesh, Hoc, lens);
+
+                // Grab the image memory from the cache
+                std::pair<vk::image, vk::device_memory> vk_image = get_image_memory(lens.dimensions, format);
+                size_t image_size = lens.dimensions[0] * lens.dimensions[1] * get_image_depth(format);
+                operation::map_memory<void>(
+                  context, 0, VK_WHOLE_SIZE, vk_image.second, [&image, &image_size](void* payload) {
+                      std::memcpy(payload, image, image_size);
+                  });
+
+                // This includes the offscreen point at the end
+                int n_points = neighbourhood.size();
+
+                // Get the neighbourhood memory from cache
+                std::pair<vk::buffer, vk::device_memory> vk_neighbourhood =
+                  get_neighbourhood_memory(n_points * N_NEIGHBOURS);
+
+                // Upload the neighbourhood buffer
+                operation::map_memory<void>(
+                  context, 0, VK_WHOLE_SIZE, vk_neighbourhood.second, [&neighbourhood](void* payload) {
+                      std::memcpy(payload, neighbourhood.data(), neighbourhood.size() * N_NEIGHBOURS * sizeof(int));
+                  });
+
+                // Grab our ping pong buffers from the cache
+                auto vk_conv_mem                                        = get_network_memory(max_width * n_points);
+                std::pair<vk::buffer, vk::device_memory> vk_conv_input  = vk_conv_mem[0];
+                std::pair<vk::buffer, vk::device_memory> vk_conv_output = vk_conv_mem[1];
+
+                // The offscreen point gets a value of -1.0 to make it easy to distinguish
+                operation::map_memory<Scalar>(context,
+                                              (n_points - 1) * sizeof(Scalar),
+                                              sizeof(Scalar),
+                                              vk_conv_input.second,
+                                              [&n_points](Scalar* payload) { payload[0] = Scalar(-1); });
+
+                // Read the pixels into the buffer
+                // Create a descriptor pool
+                // Descriptor Set 0: {image+sampler, coordinates, network}
+                std::vector<VkDescriptorPoolSize> load_image_pool_size = {
+                  VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
+                  VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2},
+                };
+                vk::descriptor_pool load_image_pool = operation::create_descriptor_pool(context, load_image_pool_size);
+
+                // Allocate the descriptor set
+                VkDescriptorSet descriptor_set =
+                  operation::create_descriptor_set(context, load_image_pool, {load_image_descriptor_layout}).back();
+
+                // Load the arguments
+                std::array<VkDescriptorBufferInfo, 2> buffer_infos = {
+                  VkDescriptorBufferInfo{vk_pixels.first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{vk_conv_input.first, 0, VK_WHOLE_SIZE},
+                };
+                VkDescriptorImageInfo image_info = {get_image_sampler(format),
+                                                    get_image_view(vk_image.first, format),
+                                                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+
+                std::array<VkWriteDescriptorSet, 3> write_descriptors;
+                write_descriptors[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                        nullptr,
+                                        descriptor_set,
+                                        0,
+                                        0,
+                                        1,
+                                        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                        &image_info,
+                                        nullptr,
+                                        nullptr};
+                for (size_t i = 0; i < buffer_infos.size(); ++i) {
+                    write_descriptors[i + 1] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                                nullptr,
+                                                descriptor_set,
+                                                static_cast<uint32_t>(i + 1),
+                                                0,
+                                                1,
+                                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                                nullptr,
+                                                &buffer_infos[i],
+                                                nullptr};
+                }
+
+                vkUpdateDescriptorSets(context.device, write_descriptors.size(), write_descriptors.data(), 0, nullptr);
+
+                // Project!
+                vk::command_buffer command_buffer =
+                  operation::create_command_buffer(context, context.compute_command_pool, true);
+
+                vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, get_image_pipeline(format));
+
+                vkCmdBindDescriptorSets(command_buffer,
+                                        VK_PIPELINE_BIND_POINT_COMPUTE,
+                                        load_image_pipeline_layout,
+                                        0,
+                                        1,
+                                        &descriptor_set,
+                                        0,
+                                        nullptr);
+
+                vkCmdDispatch(command_buffer, static_cast<uint32_t>(n_points - 1), 1, 1);
+
+                VkSemaphoreCreateInfo semaphore_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0};
+                VkSemaphore semaphore;
+                throw_vk_error(vkCreateSemaphore(context.device, &semaphore_info, nullptr, &semaphore),
+                               "Failed to create reprojection semaphore");
+                operation::submit_command_buffer(
+                  context.compute_queue, command_buffer, {reprojection_semaphore}, {semaphore});
+
                 return ClassifiedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS>();
-                // // Grab the image memory from the cache
-                // std::pair<vk::image, vk::device_memory> vk_image = get_image_memory(lens.dimensions, format);
-                // size_t image_size = lens.dimensions[0] * lens.dimensions[1] * get_image_depth(format);
-                // operation::map_memory<void>(
-                //   context, VK_WHOLE_SIZE, vk_image.second, [&image, &image_size](void* payload) {
-                //       std::memcpy(payload, image, image_size);
-                //   });
-
-                // // Project our visual mesh
-                // std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
-                // std::vector<int> indices;
-                // std::pair<vk::buffer, vk::device_memory> vk_pixels;
-                // std::vector<vk::semaphore> semaphores;
-                // std::tie(neighbourhood, indices, vk_pixels, semaphores) = do_project(mesh, Hoc, lens);
-
-                // // This includes the offscreen point at the end
-                // int n_points = neighbourhood.size();
-
-                // // Get the neighbourhood memory from cache
-                // std::pair<vk::buffer, vk::device_memory> vk_neighbourhood =
-                //   get_neighbourhood_memory(n_points * N_NEIGHBOURS);
-
-                // // Upload the neighbourhood buffer
-                // operation::map_memory<void>(
-                //   context, VK_WHOLE_SIZE, vk_neighbourhood.second, [&neighbourhood](void* payload) {
-                //       std::memcpy(payload, neighbourhood.data(), neighbourhood.size() * N_NEIGHBOURS * sizeof(int));
-                //   });
-
-                // std::pair<vk::buffer, vk::device_memory> vk_sampler = operation::create_buffer(context, )
-
-                //   // Read the pixels into the buffer
-                //   // Create a descriptor pool
-                //   // Descriptor Set 0: {sampler, image, coordinates, network}
-                //   std::vector<VkDescriptorPoolSize>
-                //     load_image_pool_size = {
-                //       VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLER, 1},
-                //       VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1},
-                //       VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2},
-                //     };
-                // vk::descriptor_pool load_image_pool = create_descriptor_pool(context, load_image_pool_size);
-
-                // // Allocate the descriptor set
-                // VkDescriptorSet descriptor_set =
-                //   create_descriptor_set(context, load_image_pool, {load_image_descriptor_layout}).back();
-
-                // // Load the arguments
-                // std::array<VkDescriptorBufferInfo, 8> buffer_infos = {
-                //   VkDescriptorBufferInfo{vk_points.first, 0, VK_WHOLE_SIZE},
-                //   VkDescriptorBufferInfo{vk_indices.first, 0, VK_WHOLE_SIZE},
-                //   VkDescriptorBufferInfo{reprojection_buffers["vk_rco"].first, 0, VK_WHOLE_SIZE},
-                //   VkDescriptorBufferInfo{reprojection_buffers["vk_f"].first, 0, VK_WHOLE_SIZE},
-                //   VkDescriptorBufferInfo{reprojection_buffers["vk_centre"].first, 0, VK_WHOLE_SIZE},
-                //   VkDescriptorBufferInfo{reprojection_buffers["vk_k"].first, 0, VK_WHOLE_SIZE},
-                //   VkDescriptorBufferInfo{reprojection_buffers["vk_dimensions"].first, 0, VK_WHOLE_SIZE},
-                //   VkDescriptorBufferInfo{vk_pixels.first, 0, VK_WHOLE_SIZE},
-                // };
-                // std::array<VkWriteDescriptorSet, 8> write_descriptors;
-                // for (size_t i = 0; i < buffer_infos.size(); ++i) {
-                //     write_descriptors[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                //                             nullptr,
-                //                             descriptor_set,
-                //                             0,
-                //                             0,
-                //                             1,
-                //                             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                //                             nullptr,
-                //                             &buffer_info[i],
-                //                             nullptr};
-                // }
-
-                // vkUpdateDescriptorSets(context.device, write_descriptors.size(), write_descriptors.data(), 0,
-                // nullptr);
-
-                // // Project!
-                // vk::command_buffer command_buffer = create_command_buffer(context, true);
-
-                // vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, reprojection_pipeline);
-
-                // vkCmdBindDescriptorSets(command_buffer,
-                //                         VK_PIPELINE_BIND_POINT_COMPUTE,
-                //                         reprojection_pipeline_layout,
-                //                         0,
-                //                         1,
-                //                         &descriptor_set,
-                //                         0,
-                //                         nullptr);
-
-                // vkCmdDispatch(command_buffer, static_cast<int32_t>(points), 1, 1);
-
-                // VkSemaphoreTypeCreateInfo sem_type_info = {
-                //   VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO, nullptr, VK_SEMAPHORE_TYPE_TIMELINE, 0};
-                // VkSemaphoreCreateInfo sem_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, &sem_type_info, 0};
-                // VkSemaphore sem;
-                // VkResult vkCreateSemaphore(context.device, &sem_info, nullptr, &sem);
-                // std::vector<vk::semaphore> semaphores = {
-                //   vk::semaphore(sem, [this](auto p) { vkDestroySemaphore(context.device, p, nullptr); })};
-                // submit_command_buffer(context.compute_queue, command_buffer, semaphores);
-
-                // // Grab our ping pong buffers from the cache
-                // std::pair<vk::buffer, vk::device_memory> vk_conv_input;
-                // std::pair<vk::buffer, vk::device_memory> vk_conv_output;
-                // std::tie(vk_conv_input, vk_conv_output) = get_network_memory(max_width * n_points);
-
-                // // The offscreen point gets a value of -1.0 to make it easy to distinguish
-                // operation::map_memory<void>(context, VK_WHOLE_SIZE, vk_conv_input.second, [&n_points](void* payload)
-                // {
-                //     Scalar minus_one(-1.0);
-                //     std::memcpy(payload + ((n_points - 1) * sizeof(vec4<Scalar>)), &minus_one, sizeof(Scalar));
-                // });
-
 
                 // cl::event img_load_event;
                 // cl::event network_complete;
@@ -1257,7 +1262,7 @@ namespace engine {
                                        std::move(checkpoint));          // Checkpoint to wait on
             }
 
-            uint32_t get_image_depth(const uint32_t& format) {
+            uint32_t get_image_depth(const uint32_t& format) const {
                 switch (format) {
                     // Bayer
                     case fourcc("GRBG"):
@@ -1272,19 +1277,69 @@ namespace engine {
                 return 0;
             }
 
-            VkFormat get_image_format(const uint32_t& format) {
+            VkFormat get_image_format(const uint32_t& format) const {
                 switch (format) {
                     // Bayer
                     case fourcc("GRBG"):
                     case fourcc("RGGB"):
                     case fourcc("GBRG"):
-                    case fourcc("BGGR"): format = VK_FORMAT_R8_UNORM; break;
-                    case fourcc("BGRA"): format = VK_FORMAT_B8G8R8A8_UNORM; break;
-                    case fourcc("RGBA"): format = VK_FORMAT_R8G8B8A8_UNORM; break;
+                    case fourcc("BGGR"): return VK_FORMAT_R8_UNORM; break;
+                    case fourcc("BGRA"): return VK_FORMAT_B8G8R8A8_UNORM; break;
+                    case fourcc("RGBA"): return VK_FORMAT_R8G8B8A8_UNORM; break;
                     // Oh no...
                     default: throw std::runtime_error("Unsupported image format " + fourcc_text(format));
                 }
                 return VK_FORMAT_UNDEFINED;
+            }
+
+            vk::sampler get_image_sampler(const uint32_t& format) const {
+                switch (format) {
+                    // Bayer
+                    case fourcc("GRBG"):
+                    case fourcc("RGGB"):
+                    case fourcc("GBRG"):
+                    case fourcc("BGGR"): return bayer_sampler;
+                    case fourcc("BGRA"):
+                    case fourcc("RGBA"): return interp_sampler;
+                    // Oh no...
+                    default: throw std::runtime_error("Unsupported image format " + fourcc_text(format));
+                }
+                return vk::sampler();
+            }
+
+            vk::image_view get_image_view(const vk::image& image, const uint32_t& format) const {
+                // TODO: Can we use the swizzling here to map RGBA <-> BGRA?
+                VkImageViewCreateInfo view_info = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                                                   nullptr,
+                                                   0,
+                                                   image,
+                                                   VK_IMAGE_VIEW_TYPE_2D,
+                                                   get_image_format(format),
+                                                   {VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                    VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                    VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                    VK_COMPONENT_SWIZZLE_IDENTITY},
+                                                   {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}};
+
+                VkImageView image_view;
+                throw_vk_error(vkCreateImageView(context.device, &view_info, nullptr, &image_view),
+                               "Failed to create image view");
+                return vk::image_view(image_view, [this](auto p) { vkDestroyImageView(context.device, p, nullptr); });
+            }
+
+            VkPipeline get_image_pipeline(const uint32_t& format) const {
+                switch (format) {
+                    // Bayer
+                    case fourcc("GRBG"): return load_GRBG_image;
+                    case fourcc("RGGB"): return load_RGGB_image;
+                    case fourcc("GBRG"): return load_GBRG_image;
+                    case fourcc("BGGR"): return load_BGGR_image;
+                    case fourcc("BGRA"):
+                    case fourcc("RGBA"): return load_RGBA_image;
+                    // Oh no...
+                    default: throw std::runtime_error("Unsupported image format " + fourcc_text(format));
+                }
+                return VkPipeline();
             }
 
             std::pair<vk::image, vk::device_memory> get_image_memory(const vec2<int>& dimensions,
@@ -1292,7 +1347,9 @@ namespace engine {
                 // If our dimensions and format haven't changed from last time we can reuse the same memory location
                 if (dimensions != image_memory.dimensions || format != image_memory.format) {
                     VkFormat format   = get_image_format(format);
-                    VkExtent3D extent = {dimensions[0], dimensions[1], get_image_depth(format)};
+                    VkExtent3D extent = {static_cast<uint32_t>(dimensions[0]),
+                                         static_cast<uint32_t>(dimensions[1]),
+                                         get_image_depth(format)};
 
                     image_memory.memory = operation::create_image(
                       context,
@@ -1302,7 +1359,7 @@ namespace engine {
                       VK_SHARING_MODE_EXCLUSIVE,
                       {context.transfer_queue_family},
                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-                    operation::bind_image(context, image_memory.first, image_memory.second, 0);
+                    operation::bind_image(context, image_memory.memory.first, image_memory.memory.second, 0);
 
                     // Update what we are caching
                     image_memory.dimensions = dimensions;
@@ -1331,8 +1388,8 @@ namespace engine {
                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                     network_memory.max_size = max_size;
-                    operation::bind_buffer(context, network_memory[0].first, network_memory[0].second, 0);
-                    operation::bind_buffer(context, network_memory[1].first, network_memory[1].second, 0);
+                    operation::bind_buffer(context, network_memory.memory[0].first, network_memory.memory[0].second, 0);
+                    operation::bind_buffer(context, network_memory.memory[1].first, network_memory.memory[1].second, 0);
                 }
                 return network_memory.memory;
             }
@@ -1347,7 +1404,8 @@ namespace engine {
                       {context.transfer_queue_family},
                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
                     neighbourhood_memory.max_size = max_size;
-                    operation::bind_buffer(context, neighbourhood_memory.first, neighbourhood_memory.second, 0);
+                    operation::bind_buffer(
+                      context, neighbourhood_memory.memory.first, neighbourhood_memory.memory.second, 0);
                 }
                 return neighbourhood_memory.memory;
             }

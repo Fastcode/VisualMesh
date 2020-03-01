@@ -59,6 +59,7 @@ namespace engine {
             using sampler                = vulkan_wrapper<::VkSampler>;
             using shader_module          = vulkan_wrapper<::VkShaderModule>;
             using image                  = vulkan_wrapper<::VkImage>;
+            using image_view             = vulkan_wrapper<::VkImageView>;
             using descriptor_pool        = vulkan_wrapper<::VkDescriptorPool>;
             using command_pool           = vulkan_wrapper<::VkCommandPool>;
             using command_buffer         = vulkan_wrapper<::VkCommandBuffer>;
