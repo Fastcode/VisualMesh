@@ -576,6 +576,9 @@ namespace engine {
                     std::memcpy(pixels.data(), payload, pixels.size() * sizeof(vec2<Scalar>));
                 });
 
+                // Perform cleanup
+                reprojection_buffers.clear();
+
                 return ProjectedMesh<Scalar, N_NEIGHBOURS>{
                   std::move(pixels), std::move(neighbourhood), std::move(indices)};
             }
@@ -667,11 +670,11 @@ namespace engine {
                 // std::array<VkDescriptorBufferInfo, 8> buffer_infos = {
                 //   VkDescriptorBufferInfo{vk_points.first, 0, VK_WHOLE_SIZE},
                 //   VkDescriptorBufferInfo{vk_indices.first, 0, VK_WHOLE_SIZE},
-                //   VkDescriptorBufferInfo{vk_rco.first, 0, VK_WHOLE_SIZE},
-                //   VkDescriptorBufferInfo{vk_f.first, 0, VK_WHOLE_SIZE},
-                //   VkDescriptorBufferInfo{vk_centre.first, 0, VK_WHOLE_SIZE},
-                //   VkDescriptorBufferInfo{vk_k.first, 0, VK_WHOLE_SIZE},
-                //   VkDescriptorBufferInfo{vk_deimensions.first, 0, VK_WHOLE_SIZE},
+                //   VkDescriptorBufferInfo{reprojection_buffers["vk_rco"].first, 0, VK_WHOLE_SIZE},
+                //   VkDescriptorBufferInfo{reprojection_buffers["vk_f"].first, 0, VK_WHOLE_SIZE},
+                //   VkDescriptorBufferInfo{reprojection_buffers["vk_centre"].first, 0, VK_WHOLE_SIZE},
+                //   VkDescriptorBufferInfo{reprojection_buffers["vk_k"].first, 0, VK_WHOLE_SIZE},
+                //   VkDescriptorBufferInfo{reprojection_buffers["vk_dimensions"].first, 0, VK_WHOLE_SIZE},
                 //   VkDescriptorBufferInfo{vk_pixels.first, 0, VK_WHOLE_SIZE},
                 // };
                 // std::array<VkWriteDescriptorSet, 8> write_descriptors;
@@ -871,7 +874,7 @@ namespace engine {
                 auto ranges = mesh.lookup(Hoc, lens);
 
                 // Transfer Rco to the device
-                std::pair<vk::buffer, vk::device_memory> vk_rco =
+                reprojection_buffers["vk_rco"] =
                   operation::create_buffer(context,
                                            sizeof(vec4<Scalar>) * sizeof(Scalar),
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -881,16 +884,17 @@ namespace engine {
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
                 operation::map_memory<vec4<Scalar>>(
-                  context, VK_WHOLE_SIZE, vk_rco.second, [&Hoc](vec4<Scalar>* payload) {
+                  context, VK_WHOLE_SIZE, reprojection_buffers["vk_rco"].second, [&Hoc](vec4<Scalar>* payload) {
                       for (size_t index = 0; index < 3; ++index) {
                           payload[index] = vec4<Scalar>{Hoc[0][index], Hoc[1][index], Hoc[2][index], Scalar(0)};
                       }
                       payload[4] = vec4<Scalar>{Scalar(0), Scalar(0), Scalar(0), Scalar(1)};
                   });
-                operation::bind_buffer(context, vk_rco.first, vk_rco.second, 0);
+                operation::bind_buffer(
+                  context, reprojection_buffers["vk_rco"].first, reprojection_buffers["vk_rco"].second, 0);
 
                 // Transfer f to the device
-                std::pair<vk::buffer, vk::device_memory> vk_f =
+                reprojection_buffers["vk_f"] =
                   operation::create_buffer(context,
                                            sizeof(Scalar),
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -900,11 +904,14 @@ namespace engine {
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
                 operation::map_memory<Scalar>(
-                  context, VK_WHOLE_SIZE, vk_f.second, [&lens](Scalar* payload) { payload[0] = lens.focal_length; });
-                operation::bind_buffer(context, vk_f.first, vk_f.second, 0);
+                  context, VK_WHOLE_SIZE, reprojection_buffers["vk_f"].second, [&lens](Scalar* payload) {
+                      payload[0] = lens.focal_length;
+                  });
+                operation::bind_buffer(
+                  context, reprojection_buffers["vk_f"].first, reprojection_buffers["vk_f"].second, 0);
 
                 // Transfer centre to the device
-                std::pair<vk::buffer, vk::device_memory> vk_centre =
+                reprojection_buffers["vk_centre"] =
                   operation::create_buffer(context,
                                            sizeof(vec2<Scalar>),
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -914,16 +921,17 @@ namespace engine {
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
                 operation::map_memory<vec2<Scalar>>(
-                  context, VK_WHOLE_SIZE, vk_centre.second, [&lens](vec2<Scalar>* payload) {
+                  context, VK_WHOLE_SIZE, reprojection_buffers["vk_centre"].second, [&lens](vec2<Scalar>* payload) {
                       payload[0] = lens.centre;
                   });
-                operation::bind_buffer(context, vk_centre.first, vk_centre.second, 0);
+                operation::bind_buffer(
+                  context, reprojection_buffers["vk_centre"].first, reprojection_buffers["vk_centre"].second, 0);
 
                 // Calculate the coefficients for performing a distortion to give to the engine
                 vec4<Scalar> ik = inverse_coefficients(lens.k);
 
                 // Transfer k to the device
-                std::pair<vk::buffer, vk::device_memory> vk_k =
+                reprojection_buffers["vk_k"] =
                   operation::create_buffer(context,
                                            sizeof(vec4<Scalar>),
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -933,11 +941,14 @@ namespace engine {
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
                 operation::map_memory<vec4<Scalar>>(
-                  context, VK_WHOLE_SIZE, vk_k.second, [&ik](vec4<Scalar>* payload) { payload[0] = ik; });
-                operation::bind_buffer(context, vk_k.first, vk_k.second, 0);
+                  context, VK_WHOLE_SIZE, reprojection_buffers["vk_k"].second, [&ik](vec4<Scalar>* payload) {
+                      payload[0] = ik;
+                  });
+                operation::bind_buffer(
+                  context, reprojection_buffers["vk_k"].first, reprojection_buffers["vk_k"].second, 0);
 
                 // Transfer dimensions to the device
-                std::pair<vk::buffer, vk::device_memory> vk_dimensions =
+                reprojection_buffers["vk_dimensions"] =
                   operation::create_buffer(context,
                                            sizeof(vec2<int>),
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -947,10 +958,13 @@ namespace engine {
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
                 operation::map_memory<vec2<int>>(
-                  context, VK_WHOLE_SIZE, vk_dimensions.second, [&lens](vec2<int>* payload) {
+                  context, VK_WHOLE_SIZE, reprojection_buffers["vk_dimensions"].second, [&lens](vec2<int>* payload) {
                       payload[0] = lens.dimensions;
                   });
-                operation::bind_buffer(context, vk_dimensions.first, vk_dimensions.second, 0);
+                operation::bind_buffer(context,
+                                       reprojection_buffers["vk_dimensions"].first,
+                                       reprojection_buffers["vk_dimensions"].second,
+                                       0);
 
                 // Convenience variables
                 const auto& nodes = mesh.nodes;
@@ -960,7 +974,8 @@ namespace engine {
 
                 auto device_mesh = device_points_cache.find(&mesh);
                 if (device_mesh == device_points_cache.end()) {
-                    vk_points = operation::create_buffer(context,
+                    vk_points = operation::create_buffer(
+                      context,
                                                          sizeof(vec4<Scalar>) * mesh.nodes.size(),
                                                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                                          VK_SHARING_MODE_EXCLUSIVE,
@@ -1011,15 +1026,13 @@ namespace engine {
                 }
 
                 // Create buffer for indices map
-                std::pair<vk::buffer, vk::device_memory> vk_indices =
-                  operation::create_buffer(context,
-                                           sizeof(int) * points,
-                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                           VK_SHARING_MODE_EXCLUSIVE,
-                                           {context.transfer_queue_family},
-                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                             | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-                operation::bind_buffer(context, vk_indices.first, vk_indices.second, 0);
+                std::pair<vk::buffer, vk::device_memory> vk_indices = get_indices_memory(points);
+
+                // Upload our indices map
+                operation::map_memory<void>(
+                  context, points * sizeof(int), vk_indices.second, [&indices](void* payload) {
+                      std::memcpy(payload, indices.data(), indices.size() * sizeof(int));
+                  });
 
                 // Create output buffer for pixel_coordinates
                 std::pair<vk::buffer, vk::device_memory> vk_pixels =
@@ -1031,11 +1044,6 @@ namespace engine {
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
                                              | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
                 operation::bind_buffer(context, vk_pixels.first, vk_pixels.second, 0);
-
-                // Upload our indices map
-                operation::map_memory<void>(context, VK_WHOLE_SIZE, vk_indices.second, [&indices](void* payload) {
-                    std::memcpy(payload, indices.data(), indices.size() * sizeof(int));
-                });
 
                 // --------------------------------------------------
                 // At this point the point and the indices should be
@@ -1070,12 +1078,12 @@ namespace engine {
                 // Load the arguments
                 std::array<VkDescriptorBufferInfo, 8> buffer_infos = {
                   VkDescriptorBufferInfo{vk_points.first, 0, VK_WHOLE_SIZE},
-                  VkDescriptorBufferInfo{vk_indices.first, 0, VK_WHOLE_SIZE},
-                  VkDescriptorBufferInfo{vk_rco.first, 0, VK_WHOLE_SIZE},
-                  VkDescriptorBufferInfo{vk_f.first, 0, VK_WHOLE_SIZE},
-                  VkDescriptorBufferInfo{vk_centre.first, 0, VK_WHOLE_SIZE},
-                  VkDescriptorBufferInfo{vk_k.first, 0, VK_WHOLE_SIZE},
-                  VkDescriptorBufferInfo{vk_dimensions.first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{vk_indices.first, 0, points * sizeof(int)},
+                  VkDescriptorBufferInfo{reprojection_buffers["vk_rco"].first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{reprojection_buffers["vk_f"].first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{reprojection_buffers["vk_centre"].first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{reprojection_buffers["vk_k"].first, 0, VK_WHOLE_SIZE},
+                  VkDescriptorBufferInfo{reprojection_buffers["vk_dimensions"].first, 0, VK_WHOLE_SIZE},
                   VkDescriptorBufferInfo{vk_pixels.first, 0, VK_WHOLE_SIZE},
                 };
                 std::array<VkWriteDescriptorSet, 8> write_descriptors;
@@ -1246,6 +1254,21 @@ namespace engine {
                 return neighbourhood_memory.memory;
             }
 
+            std::pair<vk::buffer, vk::device_memory> get_indices_memory(const int& max_size) const {
+                if (indices_memory.max_size < max_size) {
+                    indices_memory.memory = operation::create_buffer(
+                      context,
+                      max_size * sizeof(int),
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VK_SHARING_MODE_EXCLUSIVE,
+                      {context.transfer_queue_family},
+                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                    indices_memory.max_size = max_size;
+                    operation::bind_buffer(context, indices_memory.memory.first, indices_memory.memory.second, 0);
+                }
+                return indices_memory.memory;
+            }
+
             /// Vulkan instance
             VulkanContext context;
 
@@ -1265,6 +1288,9 @@ namespace engine {
             VkPipeline project_equisolid;
             /// Kernel for projecting rays to pixels using a rectilinear projection
             VkPipeline project_rectilinear;
+            /// Memory buufers for the reprojection pipelines
+            /// Memory buffers for the reprojection pipelines
+            mutable std::map<std::string, std::pair<vk::buffer, vk::device_memory>> reprojection_buffers;
 
             /// DescriptorSetLayouts for the load_image kernel
             VkDescriptorSetLayout load_image_descriptor_layout;
@@ -1310,6 +1336,11 @@ namespace engine {
                 int max_size = 0;
                 std::pair<vk::buffer, vk::device_memory> memory;
             } neighbourhood_memory;
+
+            mutable struct {
+                int max_size = 0;
+                std::pair<vk::buffer, vk::device_memory> memory;
+            } indices_memory;
 
             // The width of the maximumally wide layer in the network
             size_t max_width;
