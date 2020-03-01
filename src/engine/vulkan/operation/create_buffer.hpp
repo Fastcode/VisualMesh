@@ -60,7 +60,7 @@ namespace engine {
                                                   static_cast<uint32_t>(queues.size()),
                                                   queues.data()};
                 VkBuffer buf;
-                throw_vk_error(vkCreateBuffer(context.device, &buffer_info, 0, &buf), "Failed to create buffer");
+                throw_vk_error(vkCreateBuffer(context.device, &buffer_info, nullptr, &buf), "Failed to create buffer");
                 vk::buffer buffer(buf, [&context](auto p) { vkDestroyBuffer(context.device, p, nullptr); });
 
                 VkPhysicalDeviceMemoryProperties mem_props;
@@ -75,7 +75,7 @@ namespace engine {
                 for (uint32_t k = 0; k < mem_props.memoryTypeCount; k++) {
                     if ((mem_requirements.memoryTypeBits & (1 << k))
                         && ((mem_props.memoryTypes[k].propertyFlags & properties) == properties)
-                        && (size < mem_props.memoryHeaps[mem_props.memoryTypes[k].heapIndex].size)) {
+                        && (mem_requirements.size < mem_props.memoryHeaps[mem_props.memoryTypes[k].heapIndex].size)) {
                         heap_index = k;
                         break;
                     }
@@ -84,10 +84,11 @@ namespace engine {
                 throw_vk_error(heap_index == VK_MAX_MEMORY_TYPES ? VK_ERROR_OUT_OF_DEVICE_MEMORY : VK_SUCCESS,
                                "Failed to find enough allocatable device memory");
 
-                VkMemoryAllocateInfo memoryAllocateInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, 0, size, heap_index};
+                VkMemoryAllocateInfo alloc_info = {
+                  VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, nullptr, mem_requirements.size, heap_index};
 
                 VkDeviceMemory mem;
-                throw_vk_error(vkAllocateMemory(context.device, &memoryAllocateInfo, 0, &mem),
+                throw_vk_error(vkAllocateMemory(context.device, &alloc_info, nullptr, &mem),
                                "Failed to allocate memory on the device");
                 vk::device_memory memory(mem, [&context](auto p) { vkFreeMemory(context.device, p, nullptr); });
 
