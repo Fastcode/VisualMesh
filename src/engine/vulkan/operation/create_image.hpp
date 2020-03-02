@@ -112,7 +112,7 @@ namespace engine {
                                                 const VkImageLayout& new_layout) {
 
                 vk::command_buffer command_buffer =
-                  operation::create_command_buffer(context, context.transfer_command_pool, true);
+                  operation::create_command_buffer(context, context.compute_command_pool, true);
 
                 VkImageMemoryBarrier barrier = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                                                 nullptr,
@@ -141,7 +141,7 @@ namespace engine {
                     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
                     source_stage      = VK_PIPELINE_STAGE_TRANSFER_BIT;
-                    destination_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+                    destination_stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
                 }
                 else {
                     throw_vk_error(VK_ERROR_FORMAT_NOT_SUPPORTED, "Unsupported layout transition");
