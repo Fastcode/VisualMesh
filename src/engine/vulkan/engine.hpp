@@ -1401,14 +1401,14 @@ namespace engine {
                     VkExtent3D vk_extent = {
                       static_cast<uint32_t>(dimensions[0]), static_cast<uint32_t>(dimensions[1]), 1};
 
-                    image_memory.memory = operation::create_image(
-                      context,
-                      vk_extent,
-                      vk_format,
-                      VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                      VK_SHARING_MODE_EXCLUSIVE,
-                      {context.transfer_queue_family},
-                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                    image_memory.memory =
+                      operation::create_image(context,
+                                              vk_extent,
+                                              vk_format,
+                                              VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                                              VK_SHARING_MODE_EXCLUSIVE,
+                                              {context.transfer_queue_family},
+                                              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
                     operation::bind_image(context, image_memory.memory.first, image_memory.memory.second, 0);
 
                     // Update what we are caching
