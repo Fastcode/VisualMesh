@@ -84,7 +84,7 @@ namespace engine {
                 }
 
                 throw_vk_error(heap_index == VK_MAX_MEMORY_TYPES ? VK_ERROR_OUT_OF_DEVICE_MEMORY : VK_SUCCESS,
-                               "Failed to find enough allocatable device memory");
+                               "Failed to find enough allocatable device memory for image");
 
                 VkMemoryAllocateInfo memory_alloc_info = {
                   VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, 0, mem_requirements.size, heap_index};
@@ -125,8 +125,8 @@ namespace engine {
                                                 image,
                                                 {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}};
 
-                VkPipelineStageFlags source_stage;
-                VkPipelineStageFlags destination_stage;
+                VkPipelineStageFlags source_stage      = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+                VkPipelineStageFlags destination_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
                 if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
                     barrier.srcAccessMask = 0;

@@ -83,7 +83,7 @@ namespace engine {
                 }
 
                 throw_vk_error(heap_index == VK_MAX_MEMORY_TYPES ? VK_ERROR_OUT_OF_DEVICE_MEMORY : VK_SUCCESS,
-                               "Failed to find enough allocatable device memory");
+                               "Failed to find enough allocatable device memory for buffer");
 
                 VkMemoryAllocateInfo alloc_info = {
                   VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, nullptr, mem_requirements.size, heap_index};

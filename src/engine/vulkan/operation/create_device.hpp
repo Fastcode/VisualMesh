@@ -143,10 +143,10 @@ namespace engine {
                   vkEnumeratePhysicalDevices(context.instance, &physical_device_count, physical_devices.data()),
                   "Failed to enumerate physical devices");
 
-                uint32_t best_compute_queue_family  = std::numeric_limits<uint32_t>::max();
-                uint32_t best_transfer_queue_family = std::numeric_limits<uint32_t>::max();
-                VkDeviceSize max_heap_size          = 0;
-                VkPhysicalDevice best_physical_device;
+                uint32_t best_compute_queue_family    = std::numeric_limits<uint32_t>::max();
+                uint32_t best_transfer_queue_family   = std::numeric_limits<uint32_t>::max();
+                VkDeviceSize max_heap_size            = 0;
+                VkPhysicalDevice best_physical_device = VK_NULL_HANDLE;
 
                 for (const auto& physical_device : physical_devices) {
                     // Only consider GPU devices
