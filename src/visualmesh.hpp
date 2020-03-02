@@ -102,24 +102,21 @@ public:
      * @return the closest generated visual mesh to the provided height
      */
     const Mesh<Scalar, Model>& height(const Scalar& height) const {
-        // Find the bounding height values
-        auto range = luts.equal_range(height);
 
-        // If we reached the end of the list return the lower bound
-        if (range.second == luts.end()) {
-            if (range.first == luts.end()) {  // We are off the larger end
-                return luts.rbegin()->second;
-            }
-            else {  // We are off the smaller end
-                return luts.begin()->second;
-            }
+        auto it = luts.lower_bound(height);
+
+        // First element that is >= is the first one (we are off the low end)
+        if (it == luts.begin()) {
+            return it->second;
         }
-        // Otherwise see which has less error
-        else if (std::abs(range.first->first - height) < std::abs(range.second->first - height)) {
-            return range.first->second;
+        // We don't have an element that >= height (we are off the high end)
+        else if (it == luts.end()) {
+            return luts.rbegin()->second;
         }
+        // Otherwise see if this element has less error than the previous one
         else {
-            return range.second->second;
+            return std::abs(it->first - height) < std::abs(std::prev(it)->first - height) ? it->second
+                                                                                          : std::prev(it)->second;
         }
     }
 
