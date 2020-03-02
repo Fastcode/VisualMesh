@@ -32,15 +32,21 @@ namespace engine {
         namespace operation {
 
             inline vk::descriptor_pool create_descriptor_pool(const VulkanContext& context,
-                                                              const std::vector<VkDescriptorPoolSize>& pool_size,
+                                                              const std::vector<VkDescriptorPoolSize>& pool_sizes,
                                                               const uint32_t& max_allocations = 1) {
 
+                std::vector<VkDescriptorPoolSize> pools;
+                for (uint32_t i = 0; i < max_allocations; ++i) {
+                    for (const auto& pool_size : pool_sizes) {
+                        pools.push_back(pool_size);
+                    }
+                }
                 VkDescriptorPoolCreateInfo info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
                                                    nullptr,
                                                    0,
                                                    max_allocations,
-                                                   static_cast<uint32_t>(pool_size.size()),
-                                                   pool_size.data()};
+                                                   static_cast<uint32_t>(pools.size()),
+                                                   pools.data()};
 
                 VkDescriptorPool pool;
                 throw_vk_error(vkCreateDescriptorPool(context.device, &info, 0, &pool),

@@ -69,22 +69,33 @@ namespace engine {
                 return command_buffer;
             }
 
-            inline void submit_command_buffer(const VkQueue& queue,
-                                              const vk::command_buffer& command_buffer,
-                                              const std::vector<VkSemaphore>& wait_semaphores,
-                                              const std::vector<VkSemaphore>& complete_semaphores) {
+            inline void submit_command_buffer(
+              const VkQueue& queue,
+              const vk::command_buffer& command_buffer,
+              const std::vector<std::pair<vk::semaphore, VkPipelineStageFlags>>& wait_semaphores,
+              const std::vector<vk::semaphore>& signal_semaphores) {
                 throw_vk_error(vkEndCommandBuffer(command_buffer), "Failed to end command buffer");
 
+                std::vector<VkSemaphore> waits;
+                std::vector<VkPipelineStageFlags> wait_stages;
+                for (const auto& wait : wait_semaphores) {
+                    waits.push_back(wait.first);
+                    wait_stages.push_back(wait.second);
+                }
+                std::vector<VkSemaphore> signals;
+                for (const auto& semaphore : signal_semaphores) {
+                    signals.push_back(semaphore);
+                }
                 std::array<VkCommandBuffer, 1> buf = {command_buffer};
                 VkSubmitInfo submit_info           = {VK_STRUCTURE_TYPE_SUBMIT_INFO,
                                             nullptr,
-                                            static_cast<uint32_t>(wait_semaphores.size()),
-                                            wait_semaphores.data(),
-                                            nullptr,
+                                            static_cast<uint32_t>(waits.size()),
+                                            waits.data(),
+                                            wait_stages.data(),
                                             buf.size(),
                                             buf.data(),
-                                            static_cast<uint32_t>(complete_semaphores.size()),
-                                            complete_semaphores.data()};
+                                            static_cast<uint32_t>(signals.size()),
+                                            signals.data()};
 
                 throw_vk_error(vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE),
                                "Failed to submit command buffer to queue");

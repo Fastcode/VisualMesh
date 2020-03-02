@@ -645,14 +645,15 @@ namespace engine {
                 std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
                 std::vector<int> indices;
                 std::pair<vk::buffer, vk::device_memory> vk_pixels;
-                VkFence fence;
+                vk::fence fence;
 
-                std::tie(neighbourhood, indices, vk_pixels, fence) = do_project<Model, VkFence>(mesh, Hoc, lens);
+                std::tie(neighbourhood, indices, vk_pixels, fence) = do_project<Model, vk::fence>(mesh, Hoc, lens);
 
                 // Wait 10,000 * 1,000 nanoseconds = 10,000 * 1us = 10ms
                 VkResult res;
+                VkFence vk_fence = fence;
                 for (uint32_t timeout_count = 0; timeout_count < 10000; ++timeout_count) {
-                    res = vkWaitForFences(context.device, 1, &fence, VK_TRUE, static_cast<uint64_t>(1e3));
+                    res = vkWaitForFences(context.device, 1, &vk_fence, VK_TRUE, static_cast<uint64_t>(1e3));
                     if (res == VK_SUCCESS) { break; }
                     else if (res == VK_ERROR_DEVICE_LOST) {
                         throw_vk_error(VK_ERROR_DEVICE_LOST, "Lost device while waiting for reprojection to complete");
@@ -667,7 +668,6 @@ namespace engine {
                 });
 
                 // Perform cleanup
-                vkDestroyFence(context.device, fence, nullptr);
                 reprojection_command_buffer.reset();
                 reprojection_descriptor_pool.reset();
                 reprojection_buffers.clear();
@@ -715,21 +715,28 @@ namespace engine {
                                                                            const uint32_t& format) const {
                 static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
-                // Project our visual mesh
+                std::vector<std::pair<vk::semaphore, VkPipelineStageFlags>> wait_semaphores;
+
+                // *******************************
+                // *** PROJECT OUR VISUAL MESH ***
+                // *******************************
+
                 std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
                 std::vector<int> indices;
                 std::pair<vk::buffer, vk::device_memory> vk_pixels;
-                VkSemaphore reprojection_semaphore;
+                vk::semaphore reprojection_semaphore;
                 std::tie(neighbourhood, indices, vk_pixels, reprojection_semaphore) =
-                  do_project<Model, VkSemaphore>(mesh, Hoc, lens);
+                  do_project<Model, vk::semaphore>(mesh, Hoc, lens);
+
+                wait_semaphores.push_back(std::make_pair(reprojection_semaphore, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT));
+
+                // ****************************
+                // *** LOAD IMAGE TO DEVICE ***
+                // ****************************
 
                 // Grab the image memory from the cache
                 std::pair<vk::image, vk::device_memory> vk_image = get_image_memory(lens.dimensions, format);
-                size_t image_size = lens.dimensions[0] * lens.dimensions[1] * get_image_depth(format);
-                operation::map_memory<void>(
-                  context, 0, VK_WHOLE_SIZE, vk_image.second, [&image, &image_size](void* payload) {
-                      std::memcpy(payload, image, image_size);
-                  });
+                operation::copy_image_to_device(context, image, lens.dimensions, vk_image, get_image_format(format));
 
                 // This includes the offscreen point at the end
                 int n_points = neighbourhood.size();
@@ -774,9 +781,9 @@ namespace engine {
                   VkDescriptorBufferInfo{vk_pixels.first, 0, VK_WHOLE_SIZE},
                   VkDescriptorBufferInfo{vk_conv_input.first, 0, VK_WHOLE_SIZE},
                 };
-                VkDescriptorImageInfo image_info = {get_image_sampler(format),
-                                                    get_image_view(vk_image.first, format),
-                                                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+                vk::image_view image_view        = get_image_view(vk_image.first, format);
+                VkDescriptorImageInfo image_info = {
+                  get_image_sampler(format), image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
 
                 std::array<VkWriteDescriptorSet, 3> write_descriptors;
                 write_descriptors[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -804,7 +811,6 @@ namespace engine {
 
                 vkUpdateDescriptorSets(context.device, write_descriptors.size(), write_descriptors.data(), 0, nullptr);
 
-                // Project!
                 vk::command_buffer command_buffer =
                   operation::create_command_buffer(context, context.compute_command_pool, true);
 
@@ -825,104 +831,141 @@ namespace engine {
                 VkSemaphore semaphore;
                 throw_vk_error(vkCreateSemaphore(context.device, &semaphore_info, nullptr, &semaphore),
                                "Failed to create reprojection semaphore");
+                vk::semaphore load_image_semaphore =
+                  vk::semaphore(semaphore, [this](auto p) { vkDestroySemaphore(context.device, p, nullptr); });
                 operation::submit_command_buffer(
-                  context.compute_queue, command_buffer, {reprojection_semaphore}, {semaphore});
+                  context.compute_queue, command_buffer, wait_semaphores, {load_image_semaphore});
 
-                return ClassifiedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS>();
+                // *******************
+                // *** RUN NETWORK ***
+                // *******************
 
-                // cl::event img_load_event;
-                // cl::event network_complete;
+                // Create a descriptor pool
+                // Descriptor Set 0: {neighbourhood_ptr, input_ptr, output_ptr}
+                std::vector<VkDescriptorPoolSize> conv_pool_size = {
+                  VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
+                };
+                vk::descriptor_pool conv_layer_pool =
+                  operation::create_descriptor_pool(context, conv_pool_size, conv_layers.size());
 
-                // cl_mem arg;
-                // arg   = cl_image;
-                // error = ::clSetKernelArg(load_image, 0, sizeof(arg), &arg);
-                // throw_cl_error(error, "Error setting kernel argument 0 for image load kernel");
-                // error = ::clSetKernelArg(load_image, 1, sizeof(format), &format);
-                // throw_cl_error(error, "Error setting kernel argument 1 for image load kernel");
-                // arg   = cl_pixels;
-                // error = ::clSetKernelArg(load_image, 2, sizeof(arg), &arg);
-                // throw_cl_error(error, "Error setting kernel argument 2 for image load kernel");
-                // arg   = cl_conv_input;
-                // error = ::clSetKernelArg(load_image, 3, sizeof(arg), &arg);
-                // throw_cl_error(error, "Error setting kernel argument 3 for image load kernel");
+                // Allocate the descriptor set
+                std::vector<VkDescriptorSet> conv_descriptor_sets = operation::create_descriptor_set(
+                  context,
+                  conv_layer_pool,
+                  std::vector<VkDescriptorSetLayout>(conv_layers.size(), conv_descriptor_layout));
 
-                // size_t offset[1]       = {0};
-                // size_t global_size[1]  = {size_t(n_points - 1)};  // -1 as we don't project the offscreen point
-                // cl_event event_list[2] = {cl_pixels_loaded, cl_image_loaded};
-                // ev                     = nullptr;
-                // error =
-                //   ::clEnqueueNDRangeKernel(queue, load_image, 1, offset, global_size, nullptr, 2, event_list, &ev);
-                // if (ev) img_load_event = cl::event(ev, ::clReleaseEvent); throw_cl_error(error, "Error queueing
-                // the image load kernel");
+                wait_semaphores.push_back(std::make_pair(load_image_semaphore, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT));
+                std::vector<std::array<VkDescriptorBufferInfo, 3>> conv_buffer_infos;
+                std::vector<std::array<VkWriteDescriptorSet, 3>> conv_write_descriptors;
+                std::vector<vk::command_buffer> conv_command_buffers;
+                vk::fence fence;
+                for (size_t conv_no = 0; conv_no < conv_layers.size(); ++conv_no) {
+                    auto& conv = conv_layers[conv_no];
 
-                // // These events are required for our first convolution
-                // std::vector<cl::event> events({img_load_event, offscreen_fill_event, cl_neighbourhood_loaded});
+                    // Load the arguments
+                    std::array<VkDescriptorBufferInfo, 3> buffer_infos = {
+                      VkDescriptorBufferInfo{vk_neighbourhood.first, 0, VK_WHOLE_SIZE},
+                      VkDescriptorBufferInfo{vk_conv_input.first, 0, VK_WHOLE_SIZE},
+                      VkDescriptorBufferInfo{vk_conv_output.first, 0, VK_WHOLE_SIZE}};
+                    conv_buffer_infos.push_back(buffer_infos);
 
-                // for (auto& conv : conv_layers) {
-                //     cl_mem arg;
-                //     arg   = cl_neighbourhood;
-                //     error = ::clSetKernelArg(conv.first, 0, sizeof(arg), &arg);
-                //     throw_cl_error(error, "Error setting argument 0 for convolution kernel");
-                //     arg   = cl_conv_input;
-                //     error = ::clSetKernelArg(conv.first, 1, sizeof(arg), &arg);
-                //     throw_cl_error(error, "Error setting argument 1 for convolution kernel");
-                //     arg   = cl_conv_output;
-                //     error = ::clSetKernelArg(conv.first, 2, sizeof(arg), &arg);
-                //     throw_cl_error(error, "Error setting argument 2 for convolution kernel");
+                    std::array<VkWriteDescriptorSet, 3> write_descriptors;
+                    for (size_t i = 0; i < buffer_infos.size(); ++i) {
+                        write_descriptors[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                                nullptr,
+                                                conv_descriptor_sets[conv_no],
+                                                static_cast<uint32_t>(i),
+                                                0,
+                                                1,
+                                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                                nullptr,
+                                                &conv_buffer_infos.back()[i],
+                                                nullptr};
+                    }
+                    conv_write_descriptors.push_back(write_descriptors);
 
-                //     size_t offset[1]      = {0};
-                //     size_t global_size[1] = {size_t(n_points)};
-                //     cl::event event;
-                //     ev = nullptr;
-                //     std::vector<cl_event> cl_events(events.begin(), events.end());
-                //     error = ::clEnqueueNDRangeKernel(
-                //       queue, conv.first, 1, offset, global_size, nullptr, cl_events.size(), cl_events.data(), &ev);
-                //     if (ev) event = cl::event(ev, ::clReleaseEvent);
-                //     throw_cl_error(error, "Error queueing convolution kernel");
+                    vkUpdateDescriptorSets(
+                      context.device, write_descriptors.size(), write_descriptors.data(), 0, nullptr);
 
-                //     // Convert our events into a vector of events and ping pong our buffers
-                //     events           = std::vector<cl::event>({event});
-                //     network_complete = event;
-                //     std::swap(cl_conv_input, cl_conv_output);
-                // }
+                    // Project!
+                    conv_command_buffers.push_back(
+                      operation::create_command_buffer(context, context.compute_command_pool, true));
 
-                // // Read the pixel coordinates off the device
-                // cl::event pixels_read;
-                // ev = nullptr;
-                // std::vector<std::array<Scalar, 2>> pixels(neighbourhood.size() - 1);
-                // cl_event iev = cl_pixels_loaded;
-                // error        = ::clEnqueueReadBuffer(
-                //  queue, cl_pixels, false, 0, pixels.size() * sizeof(std::array<Scalar, 2>), pixels.data(), 1, &iev,
-                //  &ev);
-                // if (ev) pixels_read = cl::event(ev, ::clReleaseEvent);
-                // throw_cl_error(error, "Error reading projected pixels");
+                    vkCmdBindPipeline(conv_command_buffers.back(), VK_PIPELINE_BIND_POINT_COMPUTE, conv.first);
 
-                // // Read the classifications off the device (they'll be in input)
-                // cl::event classes_read;
-                // ev  = nullptr;
-                // iev = network_complete;
-                // std::vector<Scalar> classifications(neighbourhood.size() * conv_layers.back().second);
-                // error = ::clEnqueueReadBuffer(queue,
-                //                              cl_conv_input,
-                //                              false,
-                //                              0,
-                //                              classifications.size() * sizeof(Scalar),
-                //                              classifications.data(),
-                //                              1,
-                //                              &iev,
-                //                              &ev);
-                // if (ev) classes_read = cl::event(ev, ::clReleaseEvent);
-                // throw_cl_error(error, "Error reading classified values");
+                    vkCmdBindDescriptorSets(conv_command_buffers.back(),
+                                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                                            conv_pipeline_layout,
+                                            0,
+                                            1,
+                                            &conv_descriptor_sets[conv_no],
+                                            0,
+                                            nullptr);
 
-                // // Flush the queue to ensure all the commands have been issued
-                // ::clFlush(queue);
+                    vkCmdDispatch(conv_command_buffers.back(), static_cast<uint32_t>(n_points), 1, 1);
 
-                // // Wait for the chain to finish up to where we care about it
-                // cl_event end_events[2] = {pixels_read, classes_read};
-                // ::clWaitForEvents(2, end_events);
+                    VkSemaphoreCreateInfo semaphore_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0};
+                    VkSemaphore semaphore;
+                    throw_vk_error(vkCreateSemaphore(context.device, &semaphore_info, nullptr, &semaphore),
+                                   "Failed to create conv layer semaphore");
+                    vk::semaphore conv_layer_semaphore =
+                      vk::semaphore(semaphore, [this](auto p) { vkDestroySemaphore(context.device, p, nullptr); });
 
-                // return ClassifiedMesh<Scalar, N_NEIGHBOURS>{
-                //  std::move(pixels), std::move(neighbourhood), std::move(indices), std::move(classifications)};
+                    if (conv_no + 1 == conv_layers.size()) {
+                        VkFence f;
+                        VkFenceCreateInfo fence_info = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, 0};
+                        throw_vk_error(vkCreateFence(context.device, &fence_info, nullptr, &f),
+                                       "Failed to create reprojection semaphore");
+                        fence = vk::fence(f, [this](auto p) { vkDestroyFence(context.device, p, nullptr); });
+                        operation::submit_command_buffer(context.compute_queue, conv_command_buffers.back(), fence);
+                    }
+                    else {
+                        operation::submit_command_buffer(context.compute_queue,
+                                                         conv_command_buffers.back(),
+                                                         {wait_semaphores.back()},
+                                                         {conv_layer_semaphore});
+                    }
+
+                    // Convert our events into a vector of events and ping pong our buffers
+                    wait_semaphores.push_back(std::make_pair(conv_layer_semaphore, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT));
+                    std::swap(vk_conv_input, vk_conv_output);
+                }
+
+                // ***************************
+                // *** WAIT FOR COMPLETION ***
+                // ***************************
+
+                // Wait 10,000 * 1,000 nanoseconds = 10,000 * 1us = 10ms
+                VkResult res;
+                VkFence vk_fence = fence;
+                for (uint32_t timeout_count = 0; timeout_count < 10000; ++timeout_count) {
+                    res = vkWaitForFences(context.device, 1, &vk_fence, VK_TRUE, static_cast<uint64_t>(1e3));
+                    if (res == VK_SUCCESS) { break; }
+                    else if (res == VK_ERROR_DEVICE_LOST) {
+                        throw_vk_error(VK_ERROR_DEVICE_LOST, "Lost device while waiting for network to complete");
+                    }
+                }
+                if (res != VK_SUCCESS) { throw_vk_error(res, "Timed out waiting for network to complete"); }
+
+                // ************************
+                // *** RETRIEVE RESULTS ***
+                // ************************
+
+                // Read the pixels off the buffer
+                std::vector<vec2<Scalar>> pixels(neighbourhood.size() - 1);
+                operation::map_memory<void>(context, 0, VK_WHOLE_SIZE, vk_pixels.second, [&pixels](void* payload) {
+                    std::memcpy(pixels.data(), payload, pixels.size() * sizeof(vec2<Scalar>));
+                });
+
+                // Read the classifications off the device (they'll be in input)
+                std::vector<Scalar> classifications(neighbourhood.size() * conv_layers.back().second);
+                operation::map_memory<void>(
+                  context, 0, VK_WHOLE_SIZE, vk_conv_input.second, [&classifications](void* payload) {
+                      std::memcpy(classifications.data(), payload, classifications.size() * sizeof(Scalar));
+                  });
+
+                return ClassifiedMesh<Scalar, N_NEIGHBOURS>{
+                  std::move(pixels), std::move(neighbourhood), std::move(indices), std::move(classifications)};
             }
 
             /**
@@ -950,13 +993,15 @@ namespace engine {
 
             void clear_cache() {
                 device_points_cache.clear();
-                // image_memory.memory           = nullptr;
-                // image_memory.dimensions       = {0, 0};
-                // image_memory.format           = 0;
-                // neighbourhood_memory.memory   = nullptr;
-                // neighbourhood_memory.max_size = 0;
-                // network_memory.memory         = {nullptr, nullptr};
-                // network_memory.max_size       = 0;
+                image_memory.memory           = std::make_pair(nullptr, nullptr);
+                image_memory.dimensions       = {0, 0};
+                image_memory.format           = VK_FORMAT_UNDEFINED;
+                neighbourhood_memory.memory   = std::make_pair(nullptr, nullptr);
+                neighbourhood_memory.max_size = 0;
+                network_memory.memory         = {std::make_pair(nullptr, nullptr), std::make_pair(nullptr, nullptr)};
+                network_memory.max_size       = 0;
+                indices_memory.max_size       = 0;
+                indices_memory.memory         = std::make_pair(nullptr, nullptr);
             }
 
         private:
@@ -969,10 +1014,10 @@ namespace engine {
                 static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 // We only support VkSemaphore and VkFence here.
-                // Use VkFence if the CPU will be waiting for the signal.
-                // Use VkSemaphore if the GPU will be waiting for the signal
+                // Use vk::fence if the CPU will be waiting for the signal.
+                // Use vk::semaphore if the GPU will be waiting for the signal
                 static_assert(
-                  std::is_same<CheckpointType, VkSemaphore>::value || std::is_same<CheckpointType, VkFence>::value,
+                  std::is_same<CheckpointType, vk::semaphore>::value || std::is_same<CheckpointType, vk::fence>::value,
                   "Unknown checkpoint type. Must be one of VkFence or VkSemaphore");
 
                 // Lookup the on screen ranges
@@ -1223,16 +1268,21 @@ namespace engine {
                 vkCmdDispatch(reprojection_command_buffer, static_cast<int32_t>(points), 1, 1);
 
                 CheckpointType checkpoint;
-                static_if<std::is_same<CheckpointType, VkSemaphore>::value>([&](auto f) {
+                static_if<std::is_same<CheckpointType, vk::semaphore>::value>([&](auto f) {
+                    VkSemaphore semaphore;
                     VkSemaphoreCreateInfo semaphore_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0};
-                    throw_vk_error(vkCreateSemaphore(context.device, &semaphore_info, nullptr, &f(checkpoint)),
+                    throw_vk_error(vkCreateSemaphore(context.device, &semaphore_info, nullptr, &semaphore),
                                    "Failed to create reprojection semaphore");
+                    f(checkpoint) =
+                      vk::semaphore(semaphore, [this](auto p) { vkDestroySemaphore(context.device, p, nullptr); });
                     operation::submit_command_buffer(
                       context.compute_queue, reprojection_command_buffer, {}, {f(checkpoint)});
                 }).else_([&](auto f) {
+                    VkFence fence;
                     VkFenceCreateInfo fence_info = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, 0};
-                    throw_vk_error(vkCreateFence(context.device, &fence_info, nullptr, &f(checkpoint)),
+                    throw_vk_error(vkCreateFence(context.device, &fence_info, nullptr, &fence),
                                    "Failed to create reprojection semaphore");
+                    f(checkpoint) = vk::fence(fence, [this](auto p) { vkDestroyFence(context.device, p, nullptr); });
                     operation::submit_command_buffer(context.compute_queue, reprojection_command_buffer, f(checkpoint));
                 });
 
@@ -1283,9 +1333,9 @@ namespace engine {
                     case fourcc("GRBG"):
                     case fourcc("RGGB"):
                     case fourcc("GBRG"):
-                    case fourcc("BGGR"): return VK_FORMAT_R8_UNORM; break;
-                    case fourcc("BGRA"): return VK_FORMAT_B8G8R8A8_UNORM; break;
-                    case fourcc("RGBA"): return VK_FORMAT_R8G8B8A8_UNORM; break;
+                    case fourcc("BGGR"): return VK_FORMAT_R8_UNORM;
+                    case fourcc("BGRA"): return VK_FORMAT_B8G8R8A8_UNORM;
+                    case fourcc("RGBA"): return VK_FORMAT_R8G8B8A8_UNORM;
                     // Oh no...
                     default: throw std::runtime_error("Unsupported image format " + fourcc_text(format));
                 }
@@ -1321,10 +1371,10 @@ namespace engine {
                                                     VK_COMPONENT_SWIZZLE_IDENTITY},
                                                    {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}};
 
-                VkImageView image_view;
-                throw_vk_error(vkCreateImageView(context.device, &view_info, nullptr, &image_view),
+                VkImageView img_view;
+                throw_vk_error(vkCreateImageView(context.device, &view_info, nullptr, &img_view),
                                "Failed to create image view");
-                return vk::image_view(image_view, [this](auto p) { vkDestroyImageView(context.device, p, nullptr); });
+                return vk::image_view(img_view, [this](auto p) { vkDestroyImageView(context.device, p, nullptr); });
             }
 
             VkPipeline get_image_pipeline(const uint32_t& format) const {
@@ -1344,18 +1394,18 @@ namespace engine {
 
             std::pair<vk::image, vk::device_memory> get_image_memory(const vec2<int>& dimensions,
                                                                      const uint32_t& format) const {
+
                 // If our dimensions and format haven't changed from last time we can reuse the same memory location
                 if (dimensions != image_memory.dimensions || format != image_memory.format) {
-                    VkFormat format   = get_image_format(format);
-                    VkExtent3D extent = {static_cast<uint32_t>(dimensions[0]),
-                                         static_cast<uint32_t>(dimensions[1]),
-                                         get_image_depth(format)};
+                    VkFormat vk_format   = get_image_format(format);
+                    VkExtent3D vk_extent = {
+                      static_cast<uint32_t>(dimensions[0]), static_cast<uint32_t>(dimensions[1]), 1};
 
                     image_memory.memory = operation::create_image(
                       context,
-                      extent,
-                      format,
-                      VK_IMAGE_USAGE_STORAGE_BIT,
+                      vk_extent,
+                      vk_format,
+                      VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                       VK_SHARING_MODE_EXCLUSIVE,
                       {context.transfer_queue_family},
                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -1363,7 +1413,7 @@ namespace engine {
 
                     // Update what we are caching
                     image_memory.dimensions = dimensions;
-                    image_memory.format     = format;
+                    image_memory.format     = vk_format;
                 }
 
                 // Return the cache

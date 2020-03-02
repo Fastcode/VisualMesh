@@ -21,6 +21,7 @@
 #include "dataset.hpp"
 #include "engine/cpu/engine.hpp"
 #include "engine/opencl/engine.hpp"
+#include "engine/vulkan/engine.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/model/ring6.hpp"
 #include "mesh/network_structure.hpp"
@@ -128,6 +129,8 @@ int main() {
     // Do benchmarks
     std::cout << "Benchmarking OpenCL Engine" << std::endl;
     benchmark<visualmesh::engine::opencl::Engine<Scalar>>(network, dataset, mesh, 100, 4);
+    std::cout << "Benchmarking Vulkan Engine" << std::endl;
+    benchmark<visualmesh::engine::vulkan::Engine<Scalar>>(network, dataset, mesh, 100, 4);
     std::cout << "Benchmarking CPU Engine" << std::endl;
     benchmark<visualmesh::engine::cpu::Engine<Scalar>>(network, dataset, mesh, 2, std::thread::hardware_concurrency());
 }

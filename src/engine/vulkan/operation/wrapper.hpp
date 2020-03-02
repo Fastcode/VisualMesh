@@ -64,6 +64,8 @@ namespace engine {
             using command_pool           = vulkan_wrapper<::VkCommandPool>;
             using command_buffer         = vulkan_wrapper<::VkCommandBuffer>;
             using descriptor_buffer_info = vulkan_wrapper<::VkDescriptorBufferInfo>;
+            using semaphore              = vulkan_wrapper<::VkSemaphore>;
+            using fence                  = vulkan_wrapper<::VkFence>;
         }  // namespace vk
 
         enum class DeviceType { CPU, GPU, INTEGRATED_GPU, DISCRETE_GPU, VIRTUAL_GPU, ANY };
