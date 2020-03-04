@@ -24,7 +24,7 @@ if (
     os.path.exists("/.dockerenv")
     or os.path.isfile("/proc/self/cgroup")
     and any("docker" in line for line in open("/proc/self/cgroup"))
-) and os.path.isfile("/visualmesh/training/visualmesh_op.so"):
+) and os.path.isfile("/visualmesh/training/dataset/visualmesh_op.so"):
     VisualMesh = tf.load_op_library("/visualmesh/training/dataset/visualmesh_op.so").visual_mesh
 # Otherwise check to see if we built it and it should be right next to this file
 elif os.path.isfile(os.path.join(os.path.dirname(__file__), "visualmesh_op.so")):
