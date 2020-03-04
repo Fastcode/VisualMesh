@@ -89,8 +89,9 @@ if(TOP_LEVEL_PROJECT)
 
         add_library(tf_op SHARED "src/tf_op.cpp" ${hdr})
         target_compile_options(tf_op PRIVATE -march=native -mtune=native)
-        set_target_properties(tf_op PROPERTIES CXX_STANDARD 14 LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/training
-                                               PREFIX "" OUTPUT_NAME visualmesh_op SUFFIX ".so")
+        set_target_properties(
+            tf_op PROPERTIES CXX_STANDARD 14 LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/training/dataset"
+                             PREFIX "" OUTPUT_NAME visualmesh_op SUFFIX ".so")
         target_include_directories(tf_op SYSTEM PRIVATE ${TENSORFLOW_INCLUDE_DIRS})
         target_include_directories(tf_op PRIVATE ${PROJECT_SOURCE_DIR}/src)
         target_link_libraries(tf_op ${TENSORFLOW_LIBRARIES})
