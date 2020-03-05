@@ -31,13 +31,13 @@ mpl.use("Agg")
 def _thresholded_confusion(X, c):
     thresholded = tf.cumsum(c, reverse=True, axis=0)
 
-    p = tf.reduce_sum(c[:, 0])
-    n = tf.reduce_sum(c[:, 1])
+    rp = tf.reduce_sum(c[:, 0])
+    rn = tf.reduce_sum(c[:, 1])
 
     tp = thresholded[:, 0]
     fp = thresholded[:, 1]
-    tn = n - fp
-    fn = p - tp
+    tn = rn - fp
+    fn = rp - tp
 
     return (tp, fp, tn, fn)
 
