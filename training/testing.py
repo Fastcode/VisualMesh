@@ -15,6 +15,8 @@
 
 import os
 
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
@@ -23,23 +25,56 @@ from . import dataset
 from .dataset import VisualMeshDataset
 from .model import VisualMeshModel
 
+mpl.use("Agg")
+
+
+def _thresholded_confusion(X, c):
+    thresholded = tf.cumsum(c, reverse=True, axis=0)
+
+    p = tf.reduce_sum(c[:, 0])
+    n = tf.reduce_sum(c[:, 1])
+
+    tp = thresholded[:, 0]
+    fp = thresholded[:, 1]
+    tn = n - fp
+    fn = p - tp
+
+    return (tp, fp, tn, fn)
+
 
 def _precision(X, c):
-    thresholded = tf.cumsum(c, reverse=True, axis=0)
-    return tf.math.divide(thresholded[:, 0], tf.add(thresholded[:, 0], thresholded[:, 1]))
+    tp, fp, tn, fn = _thresholded_confusion(X, c)
+    return tp / (tp + fp)
 
 
 def _recall(X, c):
-    thresholded = tf.cumsum(c, reverse=True, axis=0)
-    p = tf.reduce_sum(c[:, 0], axis=0)
-    return tf.math.divide(thresholded[:, 0], p)
+    tp, fp, tn, fn = _thresholded_confusion(X, c)
+    return tp / (tp + fn)
+
+
+def _f1(X, c):
+    tp, fp, tn, fn = _thresholded_confusion(X, c)
+    return 2 * tp / (2 * tp + fp + fn)
+
+
+def _informedness(X, c):
+    tp, fp, tn, fn = _thresholded_confusion(X, c)
+    return tp / (tp + fn) + tn / (tn + fp) - 1.0
+
+
+def _false_positive_rate(X, c):
+    tp, fp, tn, fn = _thresholded_confusion(X, c)
+    return fp / (fp + tn)
 
 
 def _threshold(X, c):
     return tf.cast(X, tf.float64)
 
 
-def _reduce_curve(X, c, n_bins, x_axis, y_axis):
+def _reduce_curve(X, c, n_bins, x_func, y_func):
+
+    if tf.size(X) < n_bins:
+        return (X, c)
 
     # Sort by confidence
     idx = tf.argsort(X)
@@ -47,8 +82,8 @@ def _reduce_curve(X, c, n_bins, x_axis, y_axis):
     c = tf.gather(c, idx)
 
     # Calculate the x and y value for all the thresholds we have
-    x_values = x_axis(X, c)
-    y_values = y_axis(X, c)
+    x_values = x_func(X, c)
+    y_values = y_func(X, c)
 
     # Calculate the distance along the PR curve for each point so we can sample evenly along the PR curve
     curve = tf.math.sqrt(
@@ -72,11 +107,7 @@ def _reduce_curve(X, c, n_bins, x_axis, y_axis):
     h_X = tf.gather(h_X, idx)
     h_c = tf.gather(h_c, idx)
 
-    # If we don't have enough values to make up the bins, just return the values themselves
-    X = tf.cond(tf.size(X) < n_bins, lambda: X, lambda: h_X)
-    c = tf.cond(tf.size(c) < n_bins, lambda: c, lambda: h_c)
-
-    return X, c
+    return h_X, h_c
 
 
 def test(config, output_path):
@@ -121,9 +152,18 @@ def test(config, output_path):
         variants={},
     ).build()
 
+    curve_types = [
+        ("pr", _recall, _precision),
+        ("roc", _false_positive_rate, _recall),
+        ("precision", _threshold, _precision),
+        ("recall", _threshold, _recall),
+        ("f1", _threshold, _f1),
+        ("informedness", _threshold, _informedness),
+    ]
+
     # Storage for the metric information
     confusion = tf.Variable(tf.zeros(shape=(n_classes, n_classes), dtype=tf.int64))
-    curves = [{"recall_threshold": [], "precision_threshold": [], "precision_recall": []} for i in range(n_classes)]
+    curves = [{c: [] for c, x, y in curve_types} for i in range(n_classes)]
 
     for e in tqdm(validation_dataset, dynamic_ncols=True, unit=" batches", leave=True, total=n_batches):
         # Run the predictions
@@ -149,9 +189,9 @@ def test(config, output_path):
             fp_c = fp[:, i]
             tpfp = tf.stack([tp_c, fp_c], axis=-1)
 
-            curves[i]["precision_recall"].append(_reduce_curve(X_c, tpfp, n_bins, _recall, _precision))
-            curves[i]["precision_threshold"].append(_reduce_curve(X_c, tpfp, n_bins, _threshold, _precision))
-            curves[i]["recall_threshold"].append(_reduce_curve(X_c, tpfp, n_bins, _threshold, _recall))
+            # Add our reduced curve
+            for c, x_func, y_func in curve_types:
+                curves[i][c].append(_reduce_curve(X_c, tpfp, n_bins, x_func, y_func))
 
     # Go through our output and calculate the metrics we can
     metrics = []
@@ -163,52 +203,33 @@ def test(config, output_path):
         class_recall = tf.stack([confusion[i, j] / tp_fn for j in range(n_classes)])
         class_precision = tf.stack([confusion[j, i] / p for j in range(n_classes)])
 
-        # Extract the curve information
-        pr = curves[i]["precision_recall"]
-        pr = _reduce_curve(
-            tf.concat([v[0] for v in pr], axis=0), tf.concat([v[1] for v in pr], axis=0), n_bins, _recall, _precision
-        )
+        # Reduce the curves down
+        for name, x_func, y_func in curve_types:
 
-        # For the precision recall curve specifically we need to add on a first point
-        # and a last point if we didn't reach the end of the curve
-        all_points_precision = tf.reduce_sum(pr[1][:, 0]) / tf.reduce_sum(pr[1])
-        pr = (
-            tf.concat([_recall(*pr), [0.0]], axis=0),
-            tf.concat([_precision(*pr), [1.0]], axis=0),
-            tf.concat([_threshold(*pr), [1.0]], axis=0),
-        )
-        if tf.reduce_max(pr[0]) < 1.0:
-            pr = (
-                tf.concat([pr[0], [1.0]], axis=0),
-                tf.concat([pr[1], [all_points_precision]], axis=0),
-                tf.concat([pr[2], [0.0]], axis=0),
+            # Concatentate all our data and reduce the curve
+            data = curves[i][name]
+
+            c = _reduce_curve(
+                tf.concat([v[0] for v in data], axis=0),
+                tf.concat([v[1] for v in data], axis=0),
+                n_bins,
+                x_func,
+                y_func,
             )
 
-        idx = tf.argsort(pr[0], stable=True)
-        pr = tuple(tf.gather(p, idx) for p in pr)
+            # Calculate our x, y and threshold for this point
+            curve = (x_func(*c), y_func(*c), _threshold(*c))
 
-        pt = curves[i]["precision_threshold"]
-        pt = _reduce_curve(
-            tf.concat([v[0] for v in pt], axis=0),
-            tf.concat([v[1] for v in pt], axis=0),
-            n_bins,
-            _threshold,
-            _precision,
-        )
-        pt = (_threshold(*pt), _precision(*pt))
-
-        rt = curves[i]["recall_threshold"]
-        rt = _reduce_curve(
-            tf.concat([v[0] for v in rt], axis=0), tf.concat([v[1] for v in rt], axis=0), n_bins, _threshold, _recall,
-        )
-        rt = (_threshold(*rt), _recall(*rt))
+            # Sort the curve by the value on the x axis
+            idx = tf.argsort(curve[0])
+            curves[i][name] = (tf.gather(curve[0], idx), tf.gather(curve[1], idx), tf.gather(curve[2], idx))
 
         metrics.append(
             {
-                "curves": {"precision_recall": pr, "precision_threshold": pt, "recall_threshold": rt},
+                "curves": curves[i],
                 "precision": class_precision,
                 "recall": class_recall,
-                "ap": np.trapz(pr[1], pr[0]),
+                "ap": np.trapz(curves[i]["pr"][1].numpy(), curves[i]["pr"][0].numpy()),
             }
         )
 
@@ -247,27 +268,38 @@ def test(config, output_path):
                 )
             )
 
-            # Save the curves
-            np.savetxt(
-                os.path.join(output_path, "test", "{}_precision_recall.csv".format(name)),
-                tf.stack(m["curves"]["precision_recall"], axis=-1).numpy(),
-                comments="",
-                header="Recall,Precision,Threshold",
-                delimiter=",",
-            )
-            np.savetxt(
-                os.path.join(output_path, "test", "{}_precision_threshold.csv".format(name)),
-                tf.stack(m["curves"]["precision_threshold"], axis=-1).numpy(),
-                comments="",
-                header="Threshold,Precision",
-                delimiter=",",
-            )
-            np.savetxt(
-                os.path.join(output_path, "test", "{}_recall_threshold.csv".format(name)),
-                tf.stack(m["curves"]["recall_threshold"], axis=-1).numpy(),
-                comments="",
-                header="Threshold,Recall",
-                delimiter=",",
-            )
+            for curve_name, x_func, y_func in curve_types:
+                # Save the curves
+                np.savetxt(
+                    os.path.join(output_path, "test", "{}_{}.csv".format(name, curve_name)),
+                    tf.stack(m["curves"][curve_name], axis=-1).numpy(),
+                    comments="",
+                    header="{},{},Threshold".format(x_func.__name__[1:].title(), y_func.__name__[1:].title()),
+                    delimiter=",",
+                )
 
-            # Make curve images using matplotlib
+            # Precision recall plot
+            fig, ax = plt.subplots()
+            ax.plot(m["curves"]["pr"][0], m["curves"]["pr"][1])
+            ax.set_xlabel("Recall")
+            ax.set_ylabel("Precision")
+            ax.set_title("{} Precision/Recall".format(name.title()))
+            ax.set_xlim(-0.01, 1.01)
+            ax.set_ylim(-0.01, 1.01)
+            fig.savefig(os.path.join(output_path, "test", "{}_pr.pdf".format(name)))
+            plt.close(fig)
+
+            # Precision/threshold, recall/threshold plot
+            fig, ax = plt.subplots()
+            ax.plot(m["curves"]["precision"][0], m["curves"]["precision"][1])[0].set_label("Precision")
+            ax.plot(m["curves"]["recall"][0], m["curves"]["recall"][1])[0].set_label("Recall")
+            ax.plot(m["curves"]["f1"][0], m["curves"]["f1"][1])[0].set_label("f1")
+            ax.plot(m["curves"]["informedness"][0], m["curves"]["informedness"][1])[0].set_label("Informedness")
+            ax.legend()
+            ax.set_xlabel("Threshold")
+            ax.set_ylabel("Value")
+            ax.set_title("{} Metrics".format(name.title()))
+            ax.set_xlim(-0.01, 1.01)
+            ax.set_ylim(-0.01, 1.01)
+            fig.savefig(os.path.join(output_path, "test", "{}_metric.pdf".format(name)))
+            plt.close(fig)
