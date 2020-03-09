@@ -29,7 +29,7 @@ from .model import VisualMeshModel
 # Train the network
 def train(config, output_path):
 
-    n_classes = config["network"]["classes"]
+    n_classes = len(config["network"]["classes"])
 
     # Get the training dataset
     training_dataset = (
