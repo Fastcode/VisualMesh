@@ -18,6 +18,8 @@
 #ifndef VISUALMESH_VULKAN_KERNELS_MAKE_NETWORK_HPP
 #define VISUALMESH_VULKAN_KERNELS_MAKE_NETWORK_HPP
 
+#include <fmt/format.h>
+
 #include <iostream>
 #include <string>
 #include <utility>
@@ -87,22 +89,25 @@ namespace engine {
                     // Prepare the input/output/descriptor set variables
                     uint32_t neighbourhood_array  = program.add_array_type(uint_type);
                     uint32_t neighbourhood_struct = program.add_struct({neighbourhood_array});
-                    uint32_t neighbourhood_ptr =
+                    uint32_t neighbourhood_ptr    = program.add_name(
                       program.add_variable(program.add_pointer(neighbourhood_struct, spv::StorageClass::StorageBuffer),
-                                           spv::StorageClass::StorageBuffer);
+                                           spv::StorageClass::StorageBuffer),
+                      "neighbourhood");
 
                     // The input layer is coming from the image, so the input is an fvec4
                     uint32_t input_array  = program.add_array_type(float_type);
                     uint32_t input_struct = program.add_struct({input_array});
-                    uint32_t input_ptr =
+                    uint32_t input_ptr    = program.add_name(
                       program.add_variable(program.add_pointer(input_struct, spv::StorageClass::StorageBuffer),
-                                           spv::StorageClass::StorageBuffer);
+                                           spv::StorageClass::StorageBuffer),
+                      "input");
 
                     uint32_t output_array  = program.add_array_type(float_type);
                     uint32_t output_struct = program.add_struct({output_array});
-                    uint32_t output_ptr =
+                    uint32_t output_ptr    = program.add_name(
                       program.add_variable(program.add_pointer(output_struct, spv::StorageClass::StorageBuffer),
-                                           spv::StorageClass::StorageBuffer);
+                                           spv::StorageClass::StorageBuffer),
+                      "output");
 
                     // Decorate the structs and their members.
                     uint32_t block_decoration = program.add_decoration_group(spv::Decoration::Block);
@@ -129,23 +134,27 @@ namespace engine {
                     // Pre-allocate all arrays
                     // These array variables must be the first things in the function
                     std::vector<uint32_t> layers;
-                    layers.push_back(program.add_variable(
-                      program.add_pointer(
-                        program.add_array_type(
-                          float_type, program.add_constant(uint_type, {input_dimensions * (n_neighbours + 1u)})),
+                    layers.push_back(program.add_name(
+                      program.add_variable(
+                        program.add_pointer(
+                          program.add_array_type(
+                            float_type, program.add_constant(uint_type, {input_dimensions * (n_neighbours + 1u)})),
+                          spv::StorageClass::Function),
                         spv::StorageClass::Function),
-                      spv::StorageClass::Function));
+                      fmt::format("in0[{}]", input_dimensions * (n_neighbours + 1))));
 
                     program.add_source_line(__FILE__, __LINE__, conv_no);
 
                     for (uint32_t layer_no = 0; layer_no < conv.size(); ++layer_no) {
-                        layers.push_back(program.add_variable(
-                          program.add_pointer(
-                            program.add_array_type(
-                              float_type,
-                              program.add_constant(uint_type, {static_cast<uint32_t>(conv[layer_no].second.size())})),
+                        layers.push_back(program.add_name(
+                          program.add_variable(
+                            program.add_pointer(
+                              program.add_array_type(
+                                float_type,
+                                program.add_constant(uint_type, {static_cast<uint32_t>(conv[layer_no].second.size())})),
+                              spv::StorageClass::Function),
                             spv::StorageClass::Function),
-                          spv::StorageClass::Function));
+                          fmt::format("in{}[{}]", layer_no + 1, conv[layer_no].second.size())));
                     }
 
                     program.add_source_line(__FILE__, __LINE__, conv_no);
@@ -153,8 +162,9 @@ namespace engine {
                     // Get our kernel index
                     // idx = get_global_id(0);
                     program.add_source_line(__FILE__, __LINE__, conv_no);
-                    uint32_t idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
-                    program.add_name(idx, "get_global_id");
+                    uint32_t idx = program.add_name(
+                      program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type),
+                      "get_global_id");
 
                     /*************************************************
                      *                    GATHER                     *
@@ -165,31 +175,33 @@ namespace engine {
                     // idx * n_neighbours is used a lot, precalculate it
                     program.add_source_line(__FILE__, __LINE__, conv_no);
                     uint32_t idx_dim = program.add_name(
-                      program.imul(idx, program.add_constant(uint_type, {input_dimensions}), uint_type),
-                      "idx_times_n_neighbours");
-                    uint32_t idx_neighbours =
-                      program.add_name(program.imul(idx, program.add_constant(uint_type, {n_neighbours}), uint_type),
-                                       "idx_times_n_neighbours");
+                      program.imul(idx, program.add_constant(uint_type, {input_dimensions}), uint_type), "input_idx");
+                    uint32_t idx_neighbours = program.add_name(
+                      program.imul(idx, program.add_constant(uint_type, {n_neighbours}), uint_type), "neighbour_idx");
 
                     program.add_source_line(__FILE__, __LINE__, conv_no);
 
                     // Read the ones for our own index
                     for (uint32_t j = 0; j < input_dimensions; ++j) {
                         // input[idx * input_dimensions + j]
-                        uint32_t input_val = program.load_variable(
-                          program.member_access(
-                            input_ptr,
-                            // idx0 = offset to struct member (only one member in struct, its at offset 0)
-                            {idx0,
-                             // idx * input_dimensions + j
-                             program.iadd(idx_dim, program.add_constant(uint_type, {j}), uint_type)},
-                            float_ptr),
-                          float_type);
+                        uint32_t input_val = program.add_name(
+                          program.load_variable(
+                            program.member_access(
+                              input_ptr,
+                              // idx0 = offset to struct member (only one member in struct, its at offset 0)
+                              {idx0,
+                               // idx * input_dimensions + j
+                               program.iadd(idx_dim, program.add_constant(uint_type, {j}), uint_type)},
+                              float_ptr),
+                            float_type),
+                          fmt::format("input[idx * {} + {}]", input_dimensions, j));
 
                         program.add_source_line(__FILE__, __LINE__, conv_no);
 
                         program.store_variable(
-                          program.member_access(layers[0], {program.add_constant(uint_type, {j})}, float_ptr_func),
+                          program.add_name(
+                            program.member_access(layers[0], {program.add_constant(uint_type, {j})}, float_ptr_func),
+                            fmt::format("in0[{}]", j)),
                           input_val);
 
                         program.add_source_line(__FILE__, __LINE__, conv_no);
@@ -201,43 +213,50 @@ namespace engine {
                     for (uint32_t i = 0; i < n_neighbours; ++i) {
                         // neighbour_idx is used in every iteration of the sub loop
                         // neighbourhood[idx * n_neighbours + i]
-                        uint32_t neighbour_idx = program.load_variable(
-                          program.member_access(
-                            neighbourhood_ptr,
-                            // idx0 = offset to struct member (only one member in struct, its at offset 0)
-                            // idx * n_neighbours + i
-                            {idx0, program.iadd(idx_neighbours, program.add_constant(uint_type, {i}), uint_type)},
-                            uint_ptr_sb),
-                          uint_type);
+                        uint32_t neighbour_idx = program.add_name(
+                          program.load_variable(
+                            program.member_access(
+                              neighbourhood_ptr,
+                              // idx0 = offset to struct member (only one member in struct, its at offset 0)
+                              // idx * n_neighbours + i
+                              {idx0, program.iadd(idx_neighbours, program.add_constant(uint_type, {i}), uint_type)},
+                              uint_ptr_sb),
+                            uint_type),
+                          fmt::format("neighbourhood[idx * {} + {}]", n_neighbours, i));
 
                         program.add_source_line(__FILE__, __LINE__, conv_no);
 
                         // neighbour_input_idx is used in every iteration of the sub loop
-                        // neighbourhood[idx * 6 + i] * conv_in_size
-                        uint32_t neighbour_input_idx =
-                          program.imul(neighbour_idx, program.add_constant(uint_type, {input_dimensions}), uint_type);
+                        // neighbourhood[idx * n_neighbours + i] * input_dimensions
+                        uint32_t neighbour_input_idx = program.add_name(
+                          program.imul(neighbour_idx, program.add_constant(uint_type, {input_dimensions}), uint_type),
+                          fmt::format("neighbourhood[idx * {} + {}] * {}", n_neighbours, i, input_dimensions));
 
                         program.add_source_line(__FILE__, __LINE__, conv_no);
 
                         for (uint32_t j = 0; j < input_dimensions; ++j) {
                             // input[neighbourhood[idx * n_neighbours + i] * input_dimensions + j]
-                            uint32_t neighbour_val = program.load_variable(
-                              program.member_access(
-                                input_ptr,
-                                // idx0 = offset to struct member (only one member in struct, its at offset 0)
-                                {idx0,
-                                 // neighbourhood[idx * 6 + i] * conv_in_size + j
-                                 program.iadd(neighbour_input_idx, program.add_constant(uint_type, {j}), uint_type)},
-                                float_ptr),
-                              float_type);
+                            uint32_t neighbour_val = program.add_name(
+                              program.load_variable(
+                                program.member_access(
+                                  input_ptr,
+                                  // idx0 = offset to struct member (only one member in struct, its at offset 0)
+                                  {idx0,
+                                   // neighbourhood[idx * 6 + i] * conv_in_size + j
+                                   program.iadd(neighbour_input_idx, program.add_constant(uint_type, {j}), uint_type)},
+                                  float_ptr),
+                                float_type),
+                              fmt::format(
+                                "input[neighbourhood[idx * {} + {}] * {} + {}]", n_neighbours, i, input_dimensions, j));
 
                             program.add_source_line(__FILE__, __LINE__, conv_no);
 
                             program.store_variable(
-                              program.member_access(
-                                layers[0],
-                                {program.add_constant(uint_type, {(i + 1u) * input_dimensions + j})},
-                                float_ptr_func),
+                              program.add_name(program.member_access(
+                                                 layers[0],
+                                                 {program.add_constant(uint_type, {(i + 1u) * input_dimensions + j})},
+                                                 float_ptr_func),
+                                               fmt::format("in0[{}]", i + 1)),
                               neighbour_val);
 
                             program.add_source_line(__FILE__, __LINE__, conv_no);
@@ -280,29 +299,38 @@ namespace engine {
                             program.add_source_line(__FILE__, __LINE__, conv_no);
 
                             for (uint32_t j = 0; j < input_dimensions; ++j) {
-                                uint32_t current_val = program.load_variable(
-                                  program.member_access(
+                                uint32_t current_val = program.add_name(
+                                  program.load_variable(
+                                    program.member_access(
                                       layers[layer_no], {program.add_constant(uint_type, {j})}, float_ptr_func),
-                                  float_type);
+                                    float_type),
+                                  fmt::format("in{}[{}]", layer_no, j));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
-                                current_val = program.fmul(
-                                  current_val, program.add_constant(float_type, {weights[j][i]}), float_type);
+                                current_val = program.add_name(
+                                  program.fmul(
+                                    current_val, program.add_constant(float_type, {weights[j][i]}), float_type),
+                                  "current_mul_weight");
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
-                                total_val = program.fadd(total_val, current_val, float_type);
-
-                                program.add_source_line(__FILE__, __LINE__, conv_no);
-
-                                program.store_variable(
-                                  program.member_access(
-                                    layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
-                                  total_val);
+                                total_val = program.add_name(program.fadd(total_val, current_val, float_type),
+                                                             "total_peq_current");
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
                             }
+
+                            program.add_source_line(__FILE__, __LINE__, conv_no);
+
+                            program.store_variable(
+                              program.add_name(
+                                program.member_access(
+                                  layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
+                                fmt::format("in{}[{}]", layer_no + 1, i)),
+                              total_val);
+
+                            program.add_source_line(__FILE__, __LINE__, conv_no);
                         }
 
                         program.add_source_line(__FILE__, __LINE__, conv_no);
@@ -317,26 +345,32 @@ namespace engine {
 
                             for (uint32_t i = 0; i < output_dimensions; ++i) {
                                 // in1[i] = lambda * (in1[i] > 0 ? in1[i] : alpha * exp(in1[i]) - alpha;
-                                uint32_t current_val = program.load_variable(
-                                  program.member_access(
-                                    layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
-                                  float_type);
+                                uint32_t current_val = program.add_name(
+                                  program.load_variable(
+                                    program.member_access(
+                                      layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
+                                    float_type),
+                                  fmt::format("in{}[{}]", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
                                 // selu = alpha * exp(in1[i]) - alpha
-                                uint32_t selu =
+                                uint32_t selu = program.add_name(
                                   program.fsub(program.fmul(alpha, program.exp(current_val, float_type), float_type),
                                                alpha,
-                                               float_type);
+                                               float_type),
+                                  fmt::format("selu(in{}[{}])", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
                                 // in1[i] = lambda * (in1[i] > 0 ? in1[i] : selu)
-                                uint32_t condition =
-                                  program.fgeq(current_val, program.add_constant(float_type, {Scalar(0)}));
-                                current_val = program.fmul(
-                                  lambda, program.select(float_type, condition, current_val, selu), float_type);
+                                uint32_t condition = program.add_name(
+                                  program.fgeq(current_val, program.add_constant(float_type, {Scalar(0)})),
+                                  fmt::format("in{}[{}]_gt_0", layer_no + 1, i));
+                                current_val = program.add_name(
+                                  program.fmul(
+                                    lambda, program.select(float_type, condition, current_val, selu), float_type),
+                                  "lambda_selu");
                                 program.store_variable(
                                   program.member_access(
                                     layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
@@ -354,14 +388,17 @@ namespace engine {
                             // Apply exp to each of the elements
                             for (uint32_t i = 0; i < output_dimensions; ++i) {
                                 // in1[i] = exp(in1[i])
-                                uint32_t current_val = program.load_variable(
-                                  program.member_access(
-                                    layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
-                                  float_type);
+                                uint32_t current_val = program.add_name(
+                                  program.load_variable(
+                                    program.member_access(
+                                      layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
+                                    float_type),
+                                  fmt::format("in{}[{}]", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
-                                current_val = program.exp(current_val, float_type);
+                                current_val = program.add_name(program.exp(current_val, float_type),
+                                                               fmt::format("exp(in{}[{}])", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
@@ -379,14 +416,17 @@ namespace engine {
                             uint32_t exp_sum = program.add_constant(float_type, {Scalar(0)});
                             for (uint32_t i = 0; i < output_dimensions; ++i) {
                                 // exp_sum += in1[i]
-                                uint32_t current_val = program.load_variable(
-                                  program.member_access(
-                                    layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
-                                  float_type);
+                                uint32_t current_val = program.add_name(
+                                  program.load_variable(
+                                    program.member_access(
+                                      layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
+                                    float_type),
+                                  fmt::format("in{}[{}]", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
-                                exp_sum = program.fadd(exp_sum, current_val, float_type);
+                                exp_sum = program.add_name(program.fadd(exp_sum, current_val, float_type),
+                                                           fmt::format("exp_sum_plus_in{}[{}]", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
                             }
@@ -396,14 +436,17 @@ namespace engine {
                             // Divide all the values
                             for (uint32_t i = 0; i < output_dimensions; ++i) {
                                 // in1[i] /= exp_sum
-                                uint32_t current_val = program.load_variable(
-                                  program.member_access(
-                                    layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
-                                  float_type);
+                                uint32_t current_val = program.add_name(
+                                  program.load_variable(
+                                    program.member_access(
+                                      layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
+                                    float_type),
+                                  fmt::format("in{}[{}]", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
-                                current_val = program.fdiv(current_val, exp_sum, float_type);
+                                current_val = program.add_name(program.fdiv(current_val, exp_sum, float_type),
+                                                               fmt::format("in{}[{}]_div_exp_sum", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
@@ -457,7 +500,7 @@ namespace engine {
                 }
 
                 return programs;
-            }  // namespace kernels
+            }
 
         }  // namespace kernels
     }      // namespace vulkan
