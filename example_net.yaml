@@ -45,14 +45,24 @@ network:
   # Activation Function
   activation_fn: selu
   # This is a mapping of the classes to the colours that represent them in the mask images.
-  # Each of the elements has a name, and an RGB value that stores it in the mask image.
-  # The index of the final output layer will be the same as the order provided in this list.
+  # Each of the elements has a name, and one or more RGB values that represent it in the mask image.
+  # The size of the final output layer will be the same as the order provided in this list.
   classes:
-    - [ball, [255, 0, 0]]
-    - [goal, [255, 255, 0]]
-    - [line, [255, 255, 255]]
-    - [field, [0, 255, 0]]
-    - [environment, [0, 0, 0]]
+    - name: ball
+      colours:
+        - [255, 0, 0]
+    - name: goal
+      colours:
+        - [255, 255, 0]
+    - name: line
+      colours:
+        - [255, 255, 255]
+    - name: field
+      colours:
+        - [0, 255, 0]
+    - name: environment
+      colours:
+        - [0, 0, 0]
 
 # Testing
 testing:
