@@ -30,11 +30,24 @@ else()
     set(TOP_LEVEL_PROJECT OFF)
 endif()
 
+option(USE_ASAN "Enable address sanitisation" OFF)
+
 # Turn on warnings
 if(MSVC)
     add_compile_options(/W4 /WX)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# Turn on address sanitisation
+if(USE_ASAN)
+    if(MSVC)
+        # UNTESTED
+        add_compile_options(/fsanitize=address /wholearchive:asan-i386.lib /wholearchive:asan_cxx-i386.lib)
+    else()
+        add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+        link_libraries(asan)
+    endif()
 endif()
 
 # All the header files for this library
