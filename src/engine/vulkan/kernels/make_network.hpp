@@ -274,7 +274,11 @@ namespace engine {
 
                         // Perform our matrix multiplication for weights and add bias for layer
                         for (uint32_t i = 0; i < output_dimensions; ++i) {
-                            uint32_t total_val = program.add_constant(float_type, {Scalar(0)});
+                            uint32_t total_val = program.add_name(program.add_constant(float_type, {biases[i]}),
+                                                                  fmt::format("in{}[{}]_bias[{}]", layer_no, i, i));
+
+                            program.add_source_line(__FILE__, __LINE__, conv_no);
+
                             for (uint32_t j = 0; j < input_dimensions; ++j) {
                                 uint32_t current_val = program.load_variable(
                                   program.member_access(
