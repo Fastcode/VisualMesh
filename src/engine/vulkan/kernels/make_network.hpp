@@ -278,7 +278,7 @@ namespace engine {
                             for (uint32_t j = 0; j < input_dimensions; ++j) {
                                 uint32_t current_val = program.load_variable(
                                   program.member_access(
-                                    layers.back(), {program.add_constant(uint_type, {j})}, float_ptr_func),
+                                      layers[layer_no], {program.add_constant(uint_type, {j})}, float_ptr_func),
                                   float_type);
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
