@@ -182,6 +182,47 @@ namespace engine {
                                                                            const uint32_t& format) const {
                 static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
+                auto interpolate =
+                  [](const vec2<Scalar>& P, const uint8_t* const image, const vec2<int>& dimensions, const int& depth) {
+                      auto get_pixel = [](const vec2<Scalar>& px,
+                                          const uint8_t* const image,
+                                          const vec2<int>& dimensions,
+                                          const int& depth) {
+                          int c              = (px[1] * dimensions[0] + px[0]) * depth;
+                          vec4<Scalar> pixel = {image[c + 0] * Scalar(1.0 / 255.0),
+                                                image[c + 1] * Scalar(1.0 / 255.0),
+                                                image[c + 2] * Scalar(1.0 / 255.0),
+                                                (depth == 3) ? Scalar(0) : image[c + 3] * Scalar(1.0 / 255.0)};
+                          return pixel;
+                      };
+
+                      // P1 -------------- P2
+                      // |                 |
+                      // |                 |
+                      // |                 |
+                      // |        P        |
+                      // |                 |
+                      // |                 |
+                      // P3 -------------- P4
+                      const Scalar x        = P[0];
+                      const Scalar y        = P[1];
+                      const Scalar x1       = std::floor(P[0]);
+                      const Scalar x2       = std::ceil(P[0]);
+                      const Scalar y1       = std::floor(P[1]);
+                      const Scalar y2       = std::ceil(P[1]);
+                      const vec4<Scalar> Q1 = get_pixel(vec2<Scalar>{x1, y1}, image, dimensions, depth);
+                      const vec4<Scalar> Q2 = get_pixel(vec2<Scalar>{x2, y1}, image, dimensions, depth);
+                      const vec4<Scalar> Q3 = get_pixel(vec2<Scalar>{x1, y2}, image, dimensions, depth);
+                      const vec4<Scalar> Q4 = get_pixel(vec2<Scalar>{x2, y2}, image, dimensions, depth);
+
+                      const vec4<Scalar> R1 =
+                        add(multiply(Q1, ((x2 - x) / (x2 - x1))), multiply(Q2, ((x - x1) / (x2 - x1))));
+                      const vec4<Scalar> R2 =
+                        add(multiply(Q3, ((x2 - x) / (x2 - x1))), multiply(Q4, ((x - x1) / (x2 - x1))));
+
+                      return add(multiply(R1, ((y2 - y) / (y2 - y1))), multiply(R2, ((y - y1) / (y2 - y1))));
+                  };
+
                 // Project the pixels to the display
                 ProjectedMesh<Scalar, N_NEIGHBOURS> projected = project(mesh, Hoc, lens);
                 auto& neighbourhood                           = projected.neighbourhood;
@@ -191,43 +232,32 @@ namespace engine {
 
                 // Based on the fourcc code, load the data from the image into input
                 input.reserve(n_points * 4);
-                const int R = ('R' == (format & 0xFF) ? 0 : 2);
-                const int B = ('R' == (format & 0xFF) ? 2 : 0);
+                const int R     = ('R' == (format & 0xFF) ? 0 : 2);
+                const int B     = ('R' == (format & 0xFF) ? 2 : 0);
+                const int depth = ('A' == ((format >> 24) & 0xFF) ? 4 : 3);
                 switch (format) {
                     case fourcc("RGB8"):
                     case fourcc("RGB3"):
                     case fourcc("BGR8"):
                     case fourcc("BGR3"):
-
-                        for (const auto& px : projected.pixel_coordinates) {
-                            const uint8_t* const im = reinterpret_cast<const uint8_t*>(image);
-
-                            int c = (std::round(px[1]) * lens.dimensions[0] + std::round(px[0])) * 3;
-
-                            input.emplace_back(im[c + R] * Scalar(1.0 / 255.0));
-                            input.emplace_back(im[c + 1] * Scalar(1.0 / 255.0));
-                            input.emplace_back(im[c + B] * Scalar(1.0 / 255.0));
-                            input.emplace_back(0.0);
-                        }
-                        break;
                     case fourcc("RGBA"):
-                    case fourcc("BGRA"):
-
-                        for (const auto& px : projected.pixel_coordinates) {
-                            auto im = reinterpret_cast<const uint8_t*>(image);
-
-                            int c = (std::round(px[1]) * lens.dimensions[0] + std::round(px[0])) * 4;
-
-                            input.emplace_back(im[c + R] * Scalar(1.0 / 255.0));
-                            input.emplace_back(im[c + 1] * Scalar(1.0 / 255.0));
-                            input.emplace_back(im[c + B] * Scalar(1.0 / 255.0));
-                            input.emplace_back(im[c + 3] * Scalar(1.0 / 255.0));
-                        }
-                        break;
+                    case fourcc("BGRA"): break;
                     default:
                         throw std::runtime_error("The CPU classifier is unable to decode the format "
                                                  + fourcc_text(format));
                 }
+
+                for (const auto& px : projected.pixel_coordinates) {
+                    const uint8_t* const im = reinterpret_cast<const uint8_t*>(image);
+
+                    const vec4<Scalar> p = interpolate(px, im, lens.dimensions, depth);
+
+                    input.emplace_back(p[R]);
+                    input.emplace_back(p[1]);
+                    input.emplace_back(p[B]);
+                    input.emplace_back(p[3]);
+                }
+
                 // Four -1 values for the offscreen point
                 input.insert(input.end(), {Scalar(-1.0), Scalar(-1.0), Scalar(-1.0), Scalar(-1.0)});
 
