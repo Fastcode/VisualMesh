@@ -217,7 +217,6 @@ def test(config, output_path):
     confusion = tf.Variable(tf.zeros(shape=(n_classes, n_classes), dtype=tf.int64))
     curves = [{c: [] for c, x, y in curve_types} for i in range(n_classes)]
 
-    v = 0
     for e in tqdm(validation_dataset, dynamic_ncols=True, unit=" batches", leave=True, total=n_batches):
         # Run the predictions
         X = model.predict_on_batch((e["X"], e["G"]))
@@ -245,10 +244,6 @@ def test(config, output_path):
             # Add our reduced curve
             for c, x_func, y_func in curve_types:
                 curves[i][c].append(_reduce_curve(X_c, tpfp, n_bins, x_func, y_func))
-
-        v = v + 1
-        if v > 5:
-            break
 
     # Go through our output and calculate the metrics we can
     metrics = []
