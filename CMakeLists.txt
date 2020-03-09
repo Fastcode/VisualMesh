@@ -105,6 +105,7 @@ if(TOP_LEVEL_PROJECT)
         find_package(OpenCV REQUIRED core highgui imgproc)
         find_package(YAML-CPP REQUIRED)
         find_package(OpenCL REQUIRED)
+        find_package(fmt REQUIRED)
 
         set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
         set(THREADS_PREFER_PTHREAD_FLAG TRUE)
@@ -122,6 +123,7 @@ if(TOP_LEVEL_PROJECT)
             ${OpenCL_LIBRARIES}
             Vulkan::Vulkan
             SPIRV::SPIRV
+            fmt::fmt
             ${OpenCV_LIBS}
             ${fmt_LIBRARIES}
             ${YAML_CPP_LIBRARIES}
@@ -139,6 +141,7 @@ if(TOP_LEVEL_PROJECT)
             ${OpenCL_LIBRARIES}
             Vulkan::Vulkan
             SPIRV::SPIRV
+            fmt::fmt
             ${OpenCV_LIBS}
             ${fmt_LIBRARIES}
             ${YAML_CPP_LIBRARIES}
@@ -156,6 +159,7 @@ if(TOP_LEVEL_PROJECT)
             ${OpenCL_LIBRARIES}
             Vulkan::Vulkan
             SPIRV::SPIRV
+            fmt::fmt
             ${OpenCV_LIBS}
             ${fmt_LIBRARIES}
             ${YAML_CPP_LIBRARIES}
