@@ -424,7 +424,8 @@ namespace engine {
                      *                    OUTPUT                     *
                      *************************************************/
                     // Save our value to the output
-                    uint32_t output_idx = program.add_constant(uint_type, {idx * input_dimensions});
+                    uint32_t output_idx = program.add_name(
+                      program.imul(idx, program.add_constant(uint_type, {input_dimensions}), uint_type), "output_idx");
                     for (unsigned int i = 0; i < input_dimensions; ++i) {
                         // output[idx * input_dimensions + i] = inN[i]
                         uint32_t current_val = program.load_variable(
