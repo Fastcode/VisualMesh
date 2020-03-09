@@ -24,36 +24,6 @@ import training.testing as testing
 import training.training as training
 
 
-class Config:
-    def __init__(self, **config):
-        for k, v in config.items():
-            if type(v) == dict:
-                self.__dict__[k] = Config(**v)
-            elif type(v) == list:
-                self.__dict__[k] = Config.objectify_list(*v)
-            else:
-                self.__dict__[k] = v
-
-    def objectify_list(*config):
-        out = []
-
-        for v in config:
-            if type(v) == dict:
-                out.append(Config(**v))
-            elif type(v) == list:
-                out.append(Config.objectify_list(*v))
-            else:
-                out.append(v)
-
-        return out
-
-    def __iter__(self):
-        return self.__dict__.__iter__()
-
-    def __repr__(self):
-        return self.__dict__.__repr__()
-
-
 if __name__ == "__main__":
 
     # Parse our command line arguments
@@ -70,7 +40,6 @@ if __name__ == "__main__":
     # Load our yaml file and convert it to an object
     with open(args.config) as f:
         config = yaml.safe_load(f)
-        config = Config(**config)
 
     output_path = "output" if args.output_path is None else args.output_path
 

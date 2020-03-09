@@ -234,7 +234,7 @@ def test(config, output_path):
         # Build the threshold curves for each class
         tp = tf.cast(Y, tf.int64)
         fp = 1 - tp
-        for i, c in enumerate(classes):
+        for i in range(n_classes):
             # Extract the relevant information
             X_c = X[:, i]
             tp_c = tp[:, i]
@@ -247,7 +247,7 @@ def test(config, output_path):
 
     # Go through our output and calculate the metrics we can
     metrics = []
-    for i, c in enumerate(classes):
+    for i in range(n_classes):
 
         # Calculate interclass precision and recall
         tp_fn = tf.reduce_sum(confusion[i, :])
@@ -301,17 +301,17 @@ def test(config, output_path):
         for i, m in enumerate(metrics):
 
             # Save the metrics
-            name = classes[i][0]
+            name = classes[i]["name"]
             write("{}".format(name.title()))
             write("\tAP: {}".format(m["ap"]))
             write("\tPrecision: {}".format(m["precision"][i]))
             write("\tRecall: {}".format(m["recall"][i]))
             write("\tPredicted {} samples are really:".format(name.title()))
             for j in range(n_classes):
-                write("\t\t{}: {:.3f}%".format(classes[j][0].title(), 100 * m["precision"][j]))
+                write("\t\t{}: {:.3f}%".format(classes[j]["name"].title(), 100 * m["precision"][j]))
             write("\tReal {} samples are predicted as:".format(name.title()))
             for j in range(n_classes):
-                write("\t\t{}: {:.3f}%".format(classes[j][0].title(), 100 * m["recall"][j]))
+                write("\t\t{}: {:.3f}%".format(classes[j]["name"].title(), 100 * m["recall"][j]))
 
             for curve_name, x_func, y_func in curve_types:
                 # Save the curves

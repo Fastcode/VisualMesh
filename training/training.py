@@ -29,31 +29,33 @@ from .model import VisualMeshModel
 # Train the network
 def train(config, output_path):
 
+    n_classes = config["network"]["classes"]
+
     # Get the training dataset
     training_dataset = (
         VisualMeshDataset(
-            input_files=config.dataset.training,
-            classes=config.network.classes,
-            model=config.model,
-            batch_size=config.training.batch_size,
+            input_files=config["dataset"]["training"],
+            classes=config["network"]["classes"],
+            model=config["model"],
+            batch_size=config["training"]["batch_size"],
             prefetch=tf.data.experimental.AUTOTUNE,
-            variants=config.training.variants,
+            variants=config["training"]["variants"],
         )
         .build()
         .map(keras_dataset)
     )
 
     # If we are using batches_per_epoch as a number rather than the whole dataset
-    if config.training.batches_per_epoch is not None:
+    if "batches_per_epoch" in config["training"]:
         training_dataset = training_dataset.repeat()
 
     # Get the validation dataset
     validation_dataset = (
         VisualMeshDataset(
-            input_files=config.dataset.validation,
-            classes=config.network.classes,
-            model=config.model,
-            batch_size=config.training.validation.batch_size,
+            input_files=config["dataset"]["validation"],
+            classes=config["network"]["classes"],
+            model=config["model"],
+            batch_size=config["training"]["validation"]["batch_size"],
             prefetch=tf.data.experimental.AUTOTUNE,
             variants={},
         )
@@ -63,31 +65,29 @@ def train(config, output_path):
 
     # Metrics that we want to track
     metrics = [
-        AveragePrecision("metrics/average_precision", len(config.network.classes)),
-        AverageRecall("metrics/average_recall", len(config.network.classes)),
+        AveragePrecision("metrics/average_precision", n_classes),
+        AverageRecall("metrics/average_recall", n_classes),
     ]
-    for i, k in enumerate(config.network.classes):
-        metrics.append(ClassPrecision("metrics/{}_precision".format(k[0]), i, len(config.network.classes)))
-        metrics.append(ClassRecall("metrics/{}_recall".format(k[0]), i, len(config.network.classes)))
+    for i, k in enumerate(config["network"]["classes"]):
+        metrics.append(ClassPrecision("metrics/{}_precision".format(k["name"]), i, n_classes))
+        metrics.append(ClassRecall("metrics/{}_recall".format(k["name"]), i, n_classes))
 
     # Define the model
     model = VisualMeshModel(
-        structure=config.network.structure,
-        n_classes=len(config.network.classes),
-        activation=config.network.activation_fn,
+        structure=config["network"]["structure"], n_classes=n_classes, activation=config["network"]["activation_fn"],
     )
 
     # Setup the optimiser
-    if config.training.optimiser.type == "Adam":
-        optimiser = tf.optimizers.Adam(learning_rate=float(config.training.optimiser.learning_rate))
-    elif config.training.optimiser.type == "Ranger":
+    if config["training"]["optimiser"]["type"] == "Adam":
+        optimiser = tf.optimizers.Adam(learning_rate=float(config["training"]["optimiser"]["learning_rate"]))
+    elif config["training"]["optimiser"]["type"] == "Ranger":
         optimiser = tfa.optimizers.Lookahead(
-            tfa.optimizers.RectifiedAdam(learning_rate=float(config.training.optimiser.learning_rate)),
-            sync_period=int(config.training.optimiser.sync_period),
-            slow_step_size=float(config.training.optimiser.slow_step_size),
+            tfa.optimizers.RectifiedAdam(learning_rate=float(config["training"]["optimiser"]["learning_rate"])),
+            sync_period=int(config["training"]["optimiser"]["sync_period"]),
+            slow_step_size=float(config["training"]["optimiser"]["slow_step_size"]),
         )
     else:
-        raise RuntimeError("Unknown optimiser type" + config.training.optimiser)
+        raise RuntimeError("Unknown optimiser type" + config["training"]["optimiser"]["type"])
 
     # Compile the model
     model.compile(
@@ -102,10 +102,12 @@ def train(config, output_path):
     # Fit the model
     model.fit(
         training_dataset,
-        epochs=config.training.epochs,
-        steps_per_epoch=config.training.batches_per_epoch,
+        epochs=config["training"]["epochs"],
+        steps_per_epoch=(
+            None if "batches_per_epoch" not in config["training"] else config["training"]["batches_per_epoch"]
+        ),
         validation_data=validation_dataset,
-        validation_steps=config.training.validation.samples,
+        validation_steps=config["training"]["validation"]["samples"],
         callbacks=[
             tf.keras.callbacks.TensorBoard(
                 log_dir=output_path, update_freq="batch", profile_batch=0, write_graph=True, histogram_freq=1
@@ -115,11 +117,11 @@ def train(config, output_path):
             ),
             MeshImages(
                 output_path,
-                config.dataset.validation,
-                config.network.classes,
-                config.model,
-                config.training.validation.progress_images,
-                [c[1] for c in config.network.classes],
+                config["dataset"]["validation"],
+                config["network"]["classes"],
+                config["model"],
+                config["training"]["validation"]["progress_images"],
+                [c["colours"][0] for c in config["network"]["classes"]],  # Draw using the first colour
             ),
         ],
     )

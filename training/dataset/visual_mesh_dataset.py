@@ -38,13 +38,13 @@ class VisualMeshDataset:
         self.input_files = input_files
         self.classes = classes
         self.batch_size = batch_size
-        self.mesh_type = model.mesh.type
-        self.cached_meshes = model.mesh.cached_meshes
-        self.max_distance = model.mesh.max_distance
-        self.geometry = tf.constant(model.geometry.shape, dtype=tf.string, name="GeometryType")
-        self.radius = model.geometry.radius
-        self.n_intersections = model.geometry.intersections
-        self.intersection_tolerance = model.geometry.intersection_tolerance
+        self.mesh_type = model["mesh"]["type"]
+        self.cached_meshes = model["mesh"]["cached_meshes"]
+        self.max_distance = model["mesh"]["max_distance"]
+        self.geometry = tf.constant(model["geometry"]["shape"], dtype=tf.string, name="GeometryType")
+        self.radius = model["geometry"]["radius"]
+        self.n_intersections = model["geometry"]["intersections"]
+        self.intersection_tolerance = model["geometry"]["intersection_tolerance"]
         self.prefetch = prefetch
         self._variants = variants
 
@@ -87,12 +87,16 @@ class VisualMeshDataset:
 
         # Adjust our height and orientation
         if "mesh" in self._variants:
-            v = self._variants.mesh
+            v = self._variants["mesh"]
             if "height" in v:
-                height = height + tf.random.truncated_normal(shape=(), mean=v.height.mean, stddev=v.height.stddev,)
+                height = height + tf.random.truncated_normal(
+                    shape=(), mean=v["height"]["mean"], stddev=v["height"]["stddev"],
+                )
             if "rotation" in v:
                 # Make 3 random euler angles
-                rotation = tf.random.truncated_normal(shape=[3], mean=v.rotation.mean, stddev=v.rotation.stddev,)
+                rotation = tf.random.truncated_normal(
+                    shape=[3], mean=v["rotation"]["mean"], stddev=v["rotation"]["stddev"],
+                )
                 # Cos and sin for everyone!
                 ca = tf.cos(rotation[0])
                 sa = tf.sin(rotation[0])
@@ -196,24 +200,26 @@ class VisualMeshDataset:
         X = tf.expand_dims(X, axis=0)
 
         # Apply the variants that were listed
-        var = self._variants.image
-        if "brightness" in var and var.brightness.stddev > 0:
+        v = self._variants["image"]
+        if "brightness" in v and v["brightness"]["stddev"] > 0:
             X = tf.image.adjust_brightness(
-                X, tf.random.truncated_normal(shape=(), mean=var.brightness.mean, stddev=var.brightness.stddev,)
+                X, tf.random.truncated_normal(shape=(), mean=v["brightness"]["mean"], stddev=v["brightness"]["stddev"])
             )
-        if "contrast" in var and var.contrast.stddev > 0:
+        if "contrast" in v and v["contrast"]["stddev"] > 0:
             X = tf.image.adjust_contrast(
-                X, tf.random.truncated_normal(shape=(), mean=var.contrast.mean, stddev=var.contrast.stddev,)
+                X, tf.random.truncated_normal(shape=(), mean=v["contrast"]["mean"], stddev=v["contrast"]["stddev"])
             )
-        if "hue" in var and var.hue.stddev > 0:
-            X = tf.image.adjust_hue(X, tf.random.truncated_normal(shape=(), mean=var.hue.mean, stddev=var.hue.stddev,))
-        if "saturation" in var and var.saturation.stddev > 0:
+        if "hue" in v and v["hue"]["stddev"] > 0:
+            X = tf.image.adjust_hue(
+                X, tf.random.truncated_normal(shape=(), mean=v["hue"]["mean"], stddev=v["hue"]["stddev"])
+            )
+        if "saturation" in v and v["saturation"]["stddev"] > 0:
             X = tf.image.adjust_saturation(
-                X, tf.random.truncated_normal(shape=(), mean=var.saturation.mean, stddev=var.saturation.stddev,)
+                X, tf.random.truncated_normal(shape=(), mean=v["saturation"]["mean"], stddev=v["saturation"]["stddev"])
             )
-        if "gamma" in var and var.gamma.stddev > 0:
+        if "gamma" in v and v["gamma"]["stddev"] > 0:
             X = tf.image.adjust_gamma(
-                X, tf.random.truncated_normal(shape=(), mean=var.gamma.mean, stddev=var.gamma.stddev,)
+                X, tf.random.truncated_normal(shape=(), mean=v["gamma"]["mean"], stddev=v["gamma"]["stddev"])
             )
 
         # Remove the extra dimension we added
