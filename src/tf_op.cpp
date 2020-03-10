@@ -326,18 +326,19 @@ private:
         visualmesh::engine::cpu::Engine<T> engine;
         visualmesh::ProjectedMesh<T, Model<T>::N_NEIGHBOURS> projected;
 
+        std::shared_ptr<visualmesh::Mesh<T, Model>> mesh;
         if (geometry == "SPHERE") {
             visualmesh::geometry::Sphere<T> shape(radius);
-            std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Sphere>(
+            mesh = get_mesh<T, Model, visualmesh::geometry::Sphere>(
               shape, Hoc[2][3], n_intersections, intersection_tolerance, cached_meshes, max_distance);
-            projected = engine.project(*mesh, Hoc, lens);
         }
         else if (geometry == "CIRCLE") {
             visualmesh::geometry::Circle<T> shape(radius);
-            std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Circle>(
+            mesh = get_mesh<T, Model, visualmesh::geometry::Circle>(
               shape, Hoc[2][3], n_intersections, intersection_tolerance, cached_meshes, max_distance);
-            projected = engine.project(*mesh, Hoc, lens);
         }
+        // Now project the mesh
+        projected = engine.project(*mesh, Hoc, lens);
 
         // Get the interesting things out of the projected mesh
         const auto& px             = projected.pixel_coordinates;
