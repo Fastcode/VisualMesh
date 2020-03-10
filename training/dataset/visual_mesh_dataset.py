@@ -122,6 +122,11 @@ class VisualMeshDataset:
                 # Apply the rotation
                 orientation = tf.matmul(rot, orientation)
 
+        # Construct the camera to observation plane transformation matrix
+        Hoc = tf.zeros(shape=(4, 4))
+        Hoc[0:3, 0:3] = orientation
+        Hoc[2, 3] = height
+
         # Run the visual mesh to get our values
         pixels, neighbours = VisualMesh(
             tf.shape(input=args["image"])[:2],
@@ -130,8 +135,7 @@ class VisualMeshDataset:
             args["lens_centre"],
             args["lens_distortion"],
             args["fov"],
-            orientation,
-            height,
+            Hoc,
             self.mesh_type,
             self.cached_meshes,
             self.max_distance,

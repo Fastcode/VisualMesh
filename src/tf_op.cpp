@@ -43,7 +43,6 @@ REGISTER_OP("VisualMesh")
   .Input("lens_distortion: T")
   .Input("lens_fov: T")
   .Input("cam_to_observation_plane: T")
-  .Input("height: T")
   .Input("model: string")
   .Input("cached_meshes: int32")
   .Input("max_distance: T")
@@ -67,15 +66,14 @@ enum Args {
     LENS_CENTRE            = 3,
     LENS_DISTORTION        = 4,
     FIELD_OF_VIEW          = 5,
-    ROC                    = 6,
-    HEIGHT                 = 7,
-    MODEL                  = 8,
-    CACHED_MESHES          = 9,
-    MAX_DISTANCE           = 10,
-    GEOMETRY               = 11,
-    RADIUS                 = 12,
-    N_INTERSECTIONS        = 13,
-    INTERSECTION_TOLERANCE = 14
+    HOC                    = 6,
+    MODEL                  = 7,
+    CACHED_MESHES          = 8,
+    MAX_DISTANCE           = 9,
+    GEOMETRY               = 10,
+    RADIUS                 = 11,
+    N_INTERSECTIONS        = 12,
+    INTERSECTION_TOLERANCE = 13
 };
 
 /**
@@ -252,12 +250,9 @@ private:
                     tensorflow::TensorShapeUtils::IsScalar(context->input(Args::FIELD_OF_VIEW).shape()),
                     tensorflow::errors::InvalidArgument("The field of view must be a scalar"));
         OP_REQUIRES(context,
-                    tensorflow::TensorShapeUtils::IsSquareMatrix(context->input(Args::ROC).shape())
-                      && context->input(Args::ROC).shape().dim_size(0) == 3,
+                    tensorflow::TensorShapeUtils::IsSquareMatrix(context->input(Args::HOC).shape())
+                      && context->input(Args::HOC).shape().dim_size(0) == 4,
                     tensorflow::errors::InvalidArgument("Roc must be a 3x3 matrix"));
-        OP_REQUIRES(context,
-                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::HEIGHT).shape()),
-                    tensorflow::errors::InvalidArgument("The height must be a scalar"));
         OP_REQUIRES(context,
                     tensorflow::TensorShapeUtils::IsScalar(context->input(Args::N_INTERSECTIONS).shape()),
                     tensorflow::errors::InvalidArgument("The number of intersections must be a scalar"));
@@ -285,8 +280,7 @@ private:
         auto lens_centre                     = context->input(Args::LENS_CENTRE).flat<T>();
         auto lens_distortion                 = context->input(Args::LENS_DISTORTION).flat<T>();
         T fov                                = context->input(Args::FIELD_OF_VIEW).scalar<T>()(0);
-        auto tRoc                            = context->input(Args::ROC).matrix<T>();
-        T height                             = context->input(Args::HEIGHT).scalar<T>()(0);
+        auto tHoc                            = context->input(Args::HOC).matrix<T>();
         T max_distance                       = context->input(Args::MAX_DISTANCE).scalar<T>()(0);
         T n_intersections                    = context->input(Args::N_INTERSECTIONS).scalar<T>()(0);
         tensorflow::int32 cached_meshes      = context->input(Args::N_INTERSECTIONS).scalar<tensorflow::int32>()(0);
@@ -305,9 +299,9 @@ private:
 
         // Create our transformation matrix
         visualmesh::mat4<T> Hoc = {{
-          visualmesh::vec4<T>{tRoc(0, 0), tRoc(0, 1), tRoc(0, 2), 0},
-          visualmesh::vec4<T>{tRoc(1, 0), tRoc(1, 1), tRoc(1, 2), 0},
-          visualmesh::vec4<T>{tRoc(2, 0), tRoc(2, 1), tRoc(2, 2), height},
+          visualmesh::vec4<T>{tHoc(0, 0), tHoc(0, 1), tHoc(0, 2), tHoc(0, 3)},
+          visualmesh::vec4<T>{tHoc(1, 0), tHoc(1, 1), tHoc(1, 2), tHoc(1, 3)},
+          visualmesh::vec4<T>{tHoc(2, 0), tHoc(2, 1), tHoc(2, 2), tHoc(2, 3)},
           visualmesh::vec4<T>{0, 0, 0, 1},
         }};
 
@@ -335,13 +329,13 @@ private:
         if (geometry == "SPHERE") {
             visualmesh::geometry::Sphere<T> shape(radius);
             std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Sphere>(
-              shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
+              shape, Hoc[2][3], n_intersections, intersection_tolerance, cached_meshes, max_distance);
             projected = engine.project(*mesh, Hoc, lens);
         }
         else if (geometry == "CIRCLE") {
             visualmesh::geometry::Circle<T> shape(radius);
             std::shared_ptr<visualmesh::Mesh<T, Model>> mesh = get_mesh<T, Model, visualmesh::geometry::Circle>(
-              shape, height, n_intersections, intersection_tolerance, cached_meshes, max_distance);
+              shape, Hoc[2][3], n_intersections, intersection_tolerance, cached_meshes, max_distance);
             projected = engine.project(*mesh, Hoc, lens);
         }
 
