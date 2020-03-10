@@ -128,7 +128,7 @@ class VisualMeshDataset:
         Hoc[2, 3] = height
 
         # Run the visual mesh to get our values
-        pixels, neighbours = VisualMesh(
+        pixels, neighbours, _ = VisualMesh(
             tf.shape(input=args["image"])[:2],
             args["projection"],
             args["focal_length"],

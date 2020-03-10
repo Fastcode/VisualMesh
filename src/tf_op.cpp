@@ -340,8 +340,9 @@ private:
         }
 
         // Get the interesting things out of the projected mesh
-        const auto& px            = projected.pixel_coordinates;
-        const auto& neighbourhood = projected.neighbourhood;
+        const auto& px             = projected.pixel_coordinates;
+        const auto& neighbourhood  = projected.neighbourhood;
+        const auto& global_indices = projected.global_indices;
 
         // Fill in our tensorflow output matrix
         tensorflow::Tensor* coordinates = nullptr;
@@ -376,6 +377,18 @@ private:
             for (unsigned int j = 0; j < neighbourhood[i].size(); ++j) {
                 n(i, j + 1) = m[j];
             }
+        }
+
+        // Fill in our tensorflow global_indices output matrix
+        tensorflow::Tensor* global_indices_out = nullptr;
+        tensorflow::TensorShape global_indices_shape;
+        global_indices_shape.AddDim(global_indices.size());
+        OP_REQUIRES_OK(context, context->allocate_output(1, global_indices_shape, &global_indices_out));
+
+        // Copy across our global indices
+        auto g = global_indices_out->matrix<U>();
+        for (unsigned int i = 0; i < global_indices.size(); ++i) {
+            g(i) = global_indices[i];
         }
     }
 
