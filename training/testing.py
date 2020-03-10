@@ -161,13 +161,13 @@ def _reduce_curve(X, c, n_bins, x_func, y_func):
 
 def test(config, output_path):
 
-    classes = config.network.classes
+    classes = config["network"]["classes"]
     n_classes = len(classes)
-    n_bins = config.testing.n_bins
+    n_bins = config["testing"]["n_bins"]
 
     # Define the model
     model = VisualMeshModel(
-        structure=config.network.structure, n_classes=n_classes, activation=config.network.activation_fn,
+        structure=config["network"]["structure"], n_classes=n_classes, activation=config["network"]["activation_fn"],
     )
 
     # Find the latest checkpoint file and load it
@@ -181,22 +181,22 @@ def test(config, output_path):
     n_records = sum(
         1
         for _ in tqdm(
-            tf.data.TFRecordDataset(config.dataset.testing),
+            tf.data.TFRecordDataset(config["dataset"]["testing"]),
             dynamic_ncols=True,
             leave=False,
             unit=" records",
             desc="Counting records in test dataset",
         )
     )
-    n_batches = n_records // max(1, config.testing.batch_size)
+    n_batches = n_records // max(1, config["testing"]["batch_size"])
     print("Testing using {} records in {} batches".format(n_records, n_batches))
 
     # Load the testing dataset
     validation_dataset = VisualMeshDataset(
-        input_files=config.dataset.testing,
+        input_files=config["dataset"]["testing"],
         classes=classes,
-        model=config.model,
-        batch_size=config.testing.batch_size,
+        model=config["model"],
+        batch_size=config["testing"]["batch_size"],
         prefetch=tf.data.experimental.AUTOTUNE,
         variants={},
     ).build()
