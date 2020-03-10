@@ -406,12 +406,12 @@ public:
         std::string model = *context->input(Args::MODEL).flat<tensorflow::string>().data();
 
         // clang-format off
-    if (model == "RING6") { ComputeModel<visualmesh::model::Ring6>(context); }
-    else if (model == "RING4") { ComputeModel<visualmesh::model::Ring4>(context); }
-    else if (model == "RADIAL8") { ComputeModel<visualmesh::model::Radial8>(context); }
-    else if (model == "RADIAL6") { ComputeModel<visualmesh::model::Radial6>(context); }
-    else if (model == "RADIAL4") { ComputeModel<visualmesh::model::Radial4>(context); }
-    else if (model == "XGRID4") { ComputeModel<visualmesh::model::XGrid4>(context); }
+        if (model == "RING6") { ComputeModel<visualmesh::model::Ring6>(context); }
+        else if (model == "RING4") { ComputeModel<visualmesh::model::Ring4>(context); }
+        else if (model == "RADIAL8") { ComputeModel<visualmesh::model::Radial8>(context); }
+        else if (model == "RADIAL6") { ComputeModel<visualmesh::model::Radial6>(context); }
+        else if (model == "RADIAL4") { ComputeModel<visualmesh::model::Radial4>(context); }
+        else if (model == "XGRID4") { ComputeModel<visualmesh::model::XGrid4>(context); }
         // clang-format on
         else {
             OP_REQUIRES(
