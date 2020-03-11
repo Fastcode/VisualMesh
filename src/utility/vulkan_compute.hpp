@@ -26,10 +26,70 @@
 #include <limits>
 #include <set>
 #include <spirv/unified1/spirv.hpp11>
+#include <sstream>
 #include <string>
 #include <system_error>
 #include <utility>
 #include <vector>
+
+template <typename Iterator>
+inline std::stringstream& compose_string(std::stringstream& stream, const Iterator& begin, const Iterator& end) {
+    for (Iterator it = begin; it != end; ++it) {
+        stream << *it;
+    }
+    return stream;
+}
+
+template <typename Iterator, typename T, typename... Targs>
+inline std::stringstream& compose_string(
+  std::stringstream& stream, const Iterator& begin, const Iterator& end, T value, Targs... Fargs) {
+    for (Iterator it = begin; it != end; ++it) {
+        if (*it == '{') {
+            Iterator next = std::next(it, 1);
+            if (next != end) {
+                if (*next == '}') {
+                    stream << value;
+                    compose_string(stream, std::next(it, 2), end, Fargs...);
+                    return stream;
+                }
+                else if (*next == '{') {
+                    stream << "{";
+                    it = std::next(it, 1);
+                }
+                else {
+                    throw std::system_error(std::make_error_code(std::errc::invalid_argument),
+                                            "Dangling '{' found. '{' must be followed by either '}' or '{'");
+                }
+            }
+        }
+        else if (*it == '}') {
+            Iterator next = std::next(it, 1);
+            if (next != end) {
+                if (*next == '}') {
+                    stream << "}";
+                    it = std::next(it, 1);
+                }
+                else {
+                    throw std::system_error(std::make_error_code(std::errc::invalid_argument),
+                                            "Dangling '}' found. '}' must be preceeded by a '{' or followed by a '}'");
+                }
+            }
+        }
+        else {
+            stream << *it;
+        }
+    }
+
+    return stream;
+}
+
+template <bool debug, typename... Targs>
+inline std::string compose_string(const std::string& format, Targs... Fargs) {
+    if (debug) { return ""; }
+    std::stringstream stream;
+    compose_string(stream, format.begin(), format.end(), Fargs...);
+    return stream.str();
+}
 
 struct Program {
     struct Config {

@@ -18,8 +18,6 @@
 #ifndef VISUALMESH_VULKAN_KERNELS_MAKE_NETWORK_HPP
 #define VISUALMESH_VULKAN_KERNELS_MAKE_NETWORK_HPP
 
-#include <fmt/format.h>
-
 #include <iostream>
 #include <string>
 #include <utility>
@@ -44,7 +42,7 @@ namespace engine {
              *
              * @return the SPIRV source code for the kernels to be built
              */
-            template <typename Scalar>
+            template <typename Scalar, bool debug>
             std::vector<std::pair<uint32_t, std::vector<uint32_t>>> make_network(
               const network_structure_t<Scalar>& structure) {
                 std::vector<std::pair<uint32_t, std::vector<uint32_t>>> programs;
@@ -69,7 +67,7 @@ namespace engine {
                     config.enable_float64         = ((sizeof(Scalar) == 8) && std::is_floating_point<Scalar>::value);
                     config.address_model          = spv::AddressingModel::Logical;
                     config.memory_model           = spv::MemoryModel::GLSL450;
-                    config.enable_debug           = true;
+                    config.enable_debug           = debug;
                     Program program(config);
 
                     uint32_t uint_type  = program.add_type(spv::Op::OpTypeInt, {32, 0});
@@ -141,7 +139,7 @@ namespace engine {
                             float_type, program.add_constant(uint_type, {input_dimensions * (n_neighbours + 1u)})),
                           spv::StorageClass::Function),
                         spv::StorageClass::Function),
-                      fmt::format("in0[{}]", input_dimensions * (n_neighbours + 1))));
+                      compose_string<debug>("in0[{}]", input_dimensions * (n_neighbours + 1))));
 
                     program.add_source_line(__FILE__, __LINE__, conv_no);
 
@@ -154,7 +152,7 @@ namespace engine {
                                 program.add_constant(uint_type, {static_cast<uint32_t>(conv[layer_no].second.size())})),
                               spv::StorageClass::Function),
                             spv::StorageClass::Function),
-                          fmt::format("in{}[{}]", layer_no + 1, conv[layer_no].second.size())));
+                          compose_string<debug>("in{}[{}]", layer_no + 1, conv[layer_no].second.size())));
                     }
 
                     program.add_source_line(__FILE__, __LINE__, conv_no);
@@ -194,14 +192,14 @@ namespace engine {
                                program.iadd(idx_dim, program.add_constant(uint_type, {j}), uint_type)},
                               float_ptr),
                             float_type),
-                          fmt::format("input[idx * {} + {}]", input_dimensions, j));
+                          compose_string<debug>("input[idx * {} + {}]", input_dimensions, j));
 
                         program.add_source_line(__FILE__, __LINE__, conv_no);
 
                         program.store_variable(
                           program.add_name(
                             program.member_access(layers[0], {program.add_constant(uint_type, {j})}, float_ptr_func),
-                            fmt::format("in0[{}]", j)),
+                            compose_string<debug>("in0[{}]", j)),
                           input_val);
 
                         program.add_source_line(__FILE__, __LINE__, conv_no);
@@ -222,7 +220,7 @@ namespace engine {
                               {idx0, program.iadd(idx_neighbours, program.add_constant(uint_type, {i}), uint_type)},
                               uint_ptr_sb),
                             uint_type),
-                          fmt::format("neighbourhood[idx * {} + {}]", n_neighbours, i));
+                          compose_string<debug>("neighbourhood[idx * {} + {}]", n_neighbours, i));
 
                         program.add_source_line(__FILE__, __LINE__, conv_no);
 
@@ -230,7 +228,8 @@ namespace engine {
                         // neighbourhood[idx * n_neighbours + i] * input_dimensions
                         uint32_t neighbour_input_idx = program.add_name(
                           program.imul(neighbour_idx, program.add_constant(uint_type, {input_dimensions}), uint_type),
-                          fmt::format("neighbourhood[idx * {} + {}] * {}", n_neighbours, i, input_dimensions));
+                          compose_string<debug>(
+                            "neighbourhood[idx * {} + {}] * {}", n_neighbours, i, input_dimensions));
 
                         program.add_source_line(__FILE__, __LINE__, conv_no);
 
@@ -246,7 +245,7 @@ namespace engine {
                                    program.iadd(neighbour_input_idx, program.add_constant(uint_type, {j}), uint_type)},
                                   float_ptr),
                                 float_type),
-                              fmt::format(
+                              compose_string<debug>(
                                 "input[neighbourhood[idx * {} + {}] * {} + {}]", n_neighbours, i, input_dimensions, j));
 
                             program.add_source_line(__FILE__, __LINE__, conv_no);
@@ -256,7 +255,7 @@ namespace engine {
                                                  layers[0],
                                                  {program.add_constant(uint_type, {(i + 1u) * input_dimensions + j})},
                                                  float_ptr_func),
-                                               fmt::format("in0[{}]", i + 1)),
+                                               compose_string<debug>("in0[{}]", i + 1)),
                               neighbour_val);
 
                             program.add_source_line(__FILE__, __LINE__, conv_no);
@@ -293,8 +292,9 @@ namespace engine {
 
                         // Perform our matrix multiplication for weights and add bias for layer
                         for (uint32_t i = 0; i < output_dimensions; ++i) {
-                            uint32_t total_val = program.add_name(program.add_constant(float_type, {biases[i]}),
-                                                                  fmt::format("in{}[{}]_bias[{}]", layer_no, i, i));
+                            uint32_t total_val =
+                              program.add_name(program.add_constant(float_type, {biases[i]}),
+                                               compose_string<debug>("in{}[{}]_bias[{}]", layer_no, i, i));
 
                             program.add_source_line(__FILE__, __LINE__, conv_no);
 
@@ -304,7 +304,7 @@ namespace engine {
                                     program.member_access(
                                       layers[layer_no], {program.add_constant(uint_type, {j})}, float_ptr_func),
                                     float_type),
-                                  fmt::format("in{}[{}]", layer_no, j));
+                                  compose_string<debug>("in{}[{}]", layer_no, j));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
@@ -327,7 +327,7 @@ namespace engine {
                               program.add_name(
                                 program.member_access(
                                   layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
-                                fmt::format("in{}[{}]", layer_no + 1, i)),
+                                compose_string<debug>("in{}[{}]", layer_no + 1, i)),
                               total_val);
 
                             program.add_source_line(__FILE__, __LINE__, conv_no);
@@ -350,7 +350,7 @@ namespace engine {
                                     program.member_access(
                                       layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
                                     float_type),
-                                  fmt::format("in{}[{}]", layer_no + 1, i));
+                                  compose_string<debug>("in{}[{}]", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
@@ -359,14 +359,14 @@ namespace engine {
                                   program.fsub(program.fmul(alpha, program.exp(current_val, float_type), float_type),
                                                alpha,
                                                float_type),
-                                  fmt::format("selu(in{}[{}])", layer_no + 1, i));
+                                  compose_string<debug>("selu(in{}[{}])", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
                                 // in1[i] = lambda * (in1[i] > 0 ? in1[i] : selu)
                                 uint32_t condition = program.add_name(
                                   program.fgeq(current_val, program.add_constant(float_type, {Scalar(0)})),
-                                  fmt::format("in{}[{}]_gt_0", layer_no + 1, i));
+                                  compose_string<debug>("in{}[{}]_gt_0", layer_no + 1, i));
                                 current_val = program.add_name(
                                   program.fmul(
                                     lambda, program.select(float_type, condition, current_val, selu), float_type),
@@ -393,12 +393,12 @@ namespace engine {
                                     program.member_access(
                                       layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
                                     float_type),
-                                  fmt::format("in{}[{}]", layer_no + 1, i));
+                                  compose_string<debug>("in{}[{}]", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
                                 current_val = program.add_name(program.exp(current_val, float_type),
-                                                               fmt::format("exp(in{}[{}])", layer_no + 1, i));
+                                                               compose_string<debug>("exp(in{}[{}])", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
@@ -421,12 +421,13 @@ namespace engine {
                                     program.member_access(
                                       layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
                                     float_type),
-                                  fmt::format("in{}[{}]", layer_no + 1, i));
+                                  compose_string<debug>("in{}[{}]", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
-                                exp_sum = program.add_name(program.fadd(exp_sum, current_val, float_type),
-                                                           fmt::format("exp_sum_plus_in{}[{}]", layer_no + 1, i));
+                                exp_sum =
+                                  program.add_name(program.fadd(exp_sum, current_val, float_type),
+                                                   compose_string<debug>("exp_sum_plus_in{}[{}]", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
                             }
@@ -441,12 +442,13 @@ namespace engine {
                                     program.member_access(
                                       layers[layer_no + 1], {program.add_constant(uint_type, {i})}, float_ptr_func),
                                     float_type),
-                                  fmt::format("in{}[{}]", layer_no + 1, i));
+                                  compose_string<debug>("in{}[{}]", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 
-                                current_val = program.add_name(program.fdiv(current_val, exp_sum, float_type),
-                                                               fmt::format("in{}[{}]_div_exp_sum", layer_no + 1, i));
+                                current_val =
+                                  program.add_name(program.fdiv(current_val, exp_sum, float_type),
+                                                   compose_string<debug>("in{}[{}]_div_exp_sum", layer_no + 1, i));
 
                                 program.add_source_line(__FILE__, __LINE__, conv_no);
 

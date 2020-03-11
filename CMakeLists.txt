@@ -137,7 +137,6 @@ if(TOP_LEVEL_PROJECT)
             ${OpenCL_LIBRARIES}
             Vulkan::Vulkan
             SPIRV::SPIRV
-            fmt::fmt
             ${OpenCV_LIBS}
             ${fmt_LIBRARIES}
             ${YAML_CPP_LIBRARIES}
@@ -155,7 +154,6 @@ if(TOP_LEVEL_PROJECT)
             ${OpenCL_LIBRARIES}
             Vulkan::Vulkan
             SPIRV::SPIRV
-            fmt::fmt
             ${OpenCV_LIBS}
             ${fmt_LIBRARIES}
             ${YAML_CPP_LIBRARIES}
@@ -173,7 +171,6 @@ if(TOP_LEVEL_PROJECT)
             ${OpenCL_LIBRARIES}
             Vulkan::Vulkan
             SPIRV::SPIRV
-            fmt::fmt
             ${OpenCV_LIBS}
             ${fmt_LIBRARIES}
             ${YAML_CPP_LIBRARIES}

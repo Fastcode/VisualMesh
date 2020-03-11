@@ -482,7 +482,7 @@ namespace engine {
                 program.end_function();
             }
 
-            template <typename Scalar, typename LoadImageFunc>
+            template <typename Scalar, bool debug, typename LoadImageFunc>
             inline std::vector<uint32_t> load_image(LoadImageFunc&& load_image_func) {
                 // Initialise the program.
                 Program::Config config;
@@ -490,6 +490,7 @@ namespace engine {
                 config.enable_float64         = ((sizeof(Scalar) == 8) && std::is_floating_point<Scalar>::value);
                 config.address_model          = spv::AddressingModel::Logical;
                 config.memory_model           = spv::MemoryModel::GLSL450;
+                config.enable_debug           = debug;
                 Program program(config);
 
                 // Add the standard types.

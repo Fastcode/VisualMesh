@@ -88,7 +88,7 @@ int main() {
 
     visualmesh::engine::cpu::Engine<Scalar> cpu_engine(network);
     visualmesh::engine::opencl::Engine<Scalar> cl_engine(network);
-    visualmesh::engine::vulkan::Engine<Scalar> vk_engine(network);
+    visualmesh::engine::vulkan::Engine<Scalar, false> vk_engine(network);
     t.measure("Loaded engines");
 
     auto dataset = load_dataset<Scalar>(image_path);

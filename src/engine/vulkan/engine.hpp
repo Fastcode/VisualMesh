@@ -57,7 +57,7 @@ namespace engine {
          *
          * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
          */
-        template <typename Scalar>
+        template <typename Scalar, bool debug = false>
         class Engine {
         public:
             /**
@@ -65,7 +65,7 @@ namespace engine {
              *
              * @param structure the network structure to use classification
              */
-            Engine(const network_structure_t<Scalar>& structure = {}, const bool& verbose = false) : max_width(4) {
+            Engine(const network_structure_t<Scalar>& structure = {}) : max_width(4) {
                 // Get a Vulkan instance
                 const VkApplicationInfo app_info = {
                   VK_STRUCTURE_TYPE_APPLICATION_INFO, 0, "VisualMesh", 0, "", 0, VK_MAKE_VERSION(1, 1, 0)};
@@ -78,7 +78,7 @@ namespace engine {
                 context.instance = vk::instance(instance, [](auto p) { vkDestroyInstance(p, nullptr); });
 
                 // Create the Vulkan instance and find the best devices and queues
-                operation::create_device(DeviceType::GPU, context, verbose);
+                operation::create_device(DeviceType::GPU, context, debug);
 
                 // Create queues and command pools
                 vkGetDeviceQueue(context.device, context.compute_queue_family, 0, &context.compute_queue);
@@ -101,7 +101,7 @@ namespace engine {
                 std::vector<uint32_t> rectilinear_reprojection_source =
                   kernels::build_reprojection<Scalar>("project_rectilinear", kernels::rectilinear_reprojection<Scalar>);
 
-                if (verbose) {
+                if (debug) {
                     std::ofstream ofs;
                     ofs.open("project_equidistant.spv", std::ios::binary | std::ios::out);
                     ofs.write(reinterpret_cast<const char*>(equidistant_reprojection_source.data()),
@@ -262,16 +262,16 @@ namespace engine {
 
                 // Created the load_image kernel source and program
                 std::vector<uint32_t> load_GRBG_image_source =
-                  kernels::load_image<Scalar>(kernels::load_GRBG_image<Scalar>);
+                  kernels::load_image<Scalar, debug>(kernels::load_GRBG_image<Scalar>);
                 std::vector<uint32_t> load_RGGB_image_source =
-                  kernels::load_image<Scalar>(kernels::load_RGGB_image<Scalar>);
+                  kernels::load_image<Scalar, debug>(kernels::load_RGGB_image<Scalar>);
                 std::vector<uint32_t> load_GBRG_image_source =
-                  kernels::load_image<Scalar>(kernels::load_GBRG_image<Scalar>);
+                  kernels::load_image<Scalar, debug>(kernels::load_GBRG_image<Scalar>);
                 std::vector<uint32_t> load_BGGR_image_source =
-                  kernels::load_image<Scalar>(kernels::load_BGGR_image<Scalar>);
+                  kernels::load_image<Scalar, debug>(kernels::load_BGGR_image<Scalar>);
                 std::vector<uint32_t> load_RGBA_image_source =
-                  kernels::load_image<Scalar>(kernels::load_RGBA_image<Scalar>);
-                if (verbose) {
+                  kernels::load_image<Scalar, debug>(kernels::load_RGBA_image<Scalar>);
+                if (debug) {
                     std::ofstream ofs;
                     ofs.open("load_GRBG_image.spv", std::ios::binary | std::ios::out);
                     ofs.write(reinterpret_cast<const char*>(load_GRBG_image_source.data()),
@@ -554,10 +554,10 @@ namespace engine {
                   "Failed to create conv pipeline layout");
 
                 std::vector<std::pair<uint32_t, std::vector<uint32_t>>> conv_sources =
-                  kernels::make_network<Scalar>(structure);
+                  kernels::make_network<Scalar, debug>(structure);
                 for (const auto& conv_source : conv_sources) {
                     std::string kernel = "conv" + std::to_string(conv_source.first);
-                    if (verbose) {
+                    if (debug) {
                         std::ofstream ofs;
                         ofs.open(kernel + ".spv", std::ios::binary | std::ios::out);
                         ofs.write(reinterpret_cast<const char*>(conv_source.second.data()),
