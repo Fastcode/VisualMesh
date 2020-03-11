@@ -72,6 +72,7 @@ REGISTER_OP("VisualMesh")
   .Input("intersection_tolerance: T")
   .Output("pixels: T")
   .Output("neighbours: int32")
+  .Output("global_indices: int32")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
       // nx2 points on image, n+1xG neighbours (including off screen point), and n global indices
       c->set_output(Outputs::PIXELS, c->MakeShape({c->kUnknownDim, 2}));
