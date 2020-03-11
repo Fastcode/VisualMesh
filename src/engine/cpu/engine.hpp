@@ -182,47 +182,6 @@ namespace engine {
                                                                            const uint32_t& format) const {
                 static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
-                auto interpolate =
-                  [](const vec2<Scalar>& P, const uint8_t* const image, const vec2<int>& dimensions, const int& depth) {
-                      auto get_pixel = [](const vec2<Scalar>& px,
-                                          const uint8_t* const image,
-                                          const vec2<int>& dimensions,
-                                          const int& depth) {
-                          int c              = (px[1] * dimensions[0] + px[0]) * depth;
-                          vec4<Scalar> pixel = {image[c + 0] * Scalar(1.0 / 255.0),
-                                                image[c + 1] * Scalar(1.0 / 255.0),
-                                                image[c + 2] * Scalar(1.0 / 255.0),
-                                                (depth == 3) ? Scalar(0) : image[c + 3] * Scalar(1.0 / 255.0)};
-                          return pixel;
-                      };
-
-                      // P1 -------------- P2
-                      // |                 |
-                      // |                 |
-                      // |                 |
-                      // |        P        |
-                      // |                 |
-                      // |                 |
-                      // P3 -------------- P4
-                      const Scalar x        = P[0];
-                      const Scalar y        = P[1];
-                      const Scalar x1       = std::floor(P[0]);
-                      const Scalar x2       = std::ceil(P[0]);
-                      const Scalar y1       = std::floor(P[1]);
-                      const Scalar y2       = std::ceil(P[1]);
-                      const vec4<Scalar> Q1 = get_pixel(vec2<Scalar>{x1, y1}, image, dimensions, depth);
-                      const vec4<Scalar> Q2 = get_pixel(vec2<Scalar>{x2, y1}, image, dimensions, depth);
-                      const vec4<Scalar> Q3 = get_pixel(vec2<Scalar>{x1, y2}, image, dimensions, depth);
-                      const vec4<Scalar> Q4 = get_pixel(vec2<Scalar>{x2, y2}, image, dimensions, depth);
-
-                      const vec4<Scalar> R1 =
-                        add(multiply(Q1, ((x2 - x) / (x2 - x1))), multiply(Q2, ((x - x1) / (x2 - x1))));
-                      const vec4<Scalar> R2 =
-                        add(multiply(Q3, ((x2 - x) / (x2 - x1))), multiply(Q4, ((x - x1) / (x2 - x1))));
-
-                      return add(multiply(R1, ((y2 - y) / (y2 - y1))), multiply(R2, ((y - y1) / (y2 - y1))));
-                  };
-
                 // Project the pixels to the display
                 ProjectedMesh<Scalar, N_NEIGHBOURS> projected = project(mesh, Hoc, lens);
                 auto& neighbourhood                           = projected.neighbourhood;
@@ -370,6 +329,48 @@ namespace engine {
             mutable std::vector<Scalar> input;
             /// An output buffer used to ping/pong when doing classification so we don't have to remake them
             mutable std::vector<Scalar> output;
+
+            vec4<Scalar> get_pixel(const vec2<Scalar>& px,
+                                   const uint8_t* const image,
+                                   const vec2<int>& dimensions,
+                                   const int& depth) const {
+                int c              = (px[1] * dimensions[0] + px[0]) * depth;
+                vec4<Scalar> pixel = {image[c + 0] * Scalar(1.0 / 255.0),
+                                      image[c + 1] * Scalar(1.0 / 255.0),
+                                      image[c + 2] * Scalar(1.0 / 255.0),
+                                      (depth == 3) ? Scalar(0) : image[c + 3] * Scalar(1.0 / 255.0)};
+                return pixel;
+            };
+
+            vec4<Scalar> interpolate(const vec2<Scalar>& P,
+                                     const uint8_t* const image,
+                                     const vec2<int>& dimensions,
+                                     const int& depth) const {
+
+                // (x1, y1) -------------- (x2, y1)
+                //    |                       |
+                //    |                       |
+                //    |                       |
+                //    |           P           |
+                //    |                       |
+                //    |                       |
+                // (x1, y2) -------------- (x2, y2)
+                const Scalar x        = P[0];
+                const Scalar y        = P[1];
+                const Scalar x1       = std::floor(P[0]);
+                const Scalar x2       = std::ceil(P[0]);
+                const Scalar y1       = std::floor(P[1]);
+                const Scalar y2       = std::ceil(P[1]);
+                const vec4<Scalar> Q1 = get_pixel(vec2<Scalar>{x1, y1}, image, dimensions, depth);
+                const vec4<Scalar> Q2 = get_pixel(vec2<Scalar>{x2, y1}, image, dimensions, depth);
+                const vec4<Scalar> Q3 = get_pixel(vec2<Scalar>{x1, y2}, image, dimensions, depth);
+                const vec4<Scalar> Q4 = get_pixel(vec2<Scalar>{x2, y2}, image, dimensions, depth);
+
+                const vec4<Scalar> R1 = add(multiply(Q1, ((x2 - x) / (x2 - x1))), multiply(Q2, ((x - x1) / (x2 - x1))));
+                const vec4<Scalar> R2 = add(multiply(Q3, ((x2 - x) / (x2 - x1))), multiply(Q4, ((x - x1) / (x2 - x1))));
+
+                return add(multiply(R1, ((y2 - y) / (y2 - y1))), multiply(R2, ((y - y1) / (y2 - y1))));
+            };
         };
 
     }  // namespace cpu
