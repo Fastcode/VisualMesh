@@ -33,6 +33,26 @@
 #include "mesh/model/ring6.hpp"
 #include "mesh/model/xgrid4.hpp"
 
+enum Args {
+    DIMENSIONS             = 0,
+    PROJECTION             = 1,
+    FOCAL_LENGTH           = 2,
+    LENS_CENTRE            = 3,
+    LENS_DISTORTION        = 4,
+    FIELD_OF_VIEW          = 5,
+    HOC                    = 6,
+    MODEL                  = 7,
+    CACHED_MESHES          = 8,
+    MAX_DISTANCE           = 9,
+    GEOMETRY               = 10,
+    RADIUS                 = 11,
+    N_INTERSECTIONS        = 12,
+    INTERSECTION_TOLERANCE = 13
+};
+
+enum Outputs { PIXELS = 0, NEIGHBOURS = 1, GLOBAL_INDICES = 2 };
+
+
 REGISTER_OP("VisualMesh")
   .Attr("T: {float, double}")
   .Attr("U: {int32, int64}")
@@ -53,28 +73,12 @@ REGISTER_OP("VisualMesh")
   .Output("pixels: T")
   .Output("neighbours: int32")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-      // nx2 points on image, and n+1xG neighbours (including off screen point)
-      c->set_output(0, c->MakeShape({c->kUnknownDim, 2}));
-      c->set_output(1, c->MakeShape({c->kUnknownDim, c->kUnknownDim}));
+      // nx2 points on image, n+1xG neighbours (including off screen point), and n global indices
+      c->set_output(Outputs::PIXELS, c->MakeShape({c->kUnknownDim, 2}));
+      c->set_output(Outputs::NEIGHBOURS, c->MakeShape({c->kUnknownDim, c->kUnknownDim}));
+      c->set_output(Outputs::GLOBAL_INDICES, c->MakeShape({c->kUnknownDim}));
       return tensorflow::Status::OK();
   });
-
-enum Args {
-    DIMENSIONS             = 0,
-    PROJECTION             = 1,
-    FOCAL_LENGTH           = 2,
-    LENS_CENTRE            = 3,
-    LENS_DISTORTION        = 4,
-    FIELD_OF_VIEW          = 5,
-    HOC                    = 6,
-    MODEL                  = 7,
-    CACHED_MESHES          = 8,
-    MAX_DISTANCE           = 9,
-    GEOMETRY               = 10,
-    RADIUS                 = 11,
-    N_INTERSECTIONS        = 12,
-    INTERSECTION_TOLERANCE = 13
-};
 
 /**
  * @brief Given a shape, two heights and a k value, calculate the absolute number of intersections difference given the
@@ -350,7 +354,7 @@ private:
         tensorflow::TensorShape coords_shape;
         coords_shape.AddDim(px.size());
         coords_shape.AddDim(2);
-        OP_REQUIRES_OK(context, context->allocate_output(0, coords_shape, &coordinates));
+        OP_REQUIRES_OK(context, context->allocate_output(Outputs::PIXELS, coords_shape, &coordinates));
 
         // Copy across our pixel coordinates remembering to reverse the order from x,y to y,x
         auto c = coordinates->matrix<T>();
@@ -366,7 +370,7 @@ private:
         tensorflow::TensorShape neighbours_shape;
         neighbours_shape.AddDim(neighbourhood.size());
         neighbours_shape.AddDim(Model<T>::N_NEIGHBOURS + 1);
-        OP_REQUIRES_OK(context, context->allocate_output(1, neighbours_shape, &neighbours));
+        OP_REQUIRES_OK(context, context->allocate_output(Outputs::NEIGHBOURS, neighbours_shape, &neighbours));
 
         // Copy across our neighbourhood graph, adding in a point for itself
         auto n = neighbours->matrix<U>();
@@ -384,7 +388,8 @@ private:
         tensorflow::Tensor* global_indices_out = nullptr;
         tensorflow::TensorShape global_indices_shape;
         global_indices_shape.AddDim(global_indices.size());
-        OP_REQUIRES_OK(context, context->allocate_output(1, global_indices_shape, &global_indices_out));
+        OP_REQUIRES_OK(context,
+                       context->allocate_output(Outputs::GLOBAL_INDICES, global_indices_shape, &global_indices_out));
 
         // Copy across our global indices
         auto g = global_indices_out->matrix<U>();
