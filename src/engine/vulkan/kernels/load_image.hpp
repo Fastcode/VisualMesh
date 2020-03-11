@@ -62,54 +62,67 @@ namespace engine {
                   "bayer_to_rgb", {fvec4, image_type, sampler_type, fvec2, fvec2}, spv::FunctionControlMask::Pure);
 
                 // Define some constants.
-                uint32_t offsets = program.add_constant(fvec4, {Scalar(-2.0), Scalar(-1.0), Scalar(1.0), Scalar(2.0)});
-                uint32_t kA =
-                  program.add_constant(fvec4, {Scalar(-0.125), Scalar(-0.1875), Scalar(0.0625), Scalar(-0.125)});
-                uint32_t kB = program.add_constant(fvec4, {Scalar(0.25), Scalar(0.0), Scalar(0.0), Scalar(0.5)});
-                uint32_t kC = program.add_constant(fvec4, {Scalar(0.5), Scalar(0.75), Scalar(0.625), Scalar(0.625)});
-                uint32_t kD = program.add_constant(fvec4, {Scalar(0.0), Scalar(0.25), Scalar(-0.125), Scalar(-0.125)});
-                uint32_t kE =
-                  program.add_constant(fvec4, {Scalar(-0.125), Scalar(-0.1875), Scalar(-0.125), Scalar(0.0625)});
-                uint32_t kF = program.add_constant(fvec4, {Scalar(0.25), Scalar(0.0), Scalar(0.5), Scalar(0.0)});
+                uint32_t offsets = program.add_name(
+                  program.add_constant(fvec4, {Scalar(-2.0), Scalar(-1.0), Scalar(1.0), Scalar(2.0)}), "offsets");
+                uint32_t kA = program.add_name(
+                  program.add_constant(fvec4, {Scalar(-0.125), Scalar(-0.1875), Scalar(0.0625), Scalar(-0.125)}), "kA");
+                uint32_t kB = program.add_name(
+                  program.add_constant(fvec4, {Scalar(0.25), Scalar(0.0), Scalar(0.0), Scalar(0.5)}), "kB");
+                uint32_t kC = program.add_name(
+                  program.add_constant(fvec4, {Scalar(0.5), Scalar(0.75), Scalar(0.625), Scalar(0.625)}), "kC");
+                uint32_t kD = program.add_name(
+                  program.add_constant(fvec4, {Scalar(0.0), Scalar(0.25), Scalar(-0.125), Scalar(-0.125)}), "kD");
+                uint32_t kE = program.add_name(
+                  program.add_constant(fvec4, {Scalar(-0.125), Scalar(-0.1875), Scalar(-0.125), Scalar(0.0625)}), "kE");
+                uint32_t kF = program.add_name(
+                  program.add_constant(fvec4, {Scalar(0.25), Scalar(0.0), Scalar(0.5), Scalar(0.0)}), "kF");
 
                 // centre.xy = coord
                 // centre.zw = coord + first_red
-                uint32_t centre = program.concatenate_fvec2(params[3], program.fadd(params[3], params[4], fvec2));
+                uint32_t centre = program.add_name(
+                  program.concatenate_fvec2(params[3], program.fadd(params[3], params[4], fvec2)), "centre");
 
                 // Extract components from centre.
-                uint32_t centre_x  = program.vector_component(float_type, centre, 0);
-                uint32_t centre_y  = program.vector_component(float_type, centre, 0);
-                uint32_t centre_xy = program.swizzle(centre, fvec2, {0, 1});
-                uint32_t centre_zw = program.swizzle(centre, fvec2, {2, 3});
+                uint32_t centre_x  = program.add_name(program.vector_component(float_type, centre, 0), "centre_x");
+                uint32_t centre_y  = program.add_name(program.vector_component(float_type, centre, 0), "centre_y");
+                uint32_t centre_xy = program.add_name(program.swizzle(centre, fvec2, {0, 1}), "centre_xy");
+                uint32_t centre_zw = program.add_name(program.swizzle(centre, fvec2, {2, 3}), "centre_zq");
 
                 // Sample image at centre.xy.
-                uint32_t C = program.call_function(fetch_func, float_type, {params[1], params[2], centre_xy});
+                uint32_t C = program.add_name(
+                  program.call_function(fetch_func, float_type, {params[1], params[2], centre_xy}), "C");
 
                 // float4 x_coord = centre.x + (float4){-2.0f, -1.0f, 1.0f, 2.0f};
-                uint32_t x_coord =
-                  program.fadd(program.create_vector(fvec4, {centre_x, centre_x, centre_x, centre_x}), offsets, fvec4);
+                uint32_t x_coord = program.add_name(
+                  program.fadd(program.create_vector(fvec4, {centre_x, centre_x, centre_x, centre_x}), offsets, fvec4),
+                  "x_coord");
 
                 // float4 y_coord = centre.y + (float4){-2.0f, -1.0f, 1.0f, 2.0f};
-                uint32_t y_coord =
-                  program.fadd(program.create_vector(fvec4, {centre_y, centre_y, centre_y, centre_y}), offsets, fvec4);
+                uint32_t y_coord = program.add_name(
+                  program.fadd(program.create_vector(fvec4, {centre_y, centre_y, centre_y, centre_y}), offsets, fvec4),
+                  "y_coord");
 
                 // Determine which of four types of pixels we are on.
                 // float2 alternate = fmod(floor(centre.zw), 2.0f);
-                uint32_t alternate = program.fmod(program.floor(centre_zw, fvec2, uvec2),
-                                                  program.add_constant(fvec2, {Scalar(2.0), Scalar(2.0)}),
-                                                  fvec2);
+                uint32_t alternate =
+                  program.add_name(program.fmod(program.floor(centre_zw, fvec2, uvec2),
+                                                program.add_constant(fvec2, {Scalar(2.0), Scalar(2.0)}),
+                                                fvec2),
+                                   "alternate");
 
                 // Extract components from alternate, x_coord, and y_coord.
-                uint32_t alternate_x = program.vector_component(float_type, alternate, 0);
-                uint32_t alternate_y = program.vector_component(float_type, alternate, 1);
-                uint32_t x_coord_x   = program.vector_component(float_type, x_coord, 0);
-                uint32_t x_coord_y   = program.vector_component(float_type, x_coord, 1);
-                uint32_t x_coord_z   = program.vector_component(float_type, x_coord, 2);
-                uint32_t x_coord_w   = program.vector_component(float_type, x_coord, 3);
-                uint32_t y_coord_x   = program.vector_component(float_type, y_coord, 0);
-                uint32_t y_coord_y   = program.vector_component(float_type, y_coord, 1);
-                uint32_t y_coord_z   = program.vector_component(float_type, y_coord, 2);
-                uint32_t y_coord_w   = program.vector_component(float_type, y_coord, 3);
+                uint32_t alternate_x =
+                  program.add_name(program.vector_component(float_type, alternate, 0), "alternate_x");
+                uint32_t alternate_y =
+                  program.add_name(program.vector_component(float_type, alternate, 1), "alternate_y");
+                uint32_t x_coord_x = program.add_name(program.vector_component(float_type, x_coord, 0), "x_coord_x");
+                uint32_t x_coord_y = program.add_name(program.vector_component(float_type, x_coord, 1), "x_coord_y");
+                uint32_t x_coord_z = program.add_name(program.vector_component(float_type, x_coord, 2), "x_coord_z");
+                uint32_t x_coord_w = program.add_name(program.vector_component(float_type, x_coord, 3), "x_coord_w");
+                uint32_t y_coord_x = program.add_name(program.vector_component(float_type, y_coord, 0), "y_coord_x");
+                uint32_t y_coord_y = program.add_name(program.vector_component(float_type, y_coord, 1), "y_coord_y");
+                uint32_t y_coord_z = program.add_name(program.vector_component(float_type, y_coord, 2), "y_coord_z");
+                uint32_t y_coord_w = program.add_name(program.vector_component(float_type, y_coord, 3), "y_coord_y");
 
                 // float4 Dvec = (float4){
                 //     fetch(raw_image, sampler, (float2){x_coord.y, y_coord.y}), // (-1,-1)
@@ -117,34 +130,39 @@ namespace engine {
                 //     fetch(raw_image, sampler, (float2){x_coord.z, y_coord.y}), // ( 1,-1)
                 //     fetch(raw_image, sampler, (float2){x_coord.z, y_coord.z})  // ( 1,  1)
                 // };
-                uint32_t Dvec = program.create_vector(
-                  fvec4,
-                  {
-                    program.call_function(
-                      fetch_func,
-                      float_type,
-                      {params[1], params[2], program.create_vector(fvec2, {x_coord_y, y_coord_y})}),  // (-1, -1)
-                    program.call_function(
-                      fetch_func,
-                      float_type,
-                      {params[1], params[2], program.create_vector(fvec2, {x_coord_y, y_coord_z})}),  // (-1,  1)
-                    program.call_function(
-                      fetch_func,
-                      float_type,
-                      {params[1], params[2], program.create_vector(fvec2, {x_coord_z, y_coord_y})}),  // ( 1, -1)
-                    program.call_function(
-                      fetch_func,
-                      float_type,
-                      {params[1], params[2], program.create_vector(fvec2, {x_coord_z, y_coord_z})})  // ( 1,  1)
+                uint32_t Dvec = program.add_name(
+                  program.create_vector(
+                    fvec4,
+                    {
+                      program.call_function(
+                        fetch_func,
+                        float_type,
+                        {params[1], params[2], program.create_vector(fvec2, {x_coord_y, y_coord_y})}),  // (-1, -1)
+                      program.call_function(
+                        fetch_func,
+                        float_type,
+                        {params[1], params[2], program.create_vector(fvec2, {x_coord_y, y_coord_z})}),  // (-1,  1)
+                      program.call_function(
+                        fetch_func,
+                        float_type,
+                        {params[1], params[2], program.create_vector(fvec2, {x_coord_z, y_coord_y})}),  // ( 1, -1)
+                      program.call_function(
+                        fetch_func,
+                        float_type,
+                        {params[1], params[2], program.create_vector(fvec2, {x_coord_z, y_coord_z})})  // ( 1,  1)
 
-                  });
+                    }),
+                  "Dvec");
 
                 // Can also be a dot product with (1,1,1,1) on hardware where that is specially optimized.
                 // Equivalent to: D = Dvec.x + Dvec.y + Dvec.z + Dvec.w;
                 // Dvec.xy += Dvec.zw;
                 // Dvec.x += Dvec.y;
-                uint32_t D = program.dot(
-                  Dvec, program.add_constant(fvec4, {Scalar(1.0), Scalar(1.0), Scalar(1.0), Scalar(1.0)}), float_type);
+                uint32_t D = program.add_name(
+                  program.dot(Dvec,
+                              program.add_constant(fvec4, {Scalar(1.0), Scalar(1.0), Scalar(1.0), Scalar(1.0)}),
+                              float_type),
+                  "D");
 
                 // float4 value = (float4){
                 //     fetch(raw_image, sampler, (float2){centre.x,  y_coord.x}), // ( 0,-2)
@@ -152,27 +170,29 @@ namespace engine {
                 //     fetch(raw_image, sampler, (float2){x_coord.x, centre.y}),  // (-1, 0)
                 //     fetch(raw_image, sampler, (float2){x_coord.y, centre.y})   // (-2, 0)
                 // };
-                uint32_t value = program.create_vector(
-                  fvec4,
-                  {
-                    program.call_function(
-                      fetch_func,
-                      float_type,
-                      {params[1], params[2], program.create_vector(fvec2, {centre_x, y_coord_x})}),  // ( 0, -2)
-                    program.call_function(
-                      fetch_func,
-                      float_type,
-                      {params[1], params[2], program.create_vector(fvec2, {centre_x, y_coord_y})}),  // ( 0, -1)
-                    program.call_function(
-                      fetch_func,
-                      float_type,
-                      {params[1], params[2], program.create_vector(fvec2, {x_coord_x, centre_y})}),  // (-1,  0)
-                    program.call_function(
-                      fetch_func,
-                      float_type,
-                      {params[1], params[2], program.create_vector(fvec2, {x_coord_y, centre_y})})  // (-2, 0)
+                uint32_t value = program.add_name(
+                  program.create_vector(
+                    fvec4,
+                    {
+                      program.call_function(
+                        fetch_func,
+                        float_type,
+                        {params[1], params[2], program.create_vector(fvec2, {centre_x, y_coord_x})}),  // ( 0, -2)
+                      program.call_function(
+                        fetch_func,
+                        float_type,
+                        {params[1], params[2], program.create_vector(fvec2, {centre_x, y_coord_y})}),  // ( 0, -1)
+                      program.call_function(
+                        fetch_func,
+                        float_type,
+                        {params[1], params[2], program.create_vector(fvec2, {x_coord_x, centre_y})}),  // (-1,  0)
+                      program.call_function(
+                        fetch_func,
+                        float_type,
+                        {params[1], params[2], program.create_vector(fvec2, {x_coord_y, centre_y})})  // (-2, 0)
 
-                  });
+                    }),
+                  "value");
 
                 // float4 temp = (float4){
                 //     fetch(raw_image, sampler, (float2){centre.x, y_coord.w}), // ( 0, 2)
@@ -180,34 +200,37 @@ namespace engine {
                 //     fetch(raw_image, sampler, (float2){x_coord.w, centre.y}), // ( 2, 0)
                 //     fetch(raw_image, sampler, (float2){x_coord.z, centre.y})  // ( 1, 0)
                 // };
-                uint32_t temp = program.create_vector(
-                  fvec4,
-                  {
-                    program.call_function(
-                      fetch_func,
-                      float_type,
-                      {params[1], params[2], program.create_vector(fvec2, {centre_x, y_coord_w})}),  // ( 0,  2)
-                    program.call_function(
-                      fetch_func,
-                      float_type,
-                      {params[1], params[2], program.create_vector(fvec2, {centre_x, y_coord_z})}),  // ( 0,  1)
-                    program.call_function(
-                      fetch_func,
-                      float_type,
-                      {params[1], params[2], program.create_vector(fvec2, {x_coord_w, centre_y})}),  // ( 2,  0)
-                    program.call_function(
-                      fetch_func,
-                      float_type,
-                      {params[1], params[2], program.create_vector(fvec2, {x_coord_z, centre_y})})  // ( 1, 0)
+                uint32_t temp = program.add_name(
+                  program.create_vector(
+                    fvec4,
+                    {
+                      program.call_function(
+                        fetch_func,
+                        float_type,
+                        {params[1], params[2], program.create_vector(fvec2, {centre_x, y_coord_w})}),  // ( 0,  2)
+                      program.call_function(
+                        fetch_func,
+                        float_type,
+                        {params[1], params[2], program.create_vector(fvec2, {centre_x, y_coord_z})}),  // ( 0,  1)
+                      program.call_function(
+                        fetch_func,
+                        float_type,
+                        {params[1], params[2], program.create_vector(fvec2, {x_coord_w, centre_y})}),  // ( 2,  0)
+                      program.call_function(
+                        fetch_func,
+                        float_type,
+                        {params[1], params[2], program.create_vector(fvec2, {x_coord_z, centre_y})})  // ( 1, 0)
 
-                  });
+                    }),
+                  "temp");
 
                 // value += temp;
-                value = program.fadd(value, temp, fvec4);
+                value = program.add_name(program.fadd(value, temp, fvec4), "add_value_temp");
 
                 // float4 PATTERN = (kC.xyz * C).xyzz;
-                uint32_t PATTERN =
-                  program.swizzle(program.vmul(program.swizzle(kC, fvec3, {0, 1, 2}), C, fvec3), fvec4, {0, 1, 2, 2});
+                uint32_t PATTERN = program.add_name(
+                  program.swizzle(program.vmul(program.swizzle(kC, fvec3, {0, 1, 2}), C, fvec3), fvec4, {0, 1, 2, 2}),
+                  "PATTERN");
 
                 // There are five filter patterns (identity, cross, checker,
                 // theta, phi).  Precompute the terms from all of them and then
@@ -279,22 +302,27 @@ namespace engine {
                   fvec4);
 
                 // Extract components from PATTERN.
-                uint32_t PATTERN_x = program.vector_component(float_type, PATTERN, 0);
-                uint32_t PATTERN_y = program.vector_component(float_type, PATTERN, 1);
-                uint32_t PATTERN_z = program.vector_component(float_type, PATTERN, 2);
-                uint32_t PATTERN_w = program.vector_component(float_type, PATTERN, 3);
+                uint32_t PATTERN_x = program.add_name(program.vector_component(float_type, PATTERN, 0), "PATTERN_x");
+                uint32_t PATTERN_y = program.add_name(program.vector_component(float_type, PATTERN, 1), "PATTERN_y");
+                uint32_t PATTERN_z = program.add_name(program.vector_component(float_type, PATTERN, 2), "PATTERN_z");
+                uint32_t PATTERN_w = program.add_name(program.vector_component(float_type, PATTERN, 3), "PATTERN_q");
 
                 // alternate.x == 0.0f
                 // alternate.y == 0.0f
-                uint32_t condition[] = {program.feq(alternate_x, program.add_constant(float_type, {Scalar(0.0)})),
-                                        program.feq(alternate_y, program.add_constant(float_type, {Scalar(0.0)}))};
+                uint32_t condition[] = {
+                  program.add_name(program.feq(alternate_x, program.add_constant(float_type, {Scalar(0.0)})),
+                                   "condition_x"),
+                  program.add_name(program.feq(alternate_y, program.add_constant(float_type, {Scalar(0.0)})),
+                                   "condition_y")};
 
                 // Select needs the condition to a vector of the same size as the result and the operands.
                 uint32_t vec_condition[] = {
-                  program.create_vector(program.add_vec_type(spv::Op::OpTypeBool, {}, 4),
-                                        {condition[0], condition[0], condition[0], condition[0]}),
-                  program.create_vector(program.add_vec_type(spv::Op::OpTypeBool, {}, 4),
-                                        {condition[1], condition[1], condition[1], condition[1]})};
+                  program.add_name(program.create_vector(program.add_vec_type(spv::Op::OpTypeBool, {}, 4),
+                                                         {condition[0], condition[0], condition[0], condition[0]}),
+                                   "vec_condition_x"),
+                  program.add_name(program.create_vector(program.add_vec_type(spv::Op::OpTypeBool, {}, 4),
+                                                         {condition[1], condition[1], condition[1], condition[1]}),
+                                   "vec_condition_y")};
 
                 // Select the appropriate output based on the above defined conditions.
                 program.return_function(program.select(
@@ -520,26 +548,29 @@ namespace engine {
 
                 // Prepare the descriptor set variables.
                 // Prepare the image sampler variables.
-                uint32_t sampler_ptr =
+                uint32_t sampler_ptr = program.add_name(
                   program.add_variable(program.add_pointer(sampler_type, spv::StorageClass::UniformConstant),
-                                       spv::StorageClass::UniformConstant);
+                                       spv::StorageClass::UniformConstant),
+                  "sampler");
 
                 // Prepare the image, coordinates array, and network array variables.
-                uint32_t image_ptr =
+                uint32_t image_ptr = program.add_name(
                   program.add_variable(program.add_pointer(image_type, spv::StorageClass::UniformConstant),
-                                       spv::StorageClass::UniformConstant);
-
+                                       spv::StorageClass::UniformConstant),
+                  "image");
                 uint32_t coords_array  = program.add_array_type(fvec2);
                 uint32_t coords_struct = program.add_struct({coords_array});
-                uint32_t coords_ptr =
+                uint32_t coords_ptr    = program.add_name(
                   program.add_variable(program.add_pointer(coords_struct, spv::StorageClass::StorageBuffer),
-                                       spv::StorageClass::StorageBuffer);
+                                       spv::StorageClass::StorageBuffer),
+                  "coords");
 
                 uint32_t network_array  = program.add_array_type(fvec4);
                 uint32_t network_struct = program.add_struct({network_array});
-                uint32_t network_ptr =
+                uint32_t network_ptr    = program.add_name(
                   program.add_variable(program.add_pointer(network_struct, spv::StorageClass::StorageBuffer),
-                                       spv::StorageClass::StorageBuffer);
+                                       spv::StorageClass::StorageBuffer),
+                  "network");
 
                 // Decorate the structs and their members.
                 uint32_t block_decoration = program.add_decoration_group(spv::Decoration::Block);
