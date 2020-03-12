@@ -40,31 +40,31 @@ network:
   # The network will start at this element and work back from there to find which components are needed and in what order.
   # For each of the elements they will define an operation they are doing, and optionally provide options for constructing
   structure:
-    g1: { op: GraphConvolution, inputs: ["X", "G"] }
+    g1: { op: GraphConvolution, inputs: [X, G] }
     d1: { op: Dense, inputs: [g1], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g2: { op: GraphConvolution, inputs: ["d1", "G"] }
+    g2: { op: GraphConvolution, inputs: [d1, G] }
     d2: { op: Dense, inputs: [g2], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g3: { op: GraphConvolution, inputs: ["d2", "G"] }
+    g3: { op: GraphConvolution, inputs: [d2, G] }
     d3: { op: Dense, inputs: [g3], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g4: { op: GraphConvolution, inputs: ["d3", "G"] }
+    g4: { op: GraphConvolution, inputs: [d3, G] }
     d4: { op: Dense, inputs: [g4], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g5: { op: GraphConvolution, inputs: ["d4", "G"] }
+    g5: { op: GraphConvolution, inputs: [d4, G] }
     d5: { op: Dense, inputs: [g5], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g6: { op: GraphConvolution, inputs: ["d5", "G"] }
+    g6: { op: GraphConvolution, inputs: [d5, G] }
     d6: { op: Dense, inputs: [g6], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g7: { op: GraphConvolution, inputs: ["d6", "G"] }
+    g7: { op: GraphConvolution, inputs: [d6, G] }
     d7: { op: Dense, inputs: [g7], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g8: { op: GraphConvolution, inputs: ["d7", "G"] }
+    g8: { op: GraphConvolution, inputs: [d7, G] }
     d8: { op: Dense, inputs: [g8], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
-    g9: { op: GraphConvolution, inputs: ["d8", "G"] }
+    g9: { op: GraphConvolution, inputs: [d8, G] }
     d9: { op: Dense, inputs: [g9], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
-    g10: { op: GraphConvolution, inputs: ["d9", "G"] }
+    g10: { op: GraphConvolution, inputs: [d9, G] }
     d10: { op: Dense, inputs: [g10], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
-    g11: { op: GraphConvolution, inputs: ["d10", "G"] }
+    g11: { op: GraphConvolution, inputs: [d10, G] }
     d11: { op: Dense, inputs: [g11], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
-    g12: { op: GraphConvolution, inputs: ["d11", "G"] }
+    g12: { op: GraphConvolution, inputs: [d11, G] }
     d12: { op: Dense, inputs: [g12], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
-    g13: { op: GraphConvolution, inputs: ["d12", "G"] }
+    g13: { op: GraphConvolution, inputs: [d12, G] }
     output: { op: Dense, inputs: [g13], options: { units: n_classes, activation: softmax } }
 
   # This is a mapping of the classes to the colours that represent them in the mask images.
@@ -130,7 +130,7 @@ training:
   variants:
     mesh:
       # Adjustments to the height of the mesh above the observation plane.
-      height: { "mean": 0, "stddev": 0.05 }
+      height: { mean: 0, stddev: 0.05 }
       # Adjustments to the orientation of the observation plane.
       # This value is used for three euler rotations added to the camera rotation in radians.
-      rotation: { "mean": 0, "stddev": 0.0872665 }
+      rotation: { mean: 0, stddev: 0.0872665 }
