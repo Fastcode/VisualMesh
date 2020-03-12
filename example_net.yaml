@@ -33,17 +33,40 @@ model:
 
 # Configuration for the convolutional neural network.
 network:
-  # The structure of the network is defined by this list of lists.
-  # Each list element corresponds to a neural network after a convolution.
-  # For example a network structure of [[2], [2]] would have two convolutional layers with two single layer networks
-  # after each convolution with an output size of 2.
-  # Having an empty list (e.g.) [[], [2]] would correspond to two stacked convolutions.
-  # The final layer of the network is always equal to the number of classes and should be omitted, typically by an
-  # empty list.
+  # The network structure defined as a graph of ops where each element will define its inputs.
+  # There are two predefined inputs to the graph which are `X` and `G` which represent the input values to the network
+  # and the neighbourhood graph respecitvely.
+  # There should exist a node named `output` that defines the final output of the network.
+  # The network will start at this element and work back from there to find which components are needed and in what order.
+  # For each of the elements they will define an operation they are doing, and optionally provide options for constructing
   structure:
-    [[16], [16], [16], [16], [16], [16], [16], [8], [8], [8], [8], [8], []]
-  # Activation Function
-  activation_fn: selu
+    g1: { op: GraphConvolution, inputs: ["X", "G"] }
+    d1: { op: Dense, inputs: [g1], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    g2: { op: GraphConvolution, inputs: ["d1", "G"] }
+    d2: { op: Dense, inputs: [g2], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    g3: { op: GraphConvolution, inputs: ["d2", "G"] }
+    d3: { op: Dense, inputs: [g3], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    g4: { op: GraphConvolution, inputs: ["d3", "G"] }
+    d4: { op: Dense, inputs: [g4], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    g5: { op: GraphConvolution, inputs: ["d4", "G"] }
+    d5: { op: Dense, inputs: [g5], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    g6: { op: GraphConvolution, inputs: ["d5", "G"] }
+    d6: { op: Dense, inputs: [g6], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    g7: { op: GraphConvolution, inputs: ["d6", "G"] }
+    d7: { op: Dense, inputs: [g7], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    g8: { op: GraphConvolution, inputs: ["d7", "G"] }
+    d8: { op: Dense, inputs: [g8], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
+    g9: { op: GraphConvolution, inputs: ["d8", "G"] }
+    d9: { op: Dense, inputs: [g9], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
+    g10: { op: GraphConvolution, inputs: ["d9", "G"] }
+    d10: { op: Dense, inputs: [g10], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
+    g11: { op: GraphConvolution, inputs: ["d10", "G"] }
+    d11: { op: Dense, inputs: [g11], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
+    g12: { op: GraphConvolution, inputs: ["d11", "G"] }
+    d12: { op: Dense, inputs: [g12], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
+    g13: { op: GraphConvolution, inputs: ["d12", "G"] }
+    output: { op: Dense, inputs: [g13], options: { units: n_classes, activation: softmax } }
+
   # This is a mapping of the classes to the colours that represent them in the mask images.
   # Each of the elements has a name, and one or more RGB values that represent it in the mask image.
   # The size of the final output layer will be the same as the order provided in this list.
@@ -60,6 +83,7 @@ network:
     - name: field
       colours:
         - [0, 255, 0]
+        - [255, 255, 255] # Field line is still field
     - name: environment
       colours:
         - [0, 0, 0]

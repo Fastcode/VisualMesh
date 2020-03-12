@@ -165,15 +165,10 @@ def test(config, output_path):
     n_classes = len(classes)
     n_bins = config["testing"]["n_bins"]
 
-    # Define the model
-    model = VisualMeshModel(
-        structure=config["network"]["structure"], n_classes=n_classes, activation=config["network"]["activation_fn"],
-    )
-
     # Find the latest checkpoint file and load it
     checkpoint_file = tf.train.latest_checkpoint(output_path)
     if checkpoint_file is not None:
-        model.load_weights(checkpoint_file)
+        model = tf.keras.models.load_model(checkpoint_file)
     else:
         raise RuntimeError("There was no checkpoint to load in the output_path")
 
@@ -195,7 +190,8 @@ def test(config, output_path):
     validation_dataset = VisualMeshDataset(
         input_files=config["dataset"]["testing"],
         classes=classes,
-        model=config["model"],
+        mesh=config["model"]["mesh"],
+        geometry=config["model"]["geometry"],
         batch_size=config["testing"]["batch_size"],
         prefetch=tf.data.experimental.AUTOTUNE,
         variants={},

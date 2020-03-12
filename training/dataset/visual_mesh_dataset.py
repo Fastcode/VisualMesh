@@ -34,17 +34,17 @@ else:
 
 
 class VisualMeshDataset:
-    def __init__(self, input_files, classes, model, batch_size, prefetch, variants):
+    def __init__(self, input_files, classes, mesh, geometry, batch_size, prefetch, variants):
         self.input_files = input_files
         self.classes = classes
         self.batch_size = batch_size
-        self.mesh_type = model["mesh"]["type"]
-        self.cached_meshes = model["mesh"]["cached_meshes"]
-        self.max_distance = model["mesh"]["max_distance"]
-        self.geometry = tf.constant(model["geometry"]["shape"], dtype=tf.string, name="GeometryType")
-        self.radius = model["geometry"]["radius"]
-        self.n_intersections = model["geometry"]["intersections"]
-        self.intersection_tolerance = model["geometry"]["intersection_tolerance"]
+        self.mesh_type = mesh["type"]
+        self.cached_meshes = mesh["cached_meshes"]
+        self.max_distance = mesh["max_distance"]
+        self.geometry = tf.constant(geometry["shape"], dtype=tf.string, name="GeometryType")
+        self.radius = geometry["radius"]
+        self.n_intersections = geometry["intersections"]
+        self.intersection_tolerance = geometry["intersection_tolerance"]
         self.prefetch = prefetch
         self._variants = variants
 

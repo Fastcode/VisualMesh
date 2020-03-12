@@ -30,7 +30,8 @@ mpl.use("Agg")
 
 
 class MeshImages(tf.keras.callbacks.Callback):
-    def __init__(self, output_path, dataset_path, classes, model, progress_images, colours):
+    def __init__(self, output_path, dataset_path, classes, mesh, geometry, progress_images, colours):
+        super(MeshImages, self).__init__()
 
         self.colours = colours
         self.writer = tf.summary.create_file_writer(os.path.join(output_path, "images"))
@@ -40,7 +41,8 @@ class MeshImages(tf.keras.callbacks.Callback):
             VisualMeshDataset(
                 input_files=dataset_path,
                 classes=classes,
-                model=model,
+                mesh=mesh,
+                geometry=geometry,
                 batch_size=progress_images,
                 prefetch=tf.data.experimental.AUTOTUNE,
                 variants={},

@@ -10,5 +10,6 @@
     "editor.rulers": [
         120
     ],
-    "cSpell.language": "en-GB"
+    "cSpell.language": "en-GB",
+    "yaml.format.printWidth": 120
 }
