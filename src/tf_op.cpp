@@ -77,7 +77,7 @@ REGISTER_OP("VisualMesh")
       // nx2 points on image, n+1xG neighbours (including off screen point), and n global indices
       c->set_output(Outputs::PIXELS, c->MakeShape({c->kUnknownDim, 2}));
       c->set_output(Outputs::NEIGHBOURS, c->MakeShape({c->kUnknownDim, c->kUnknownDim}));
-      c->set_output(Outputs::GLOBAL_INDICES, c->MakeShape({c->kUnknownDim, 1}));
+      c->set_output(Outputs::GLOBAL_INDICES, c->MakeShape({c->kUnknownDim}));
       return tensorflow::Status::OK();
   });
 
@@ -389,7 +389,6 @@ private:
         tensorflow::Tensor* global_indices_out = nullptr;
         tensorflow::TensorShape global_indices_shape;
         global_indices_shape.AddDim(global_indices.size());
-        global_indices_shape.AddDim(1);
         OP_REQUIRES_OK(context,
                        context->allocate_output(Outputs::GLOBAL_INDICES, global_indices_shape, &global_indices_out));
 
