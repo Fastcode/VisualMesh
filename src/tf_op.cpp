@@ -257,7 +257,7 @@ private:
         OP_REQUIRES(context,
                     tensorflow::TensorShapeUtils::IsSquareMatrix(context->input(Args::HOC).shape())
                       && context->input(Args::HOC).shape().dim_size(0) == 4,
-                    tensorflow::errors::InvalidArgument("Roc must be a 3x3 matrix"));
+                    tensorflow::errors::InvalidArgument("Hoc must be a 4x4 matrix"));
         OP_REQUIRES(context,
                     tensorflow::TensorShapeUtils::IsScalar(context->input(Args::N_INTERSECTIONS).shape()),
                     tensorflow::errors::InvalidArgument("The number of intersections must be a scalar"));
@@ -307,7 +307,7 @@ private:
           visualmesh::vec4<T>{tHoc(0, 0), tHoc(0, 1), tHoc(0, 2), tHoc(0, 3)},
           visualmesh::vec4<T>{tHoc(1, 0), tHoc(1, 1), tHoc(1, 2), tHoc(1, 3)},
           visualmesh::vec4<T>{tHoc(2, 0), tHoc(2, 1), tHoc(2, 2), tHoc(2, 3)},
-          visualmesh::vec4<T>{0, 0, 0, 1},
+          visualmesh::vec4<T>{tHoc(3, 0), tHoc(3, 1), tHoc(3, 2), tHoc(3, 3)},
         }};
 
         // Create our lens
@@ -394,7 +394,7 @@ private:
                        context->allocate_output(Outputs::GLOBAL_INDICES, global_indices_shape, &global_indices_out));
 
         // Copy across our global indices
-        auto g = global_indices_out->matrix<U>();
+        auto g = global_indices_out->flat<U>();
         for (unsigned int i = 0; i < global_indices.size(); ++i) {
             g(i) = global_indices[i];
         }

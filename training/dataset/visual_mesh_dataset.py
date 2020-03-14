@@ -123,9 +123,9 @@ class VisualMeshDataset:
                 orientation = tf.matmul(rot, orientation)
 
         # Construct the camera to observation plane transformation matrix
-        Hoc = tf.zeros(shape=(4, 4))
-        Hoc[0:3, 0:3] = orientation
-        Hoc[2, 3] = height
+        Hoc = tf.pad(orientation, [[0, 1], [0, 1]]) + tf.convert_to_tensor(
+            [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, height], [0, 0, 0, 1]]
+        )
 
         # Run the visual mesh to get our values
         pixels, neighbours, _ = VisualMesh(
