@@ -1,4 +1,3 @@
-dimensions: [1280, 1024]
 projection: RECTILINEAR
 focal_length: 666.323
 centre: [0, 0]

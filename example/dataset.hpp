@@ -71,7 +71,7 @@ std::vector<dataset_element<Scalar>> load_dataset(const std::string& path) {
                                                     ? visualmesh::EQUISOLID
                                                     : static_cast<visualmesh::LensProjection>(-1);
 
-                element.lens.dimensions   = lens["dimensions"].as<visualmesh::vec2<int>>();
+                element.lens.dimensions   = {element.image.cols, element.image.rows};
                 element.lens.focal_length = lens["focal_length"].as<Scalar>();
                 element.lens.centre       = lens["centre"].as<visualmesh::vec2<Scalar>>();
                 element.lens.k            = lens["k"].as<visualmesh::vec2<Scalar>>();
