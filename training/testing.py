@@ -165,12 +165,15 @@ def test(config, output_path):
     n_classes = len(classes)
     n_bins = config["testing"]["n_bins"]
 
+    # Define the model
+    model = VisualMeshModel(structure=config["network"]["structure"], n_classes=n_classes)
+
     # Find the latest checkpoint file and load it
     checkpoint_file = tf.train.latest_checkpoint(output_path)
     if checkpoint_file is not None:
-        model = tf.keras.models.load_model(checkpoint_file)
+        model.load_weights(checkpoint_file)
     else:
-        raise RuntimeError("There was no checkpoint to load in the output_path")
+        raise RuntimeError("Could not find weights to load into the network")
 
     # Count how many elements there are in the dataset
     n_records = sum(

@@ -31,40 +31,39 @@ def train(config, output_path):
 
     n_classes = len(config["network"]["classes"])
 
-    # Find the latest checkpoint file
+    # Define the model
+    model = VisualMeshModel(structure=config["network"]["structure"], n_classes=n_classes)
+
+    # Metrics that we want to track
+    metrics = [
+        AveragePrecision("metrics/average_precision", n_classes),
+        AverageRecall("metrics/average_recall", n_classes),
+    ]
+    for i, k in enumerate(config["network"]["classes"]):
+        metrics.append(ClassPrecision("metrics/{}_precision".format(k["name"]), i, n_classes))
+        metrics.append(ClassRecall("metrics/{}_recall".format(k["name"]), i, n_classes))
+
+    # Setup the optimiser
+    if config["training"]["optimiser"]["type"] == "Adam":
+        optimiser = tf.optimizers.Adam(learning_rate=float(config["training"]["optimiser"]["learning_rate"]))
+    elif config["training"]["optimiser"]["type"] == "Ranger":
+        optimiser = tfa.optimizers.Lookahead(
+            tfa.optimizers.RectifiedAdam(learning_rate=float(config["training"]["optimiser"]["learning_rate"])),
+            sync_period=int(config["training"]["optimiser"]["sync_period"]),
+            slow_step_size=float(config["training"]["optimiser"]["slow_step_size"]),
+        )
+    else:
+        raise RuntimeError("Unknown optimiser type" + config["training"]["optimiser"]["type"])
+
+    # Compile the model
+    model.compile(
+        optimizer=optimiser, loss=FocalLoss(), metrics=metrics,
+    )
+
+    # Find the latest checkpoint file and load it
     checkpoint_file = tf.train.latest_checkpoint(output_path)
     if checkpoint_file is not None:
-        model = tf.keras.models.load_model(checkpoint_file)
-
-    else:
-        # Metrics that we want to track
-        metrics = [
-            AveragePrecision("metrics/average_precision", n_classes),
-            AverageRecall("metrics/average_recall", n_classes),
-        ]
-        for i, k in enumerate(config["network"]["classes"]):
-            metrics.append(ClassPrecision("metrics/{}_precision".format(k["name"]), i, n_classes))
-            metrics.append(ClassRecall("metrics/{}_recall".format(k["name"]), i, n_classes))
-
-        # Define the model
-        model = VisualMeshModel(structure=config["network"]["structure"], n_classes=n_classes)
-
-        # Setup the optimiser
-        if config["training"]["optimiser"]["type"] == "Adam":
-            optimiser = tf.optimizers.Adam(learning_rate=float(config["training"]["optimiser"]["learning_rate"]))
-        elif config["training"]["optimiser"]["type"] == "Ranger":
-            optimiser = tfa.optimizers.Lookahead(
-                tfa.optimizers.RectifiedAdam(learning_rate=float(config["training"]["optimiser"]["learning_rate"])),
-                sync_period=int(config["training"]["optimiser"]["sync_period"]),
-                slow_step_size=float(config["training"]["optimiser"]["slow_step_size"]),
-            )
-        else:
-            raise RuntimeError("Unknown optimiser type" + config["training"]["optimiser"]["type"])
-
-        # Compile the model
-        model.compile(
-            optimizer=optimiser, loss=FocalLoss(), metrics=metrics,
-        )
+        model.load_weights(checkpoint_file)
 
     # Get the training dataset
     training_dataset = (
@@ -114,7 +113,10 @@ def train(config, output_path):
                 log_dir=output_path, update_freq="batch", profile_batch=0, write_graph=True, histogram_freq=1
             ),
             tf.keras.callbacks.ModelCheckpoint(
-                filepath=os.path.join(output_path, "model.ckpt"), monitor="loss", save_best_only=True
+                filepath=os.path.join(output_path, "model"),
+                monitor="loss",
+                save_weights_only=True,
+                save_best_only=True,
             ),
             MeshImages(
                 output_path,
