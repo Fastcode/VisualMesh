@@ -376,7 +376,7 @@ namespace engine {
                                                           0.0f,
                                                           0.0f,
                                                           VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
-                                                          VK_FALSE};
+                                                          VK_TRUE};
                 VkSampler bsampler;
                 throw_vk_error(vkCreateSampler(context.device, &bayer_sampler_info, nullptr, &bsampler),
                                "Failed to create bayer sampler");
@@ -385,7 +385,7 @@ namespace engine {
                                                            0,
                                                            VK_FILTER_LINEAR,
                                                            VK_FILTER_LINEAR,
-                                                           VK_SAMPLER_MIPMAP_MODE_LINEAR,
+                                                           VK_SAMPLER_MIPMAP_MODE_NEAREST,
                                                            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
                                                            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
                                                            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
@@ -397,7 +397,7 @@ namespace engine {
                                                            0.0f,
                                                            0.0f,
                                                            VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
-                                                           VK_FALSE};
+                                                           VK_TRUE};
                 VkSampler isampler;
                 throw_vk_error(vkCreateSampler(context.device, &interp_sampler_info, nullptr, &isampler),
                                "Failed to create interp sampler");

@@ -579,9 +579,8 @@ namespace engine {
 
                 // Define image and sampler types.
                 uint32_t image_type = program.add_image_type(
-                  float_type, spv::Dim::Dim2D, false, false, false, true, spv::ImageFormat::Rgba8);
-                uint32_t sampler_type       = program.add_sampler_type();
-                uint32_t sampled_image_type = program.add_sampled_image_type(image_type);
+                  float_type, spv::Dim::Dim2D, false, false, false, true, spv::ImageFormat::Unknown);
+                uint32_t sampler_type = program.add_sampler_type();
 
                 // Define the GlobalInvocationID (for get_global_id(0))
                 uint32_t global_id = program.add_variable(uvec3_ptr, spv::StorageClass::Input);
