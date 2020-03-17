@@ -348,21 +348,33 @@ namespace engine {
 
             template <typename Scalar>
             inline void load_GRBG_image(Program& program,
-                                        const uint32_t& bayer_to_rgb_func,
                                         const uint32_t& global_id,
-                                        const uint32_t& uint_type,
-                                        const uint32_t& uint_ptr,
-                                        const uint32_t& fvec4,
-                                        const uint32_t& fvec4_ptr,
-                                        const uint32_t& fvec2,
-                                        const uint32_t& fvec2_ptr,
                                         const uint32_t& network_ptr,
                                         const uint32_t& image_ptr,
                                         const uint32_t& image_type,
-                                        const uint32_t& bayer_sampler,
+                                        const uint32_t& sampler,
                                         const uint32_t& sampler_type,
-                                        const uint32_t&,
                                         const uint32_t& coords_ptr) {
+
+                uint32_t uint_type          = program.add_type(spv::Op::OpTypeInt, {32, 0});
+                uint32_t float_type         = program.add_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)});
+                uint32_t uvec2              = program.add_vec_type(spv::Op::OpTypeInt, {32, 0}, 2);
+                uint32_t fvec2              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 2);
+                uint32_t fvec3              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 3);
+                uint32_t fvec4              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 4);
+                uint32_t fvec2_ptr          = program.add_pointer(fvec2, spv::StorageClass::StorageBuffer);
+                uint32_t fvec4_ptr          = program.add_pointer(fvec4, spv::StorageClass::StorageBuffer);
+                uint32_t uint_ptr           = program.add_pointer(uint_type, spv::StorageClass::Input);
+                uint32_t sampled_image_type = program.add_sampled_image_type(image_type);
+
+                // Create the "fetch" function
+                uint32_t fetch_func =
+                  fetch_function(program, float_type, image_type, sampler_type, sampled_image_type, fvec2, fvec4);
+
+                // Create the "bayer_to_rgb" function.
+                uint32_t bayer_to_rgb_func = bayer_to_rgb_function<Scalar>(
+                  program, float_type, image_type, sampler_type, fvec2, uvec2, fvec3, fvec4, fetch_func);
+
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
                 program.begin_entry_point("load_GRBG_image", {global_id});
                 uint32_t idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
@@ -372,7 +384,7 @@ namespace engine {
                     bayer_to_rgb_func,
                     fvec4,
                     {program.load_variable(image_ptr, image_type),
-                     program.load_variable(bayer_sampler, sampler_type),
+                     program.load_variable(sampler, sampler_type),
                      program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                      program.add_constant(fvec2, {Scalar(1.0), Scalar(0.0)})}));
                 program.return_function();
@@ -381,21 +393,33 @@ namespace engine {
 
             template <typename Scalar>
             inline void load_RGGB_image(Program& program,
-                                        const uint32_t& bayer_to_rgb_func,
                                         const uint32_t& global_id,
-                                        const uint32_t& uint_type,
-                                        const uint32_t& uint_ptr,
-                                        const uint32_t& fvec4,
-                                        const uint32_t& fvec4_ptr,
-                                        const uint32_t& fvec2,
-                                        const uint32_t& fvec2_ptr,
                                         const uint32_t& network_ptr,
                                         const uint32_t& image_ptr,
                                         const uint32_t& image_type,
-                                        const uint32_t& bayer_sampler,
+                                        const uint32_t& sampler,
                                         const uint32_t& sampler_type,
-                                        const uint32_t&,
                                         const uint32_t& coords_ptr) {
+
+                uint32_t uint_type          = program.add_type(spv::Op::OpTypeInt, {32, 0});
+                uint32_t float_type         = program.add_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)});
+                uint32_t uvec2              = program.add_vec_type(spv::Op::OpTypeInt, {32, 0}, 2);
+                uint32_t fvec2              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 2);
+                uint32_t fvec3              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 3);
+                uint32_t fvec4              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 4);
+                uint32_t fvec2_ptr          = program.add_pointer(fvec2, spv::StorageClass::StorageBuffer);
+                uint32_t fvec4_ptr          = program.add_pointer(fvec4, spv::StorageClass::StorageBuffer);
+                uint32_t uint_ptr           = program.add_pointer(uint_type, spv::StorageClass::Input);
+                uint32_t sampled_image_type = program.add_sampled_image_type(image_type);
+
+                // Create the "fetch" function
+                uint32_t fetch_func =
+                  fetch_function(program, float_type, image_type, sampler_type, sampled_image_type, fvec2, fvec4);
+
+                // Create the "bayer_to_rgb" function.
+                uint32_t bayer_to_rgb_func = bayer_to_rgb_function<Scalar>(
+                  program, float_type, image_type, sampler_type, fvec2, uvec2, fvec3, fvec4, fetch_func);
+
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
                 program.begin_entry_point("load_RGGB_image", {global_id});
                 uint32_t idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
@@ -405,7 +429,7 @@ namespace engine {
                     bayer_to_rgb_func,
                     fvec4,
                     {program.load_variable(image_ptr, image_type),
-                     program.load_variable(bayer_sampler, sampler_type),
+                     program.load_variable(sampler, sampler_type),
                      program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                      program.add_constant(fvec2, {Scalar(0.0), Scalar(0.0)})}));
                 program.return_function();
@@ -414,21 +438,33 @@ namespace engine {
 
             template <typename Scalar>
             inline void load_GBRG_image(Program& program,
-                                        const uint32_t& bayer_to_rgb_func,
                                         const uint32_t& global_id,
-                                        const uint32_t& uint_type,
-                                        const uint32_t& uint_ptr,
-                                        const uint32_t& fvec4,
-                                        const uint32_t& fvec4_ptr,
-                                        const uint32_t& fvec2,
-                                        const uint32_t& fvec2_ptr,
                                         const uint32_t& network_ptr,
                                         const uint32_t& image_ptr,
                                         const uint32_t& image_type,
-                                        const uint32_t& bayer_sampler,
+                                        const uint32_t& sampler,
                                         const uint32_t& sampler_type,
-                                        const uint32_t&,
                                         const uint32_t& coords_ptr) {
+
+                uint32_t uint_type          = program.add_type(spv::Op::OpTypeInt, {32, 0});
+                uint32_t float_type         = program.add_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)});
+                uint32_t uvec2              = program.add_vec_type(spv::Op::OpTypeInt, {32, 0}, 2);
+                uint32_t fvec2              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 2);
+                uint32_t fvec3              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 3);
+                uint32_t fvec4              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 4);
+                uint32_t fvec2_ptr          = program.add_pointer(fvec2, spv::StorageClass::StorageBuffer);
+                uint32_t fvec4_ptr          = program.add_pointer(fvec4, spv::StorageClass::StorageBuffer);
+                uint32_t uint_ptr           = program.add_pointer(uint_type, spv::StorageClass::Input);
+                uint32_t sampled_image_type = program.add_sampled_image_type(image_type);
+
+                // Create the "fetch" function
+                uint32_t fetch_func =
+                  fetch_function(program, float_type, image_type, sampler_type, sampled_image_type, fvec2, fvec4);
+
+                // Create the "bayer_to_rgb" function.
+                uint32_t bayer_to_rgb_func = bayer_to_rgb_function<Scalar>(
+                  program, float_type, image_type, sampler_type, fvec2, uvec2, fvec3, fvec4, fetch_func);
+
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
                 program.begin_entry_point("load_GBRG_image", {global_id});
                 uint32_t idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
@@ -438,7 +474,7 @@ namespace engine {
                     bayer_to_rgb_func,
                     fvec4,
                     {program.load_variable(image_ptr, image_type),
-                     program.load_variable(bayer_sampler, sampler_type),
+                     program.load_variable(sampler, sampler_type),
                      program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                      program.add_constant(fvec2, {Scalar(0.0), Scalar(1.0)})}));
                 program.return_function();
@@ -447,21 +483,33 @@ namespace engine {
 
             template <typename Scalar>
             inline void load_BGGR_image(Program& program,
-                                        const uint32_t& bayer_to_rgb_func,
                                         const uint32_t& global_id,
-                                        const uint32_t& uint_type,
-                                        const uint32_t& uint_ptr,
-                                        const uint32_t& fvec4,
-                                        const uint32_t& fvec4_ptr,
-                                        const uint32_t& fvec2,
-                                        const uint32_t& fvec2_ptr,
                                         const uint32_t& network_ptr,
                                         const uint32_t& image_ptr,
                                         const uint32_t& image_type,
-                                        const uint32_t& bayer_sampler,
+                                        const uint32_t& sampler,
                                         const uint32_t& sampler_type,
-                                        const uint32_t&,
                                         const uint32_t& coords_ptr) {
+
+                uint32_t uint_type          = program.add_type(spv::Op::OpTypeInt, {32, 0});
+                uint32_t float_type         = program.add_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)});
+                uint32_t uvec2              = program.add_vec_type(spv::Op::OpTypeInt, {32, 0}, 2);
+                uint32_t fvec2              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 2);
+                uint32_t fvec3              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 3);
+                uint32_t fvec4              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 4);
+                uint32_t fvec2_ptr          = program.add_pointer(fvec2, spv::StorageClass::StorageBuffer);
+                uint32_t fvec4_ptr          = program.add_pointer(fvec4, spv::StorageClass::StorageBuffer);
+                uint32_t uint_ptr           = program.add_pointer(uint_type, spv::StorageClass::Input);
+                uint32_t sampled_image_type = program.add_sampled_image_type(image_type);
+
+                // Create the "fetch" function
+                uint32_t fetch_func =
+                  fetch_function(program, float_type, image_type, sampler_type, sampled_image_type, fvec2, fvec4);
+
+                // Create the "bayer_to_rgb" function.
+                uint32_t bayer_to_rgb_func = bayer_to_rgb_function<Scalar>(
+                  program, float_type, image_type, sampler_type, fvec2, uvec2, fvec3, fvec4, fetch_func);
+
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
                 program.begin_entry_point("load_BGGR_image", {global_id});
                 uint32_t idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
@@ -471,7 +519,7 @@ namespace engine {
                     bayer_to_rgb_func,
                     fvec4,
                     {program.load_variable(image_ptr, image_type),
-                     program.load_variable(bayer_sampler, sampler_type),
+                     program.load_variable(sampler, sampler_type),
                      program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                      program.add_constant(fvec2, {Scalar(1.0), Scalar(1.0)})}));
                 program.return_function();
@@ -480,21 +528,22 @@ namespace engine {
 
             template <typename Scalar>
             inline void load_RGBA_image(Program& program,
-                                        const uint32_t&,
                                         const uint32_t& global_id,
-                                        const uint32_t& uint_type,
-                                        const uint32_t& uint_ptr,
-                                        const uint32_t& fvec4,
-                                        const uint32_t& fvec4_ptr,
-                                        const uint32_t& fvec2,
-                                        const uint32_t& fvec2_ptr,
                                         const uint32_t& network_ptr,
                                         const uint32_t& image_ptr,
                                         const uint32_t& image_type,
-                                        const uint32_t& interp_sampler,
+                                        const uint32_t& sampler,
                                         const uint32_t& sampler_type,
-                                        const uint32_t& sampled_image_type,
                                         const uint32_t& coords_ptr) {
+
+                uint32_t uint_type          = program.add_type(spv::Op::OpTypeInt, {32, 0});
+                uint32_t fvec2              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 2);
+                uint32_t fvec4              = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 4);
+                uint32_t fvec2_ptr          = program.add_pointer(fvec2, spv::StorageClass::StorageBuffer);
+                uint32_t fvec4_ptr          = program.add_pointer(fvec4, spv::StorageClass::StorageBuffer);
+                uint32_t uint_ptr           = program.add_pointer(uint_type, spv::StorageClass::Input);
+                uint32_t sampled_image_type = program.add_sampled_image_type(image_type);
+
                 uint32_t idx0 = program.add_constant(uint_type, {0u});
                 program.begin_entry_point("load_RGBA_image", {global_id});
                 uint32_t idx = program.load_variable(program.member_access(global_id, {idx0}, uint_ptr), uint_type);
@@ -502,7 +551,7 @@ namespace engine {
                   program.member_access(network_ptr, {idx0, idx}, fvec4_ptr),
                   program.sample_image(
                     program.load_variable(image_ptr, image_type),
-                    program.load_variable(interp_sampler, sampler_type),
+                    program.load_variable(sampler, sampler_type),
                     sampled_image_type,
                     program.load_variable(program.member_access(coords_ptr, {idx0, idx}, fvec2_ptr), fvec2),
                     fvec4));
@@ -522,19 +571,11 @@ namespace engine {
                 Program program(config);
 
                 // Add the standard types.
-                // uint32_t void_type  = program.add_type(spv::Op::OpTypeVoid, {});
-                uint32_t uint_type  = program.add_type(spv::Op::OpTypeInt, {32, 0});
                 uint32_t float_type = program.add_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)});
-                uint32_t uvec2      = program.add_vec_type(spv::Op::OpTypeInt, {32, 0}, 2);
                 uint32_t uvec3      = program.add_vec_type(spv::Op::OpTypeInt, {32, 0}, 3);
                 uint32_t fvec2      = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 2);
-                uint32_t fvec3      = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 3);
                 uint32_t fvec4      = program.add_vec_type(spv::Op::OpTypeFloat, {8 * sizeof(Scalar)}, 4);
-
-                uint32_t uint_ptr  = program.add_pointer(uint_type, spv::StorageClass::Input);
-                uint32_t uvec3_ptr = program.add_pointer(uvec3, spv::StorageClass::Input);
-                uint32_t fvec2_ptr = program.add_pointer(fvec2, spv::StorageClass::StorageBuffer);
-                uint32_t fvec4_ptr = program.add_pointer(fvec4, spv::StorageClass::StorageBuffer);
+                uint32_t uvec3_ptr  = program.add_pointer(uvec3, spv::StorageClass::Input);
 
                 // Define image and sampler types.
                 uint32_t image_type = program.add_image_type(
@@ -585,30 +626,8 @@ namespace engine {
                 program.create_descriptor_set({sampler_ptr, image_ptr, coords_ptr, network_ptr},
                                               {std::set<uint32_t>({0, 1})});
 
-                // Create the "fetch" function
-                uint32_t fetch_func =
-                  fetch_function(program, float_type, image_type, sampler_type, sampled_image_type, fvec2, fvec4);
-
-                // Create the "bayer_to_rgb" function.
-                uint32_t bayer_to_rgb_func = bayer_to_rgb_function<Scalar>(
-                  program, float_type, image_type, sampler_type, fvec2, uvec2, fvec3, fvec4, fetch_func);
-
-                load_image_func(program,
-                                bayer_to_rgb_func,
-                                global_id,
-                                uint_type,
-                                uint_ptr,
-                                fvec4,
-                                fvec4_ptr,
-                                fvec2,
-                                fvec2_ptr,
-                                network_ptr,
-                                image_ptr,
-                                image_type,
-                                sampler_ptr,
-                                sampler_type,
-                                sampled_image_type,
-                                coords_ptr);
+                load_image_func(
+                  program, global_id, network_ptr, image_ptr, image_type, sampler_ptr, sampler_type, coords_ptr);
 
                 return program.build();
             }
