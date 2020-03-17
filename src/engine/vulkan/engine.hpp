@@ -834,7 +834,8 @@ namespace engine {
                 vk::semaphore load_image_semaphore =
                   vk::semaphore(semaphore, [this](auto p) { vkDestroySemaphore(context.device, p, nullptr); });
                 operation::submit_command_buffer(
-                  context.compute_queue, command_buffer, wait_semaphores, {load_image_semaphore});
+                  context.compute_queue, command_buffer, {wait_semaphores.back()}, {load_image_semaphore});
+                wait_semaphores.push_back(std::make_pair(load_image_semaphore, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT));
 
                 // *******************
                 // *** RUN NETWORK ***
@@ -854,7 +855,6 @@ namespace engine {
                   conv_layer_pool,
                   std::vector<VkDescriptorSetLayout>(conv_layers.size(), conv_descriptor_layout));
 
-                wait_semaphores.push_back(std::make_pair(load_image_semaphore, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT));
                 std::vector<std::array<VkDescriptorBufferInfo, 3>> conv_buffer_infos;
                 std::vector<std::array<VkWriteDescriptorSet, 3>> conv_write_descriptors;
                 std::vector<vk::command_buffer> conv_command_buffers;
@@ -917,7 +917,8 @@ namespace engine {
                         throw_vk_error(vkCreateFence(context.device, &fence_info, nullptr, &f),
                                        "Failed to create reprojection semaphore");
                         fence = vk::fence(f, [this](auto p) { vkDestroyFence(context.device, p, nullptr); });
-                        operation::submit_command_buffer(context.compute_queue, conv_command_buffers.back(), fence);
+                        operation::submit_command_buffer(
+                          context.compute_queue, conv_command_buffers.back(), fence, {wait_semaphores.back()});
                     }
                     else {
                         operation::submit_command_buffer(context.compute_queue,
@@ -926,8 +927,9 @@ namespace engine {
                                                          {conv_layer_semaphore});
                     }
 
-                    // Convert our events into a vector of events and ping pong our buffers
                     wait_semaphores.push_back(std::make_pair(conv_layer_semaphore, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT));
+
+                    // Convert our events into a vector of events and ping pong our buffers
                     std::swap(vk_conv_input, vk_conv_output);
                 }
 
