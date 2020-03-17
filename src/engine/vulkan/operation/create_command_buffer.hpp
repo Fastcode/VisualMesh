@@ -101,14 +101,29 @@ namespace engine {
                                "Failed to submit command buffer to queue");
             }
 
-            inline void submit_command_buffer(const VkQueue& queue,
-                                              const vk::command_buffer& command_buffer,
-                                              const VkFence& fence) {
+            inline void submit_command_buffer(
+              const VkQueue& queue,
+              const vk::command_buffer& command_buffer,
+              const VkFence& fence,
+              const std::vector<std::pair<vk::semaphore, VkPipelineStageFlags>>& wait_semaphores = {}) {
                 throw_vk_error(vkEndCommandBuffer(command_buffer), "Failed to end command buffer");
 
+                std::vector<VkSemaphore> waits;
+                std::vector<VkPipelineStageFlags> wait_stages;
+                for (const auto& wait : wait_semaphores) {
+                    waits.push_back(wait.first);
+                    wait_stages.push_back(wait.second);
+                }
                 std::array<VkCommandBuffer, 1> buf = {command_buffer};
-                VkSubmitInfo submit_info           = {
-                  VK_STRUCTURE_TYPE_SUBMIT_INFO, nullptr, 0, 0, 0, buf.size(), buf.data(), 0, nullptr};
+                VkSubmitInfo submit_info           = {VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                                            nullptr,
+                                            static_cast<uint32_t>(waits.size()),
+                                            waits.data(),
+                                            wait_stages.data(),
+                                            static_cast<uint32_t>(buf.size()),
+                                            buf.data(),
+                                            0,
+                                            nullptr};
 
                 throw_vk_error(vkQueueSubmit(queue, 1, &submit_info, fence),
                                "Failed to submit command buffer to queue");
