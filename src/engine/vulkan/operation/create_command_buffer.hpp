@@ -92,7 +92,7 @@ namespace engine {
                                             static_cast<uint32_t>(waits.size()),
                                             waits.data(),
                                             wait_stages.data(),
-                                            buf.size(),
+                                            static_cast<uint32_t>(buf.size()),
                                             buf.data(),
                                             static_cast<uint32_t>(signals.size()),
                                             signals.data()};

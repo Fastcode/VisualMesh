@@ -169,8 +169,8 @@ namespace engine {
                                            {context.transfer_queue_family},
                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-                operation::map_memory<void>(
-                  context, 0, VK_WHOLE_SIZE, vk_image_buffer.second, [&image, &image_size](void* payload) {
+                operation::map_memory<uint8_t>(
+                  context, 0, VK_WHOLE_SIZE, vk_image_buffer.second, [&image, &image_size, &format](uint8_t* payload) {
                       std::memcpy(payload, image, image_size);
                   });
                 operation::bind_buffer(context, vk_image_buffer.first, vk_image_buffer.second, 0);
