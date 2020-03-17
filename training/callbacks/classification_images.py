@@ -24,21 +24,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
-from training.dataset import VisualMeshDataset
+from training.dataset import ClassificationDataset
 
 mpl.use("Agg")
 
 
-class MeshImages(tf.keras.callbacks.Callback):
+class ClassificationImages(tf.keras.callbacks.Callback):
     def __init__(self, output_path, dataset_path, classes, mesh, geometry, progress_images, colours):
-        super(MeshImages, self).__init__()
+        super(ClassificationImages, self).__init__()
 
         self.colours = colours
         self.writer = tf.summary.create_file_writer(os.path.join(output_path, "images"))
 
         # Load the dataset and extract a single record from it
         for d in (
-            VisualMeshDataset(
+            ClassificationDataset(
                 input_files=dataset_path,
                 classes=classes,
                 mesh=mesh,

@@ -19,8 +19,8 @@ import tensorflow as tf
 
 import tensorflow_addons as tfa
 
-from .callbacks import MeshImages
-from .dataset import VisualMeshDataset, keras_dataset
+from .callbacks import ClassificationImages
+from .dataset import ClassificationDataset, keras_dataset
 from .loss import FocalLoss
 from .metrics import AveragePrecision, AverageRecall, ClassPrecision, ClassRecall
 from .model import VisualMeshModel
@@ -67,7 +67,7 @@ def train(config, output_path):
 
     # Get the training dataset
     training_dataset = (
-        VisualMeshDataset(
+        ClassificationDataset(
             input_files=config["dataset"]["training"],
             classes=config["network"]["classes"],
             mesh=config["model"]["mesh"],
@@ -86,7 +86,7 @@ def train(config, output_path):
 
     # Get the validation dataset
     validation_dataset = (
-        VisualMeshDataset(
+        ClassificationDataset(
             input_files=config["dataset"]["validation"],
             classes=config["network"]["classes"],
             mesh=config["model"]["mesh"],
@@ -118,7 +118,7 @@ def train(config, output_path):
                 save_weights_only=True,
                 save_best_only=True,
             ),
-            MeshImages(
+            ClassificationImages(
                 output_path,
                 config["dataset"]["validation"],
                 config["network"]["classes"],

@@ -34,9 +34,8 @@ else:
 
 
 class VisualMeshDataset:
-    def __init__(self, input_files, classes, mesh, geometry, batch_size, prefetch, variants):
+    def __init__(self, input_files, mesh, geometry, batch_size, prefetch, variants, features={}):
         self.input_files = input_files
-        self.classes = classes
         self.batch_size = batch_size
         self.mesh_type = mesh["type"]
         self.cached_meshes = mesh["cached_meshes"]
@@ -48,49 +47,42 @@ class VisualMeshDataset:
         self.prefetch = prefetch
         self._variants = variants
 
+        # We have the default features that are required for Visual Mesh projection
+        # and then the extras that are for the specific dataset type
+        self.features = {
+            "image": tf.io.FixedLenFeature([], tf.string),
+            "camera/projection": tf.io.FixedLenFeature([], tf.string),
+            "camera/focal_length": tf.io.FixedLenFeature([], tf.float32),
+            "camera/centre": tf.io.FixedLenFeature([2], tf.float32),
+            "camera/k": tf.io.FixedLenFeature([2], tf.float32),
+            "camera/fov": tf.io.FixedLenFeature([], tf.float32),
+            "camera/Hoc": tf.io.FixedLenFeature([4, 4], tf.float32),
+            **features,
+        }
+
         # The number of neighbours is given in the name of the mesh type
         self.n_neighbours = int(re.search(r"\d+$", self.mesh_type).group()) + 1
 
     def _load_example(self, proto):
-        example = tf.io.parse_single_example(
-            serialized=proto,
-            features={
-                "image": tf.io.FixedLenFeature([], tf.string),
-                "mask": tf.io.FixedLenFeature([], tf.string),
-                "lens/projection": tf.io.FixedLenFeature([], tf.string),
-                "lens/focal_length": tf.io.FixedLenFeature([], tf.float32),
-                "lens/centre": tf.io.FixedLenFeature([2], tf.float32),
-                "lens/k": tf.io.FixedLenFeature([2], tf.float32),
-                "lens/fov": tf.io.FixedLenFeature([], tf.float32),
-                "mesh/orientation": tf.io.FixedLenFeature([3, 3], tf.float32),
-                "mesh/height": tf.io.FixedLenFeature([], tf.float32),
-            },
-        )
-
-        return {
-            "image": tf.image.decode_image(example["image"], channels=3),
-            "mask": tf.image.decode_png(example["mask"], channels=4),
-            "projection": example["lens/projection"],
-            "focal_length": example["lens/focal_length"],
-            "lens_centre": example["lens/centre"],
-            "fov": example["lens/fov"],
-            "lens_distortion": example["lens/k"],
-            "orientation": example["mesh/orientation"],
-            "height": example["mesh/height"],
-            "raw": example["image"],
-        }
+        return tf.io.parse_single_example(serialized=proto, features=self.features)
 
     def _project_mesh(self, args):
 
-        height = args["height"]
-        orientation = args["orientation"]
+        # Grab Hoc so we can manipulate it
+        Hoc = args["camera/Hoc"]
 
         # Adjust our height and orientation
         if "mesh" in self._variants:
             v = self._variants["mesh"]
+
+            # If we have a height variation, apply it
             if "height" in v:
-                height = height + tf.random.truncated_normal(
-                    shape=(), mean=v["height"]["mean"], stddev=v["height"]["stddev"],
+                tf.tensor_scatter_nd_add(
+                    Hoc,
+                    [[3, 2]],
+                    tf.expand_dims(
+                        tf.random.truncated_normal(shape=(), mean=v["height"]["mean"], stddev=v["height"]["stddev"]), 0
+                    ),
                 )
             if "rotation" in v:
                 # Make 3 random euler angles
@@ -106,35 +98,27 @@ class VisualMeshDataset:
                 sc = tf.sin(rotation[2])
 
                 # Convert these into a rotation matrix
-                rot = [
-                    cc * ca,
-                    -cc * sa * cb + sc * sb,
-                    cc * sa * sb + sc * cb,
-                    sa,
-                    ca * cb,
-                    -ca * sb,
-                    -sc * ca,
-                    sc * sa * cb + cc * sb,
-                    -sc * sa * sb + cc * cb,
-                ]  # yapf: disable
-                rot = tf.reshape(tf.stack(rot), [3, 3])
+                rot = tf.convert_to_tensor(
+                    [
+                        [cc * ca, -cc * sa * cb + sc * sb, cc * sa * sb + sc * cb, 0.0],
+                        [sa, ca * cb, -ca * sb, 0.0],
+                        [-sc * ca, sc * sa * cb + cc * sb, -sc * sa * sb + cc * cb, 0.0],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ],
+                    dtype=Hoc.dtype,
+                )
 
                 # Apply the rotation
-                orientation = tf.matmul(rot, orientation)
-
-        # Construct the camera to observation plane transformation matrix
-        Hoc = tf.pad(orientation, [[0, 1], [0, 1]]) + tf.convert_to_tensor(
-            [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, height], [0, 0, 0, 1]]
-        )
+                Hoc = tf.matmul(rot, Hoc)
 
         # Run the visual mesh to get our values
-        pixels, neighbours, _ = VisualMesh(
-            tf.shape(input=args["image"])[:2],
-            args["projection"],
-            args["focal_length"],
-            args["lens_centre"],
-            args["lens_distortion"],
-            args["fov"],
+        px, G, global_indices = VisualMesh(
+            tf.shape(args["X"])[:2],
+            args["camera/projection"],
+            args["camera/focal_length"],
+            args["camera/centre"],
+            args["camera/k"],
+            args["camera/fov"],
             Hoc,
             self.mesh_type,
             self.cached_meshes,
@@ -146,21 +130,33 @@ class VisualMeshDataset:
             name="ProjectVisualMesh",
         )
 
+        # We actually do know the shape of G but tensorflow makes it a little hard to do
+        # We reshape here to ensure the size is known
+        G = tf.reshape(G, (-1, self.n_neighbours))
+
+        return {"px": px, "G": G, "global_indices": global_indices}
+
+    def _interpolate_gather(self, img, px):
+
         # Bilinearly interpolate our image based on our floating point pixel coordinate
-        y_0 = tf.floor(pixels[:, 0])
-        x_0 = tf.floor(pixels[:, 1])
+        y_0 = tf.floor(px[:, 0])
+        x_0 = tf.floor(px[:, 1])
         y_1 = y_0 + 1
         x_1 = x_0 + 1
 
-        # Weights for the x and y axis
-        y_w = pixels[:, 0] - y_0
-        x_w = pixels[:, 1] - x_0
+        # Calculate the weights of how much the x and y account for for each of the 4 corners
+        y_w = px[:, 0] - y_0
+        x_w = px[:, 1] - x_0
 
-        # Pixel coordinates to values to weighted values to X
+        # Get the coordinates of the four closest pixels to this point
         p_idx = [
             tf.cast(tf.stack([a, b], axis=-1), tf.int32) for a, b in [(y_0, x_0), (y_0, x_1), (y_1, x_0), (y_1, x_1),]
         ]
-        p_val = [tf.image.convert_image_dtype(tf.gather_nd(args["image"], idx), tf.float32) for idx in p_idx]
+
+        # Gather the pixel values from the image
+        p_val = [tf.gather_nd(img, idx) for idx in p_idx]
+
+        # Weight each of the pixel values based on their relative distance
         p_weighted = [
             tf.multiply(val, tf.expand_dims(w, axis=-1))
             for val, w in zip(
@@ -173,38 +169,9 @@ class VisualMeshDataset:
                 ],
             )
         ]
-        X = tf.add_n(p_weighted)
 
-        # For the segmentation just use the nearest neighbour
-        Y = tf.gather_nd(args["mask"], tf.cast(tf.round(pixels), tf.int32))
-
-        return X, Y, neighbours, pixels
-
-    def _expand_classes(self, Y):
-
-        # Expand the classes from colours into individual columns
-        W = tf.image.convert_image_dtype(Y[:, 3], tf.float32)  # Alpha channel
-        cs = []
-        for c in self.classes:
-            cs.append(
-                tf.where(
-                    tf.logical_and(
-                        tf.reduce_any(
-                            tf.stack(
-                                [tf.reduce_all(input_tensor=tf.equal(Y[:, :3], [v]), axis=-1) for v in c["colours"]],
-                                axis=-1,
-                            ),
-                            axis=-1,
-                        ),
-                        tf.greater(W, 0.0),
-                    ),
-                    1.0,
-                    0.0,
-                )
-            )
-        Y = tf.stack(cs, axis=-1)
-
-        return Y, W
+        # Add all the weighted values to get the final interpolated value
+        return tf.add_n(p_weighted)
 
     def _apply_variants(self, X):
         # Make the shape of X back into an imageish shape for the functions
@@ -244,49 +211,50 @@ class VisualMeshDataset:
         Gs = []
         pxs = []
         ns = []
-        raws = []
+        images = []
         n_elems = tf.zeros(shape=(), dtype=tf.int32)
 
         for i in range(self.batch_size):
 
             # Load the example from the proto
-            example = self._load_example(protos[i])
+            data = self._load_example(protos[i])
+
+            # Load the image so we can get it's size
+            data["X"] = tf.image.convert_image_dtype(tf.image.decode_image(data["image"], channels=3), tf.float32)
 
             # Project the visual mesh for this example
-            X, Y, G, px = self._project_mesh(example)
+            data.update(self._project_mesh(data))
 
-            # We actually do know the shape of G but tensorflow makes it a little hard to do
-            # We reshape here to ensure the size is known
-            G = tf.reshape(G, (-1, self.n_neighbours))
+            # Select and interpolate the pixels to get X
+            data["X"] = self._interpolate_gather(data["X"], data["px"],)
 
-            # Apply any visual augmentations we may want
+            # Apply any visual augmentations we may want to the image
             if "image" in self._variants:
-                X = self._apply_variants(X)
+                data["X"] = self._apply_variants(data["X"])
 
             # Expand the classes for this value
-            Y, W = self._expand_classes(Y)
+            Y, W = self.get_labels(data)
 
             # Number of elements in this component
-            n = tf.shape(input=Y)[0]
+            n = tf.shape(data["G"])[0] - 1
 
             # Cut off the null point and replace with -1s
-            G = G[:-1] + n_elems
-            G = tf.where(G == n + n_elems, -1, G)
+            G = data["G"]
+            G = tf.where(G[:-1] == n, -1, G[:-1]) + n_elems
 
-            # Move along our number of elements
+            # Move along our number of elements to ensure the graph is correct
             n_elems = n_elems + n
 
             # Add all the elements to the lists
-            Xs.append(X)
+            Xs.append(data["X"])
             Ys.append(Y)
             Ws.append(W)
             Gs.append(G)
-            pxs.append(px)
-            raws.append(example["raw"])
+            pxs.append(data["px"])
             ns.append(n)
+            images.append(data["image"])
 
         # Add on the null point for X and G
-        # This is a hack 5 is number of neighbours + 1
         Xs.append(tf.constant([[-1.0, -1.0, -1.0]], dtype=tf.float32))
         Gs.append(tf.fill([1, self.n_neighbours], n_elems))
 
@@ -296,13 +264,13 @@ class VisualMeshDataset:
         G = tf.concat(Gs, axis=0)
         n = tf.stack(ns, axis=-1)
         px = tf.concat(pxs, axis=0)
-        raw = tf.stack(raws, axis=0)
+        image = tf.stack(images, axis=0)
 
         # Fix the null point for G
         G = tf.where(G == -1, n_elems, G)
 
         # Return the results
-        return {"X": X, "Y": Y, "W": W, "n": n, "G": G, "px": px, "raw": raw}
+        return {"X": X, "G": G, "Y": Y, "W": W, "n": n, "px": px, "image": image}
 
     def build(self, stats=False):
 

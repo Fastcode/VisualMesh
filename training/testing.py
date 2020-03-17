@@ -22,7 +22,7 @@ import tensorflow as tf
 from tqdm import tqdm
 
 from . import dataset
-from .dataset import VisualMeshDataset
+from .dataset import ClassificationDataset
 from .model import VisualMeshModel
 
 mpl.use("Agg")
@@ -190,7 +190,7 @@ def test(config, output_path):
     print("Testing using {} records in {} batches".format(n_records, n_batches))
 
     # Load the testing dataset
-    validation_dataset = VisualMeshDataset(
+    testing_dataset = ClassificationDataset(
         input_files=config["dataset"]["testing"],
         classes=classes,
         mesh=config["model"]["mesh"],
@@ -216,7 +216,7 @@ def test(config, output_path):
     confusion = tf.Variable(tf.zeros(shape=(n_classes, n_classes), dtype=tf.int64))
     curves = [{c: [] for c, x, y in curve_types} for i in range(n_classes)]
 
-    for e in tqdm(validation_dataset, dynamic_ncols=True, unit=" batches", leave=True, total=n_batches):
+    for e in tqdm(testing_dataset, dynamic_ncols=True, unit=" batches", leave=True, total=n_batches):
         # Run the predictions
         X = model.predict_on_batch((e["X"], e["G"]))
         Y = e["Y"]
