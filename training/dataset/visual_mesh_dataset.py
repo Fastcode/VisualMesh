@@ -226,7 +226,7 @@ class VisualMeshDataset:
             data.update(self._project_mesh(data))
 
             # Select and interpolate the pixels to get X
-            data["X"] = self._interpolate_gather(data["X"], data["px"],)
+            data["X"] = self._interpolate_gather(data["X"], data["px"])
 
             # Apply any visual augmentations we may want to the image
             if "image" in self._variants:
@@ -242,7 +242,7 @@ class VisualMeshDataset:
             G = data["G"]
             G = tf.where(G[:-1] == n, -1, G[:-1]) + n_elems
 
-            # Move along our number of elements to ensure the graph is correct
+            # Move along our number of elements to offset the later batch graphs to be internally consistent
             n_elems = n_elems + n
 
             # Add all the elements to the lists

@@ -25,7 +25,7 @@ class ClassificationDataset(VisualMeshDataset):
     def get_labels(self, args):
 
         # Use the nearest neighbour pixel to get the classification from the mask
-        Y = tf.gather_nd(tf.image.decode_image(args["mask"], channels=4), tf.cast(tf.round(args["px"]), tf.int32))
+        Y = tf.gather_nd(tf.image.decode_png(args["mask"], channels=4), tf.cast(tf.round(args["px"]), tf.int32))
 
         # Expand the classes from colours into individual columns
         W = tf.image.convert_image_dtype(Y[:, 3], tf.float32)  # Alpha channel

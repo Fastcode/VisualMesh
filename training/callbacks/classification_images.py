@@ -122,7 +122,7 @@ class ClassificationImages(tf.keras.callbacks.Callback):
         for i, r in enumerate(ranges):
             images.append(
                 self.mesh_image(
-                    self.data["raw"][i].numpy(), self.data["px"][r[0] : r[1]], predictions[r[0] : r[1]], self.colours,
+                    self.data["image"][i].numpy(), self.data["px"][r[0] : r[1]], predictions[r[0] : r[1]], self.colours,
                 )
             )
 
