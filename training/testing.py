@@ -161,12 +161,12 @@ def _reduce_curve(X, c, n_bins, x_func, y_func):
 
 def test(config, output_path):
 
-    classes = config["network"]["classes"]
+    classes = config["dataset"]["output"]["classes"]
     n_classes = len(classes)
     n_bins = config["testing"]["n_bins"]
 
     # Define the model
-    model = VisualMeshModel(structure=config["network"]["structure"], n_classes=n_classes)
+    model = VisualMeshModel(structure=config["network"]["structure"], output_dims=n_classes)
 
     # Find the latest checkpoint file and load it
     checkpoint_file = tf.train.latest_checkpoint(output_path)

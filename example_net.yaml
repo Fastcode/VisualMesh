@@ -1,12 +1,57 @@
 # Section that defines the dataset files.
 dataset:
+  output:
+    # The type of the network. Depending on what kind of thing it is trying to predict this will result in different
+    # collections of metrics and dataset loading tools. Make sure your network structure outputs something that is
+    # compatible with this output
+    type: Classification
+    classes:
+      - name: ball
+        colours:
+          - [255, 0, 0]
+      - name: goal
+        colours:
+          - [255, 255, 0]
+      - name: line
+        colours:
+          - [255, 255, 255]
+      - name: field
+        colours:
+          - [0, 255, 0]
+          - [255, 255, 255] # Field line is still field
+      - name: environment
+        colours:
+          - [0, 0, 0]
+
+    # type: Spotlight
+    # options: {}
+
   # Training file, used for training the network.
-  training: dataset/training.tfrecord
+  training:
+    paths:
+      - dataset/spotlight_training.tfrecord
+
+    # Variations to apply to the training data, note this only applies to training data and not validation.
+    # They are defined using a mean value and a standard deviation using a truncated normal distribution.
+    # If the values are greater than 2 standard deviations from the mean they will be resampled.
+    variants:
+      mesh:
+        # Adjustments to the height of the mesh above the observation plane.
+        height: { mean: 0, stddev: 0.05 }
+        # Adjustments to the orientation of the observation plane.
+        # This value is used for three euler rotations added to the camera rotation in radians.
+        rotation: { mean: 0, stddev: 0.0872665 }
+
   # Validation file, used to inspect progress of the network as it is training.
   # It is also used as the source for progress images.
-  validation: dataset/validation.tfrecord
+  validation:
+    paths:
+      - dataset/spotlight_validation.tfrecord
+
   # Test dataset, used for performing final evaluations on the performance of the network.
-  testing: dataset/testing.tfrecord
+  testing:
+    paths:
+      - dataset/spotlight_testing.tfrecord
 
 # The model and geometry we are using
 model:
@@ -39,6 +84,9 @@ network:
   # There should exist a node named `output` that defines the final output of the network.
   # The network will start at this element and work back from there to find which components are needed and in what order.
   # For each of the elements they will define an operation they are doing, and optionally provide options for constructing
+  # The final output dimensionality (which will be the size of the dataset output) can be accessed with `$output_dims`
+  # This variable name if placed anywhere in the structure options will be replaced with the integer number of outputs
+  # the dataset will produce
   structure:
     g1: { op: GraphConvolution, inputs: [X, G] }
     d1: { op: Dense, inputs: [g1], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
@@ -65,28 +113,7 @@ network:
     g12: { op: GraphConvolution, inputs: [d11, G] }
     d12: { op: Dense, inputs: [g12], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
     g13: { op: GraphConvolution, inputs: [d12, G] }
-    output: { op: Dense, inputs: [g13], options: { units: n_classes, activation: softmax } }
-
-  # This is a mapping of the classes to the colours that represent them in the mask images.
-  # Each of the elements has a name, and one or more RGB values that represent it in the mask image.
-  # The size of the final output layer will be the same as the order provided in this list.
-  classes:
-    - name: ball
-      colours:
-        - [255, 0, 0]
-    - name: goal
-      colours:
-        - [255, 255, 0]
-    - name: line
-      colours:
-        - [255, 255, 255]
-    - name: field
-      colours:
-        - [0, 255, 0]
-        - [255, 255, 255] # Field line is still field
-    - name: environment
-      colours:
-        - [0, 0, 0]
+    output: { op: Dense, inputs: [g13], options: { units: $output_dims, activation: softmax } }
 
 # Testing
 testing:
@@ -123,14 +150,3 @@ training:
     samples: 10
     # How many images to show in tensorboard, they are taken as the first n images of the validation set.
     progress_images: 20
-
-  # Variations to apply to the training data, note this only applies to training data and not validation.
-  # They are defined using a mean value and a standard deviation using a truncated normal distribution.
-  # If the values are greater than 2 standard deviations from the mean they will be resampled.
-  variants:
-    mesh:
-      # Adjustments to the height of the mesh above the observation plane.
-      height: { mean: 0, stddev: 0.05 }
-      # Adjustments to the orientation of the observation plane.
-      # This value is used for three euler rotations added to the camera rotation in radians.
-      rotation: { mean: 0, stddev: 0.0872665 }

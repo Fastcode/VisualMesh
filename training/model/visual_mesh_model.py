@@ -21,8 +21,8 @@ from training.layer import GraphConvolution
 class VisualMeshModel(tf.keras.Model):
     def _apply_variables(self, option):
         if type(option) is str:
-            if option == "n_classes":
-                return self.n_classes
+            if option == "$output_dims":
+                return self.output_dims
             else:
                 return option
         elif type(option) is dict:
@@ -60,11 +60,11 @@ class VisualMeshModel(tf.keras.Model):
 
         return stack
 
-    def __init__(self, structure, n_classes):
+    def __init__(self, structure, output_dims):
         super(VisualMeshModel, self).__init__()
 
         # Build up the graph of operations
-        self.n_classes = n_classes
+        self.output_dims = output_dims
         self.ops = {k: (self._make_op(v["op"], v.get("options")), v["inputs"]) for k, v in structure.items()}
 
         # Perform a topological sort to ensure that the results are done in order

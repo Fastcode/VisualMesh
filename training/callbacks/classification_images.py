@@ -30,7 +30,7 @@ mpl.use("Agg")
 
 
 class ClassificationImages(tf.keras.callbacks.Callback):
-    def __init__(self, output_path, dataset_path, classes, mesh, geometry, progress_images, colours):
+    def __init__(self, output_path, dataset_paths, classes, mesh, geometry, progress_images, colours):
         super(ClassificationImages, self).__init__()
 
         self.colours = colours
@@ -39,7 +39,7 @@ class ClassificationImages(tf.keras.callbacks.Callback):
         # Load the dataset and extract a single record from it
         for d in (
             ClassificationDataset(
-                input_files=dataset_path,
+                paths=dataset_paths,
                 classes=classes,
                 mesh=mesh,
                 geometry=geometry,
@@ -110,10 +110,7 @@ class ClassificationImages(tf.keras.callbacks.Callback):
         # Make a dataset that we can infer from, we need to make the input a tuple in a tuple.
         # If it is not it considers G to be Y and it fails to execute
         # Then using this dataset of images, do a prediction using the model
-        ds = tf.data.Dataset.zip(
-            ((tf.data.Dataset.from_tensors(self.data["X"]), tf.data.Dataset.from_tensors(self.data["G"]),),)
-        )
-        predictions = self.model.predict(ds)
+        predictions = self.model((self.data["X"], self.data["G"]))
 
         # Work out the valid data ranges for each of the objects
         cs = [0] + np.cumsum(self.data["n"]).tolist()

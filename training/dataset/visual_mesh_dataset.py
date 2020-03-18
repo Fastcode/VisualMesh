@@ -34,8 +34,8 @@ else:
 
 
 class VisualMeshDataset:
-    def __init__(self, input_files, mesh, geometry, batch_size, prefetch, variants, features={}):
-        self.input_files = input_files
+    def __init__(self, paths, mesh, geometry, batch_size, prefetch, variants={}, features={}):
+        self.paths = paths
         self.batch_size = batch_size
         self.mesh_type = mesh["type"]
         self.cached_meshes = mesh["cached_meshes"]
@@ -279,7 +279,7 @@ class VisualMeshDataset:
             aggregator = tf.data.experimental.StatsAggregator()
 
         # Load our dataset records and batch them while they are still compressed
-        dataset = tf.data.TFRecordDataset(self.input_files)
+        dataset = tf.data.TFRecordDataset(self.paths)
         dataset = dataset.batch(self.batch_size, drop_remainder=True)
 
         # Apply our reduction function to project/squash our dataset into a batch

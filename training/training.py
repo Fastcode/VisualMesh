@@ -29,19 +29,74 @@ from .model import VisualMeshModel
 # Train the network
 def train(config, output_path):
 
-    n_classes = len(config["network"]["classes"])
+    # Get some arguments that will always be added to datasets
+    dataset_args = {
+        "mesh": config["model"]["mesh"],
+        "geometry": config["model"]["geometry"],
+        "prefetch": tf.data.experimental.AUTOTUNE,
+    }
+    training_dataset_args = {
+        **dataset_args,
+        **config["dataset"]["training"],
+        "batch_size": config["training"]["batch_size"],
+    }
+    validation_dataset_args = {
+        **dataset_args,
+        **config["dataset"]["validation"],
+        "batch_size": config["training"]["batch_size"],
+    }
+
+    # Load the types based on what type of network we are trying to train
+    if config["dataset"]["output"]["type"] == "Classification":
+
+        # Load classification datasets
+        training_dataset = (
+            ClassificationDataset(**training_dataset_args, classes=config["dataset"]["output"]["classes"])
+            .build()
+            .map(keras_dataset)
+        )
+        validation_dataset = (
+            ClassificationDataset(**validation_dataset_args, classes=config["dataset"]["output"]["classes"])
+            .build()
+            .map(keras_dataset)
+        )
+
+        output_dims = training_dataset.element_spec[1].shape[1]
+
+        # Metrics that we want to track
+        metrics = [
+            AveragePrecision("metrics/average_precision", output_dims),
+            AverageRecall("metrics/average_recall", output_dims),
+        ]
+        for i, k in enumerate(config["dataset"]["output"]["classes"]):
+            metrics.append(ClassPrecision("metrics/{}_precision".format(k["name"]), i, output_dims))
+            metrics.append(ClassRecall("metrics/{}_recall".format(k["name"]), i, output_dims))
+
+        # Classification image callback
+        callbacks = [
+            ClassificationImages(
+                output_path,
+                config["dataset"]["validation"]["paths"],
+                config["dataset"]["output"]["classes"],
+                config["model"]["mesh"],
+                config["model"]["geometry"],
+                config["training"]["validation"]["progress_images"],
+                # Draw using the first colour in the list
+                [c["colours"][0] for c in config["dataset"]["output"]["classes"]],
+            )
+        ]
+
+        # Use focal loss for training
+        loss = FocalLoss()
+
+    else:
+        raise RuntimeError("Unknown classification network type {}".format(config["network"]["output"]["type"]))
+
+    # Get the dimensionality of the Y part of the dataset
+    output_dims = training_dataset.element_spec[1].shape[1]
 
     # Define the model
-    model = VisualMeshModel(structure=config["network"]["structure"], n_classes=n_classes)
-
-    # Metrics that we want to track
-    metrics = [
-        AveragePrecision("metrics/average_precision", n_classes),
-        AverageRecall("metrics/average_recall", n_classes),
-    ]
-    for i, k in enumerate(config["network"]["classes"]):
-        metrics.append(ClassPrecision("metrics/{}_precision".format(k["name"]), i, n_classes))
-        metrics.append(ClassRecall("metrics/{}_recall".format(k["name"]), i, n_classes))
+    model = VisualMeshModel(structure=config["network"]["structure"], output_dims=output_dims)
 
     # Setup the optimiser
     if config["training"]["optimiser"]["type"] == "Adam":
@@ -57,7 +112,7 @@ def train(config, output_path):
 
     # Compile the model
     model.compile(
-        optimizer=optimiser, loss=FocalLoss(), metrics=metrics,
+        optimizer=optimiser, loss=loss, metrics=metrics,
     )
 
     # Find the latest checkpoint file and load it
@@ -65,39 +120,9 @@ def train(config, output_path):
     if checkpoint_file is not None:
         model.load_weights(checkpoint_file)
 
-    # Get the training dataset
-    training_dataset = (
-        ClassificationDataset(
-            input_files=config["dataset"]["training"],
-            classes=config["network"]["classes"],
-            mesh=config["model"]["mesh"],
-            geometry=config["model"]["geometry"],
-            batch_size=config["training"]["batch_size"],
-            prefetch=tf.data.experimental.AUTOTUNE,
-            variants=config["training"]["variants"],
-        )
-        .build()
-        .map(keras_dataset)
-    )
-
     # If we are using batches_per_epoch as a number rather than the whole dataset
     if "batches_per_epoch" in config["training"]:
         training_dataset = training_dataset.repeat()
-
-    # Get the validation dataset
-    validation_dataset = (
-        ClassificationDataset(
-            input_files=config["dataset"]["validation"],
-            classes=config["network"]["classes"],
-            mesh=config["model"]["mesh"],
-            geometry=config["model"]["geometry"],
-            batch_size=config["training"]["validation"]["batch_size"],
-            prefetch=tf.data.experimental.AUTOTUNE,
-            variants={},
-        )
-        .build()
-        .map(keras_dataset)
-    )
 
     # Fit the model
     model.fit(
@@ -118,14 +143,6 @@ def train(config, output_path):
                 save_weights_only=True,
                 save_best_only=True,
             ),
-            ClassificationImages(
-                output_path,
-                config["dataset"]["validation"],
-                config["network"]["classes"],
-                config["model"]["mesh"],
-                config["model"]["geometry"],
-                config["training"]["validation"]["progress_images"],
-                [c["colours"][0] for c in config["network"]["classes"]],  # Draw using the first colour
-            ),
+            *callbacks,
         ],
     )
