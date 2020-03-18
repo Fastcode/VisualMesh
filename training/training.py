@@ -24,73 +24,15 @@ from .dataset import ClassificationDataset, keras_dataset
 from .loss import FocalLoss
 from .metrics import AveragePrecision, AverageRecall, ClassPrecision, ClassRecall
 from .model import VisualMeshModel
+from .variety import get_variety
 
 
 # Train the network
 def train(config, output_path):
 
-    # Get some arguments that will always be added to datasets
-    dataset_args = {
-        "mesh": config["model"]["mesh"],
-        "geometry": config["model"]["geometry"],
-        "prefetch": tf.data.experimental.AUTOTUNE,
-    }
-    training_dataset_args = {
-        **dataset_args,
-        **config["dataset"]["training"],
-        "batch_size": config["training"]["batch_size"],
-    }
-    validation_dataset_args = {
-        **dataset_args,
-        **config["dataset"]["validation"],
-        "batch_size": config["training"]["batch_size"],
-    }
-
-    # Load the types based on what type of network we are trying to train
-    if config["dataset"]["output"]["type"] == "Classification":
-
-        # Load classification datasets
-        training_dataset = (
-            ClassificationDataset(**training_dataset_args, classes=config["dataset"]["output"]["classes"])
-            .build()
-            .map(keras_dataset)
-        )
-        validation_dataset = (
-            ClassificationDataset(**validation_dataset_args, classes=config["dataset"]["output"]["classes"])
-            .build()
-            .map(keras_dataset)
-        )
-
-        output_dims = training_dataset.element_spec[1].shape[1]
-
-        # Metrics that we want to track
-        metrics = [
-            AveragePrecision("metrics/average_precision", output_dims),
-            AverageRecall("metrics/average_recall", output_dims),
-        ]
-        for i, k in enumerate(config["dataset"]["output"]["classes"]):
-            metrics.append(ClassPrecision("metrics/{}_precision".format(k["name"]), i, output_dims))
-            metrics.append(ClassRecall("metrics/{}_recall".format(k["name"]), i, output_dims))
-
-        # Classification image callback
-        callbacks = [
-            ClassificationImages(
-                output_path,
-                config["dataset"]["validation"]["paths"],
-                config["dataset"]["output"]["classes"],
-                config["model"]["mesh"],
-                config["model"]["geometry"],
-                config["training"]["validation"]["progress_images"],
-                # Draw using the first colour in the list
-                [c["colours"][0] for c in config["dataset"]["output"]["classes"]],
-            )
-        ]
-
-        # Use focal loss for training
-        loss = FocalLoss()
-
-    else:
-        raise RuntimeError("Unknown classification network type {}".format(config["network"]["output"]["type"]))
+    # Work out what kind of dataset we are training on and get the data
+    datasets, loss, metrics, callbacks = get_variety(config, output_path)
+    training_dataset, validation_dataset, _ = datasets
 
     # Get the dimensionality of the Y part of the dataset
     output_dims = training_dataset.element_spec[1].shape[1]
