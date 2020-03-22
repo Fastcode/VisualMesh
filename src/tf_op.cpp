@@ -288,7 +288,7 @@ private:
         auto tHoc                            = context->input(Args::HOC).matrix<T>();
         T max_distance                       = context->input(Args::MAX_DISTANCE).scalar<T>()(0);
         T n_intersections                    = context->input(Args::N_INTERSECTIONS).scalar<T>()(0);
-        tensorflow::int32 cached_meshes      = context->input(Args::N_INTERSECTIONS).scalar<tensorflow::int32>()(0);
+        tensorflow::int32 cached_meshes      = context->input(Args::CACHED_MESHES).scalar<tensorflow::int32>()(0);
         T intersection_tolerance             = context->input(Args::INTERSECTION_TOLERANCE).scalar<T>()(0);
         std::string geometry                 = *context->input(Args::GEOMETRY).flat<tensorflow::string>().data();
         T radius                             = context->input(Args::RADIUS).scalar<T>()(0);
