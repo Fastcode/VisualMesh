@@ -143,7 +143,8 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> find_mesh(
     if (best_error <= t) {
         // Swap it to the top of the list so we can keep somewhat of which items are most used
         std::iter_swap(meshes.begin(), best_it);
-        return *best_it;
+        // iter_swap moves the lowest error mesh into the first position of meshes
+        return *meshes.begin();
     }
     else {
         return nullptr;
