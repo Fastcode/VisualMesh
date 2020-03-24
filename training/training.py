@@ -24,14 +24,14 @@ from .dataset import ClassificationDataset, keras_dataset
 from .loss import FocalLoss
 from .metrics import AveragePrecision, AverageRecall, ClassPrecision, ClassRecall
 from .model import VisualMeshModel
-from .variety import get_variety
+from .flavour import get_flavour
 
 
 # Train the network
 def train(config, output_path):
 
     # Work out what kind of dataset we are training on and get the data
-    datasets, loss, metrics, callbacks = get_variety(config, output_path)
+    datasets, loss, metrics, callbacks = get_flavour(config, output_path)
     training_dataset, validation_dataset, _ = datasets
 
     # Get the dimensionality of the Y part of the dataset

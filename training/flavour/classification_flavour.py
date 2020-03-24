@@ -21,7 +21,7 @@ from ..callbacks import ClassificationImages
 from ..metrics import AverageRecall, AveragePrecision, ClassPrecision, ClassRecall
 
 
-def classification_variety(config, output_path):
+def classification_flavour(config, output_path):
 
     # Get some arguments that will always be added to datasets
     dataset_args = {

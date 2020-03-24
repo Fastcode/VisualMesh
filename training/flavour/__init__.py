@@ -13,13 +13,13 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from .classification_variety import classification_variety
+from .classification_flavour import classification_flavour
 
 
-def get_variety(config, output_path):
+def get_flavour(config, output_path):
     # Load the types based on what type of network we are trying to train
     if config["dataset"]["output"]["type"] == "Classification":
-        return classification_variety(config, output_path)
+        return classification_flavour(config, output_path)
 
     # elif config['dataset']['output']['type'] == "Spotlight":
     # training_dataset =
