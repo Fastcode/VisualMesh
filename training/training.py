@@ -34,6 +34,9 @@ def train(config, output_path):
     datasets, loss, metrics, callbacks = get_flavour(config, output_path)
     training_dataset, validation_dataset, _ = datasets
 
+    # Always repeat the validation dataset
+    validation_dataset = validation_dataset.repeat()
+
     # Get the dimensionality of the Y part of the dataset
     output_dims = training_dataset.element_spec[1].shape[1]
 
