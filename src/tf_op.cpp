@@ -31,6 +31,7 @@
 #include "mesh/model/radial8.hpp"
 #include "mesh/model/ring4.hpp"
 #include "mesh/model/ring6.hpp"
+#include "mesh/model/ring8.hpp"
 #include "mesh/model/xgrid4.hpp"
 
 enum Args {
@@ -414,13 +415,15 @@ public:
         std::string model = *context->input(Args::MODEL).flat<tensorflow::string>().data();
 
         // clang-format off
-        if (model == "RING6") { ComputeModel<visualmesh::model::Ring6>(context); }
-        else if (model == "RING4") { ComputeModel<visualmesh::model::Ring4>(context); }
-        else if (model == "RADIAL8") { ComputeModel<visualmesh::model::Radial8>(context); }
+        if (model == "RADIAL4") { ComputeModel<visualmesh::model::Radial4>(context); }
         else if (model == "RADIAL6") { ComputeModel<visualmesh::model::Radial6>(context); }
-        else if (model == "RADIAL4") { ComputeModel<visualmesh::model::Radial4>(context); }
+        else if (model == "RADIAL8") { ComputeModel<visualmesh::model::Radial8>(context); }
+        else if (model == "RING4") { ComputeModel<visualmesh::model::Ring4>(context); }
+        else if (model == "RING6") { ComputeModel<visualmesh::model::Ring6>(context); }
+        else if (model == "RING8") { ComputeModel<visualmesh::model::Ring8>(context); }
         else if (model == "XGRID4") { ComputeModel<visualmesh::model::XGrid4>(context); }
         // clang-format on
+
         else {
             OP_REQUIRES(
               context,

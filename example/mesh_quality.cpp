@@ -28,6 +28,7 @@
 #include "mesh/model/radial8.hpp"
 #include "mesh/model/ring4.hpp"
 #include "mesh/model/ring6.hpp"
+#include "mesh/model/ring8.hpp"
 #include "mesh/model/xgrid4.hpp"
 #include "utility/math.hpp"
 #include "utility/phi_difference.hpp"
@@ -183,14 +184,6 @@ int main(int argc, const char* argv[]) {
     visualmesh::geometry::Sphere<float> shape(r);
 
     {
-        std::cout << "Ring6 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::Ring6> mesh(shape, h, k, max_distance);
-        auto quality = check_quality(shape, mesh);
-        print_quality(quality, k);
-        std::cout << std::endl;
-    }
-
-    {
         std::cout << "Ring4 Quality:" << std::endl;
         visualmesh::Mesh<float, visualmesh::model::Ring4> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
@@ -199,8 +192,24 @@ int main(int argc, const char* argv[]) {
     }
 
     {
-        std::cout << "Radial8 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::Radial8> mesh(shape, h, k, max_distance);
+        std::cout << "Ring6 Quality:" << std::endl;
+        visualmesh::Mesh<float, visualmesh::model::Ring6> mesh(shape, h, k, max_distance);
+        auto quality = check_quality(shape, mesh);
+        print_quality(quality, k);
+        std::cout << std::endl;
+    }
+
+    {
+        std::cout << "Ring8 Quality:" << std::endl;
+        visualmesh::Mesh<float, visualmesh::model::Ring8> mesh(shape, h, k, max_distance);
+        auto quality = check_quality(shape, mesh);
+        print_quality(quality, k);
+        std::cout << std::endl;
+    }
+
+    {
+        std::cout << "Radial4 Quality:" << std::endl;
+        visualmesh::Mesh<float, visualmesh::model::Radial4> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -215,8 +224,8 @@ int main(int argc, const char* argv[]) {
     }
 
     {
-        std::cout << "Radial4 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::Radial4> mesh(shape, h, k, max_distance);
+        std::cout << "Radial8 Quality:" << std::endl;
+        visualmesh::Mesh<float, visualmesh::model::Radial8> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
