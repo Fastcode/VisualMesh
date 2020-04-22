@@ -54,9 +54,7 @@ namespace model {
             const Scalar& phi = shape.phi(n, h);
 
             // Specifically for the origin there is only one point
-            if (n == 0) {
-                return std::make_pair(vec2<Scalar>{0, 2.0 * M_PI}, 1);
-            }
+            if (n == 0) { return std::make_pair(vec2<Scalar>{0, 2.0 * M_PI}, 1); }
 
             // At n = 0.5 we will have a delta theta of pi (two objects touching would fit). At any shorter distance
             // than this then the theta angle does not make sense as the objects intersect with the origin. As an easy

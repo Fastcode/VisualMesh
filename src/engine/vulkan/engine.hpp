@@ -654,16 +654,12 @@ namespace engine {
                 VkFence vk_fence = fence;
                 for (uint32_t timeout_count = 0; timeout_count < 10000; ++timeout_count) {
                     res = vkWaitForFences(context.device, 1, &vk_fence, VK_TRUE, static_cast<uint64_t>(1e3));
-                    if (res == VK_SUCCESS) {
-                        break;
-                    }
+                    if (res == VK_SUCCESS) { break; }
                     else if (res == VK_ERROR_DEVICE_LOST) {
                         throw_vk_error(VK_ERROR_DEVICE_LOST, "Lost device while waiting for reprojection to complete");
                     }
                 }
-                if (res != VK_SUCCESS) {
-                    throw_vk_error(res, "Timed out waiting for reprojection to complete");
-                }
+                if (res != VK_SUCCESS) { throw_vk_error(res, "Timed out waiting for reprojection to complete"); }
 
                 // Read the pixels off the buffer
                 std::vector<vec2<Scalar>> pixels(indices.size());
@@ -946,16 +942,12 @@ namespace engine {
                 VkFence vk_fence = fence;
                 for (uint32_t timeout_count = 0; timeout_count < 10000; ++timeout_count) {
                     res = vkWaitForFences(context.device, 1, &vk_fence, VK_TRUE, static_cast<uint64_t>(1e3));
-                    if (res == VK_SUCCESS) {
-                        break;
-                    }
+                    if (res == VK_SUCCESS) { break; }
                     else if (res == VK_ERROR_DEVICE_LOST) {
                         throw_vk_error(VK_ERROR_DEVICE_LOST, "Lost device while waiting for network to complete");
                     }
                 }
-                if (res != VK_SUCCESS) {
-                    throw_vk_error(res, "Timed out waiting for network to complete");
-                }
+                if (res != VK_SUCCESS) { throw_vk_error(res, "Timed out waiting for network to complete"); }
 
                 // ************************
                 // *** RETRIEVE RESULTS ***

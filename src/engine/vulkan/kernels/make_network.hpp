@@ -48,9 +48,7 @@ namespace engine {
                 std::vector<std::pair<uint32_t, std::vector<uint32_t>>> programs;
 
                 // If our structure has no layers, return empty code
-                if (structure.empty() || structure.front().empty()) {
-                    return programs;
-                }
+                if (structure.empty() || structure.front().empty()) { return programs; }
 
                 // Keep track of the input and output size of each layer for building the network
                 // The first layer input is always 4 from the image

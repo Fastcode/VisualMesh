@@ -106,9 +106,7 @@ public:
         auto it = luts.lower_bound(height);
 
         // First element that is >= is the first one (we are off the low end)
-        if (it == luts.begin()) {
-            return it->second;
-        }
+        if (it == luts.begin()) { return it->second; }
         // We don't have an element that >= height (we are off the high end)
         else if (it == luts.end()) {
             return luts.rbegin()->second;

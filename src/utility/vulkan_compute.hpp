@@ -85,9 +85,7 @@ inline std::stringstream& compose_string(
 
 template <bool debug, typename... Targs>
 inline std::string compose_string(const std::string& format, Targs... Fargs) {
-    if (debug) {
-        return "";
-    }
+    if (debug) { return ""; }
     std::stringstream stream;
     compose_string(stream, format.begin(), format.end(), Fargs...);
     return stream.str();
@@ -356,9 +354,7 @@ struct Program {
 
         std::vector<uint32_t> p = {type, 0};
         std::transform(params.begin(), params.end(), std::back_inserter(p), [&](uint32_t ui) -> uint32_t {
-            if (params.size() > 1) {
-                return add_constant(add_type(spv::Op::OpTypeInt, {32, 0}), {ui}, 1, is_spec_op);
-            }
+            if (params.size() > 1) { return add_constant(add_type(spv::Op::OpTypeInt, {32, 0}), {ui}, 1, is_spec_op); }
             else {
                 return ui;
             }
@@ -381,9 +377,7 @@ struct Program {
         std::transform(params.begin(), params.end(), std::back_inserter(p), [&](float f) -> uint32_t {
             uint32_t word;
             std::memcpy(&word, &f, sizeof(float));
-            if (params.size() > 1) {
-                return add_constant(add_type(spv::Op::OpTypeFloat, {32}), {word}, 1, is_spec_op);
-            }
+            if (params.size() > 1) { return add_constant(add_type(spv::Op::OpTypeFloat, {32}), {word}, 1, is_spec_op); }
             else {
                 return word;
             }
@@ -455,9 +449,7 @@ struct Program {
 
         uint32_t id                  = id_generator++;
         std::vector<uint32_t> params = {type, id, static_cast<uint32_t>(storage_class)};
-        if (initialiser != std::numeric_limits<uint32_t>::max()) {
-            params.push_back(initialiser);
-        }
+        if (initialiser != std::numeric_limits<uint32_t>::max()) { params.push_back(initialiser); }
         switch (storage_class) {
             case spv::StorageClass::Function: operation(functions, spv::Op::OpVariable, params); break;
             case spv::StorageClass::StorageBuffer:
@@ -475,9 +467,7 @@ struct Program {
         std::vector<uint32_t> params = {type, id, ptr};
         if (mem_access != spv::MemoryAccessMask::MaskNone) {
             params.push_back(static_cast<uint32_t>(mem_access));
-            if (mem_access == spv::MemoryAccessMask::Aligned) {
-                params.push_back(mem_access_operand);
-            }
+            if (mem_access == spv::MemoryAccessMask::Aligned) { params.push_back(mem_access_operand); }
         }
         operation(functions, spv::Op::OpLoad, params);
         return id;
@@ -491,9 +481,7 @@ struct Program {
         std::vector<uint32_t> params = {ptr, data};
         if (mem_access != spv::MemoryAccessMask::MaskNone) {
             params.push_back(static_cast<uint32_t>(mem_access));
-            if (mem_access == spv::MemoryAccessMask::Aligned) {
-                params.push_back(mem_access_operand);
-            }
+            if (mem_access == spv::MemoryAccessMask::Aligned) { params.push_back(mem_access_operand); }
         }
         operation(functions, spv::Op::OpStore, params);
     }
@@ -519,9 +507,7 @@ struct Program {
         params.insert(params.end(), operands.begin(), operands.end());
 
         std::pair<bool, uint32_t> check = check_duplicate_declaration(decorations, spv::Op::OpDecorate, -1, params);
-        if (!check.first) {
-            operation(decorations, spv::Op::OpDecorate, params);
-        }
+        if (!check.first) { operation(decorations, spv::Op::OpDecorate, params); }
     }
 
     void add_member_decoration(const uint32_t& struct_id,
@@ -532,9 +518,7 @@ struct Program {
         params.insert(params.end(), operands.begin(), operands.end());
 
         std::pair<bool, uint32_t> id = check_duplicate_declaration(decorations, spv::Op::OpMemberDecorate, -1, params);
-        if (!id.first) {
-            operation(decorations, spv::Op::OpMemberDecorate, params);
-        }
+        if (!id.first) { operation(decorations, spv::Op::OpMemberDecorate, params); }
     }
 
     uint32_t add_decoration_group(const spv::Decoration& decoration,
@@ -605,9 +589,7 @@ struct Program {
                 std::swap(result, buffer);
             }
 
-            if (!result.empty()) {
-                throw std::runtime_error("Repeated binding groups detected.");
-            }
+            if (!result.empty()) { throw std::runtime_error("Repeated binding groups detected."); }
         }
 
         for (const auto& group : combined_bindings) {
@@ -1112,9 +1094,7 @@ struct Program {
     uint32_t add_sampler_type() {
         // First add the sampler type
         std::pair<bool, uint32_t> id = check_duplicate_declaration(types, spv::Op::OpTypeSampler, 1, {0});
-        if (!id.first) {
-            operation(types, spv::Op::OpTypeSampler, {id.second});
-        }
+        if (!id.first) { operation(types, spv::Op::OpTypeSampler, {id.second}); }
         return id.second;
     }
 
@@ -1179,9 +1159,7 @@ struct Program {
     uint32_t fgeq(const uint32_t& u, const uint32_t& v, const uint32_t& components = 1) {
         uint32_t id = id_generator++;
         uint32_t type;
-        if (components == 1) {
-            type = add_type(spv::Op::OpTypeBool, {});
-        }
+        if (components == 1) { type = add_type(spv::Op::OpTypeBool, {}); }
         else {
             type = add_vec_type(spv::Op::OpTypeBool, {}, components);
         }
@@ -1276,19 +1254,13 @@ private:
                     uint32_t match_count = 0;
 
                     for (int32_t j = 0, k = i + 1; j < static_cast<int32_t>(params.size()); j++, k++) {
-                        if ((j + 1) == result_id_index) {
-                            match_count++;
-                        }
+                        if ((j + 1) == result_id_index) { match_count++; }
                         else {
-                            if (program[k] == params[j]) {
-                                match_count++;
-                            }
+                            if (program[k] == params[j]) { match_count++; }
                         }
                     }
 
-                    if (match_count == params.size()) {
-                        return std::make_pair(true, program[i + result_id_index]);
-                    }
+                    if (match_count == params.size()) { return std::make_pair(true, program[i + result_id_index]); }
                 }
             }
         }
