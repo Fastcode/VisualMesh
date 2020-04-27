@@ -29,6 +29,9 @@
 #include "mesh/model/xmgrid4.hpp"
 #include "mesh/model/xmgrid6.hpp"
 #include "mesh/model/xmgrid8.hpp"
+#include "mesh/model/xygrid4.hpp"
+#include "mesh/model/xygrid6.hpp"
+#include "mesh/model/xygrid8.hpp"
 #include "visualmesh.hpp"
 
 using Scalar = float;
@@ -57,6 +60,9 @@ int main() {
     visualmesh::VisualMesh<Scalar, visualmesh::model::XMGrid4> xmgrid4(sphere, 0.5, 1.5, 6, 0.5, 20);
     visualmesh::VisualMesh<Scalar, visualmesh::model::XMGrid6> xmgrid6(sphere, 0.5, 1.5, 6, 0.5, 20);
     visualmesh::VisualMesh<Scalar, visualmesh::model::XMGrid8> xmgrid8(sphere, 0.5, 1.5, 6, 0.5, 20);
+    visualmesh::VisualMesh<Scalar, visualmesh::model::XYGrid4> xygrid4(sphere, 0.5, 1.5, 6, 0.5, 20);
+    visualmesh::VisualMesh<Scalar, visualmesh::model::XYGrid6> xygrid6(sphere, 0.5, 1.5, 6, 0.5, 20);
+    visualmesh::VisualMesh<Scalar, visualmesh::model::XYGrid8> xygrid8(sphere, 0.5, 1.5, 6, 0.5, 20);
 
     // Build engines
     visualmesh::engine::opencl::Engine<Scalar> engine;
@@ -74,6 +80,9 @@ int main() {
         draw("XM Grid 4", element.image, engine.project(xmgrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         draw("XM Grid 6", element.image, engine.project(xmgrid6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         draw("XM Grid 8", element.image, engine.project(xmgrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("XY Grid 4", element.image, engine.project(xygrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("XY Grid 6", element.image, engine.project(xygrid6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("XY Grid 8", element.image, engine.project(xygrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         if (char(cv::waitKey(0)) == 27) break;
     }
 

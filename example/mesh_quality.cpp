@@ -32,6 +32,9 @@
 #include "mesh/model/xmgrid4.hpp"
 #include "mesh/model/xmgrid6.hpp"
 #include "mesh/model/xmgrid8.hpp"
+#include "mesh/model/xygrid4.hpp"
+#include "mesh/model/xygrid6.hpp"
+#include "mesh/model/xygrid8.hpp"
 #include "utility/math.hpp"
 #include "utility/phi_difference.hpp"
 #include "visualmesh.hpp"
@@ -252,6 +255,30 @@ int main(int argc, const char* argv[]) {
     {
         std::cout << "XM Grid 8 Quality:" << std::endl;
         visualmesh::Mesh<float, visualmesh::model::XMGrid8> mesh(shape, h, k, max_distance);
+        auto quality = check_quality(shape, mesh);
+        print_quality(quality, k);
+        std::cout << std::endl;
+    }
+
+    {
+        std::cout << "XY Grid 4 Quality:" << std::endl;
+        visualmesh::Mesh<float, visualmesh::model::XYGrid4> mesh(shape, h, k, max_distance);
+        auto quality = check_quality(shape, mesh);
+        print_quality(quality, k);
+        std::cout << std::endl;
+    }
+
+    {
+        std::cout << "XY Grid 6 Quality:" << std::endl;
+        visualmesh::Mesh<float, visualmesh::model::XYGrid6> mesh(shape, h, k, max_distance);
+        auto quality = check_quality(shape, mesh);
+        print_quality(quality, k);
+        std::cout << std::endl;
+    }
+
+    {
+        std::cout << "XY Grid 8 Quality:" << std::endl;
+        visualmesh::Mesh<float, visualmesh::model::XYGrid8> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;

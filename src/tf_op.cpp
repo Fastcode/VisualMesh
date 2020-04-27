@@ -35,6 +35,9 @@
 #include "mesh/model/xmgrid4.hpp"
 #include "mesh/model/xmgrid6.hpp"
 #include "mesh/model/xmgrid8.hpp"
+#include "mesh/model/xygrid4.hpp"
+#include "mesh/model/xygrid6.hpp"
+#include "mesh/model/xygrid8.hpp"
 
 enum Args {
     DIMENSIONS             = 0,
@@ -424,8 +427,11 @@ public:
         else if (model == "RING6") { ComputeModel<visualmesh::model::Ring6>(context); }
         else if (model == "RING8") { ComputeModel<visualmesh::model::Ring8>(context); }
         else if (model == "XMGRID4") { ComputeModel<visualmesh::model::XMGrid4>(context); }
-        else if (model == "XMGRID4") { ComputeModel<visualmesh::model::XMGrid6>(context); }
-        else if (model == "XMGRID4") { ComputeModel<visualmesh::model::XMGrid8>(context); }
+        else if (model == "XMGRID6") { ComputeModel<visualmesh::model::XMGrid6>(context); }
+        else if (model == "XMGRID8") { ComputeModel<visualmesh::model::XMGrid8>(context); }
+        else if (model == "XYGRID4") { ComputeModel<visualmesh::model::XYGrid4>(context); }
+        else if (model == "XYGRID6") { ComputeModel<visualmesh::model::XYGrid6>(context); }
+        else if (model == "XYGRID8") { ComputeModel<visualmesh::model::XYGrid8>(context); }
         // clang-format on
 
         else {
