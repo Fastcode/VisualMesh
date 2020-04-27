@@ -32,7 +32,7 @@ namespace model {
      * @tparam Scalar   the scalar type used for calculations and storage (normally one of float or double)
      * @tparam Ring     the specific ring type that is used to generate the neighbour indices
      */
-    template <typename Scalar, template <typename> class Ring, size_t N_NEIGHBOURS>
+    template <typename Scalar, template <typename> class Ring, int N_NEIGHBOURS>
     struct RingBase {
     private:
         /**

@@ -34,7 +34,7 @@ namespace model {
         }
 
     public:
-        static constexpr size_t N_NEIGHBOURS = 6;
+        static constexpr int N_NEIGHBOURS = 6;
 
         template <typename Shape>
         static std::vector<Node<Scalar, N_NEIGHBOURS>> generate(const Shape& shape,

@@ -149,7 +149,7 @@ namespace engine {
             inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Model>& mesh,
                                                                               const mat4<Scalar>& Hoc,
                                                                               const Lens<Scalar>& lens) const {
-                static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+                static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 // Perform the projection
                 std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
@@ -216,8 +216,8 @@ namespace engine {
                                                                            const Lens<Scalar>& lens,
                                                                            const void* image,
                                                                            const uint32_t& format) const {
-                static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
-                cl_int error                         = CL_SUCCESS;
+                static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+                cl_int error                      = CL_SUCCESS;
 
                 // Grab the image memory from the cache
                 cl::mem cl_image = get_image_memory(lens.dimensions, format);
@@ -425,7 +425,7 @@ namespace engine {
             template <template <typename> class Model>
             std::tuple<std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>>, std::vector<int>, cl::mem, cl::event>
               do_project(const Mesh<Scalar, Model>& mesh, const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
-                static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+                static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 // Lookup the on screen ranges
                 auto ranges = mesh.lookup(Hoc, lens);

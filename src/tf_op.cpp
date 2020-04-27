@@ -32,7 +32,9 @@
 #include "mesh/model/ring4.hpp"
 #include "mesh/model/ring6.hpp"
 #include "mesh/model/ring8.hpp"
-#include "mesh/model/xgrid4.hpp"
+#include "mesh/model/xmgrid4.hpp"
+#include "mesh/model/xmgrid6.hpp"
+#include "mesh/model/xmgrid8.hpp"
 
 enum Args {
     DIMENSIONS             = 0,
@@ -421,7 +423,9 @@ public:
         else if (model == "RING4") { ComputeModel<visualmesh::model::Ring4>(context); }
         else if (model == "RING6") { ComputeModel<visualmesh::model::Ring6>(context); }
         else if (model == "RING8") { ComputeModel<visualmesh::model::Ring8>(context); }
-        else if (model == "XGRID4") { ComputeModel<visualmesh::model::XGrid4>(context); }
+        else if (model == "XMGRID4") { ComputeModel<visualmesh::model::XMGrid4>(context); }
+        else if (model == "XMGRID4") { ComputeModel<visualmesh::model::XMGrid6>(context); }
+        else if (model == "XMGRID4") { ComputeModel<visualmesh::model::XMGrid8>(context); }
         // clang-format on
 
         else {

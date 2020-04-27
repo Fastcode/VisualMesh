@@ -31,16 +31,16 @@ namespace visualmesh {
  *  that subset being the components that were on the screen at the time of projection. the global_indices can be used
  *  to map back into the original mesh if needed (for example to get the world space unit vectors).
  *
- * @tparam Scalar     the scalar type used for calculations and storage (normally one of float or double)
- * @tparam Neighbours the number of neighbours that each point has
+ * @tparam Scalar       the scalar type used for calculations and storage (normally one of float or double)
+ * @tparam N_NEIGHBOURS the number of neighbours that each point has
  */
-template <typename Scalar, size_t Neighbours>
+template <typename Scalar, int N_NEIGHBOURS>
 struct ClassifiedMesh {
 
     /// The pixel coordinates (x,y) of the points projected from the visual mesh
     std::vector<std::array<Scalar, 2>> pixel_coordinates;
     /// The index graph giving the locations of the neighbours of each point
-    std::vector<std::array<int, Neighbours>> neighbourhood;
+    std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
     /// The original indicies of these points in the visual mesh
     std::vector<int> global_indices;
     /// The final output of classification in the visual mesh

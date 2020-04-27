@@ -26,7 +26,9 @@
 #include "mesh/model/ring4.hpp"
 #include "mesh/model/ring6.hpp"
 #include "mesh/model/ring8.hpp"
-#include "mesh/model/xgrid4.hpp"
+#include "mesh/model/xmgrid4.hpp"
+#include "mesh/model/xmgrid6.hpp"
+#include "mesh/model/xmgrid8.hpp"
 #include "visualmesh.hpp"
 
 using Scalar = float;
@@ -52,7 +54,9 @@ int main() {
     visualmesh::VisualMesh<Scalar, visualmesh::model::Ring4> ring4(sphere, 0.5, 1.5, 6, 0.5, 20);
     visualmesh::VisualMesh<Scalar, visualmesh::model::Ring6> ring6(sphere, 0.5, 1.5, 6, 0.5, 20);
     visualmesh::VisualMesh<Scalar, visualmesh::model::Ring8> ring8(sphere, 0.5, 1.5, 6, 0.5, 20);
-    visualmesh::VisualMesh<Scalar, visualmesh::model::XGrid4> xgrid4(sphere, 0.5, 1.5, 6, 0.5, 20);
+    visualmesh::VisualMesh<Scalar, visualmesh::model::XMGrid4> xmgrid4(sphere, 0.5, 1.5, 6, 0.5, 20);
+    visualmesh::VisualMesh<Scalar, visualmesh::model::XMGrid6> xmgrid6(sphere, 0.5, 1.5, 6, 0.5, 20);
+    visualmesh::VisualMesh<Scalar, visualmesh::model::XMGrid8> xmgrid8(sphere, 0.5, 1.5, 6, 0.5, 20);
 
     // Build engines
     visualmesh::engine::opencl::Engine<Scalar> engine;
@@ -67,7 +71,9 @@ int main() {
         draw("Ring 4", element.image, engine.project(ring4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         draw("Ring 6", element.image, engine.project(ring6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         draw("Ring 8", element.image, engine.project(ring8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("X Grid 4", element.image, engine.project(xgrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("XM Grid 4", element.image, engine.project(xmgrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("XM Grid 6", element.image, engine.project(xmgrid6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("XM Grid 8", element.image, engine.project(xmgrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         if (char(cv::waitKey(0)) == 27) break;
     }
 

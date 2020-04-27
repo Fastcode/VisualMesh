@@ -15,31 +15,22 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_PROJECTED_MESH_HPP
-#define VISUALMESH_PROJECTED_MESH_HPP
+#ifndef VISUALMESH_MODEL_XMGRID8_HPP
+#define VISUALMESH_MODEL_XMGRID8_HPP
 
-#include <array>
-#include <vector>
+#include "grid_base.hpp"
+#include "xmgrid_map.hpp"
 
 namespace visualmesh {
+namespace model {
 
-/**
- * @brief A projected mesh is a Visual Mesh that has been projected onto a camera image
- *
- * @tparam Scalar       the scalar type used for calculations and storage (normally one of float or double)
- * @tparam N_NEIGHBOURS the number of neighbours that each point has
- */
-template <typename Scalar, int N_NEIGHBOURS>
-struct ProjectedMesh {
+    template <typename Scalar>
+    struct XMGrid8 : public GridBase<Scalar, XMGridMap, 8> {
+    public:
+        static constexpr int N_NEIGHBOURS = 8;
+    };
 
-    /// The pixel coordinates (x,y) of the points projected from the visual mesh
-    std::vector<std::array<Scalar, 2>> pixel_coordinates;
-    /// The index graph giving the locations of the neighbours of each point
-    std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
-    /// The original indicies of these points in the visual mesh
-    std::vector<int> global_indices;
-};
-
+}  // namespace model
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_PROJECTED_MESH_HPP
+#endif  // VISUALMESH_MODEL_XMGRID8_HPP

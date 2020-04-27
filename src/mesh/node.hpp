@@ -33,15 +33,15 @@ namespace visualmesh {
  *  having neighbours pointing to indices of other points in the list make up a Visual Mesh. The neighbours are ordered
  *  in a clockwise fashion.
  *
- * @tparam Scalar     the scalar type used for calculations and storage (normally one of float or double)
- * @tparam Neighbours the number of neighbours that each point has
+ * @tparam Scalar       the scalar type used for calculations and storage (normally one of float or double)
+ * @tparam N_NEIGHBOURS the number of neighbours that each point has
  */
-template <typename Scalar, size_t Neighbours>
+template <typename Scalar, int N_NEIGHBOURS>
 struct Node {
     /// The unit vector in the direction for this node
     vec3<Scalar> ray;
     /// Absolute indices to the linked nodes ordered L, TL, TR, R, BR, BL (clockwise)
-    std::array<int, Neighbours> neighbours;
+    std::array<int, N_NEIGHBOURS> neighbours;
 };
 
 }  // namespace visualmesh

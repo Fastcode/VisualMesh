@@ -640,7 +640,7 @@ namespace engine {
             inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Model>& mesh,
                                                                               const mat4<Scalar>& Hoc,
                                                                               const Lens<Scalar>& lens) const {
-                static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+                static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
                 std::vector<int> indices;
@@ -713,7 +713,7 @@ namespace engine {
                                                                            const Lens<Scalar>& lens,
                                                                            const void* image,
                                                                            const uint32_t& format) const {
-                static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+                static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 std::vector<std::pair<vk::semaphore, VkPipelineStageFlags>> wait_semaphores;
 
@@ -1013,7 +1013,7 @@ namespace engine {
                        std::pair<vk::buffer, vk::device_memory>,
                        CheckpointType>
               do_project(const Mesh<Scalar, Model>& mesh, const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
-                static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+                static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 // We only support VkSemaphore and VkFence here.
                 // Use vk::fence if the CPU will be waiting for the signal.

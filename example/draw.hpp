@@ -25,7 +25,7 @@
 #include "mesh/classified_mesh.hpp"
 #include "mesh/projected_mesh.hpp"
 
-template <typename Scalar, size_t N_NEIGHBOURS>
+template <typename Scalar, int N_NEIGHBOURS>
 void draw(const std::string& window,
           const cv::Mat& image,
           const visualmesh::ClassifiedMesh<Scalar, N_NEIGHBOURS>& mesh,
@@ -62,7 +62,7 @@ void draw(const std::string& window,
 }
 
 
-template <typename Scalar, size_t N_NEIGHBOURS>
+template <typename Scalar, int N_NEIGHBOURS>
 void draw(const std::string& window,
           const cv::Mat& image,
           const visualmesh::ProjectedMesh<Scalar, N_NEIGHBOURS>& mesh,

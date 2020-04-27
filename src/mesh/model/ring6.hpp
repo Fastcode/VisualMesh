@@ -35,7 +35,7 @@ namespace model {
     struct Ring6 : public RingBase<Scalar, Ring6, 6> {
 
         /// The number of neighbours that each node in the graph has
-        static constexpr size_t N_NEIGHBOURS = 6;
+        static constexpr int N_NEIGHBOURS = 6;
 
         /**
          * @brief Calculates the neighbour indicies for this ring form

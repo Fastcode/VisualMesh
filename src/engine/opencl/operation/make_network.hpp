@@ -49,7 +49,7 @@ namespace engine {
                 if (structure.empty() || structure.front().empty()) { return ""; }
 
                 // First layer has 4 inputs, so that tells us how many neighbours we have (minus ourself)
-                const size_t n_neighbours = (structure.front().front().first.size() / 4) - 1;
+                const unsigned int n_neighbours = (structure.front().front().first.size() / 4) - 1;
 
                 // Set our precision for how many digits our scalar has
                 code << std::setprecision(std::numeric_limits<Scalar>::digits10 + 2);

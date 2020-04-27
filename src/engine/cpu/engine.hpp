@@ -82,7 +82,7 @@ namespace engine {
             ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Model>& mesh,
                                                                        const mat4<Scalar>& Hoc,
                                                                        const Lens<Scalar>& lens) const {
-                static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+                static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 // Lookup the on screen ranges
                 auto ranges = mesh.lookup(Hoc, lens);
@@ -180,7 +180,7 @@ namespace engine {
                                                                            const Lens<Scalar>& lens,
                                                                            const void* image,
                                                                            const uint32_t& format) const {
-                static constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+                static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 // Project the pixels to the display
                 ProjectedMesh<Scalar, N_NEIGHBOURS> projected = project(mesh, Hoc, lens);

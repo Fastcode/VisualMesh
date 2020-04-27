@@ -29,7 +29,9 @@
 #include "mesh/model/ring4.hpp"
 #include "mesh/model/ring6.hpp"
 #include "mesh/model/ring8.hpp"
-#include "mesh/model/xgrid4.hpp"
+#include "mesh/model/xmgrid4.hpp"
+#include "mesh/model/xmgrid6.hpp"
+#include "mesh/model/xmgrid8.hpp"
 #include "utility/math.hpp"
 #include "utility/phi_difference.hpp"
 #include "visualmesh.hpp"
@@ -37,25 +39,25 @@
 template <typename Scalar>
 using vec3 = visualmesh::vec3<Scalar>;
 
-template <typename Scalar, size_t Neighbours>
+template <typename Scalar, int N_NEIGHBOURS>
 struct NodeQuality {
     /// The distance this node is from the origin
     Scalar distance;
     /// The angle this node is around the z axis
     Scalar angle;
     /// The number of object jumps between this node and the nodes around it
-    std::array<Scalar, Neighbours> radial;
+    std::array<Scalar, N_NEIGHBOURS> radial;
     /// The number of object jumps between each neighbour and the subsequent neighbour
-    std::array<Scalar, Neighbours> cyclical;
+    std::array<Scalar, N_NEIGHBOURS> cyclical;
     /// The angle between each neighbour and the subsequent neighbour
-    std::array<Scalar, Neighbours> angular;
+    std::array<Scalar, N_NEIGHBOURS> angular;
 };
 
 template <typename Scalar, template <typename> class Shape, template <typename> class Model>
 std::vector<NodeQuality<Scalar, Model<Scalar>::N_NEIGHBOURS>> check_quality(
   const Shape<Scalar>& shape, const visualmesh::Mesh<Scalar, Model>& mesh) {
 
-    constexpr size_t N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
+    constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
     // Loop through all the nodes in the mesh
     std::vector<NodeQuality<Scalar, N_NEIGHBOURS>> nodes;
@@ -111,7 +113,7 @@ std::vector<NodeQuality<Scalar, Model<Scalar>::N_NEIGHBOURS>> check_quality(
     return nodes;
 }
 
-template <typename Scalar, size_t Neighbours>
+template <typename Scalar, int N_NEIGHBOURS>
 struct Statistics {
     Statistics() {
         means.fill(0);
@@ -119,9 +121,9 @@ struct Statistics {
         counts.fill(0);
     }
 
-    void update(const std::array<Scalar, Neighbours> input) {
+    void update(const std::array<Scalar, N_NEIGHBOURS> input) {
 
-        for (unsigned int i = 0; i < Neighbours; ++i) {
+        for (unsigned int i = 0; i < N_NEIGHBOURS; ++i) {
             if (!std::isnan(input[i]) && input[i] != 0) {
                 sums[i] += input[i];
                 counts[i]++;
@@ -130,27 +132,27 @@ struct Statistics {
         }
     }
 
-    std::array<Scalar, Neighbours> means;
-    std::array<Scalar, Neighbours> sums;
-    std::array<uint32_t, Neighbours> counts;
+    std::array<Scalar, N_NEIGHBOURS> means;
+    std::array<Scalar, N_NEIGHBOURS> sums;
+    std::array<uint32_t, N_NEIGHBOURS> counts;
 };
 
-template <typename Scalar, size_t Neighbours>
-void print_quality(const std::vector<NodeQuality<Scalar, Neighbours>>& nodes, const Scalar& k) {
+template <typename Scalar, int N_NEIGHBOURS>
+void print_quality(const std::vector<NodeQuality<Scalar, N_NEIGHBOURS>>& nodes, const Scalar& k) {
 
     // Storage for the statistics
-    Statistics<Scalar, Neighbours> radial;
-    Statistics<Scalar, Neighbours> radial_var;
-    Statistics<Scalar, Neighbours> cyclical;
-    Statistics<Scalar, Neighbours> cyclical_var;
-    Statistics<Scalar, Neighbours> angular;
-    Statistics<Scalar, Neighbours> angular_var;
+    Statistics<Scalar, N_NEIGHBOURS> radial;
+    Statistics<Scalar, N_NEIGHBOURS> radial_var;
+    Statistics<Scalar, N_NEIGHBOURS> cyclical;
+    Statistics<Scalar, N_NEIGHBOURS> cyclical_var;
+    Statistics<Scalar, N_NEIGHBOURS> angular;
+    Statistics<Scalar, N_NEIGHBOURS> angular_var;
 
     // Go through all the nodes and accumulate for the mean value
     for (const auto& node : nodes) {
         radial.update(visualmesh::multiply(node.radial, k));
         cyclical.update(visualmesh::multiply(node.cyclical, k));
-        angular.update(visualmesh::multiply(node.angular, Scalar(Neighbours * (M_PI * 2.0))));
+        angular.update(visualmesh::multiply(node.angular, Scalar(N_NEIGHBOURS * (M_PI * 2.0))));
     }
 
     // Sum up the variance
@@ -160,13 +162,13 @@ void print_quality(const std::vector<NodeQuality<Scalar, Neighbours>>& nodes, co
         auto c = visualmesh::subtract(visualmesh::multiply(node.cyclical, k), cyclical.means);
         cyclical_var.update(visualmesh::multiply(c, c));
         auto a =
-          visualmesh::subtract(visualmesh::multiply(node.angular, Scalar(Neighbours * (M_PI * 2.0))), angular.means);
+          visualmesh::subtract(visualmesh::multiply(node.angular, Scalar(N_NEIGHBOURS * (M_PI * 2.0))), angular.means);
         angular_var.update(visualmesh::multiply(a, a));
     }
 
     std::cout << std::setprecision(4);
     std::cout << "Covered with " << nodes.size() << " nodes" << std::endl;
-    for (unsigned int i = 0; i < Neighbours; ++i) {
+    for (unsigned int i = 0; i < N_NEIGHBOURS; ++i) {
         std::cout << "* " << (radial.means[i]) << "±" << (std::sqrt(radial_var.means[i]));
         std::cout << " o " << (cyclical.means[i]) << "±" << (std::sqrt(cyclical_var.means[i]));
         std::cout << " a " << (angular.means[i]) << "±" << (std::sqrt(angular_var.means[i]));
@@ -232,8 +234,24 @@ int main(int argc, const char* argv[]) {
     }
 
     {
-        std::cout << "XGrid4 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::XGrid4> mesh(shape, h, k, max_distance);
+        std::cout << "XM Grid 4 Quality:" << std::endl;
+        visualmesh::Mesh<float, visualmesh::model::XMGrid4> mesh(shape, h, k, max_distance);
+        auto quality = check_quality(shape, mesh);
+        print_quality(quality, k);
+        std::cout << std::endl;
+    }
+
+    {
+        std::cout << "XM Grid 6 Quality:" << std::endl;
+        visualmesh::Mesh<float, visualmesh::model::XMGrid6> mesh(shape, h, k, max_distance);
+        auto quality = check_quality(shape, mesh);
+        print_quality(quality, k);
+        std::cout << std::endl;
+    }
+
+    {
+        std::cout << "XM Grid 8 Quality:" << std::endl;
+        visualmesh::Mesh<float, visualmesh::model::XMGrid8> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
