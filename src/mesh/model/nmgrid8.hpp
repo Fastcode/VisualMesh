@@ -15,42 +15,22 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_MODEL_XMGRID_HPP
-#define VISUALMESH_MODEL_XMGRID_HPP
+#ifndef VISUALMESH_MODEL_NMGRID8_HPP
+#define VISUALMESH_MODEL_NMGRID8_HPP
 
 #include "grid_base.hpp"
-#include "utility/math.hpp"
+#include "nmgrid_map.hpp"
 
 namespace visualmesh {
 namespace model {
 
     template <typename Scalar>
-    struct XMGridMap {
-
-        /**
-         * @brief Takes a point in n, m space (jumps along x and jumps along y) and converts it into a vector to the
-         * centre of the object using the x grid method
-         *
-         * @param shape the shape object used to calculate the angles
-         * @param n     the coordinate in the n coordinate (object jumps along the x axis)
-         * @param m     the coordinate in the m coordinate (object jumps along the y axis)
-         * @param h     the height of the camera above the observation plane
-         *
-         * @return a vector <x, y, z> that points to the centre of the object at these coordinates
-         */
-        template <typename Shape>
-        static vec3<Scalar> map(const Shape& shape, const vec2<Scalar>& nm, const Scalar& h) {
-            const Scalar phi_x = shape.phi(nm[0], h);
-            const Scalar x     = (h - shape.c()) * std::tan(phi_x);
-
-            const Scalar h_p = (h - shape.c()) / std::cos(phi_x);
-            const Scalar y   = h_p * std::tan(shape.phi(nm[1], h_p + shape.c()));
-
-            return vec3<Scalar>{x, y, shape.c() - h};
-        }
+    struct NMGrid8 : public GridBase<Scalar, NMGridMap, 8> {
+    public:
+        static constexpr int N_NEIGHBOURS = 8;
     };
 
 }  // namespace model
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_MODEL_XMGRID_HPP
+#endif  // VISUALMESH_MODEL_NMGRID8_HPP

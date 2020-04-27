@@ -21,6 +21,7 @@
 #include <array>
 #include <map>
 #include <set>
+#include <stack>
 #include <vector>
 
 #include "mesh/node.hpp"
@@ -80,9 +81,6 @@ namespace model {
             // Our jumps are based on if we are hexagonal or a quad base
             const Scalar jump = 1.0 / k;
 
-            // The height difference for the shape between the ground plane and object centre
-            const Scalar c = shape.c();
-
             // Hold the final nodes, as well as a map to create the link locations
             std::vector<Node<Scalar, N_NEIGHBOURS>> output;
             std::map<vec2<int>, int> locations;
@@ -97,7 +95,6 @@ namespace model {
                 auto e = stack.top();
                 stack.pop();
 
-
                 // 6 Neighbours are using hexagonal axial coordinates so need special calculations
                 vec2<Scalar> nm =
                   N_NEIGHBOURS == 6 ? multiply(
@@ -107,7 +104,7 @@ namespace model {
                               "You must choose 4, 6 or 8 neighbours");
 
                 // Map the point using our mapping function
-                vec3<Scalar> vec = Map<Scalar>::map(shape, nm, h, c);
+                vec3<Scalar> vec = Map<Scalar>::map(shape, nm, h);
                 Scalar distance  = norm(head<2>(vec));
 
                 // We only work with this point if we didn't exceed our max distance

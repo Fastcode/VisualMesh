@@ -20,6 +20,9 @@
 #include "engine/cpu/engine.hpp"
 #include "engine/opencl/engine.hpp"
 #include "geometry/Sphere.hpp"
+#include "mesh/model/nmgrid4.hpp"
+#include "mesh/model/nmgrid6.hpp"
+#include "mesh/model/nmgrid8.hpp"
 #include "mesh/model/radial4.hpp"
 #include "mesh/model/radial6.hpp"
 #include "mesh/model/radial8.hpp"
@@ -63,6 +66,9 @@ int main() {
     visualmesh::VisualMesh<Scalar, visualmesh::model::XYGrid4> xygrid4(sphere, 0.5, 1.5, 6, 0.5, 20);
     visualmesh::VisualMesh<Scalar, visualmesh::model::XYGrid6> xygrid6(sphere, 0.5, 1.5, 6, 0.5, 20);
     visualmesh::VisualMesh<Scalar, visualmesh::model::XYGrid8> xygrid8(sphere, 0.5, 1.5, 6, 0.5, 20);
+    visualmesh::VisualMesh<Scalar, visualmesh::model::NMGrid4> nmgrid4(sphere, 0.5, 1.5, 6, 0.5, 20);
+    visualmesh::VisualMesh<Scalar, visualmesh::model::NMGrid6> nmgrid6(sphere, 0.5, 1.5, 6, 0.5, 20);
+    visualmesh::VisualMesh<Scalar, visualmesh::model::NMGrid8> nmgrid8(sphere, 0.5, 1.5, 6, 0.5, 20);
 
     // Build engines
     visualmesh::engine::opencl::Engine<Scalar> engine;
@@ -83,6 +89,9 @@ int main() {
         draw("XY Grid 4", element.image, engine.project(xygrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         draw("XY Grid 6", element.image, engine.project(xygrid6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         draw("XY Grid 8", element.image, engine.project(xygrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("NM Grid 4", element.image, engine.project(nmgrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("NM Grid 6", element.image, engine.project(nmgrid6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("NM Grid 8", element.image, engine.project(nmgrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         if (char(cv::waitKey(0)) == 27) break;
     }
 

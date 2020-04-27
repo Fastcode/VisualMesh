@@ -35,19 +35,18 @@ namespace model {
          * @param n     the coordinate in the n coordinate (object jumps along the x axis)
          * @param m     the coordinate in the m coordinate (object jumps along the y axis)
          * @param h     the height of the camera above the observation plane
-         * @param c     the height of the object above the observation plane
          *
          * @return a vector <x, y, z> that points to the centre of the object at these coordinates
          */
         template <typename Shape>
-        static vec3<Scalar> map(const Shape& shape, const vec2<Scalar>& nm, const Scalar& h, const Scalar& c) {
+        static vec3<Scalar> map(const Shape& shape, const vec2<Scalar>& nm, const Scalar& h) {
             const Scalar phi_x = shape.phi(nm[0], h);
-            const Scalar x     = (h - c) * std::tan(phi_x);
+            const Scalar x     = (h - shape.c()) * std::tan(phi_x);
 
             const Scalar phi_y = shape.phi(nm[1], h);
-            const Scalar y     = (h - c) * std::tan(phi_y);
+            const Scalar y     = (h - shape.c()) * std::tan(phi_y);
 
-            return vec3<Scalar>{x, y, c - h};
+            return vec3<Scalar>{x, y, shape.c() - h};
         }
     };
 

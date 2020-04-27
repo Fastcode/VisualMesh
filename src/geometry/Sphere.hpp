@@ -137,7 +137,7 @@ namespace geometry {
          *
          * @return Scalar the height of the centre of the object above the observation plane
          */
-        Scalar c() const {
+        const inline Scalar& c() const {
             return r;
         }
 
