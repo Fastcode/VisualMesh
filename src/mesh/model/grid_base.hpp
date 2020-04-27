@@ -97,13 +97,12 @@ namespace model {
                 auto e = stack.top();
                 stack.pop();
 
+
                 // 6 Neighbours are using hexagonal axial coordinates so need special calculations
                 vec2<Scalar> nm =
-                  N_NEIGHBOURS == 6
-                    ? vec2<Scalar>{{jump
-                                      * (e[0] * std::sqrt(Scalar(3.0)) + e[1] * std::sqrt(Scalar(3.0)) * Scalar(0.5)),
-                                    jump * (e[1] * Scalar(1.5))}}
-                    : multiply(cast<Scalar>(e), jump);
+                  N_NEIGHBOURS == 6 ? multiply(
+                    vec2<Scalar>{{e[0] + Scalar(0.5) * e[1], std::sqrt(Scalar(3)) * Scalar(0.5) * e[1]}}, jump)
+                                    : multiply(cast<Scalar>(e), jump);
                 static_assert(N_NEIGHBOURS == 4 || N_NEIGHBOURS == 6 || N_NEIGHBOURS == 8,
                               "You must choose 4, 6 or 8 neighbours");
 
