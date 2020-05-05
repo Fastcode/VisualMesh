@@ -190,21 +190,32 @@ private:
             Scalar max_phi   = std::numeric_limits<Scalar>::lowest();
             Scalar min_theta = std::numeric_limits<Scalar>::max();
             Scalar max_theta = std::numeric_limits<Scalar>::lowest();
+            Scalar sum_theta = 0;
+            Scalar sum_phi   = 0;
+            int count_theta  = 0;
+            int count_phi    = 0;
 
             for (auto it = start; it != end; ++it) {
                 const auto& ray    = nodes[*it].ray;
                 const auto& phi    = ray[2];
                 const Scalar theta = ray[0] / std::sqrt(1 - ray[2] * ray[2]);
 
-                min_phi   = std::min(min_phi, phi);
-                max_phi   = std::max(max_phi, phi);
-                min_theta = std::isfinite(theta) ? std::min(min_theta, theta) : min_theta;
-                max_theta = std::isfinite(theta) ? std::max(max_theta, theta) : max_theta;
+                min_phi = std::min(min_phi, phi);
+                max_phi = std::max(max_phi, phi);
+                sum_phi += phi;
+                count_phi += 1;
+
+                if (std::isfinite(theta)) {
+                    min_theta = std::min(min_theta, theta);
+                    max_theta = std::max(max_theta, theta);
+                    sum_theta += theta;
+                    count_theta += 1;
+                }
             }
 
-            // Work out the z and x values we need to split on
-            Scalar split_phi   = (min_phi + max_phi) * 0.5;
-            Scalar split_theta = (min_theta + max_theta) * 0.5;
+            // Work out the z and x values we need to split on as the average theta and phi
+            Scalar split_phi   = sum_phi / count_phi;
+            Scalar split_theta = sum_theta / count_theta;
 
             // Partition based on either phi or theta
             Iterator mid =

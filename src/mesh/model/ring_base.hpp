@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "mesh/node.hpp"
+#include "polar_map.hpp"
 
 namespace visualmesh {
 namespace model {
@@ -34,51 +35,6 @@ namespace model {
      */
     template <typename Scalar, template <typename> class Ring, int N_NEIGHBOURS>
     struct RingBase {
-    private:
-        /**
-         * @brief Calculates the details needed for a slice at a paticular n value
-         *
-         * @tparam Shape  the type of shape that this model will use to create the mesh
-         *
-         * @param shape the shape instance that is used for calculating details
-         * @param n     the radial ring out from the origin in object space
-         * @param h     the height of the camera above the observation plane
-         */
-        template <typename Shape>
-        static std::pair<vec2<Scalar>, int> slice(const Shape& shape,
-                                                  const Scalar& n,
-                                                  const Scalar& h,
-                                                  const Scalar& k) {
-
-            // Get phi from the shape
-            const Scalar& phi = shape.phi(n, h);
-
-            // Specifically for the origin there is only one point
-            if (n == 0) { return std::make_pair(vec2<Scalar>{0, 2.0 * M_PI}, 1); }
-
-            // At n = 0.5 we will have a delta theta of pi (two objects touching would fit). At any shorter distance
-            // than this then the theta angle does not make sense as the objects intersect with the origin. As an easy
-            // method to adapt below this we will assume a linear interpolation between 1 sphere at the origin and 2
-            // objects at 0.5n. Therefore once this is cut up by the k value it should give an approximation
-            const Scalar dtheta = n <= 0.5 ? (2.0 * M_PI) / (1.0 + n * Scalar(2.0)) : shape.theta(phi, h);
-
-            return std::make_pair(vec2<Scalar>{phi, dtheta}, int(std::ceil(k * 2 * M_PI / dtheta)));
-        }
-
-        /**
-         * @brief
-         *  Converts angles into a unit vector where phi is defined as the angle from -z to the vector, and theta is
-         *  measured around the z axis.
-         *
-         * @param phi   the phi angle (up from -z)
-         * @param theta the theta angle (around the z axis)
-         *
-         * @return The unit vector that these angles represent
-         */
-        static inline vec3<Scalar> unit_vector(const Scalar& phi, const Scalar& theta) {
-            return vec3<Scalar>{{std::cos(theta) * std::sin(phi), std::sin(theta) * std::sin(phi), -std::cos(phi)}};
-        }
-
     public:
         /**
          * @brief Generates the visual mesh vectors and graph using the Ring4 method
@@ -107,7 +63,7 @@ namespace model {
               vec3<Scalar>{{0.0, 0.0, -1.0}},
               std::array<int, N_NEIGHBOURS>{},
             });
-            int n_first       = slice(shape, jump, h, k).second;
+            int n_first       = int(std::ceil((k * Scalar(2.0 * M_PI)) / shape.theta(jump, h)));
             Scalar first_jump = Scalar(n_first) / Scalar(N_NEIGHBOURS);
             for (unsigned int i = 0; i < N_NEIGHBOURS; ++i) {
                 nodes.front().neighbours[i] = int(i * first_jump) + start;
@@ -115,34 +71,30 @@ namespace model {
 
             // Loop through until we reach our max distance
             for (int i = 1; h * std::tan(shape.phi(i * jump, h)) < max_distance; ++i) {
-
                 // Calculate the n values for our ring and adjacent rings
-                const Scalar& p_n = (i - 1) * jump;
-                const Scalar& c_n = i * jump;
+                const Scalar& n_p = (i - 1) * jump;
+                const Scalar& n_c = i * jump;
                 const Scalar& n_n = (i + 1) * jump;
 
-                // Calculate the phi and delta theta angles
-                const auto& prev = slice(shape, p_n, h, k);
-                const auto& curr = slice(shape, c_n, h, k);
-                const auto& next = slice(shape, n_n, h, k);
+                // Calculate the number of slices for each ring
+                // Specifically for the case where n == 0 we have 1 point (origin ring)
+                const Scalar s_p = i == 1 ? Scalar(1.0) : k * Scalar(2.0 * M_PI) / shape.theta(n_p, h);
+                const Scalar s_c = k * Scalar(2.0 * M_PI) / shape.theta(n_c, h);
+                const Scalar s_n = k * Scalar(2.0 * M_PI) / shape.theta(n_n, h);
 
-                // Recalculate delta theta for each of these slices based on a whole number of objects
-                const Scalar d_theta = (M_PI * 2) / curr.second;
+                // Calculate how much we should jump in m space to make an even number of points by oversampling by one
+                const Scalar m_jump = s_c / (k * std::ceil(s_c));
 
                 // Loop through and generate all the theta slices
                 start = int(nodes.size());
-                for (int j = 0; j < curr.second; ++j) {
-
-                    Scalar theta = d_theta * j;
-
+                for (int j = 0; j < int(std::ceil(s_c)); ++j) {
                     Node<Scalar, N_NEIGHBOURS> n;
-                    //  Calculate our unit vector with x facing forward and z up
-                    n.ray = unit_vector(curr.first[0], theta);
+                    n.ray = PolarMap<Scalar>::map(shape, vec2<Scalar>{{n_c, j * m_jump}}, h);
 
                     // Get the neighbours using our specific class
                     n.neighbours.fill(start);
                     n.neighbours =
-                      add(n.neighbours, Ring<Scalar>::neighbours(j, prev.second, curr.second, next.second));
+                      add(n.neighbours, Ring<Scalar>::neighbours(j, std::ceil(s_p), std::ceil(s_c), std::ceil(s_n)));
 
                     // Add to the list
                     nodes.push_back(n);

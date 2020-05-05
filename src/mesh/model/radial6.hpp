@@ -124,7 +124,7 @@ namespace model {
                 // Calculate the number of points on the next ring according to dtheta or the origin patch
                 if (v < stop) { number_points_next = origin_number_points[v]; }
                 else {
-                    number_points_next = std::ceil((2 * M_PI * k) / shape.theta(phi_next, h));
+                    number_points_next = std::ceil((2 * M_PI * k) / shape.theta(v / k, h));
                 }
                 // Find the difference between the generating ring and ring to be generated
                 int number_difference = number_points_next - number_points_now;

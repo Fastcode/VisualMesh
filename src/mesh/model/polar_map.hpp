@@ -15,8 +15,9 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_MODEL_XYGRID_MAP_HPP
-#define VISUALMESH_MODEL_XYGRID_MAP_HPP
+#ifndef VISUALMESH_MODEL_POLAR_MAP_HPP
+#define VISUALMESH_MODEL_POLAR_MAP_HPP
+
 
 #include "grid_base.hpp"
 #include "utility/math.hpp"
@@ -25,32 +26,49 @@ namespace visualmesh {
 namespace model {
 
     template <typename Scalar>
-    struct XYGridMap {
+    struct PolarMap {
+
+        /**
+         * @brief
+         *  Converts angles into a unit vector where phi is defined as the angle from -z to the vector, and theta is
+         *  measured around the z axis.
+         *
+         * @param phi   the phi angle (up from -z)
+         * @param theta the theta angle (around the z axis)
+         *
+         * @return The unit vector that these angles represent
+         */
+        static inline vec3<Scalar> unit_vector(const Scalar& phi, const Scalar& theta) {
+            return vec3<Scalar>{{std::cos(theta) * std::sin(phi), std::sin(theta) * std::sin(phi), -std::cos(phi)}};
+        }
 
         /**
          * @brief Takes a point in n, m space (jumps along x and jumps along y) and converts it into a vector to the
          * centre of the object using the x grid method
          *
+         * @tparam Shape the shape of the object we are mapping for
+         *
          * @param shape the shape object used to calculate the angles
-         * @param n     the coordinate in the n coordinate (object jumps along the x axis)
-         * @param m     the coordinate in the m coordinate (object jumps along the y axis)
+         * @param nm    the coordinates in the nm space (object space)
          * @param h     the height of the camera above the observation plane
          *
          * @return a vector <x, y, z> that points to the centre of the object at these coordinates
          */
         template <typename Shape>
         static vec3<Scalar> map(const Shape& shape, const vec2<Scalar>& nm, const Scalar& h) {
-            const Scalar phi_x = shape.phi(nm[0], h);
-            const Scalar x     = (h - shape.c()) * std::tan(phi_x);
 
-            const Scalar phi_y = shape.phi(nm[1], h);
-            const Scalar y     = (h - shape.c()) * std::tan(phi_y);
+            // Work out the phi ring from the n value
+            const Scalar phi = shape.phi(nm[0], h);
 
-            return vec3<Scalar>{x, y, shape.c() - h};
+            // Work out the radial value from the m value
+            const Scalar d_theta = shape.theta(nm[0], h);
+            const Scalar theta   = d_theta * nm[1];
+
+            return unit_vector(phi, theta);
         }
 
         /**
-         * @brief Takes a unit vector that points to a location and maps it to object coordinates as xy space
+         * @brief Takes a unit vector that points to a location and maps it to object coordinates as nm space
          *
          * @tparam Shape the shape of the object we are mapping for
          *
@@ -63,23 +81,18 @@ namespace model {
         template <typename Shape>
         static vec2<Scalar> unmap(const Shape& shape, const vec3<Scalar>& u, const Scalar& h) {
 
-            // Height of the object above the observation plane so we can get planes from it's centre
-            const Scalar& c = shape.c();
+            // Phi value measured from the -z axis
+            const Scalar n = shape.n(std::acos(-u[2]), h);
 
-            // Extend out vec to the ground (divide by z and multiply by h-c)
-            vec3<Scalar> v = multiply(u, (c - h) / u[2]);
+            // Work out theta from x/y
+            const Scalar d_theta = shape.theta(n, h);
+            const Scalar theta   = std::fmod(2.0 * M_PI + std::atan2(u[1], u[0]), 2.0 * M_PI);
 
-            // Work out what phi would have been
-            const Scalar phi_n = std::atan(-std::abs(v[0]) / std::abs(c - h));
-            const Scalar phi_m = std::atan(-std::abs(v[1]) / std::abs(c - h));
-
-            vec2<Scalar> nm = {{shape.n(phi_n, h) * (u[0] >= 0 ? -1 : 1), shape.n(phi_m, h) * (u[1] >= 0 ? -1 : 1)}};
-
-            return nm;
+            return vec2<Scalar>{{n, theta / d_theta}};
         }
     };
 
 }  // namespace model
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_MODEL_XYGRID_MAP_HPP
+#endif  // VISUALMESH_MODEL_POLAR_MAP_HPP

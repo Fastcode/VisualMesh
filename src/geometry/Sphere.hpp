@@ -65,8 +65,8 @@ namespace geometry {
          * end visually
          */
         Scalar phi(const Scalar& n, const Scalar& h) const {
-            const Scalar v = 1 - 2 * r / h;
-            return M_PI_2 - std::atan(pow(v, n - 0.5)) - std::atan(std::pow(v, n + 0.5));
+            const Scalar v = Scalar(1.0) - Scalar(2.0) * r / h;
+            return M_PI_2 - std::atan(std::pow(v, n - Scalar(0.5))) - std::atan(std::pow(v, n + Scalar(0.5)));
         }
 
         /**
@@ -102,9 +102,9 @@ namespace geometry {
             const Scalar sp = std::sin(phi);
             const Scalar cp = std::cos(phi);
 
-            return std::log((r * sp - h * sp + std::sqrt(h * h - 2 * h * r + r * r * sp * sp)) / (h * cp))
-                     / (std::log(h - 2 * r) - std::log(h))
-                   - 0.5;
+            return std::log((r * sp - h * sp + std::sqrt(h * h - Scalar(2.0) * h * r + r * r * sp * sp)) / (h * cp))
+                     / (std::log(h - Scalar(2.0) * r) - std::log(h))
+                   - Scalar(0.5);
         }
 
         /**
@@ -148,13 +148,20 @@ namespace geometry {
          *  Calculates the angle in theta that an object would have if projected on the ground. This can be used for
          * radial slicing of objects so they fit around a circle.
          *
-         * @param phi the phi value to calculate our theta value for
+         * @param n the n value for the ring we are calculating theta on
          * @param h the height of the camera above the observation plane
          *
          * @return the angular width of the object around a phi circle
          */
-        Scalar theta(const Scalar& phi, const Scalar& h) const {
-            return 2 * std::asin(r / ((h - r) * std::tan(phi)));
+        Scalar theta(const Scalar& n, const Scalar& h) const {
+
+            // If n is < 0.5 then theta doesn't make sense, we interpolate from 2π to π to get a sensible approximation
+            if (n <= 0.5) {  //
+                return Scalar(2.0 * M_PI) / (1.0 + n * Scalar(2.0));
+            }
+            else {
+                return Scalar(2.0) * std::asin(r / ((h - r) * std::tan(phi(n, h))));
+            }
         }
 
         // The radius of the sphere

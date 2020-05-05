@@ -15,14 +15,11 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VISUALMESH_MODEL_NMGRID_HPP
-#define VISUALMESH_MODEL_NMGRID_HPP
-
-#include <iostream>
+#ifndef VISUALMESH_MODEL_NMGRID_MAP_HPP
+#define VISUALMESH_MODEL_NMGRID_MAP_HPP
 
 #include "grid_base.hpp"
 #include "utility/math.hpp"
-
 
 namespace visualmesh {
 namespace model {
@@ -127,15 +124,53 @@ namespace model {
                 h_n = (lo + hi) * 0.5;
             }
 
+            // Make the vector and flip the vectors to point to the correct directions
             vec3<Scalar> vec = xyz(shape, h, n, h_n);
             vec[0] *= nm[0] >= 0 ? 1 : -1;
             vec[1] *= nm[1] >= 0 ? 1 : -1;
 
             return vec;
         }
+
+        /**
+         * @brief Takes a unit vector that points to a location and maps it to object coordinates as nm space
+         *
+         * @tparam Shape the shape of the object we are mapping for
+         *
+         * @param shape the shape object used to calculate the angles
+         * @param u     the unit vector that points towards the centre of the object
+         * @param h     the height of the camera above the observation plane
+         *
+         * @return a vector <x, y, z> that points to the centre of the object at these coordinates
+         */
+        template <typename Shape>
+        static vec2<Scalar> unmap(const Shape& shape, const vec3<Scalar>& u, const Scalar& h) {
+
+            // Height of the object above the observation plane so we can get planes from it's centre
+            const Scalar& c = shape.c();
+
+            // Extend out vec to the ground (divide by z and multiply by h-c)
+            vec3<Scalar> v = multiply(u, (c - h) / u[2]);
+
+            // Calculate what the h values must be for each direction
+            const Scalar h_n = std::sqrt(v[1] * v[1] + v[2] * v[2]) + c;
+            const Scalar h_m = std::sqrt(v[0] * v[0] + v[2] * v[2]) + c;
+
+            // The phi angle for the guess is the angle between <x, y, z> and <x, 0, z>
+            const Scalar phi_n =
+              std::acos(std::sqrt((v[1] * v[1] + v[2] * v[2]) / (v[0] * v[0] + v[1] * v[1] + v[2] * v[2])));
+            const Scalar phi_m =
+              std::acos(std::sqrt((v[0] * v[0] + v[2] * v[2]) / (v[0] * v[0] + v[1] * v[1] + v[2] * v[2])));
+
+            vec2<Scalar> nm = {{shape.n(phi_n, h_n), shape.n(phi_m, h_m)}};
+            nm[0] *= u[0] >= 0 ? 1 : -1;
+            nm[1] *= u[1] >= 0 ? 1 : -1;
+
+            return nm;
+        }
     };
 
 }  // namespace model
 }  // namespace visualmesh
 
-#endif  // VISUALMESH_MODEL_NMGRID_HPP
+#endif  // VISUALMESH_MODEL_NMGRID_MAP_HPP

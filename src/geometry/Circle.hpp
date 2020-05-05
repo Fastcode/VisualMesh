@@ -60,7 +60,7 @@ namespace geometry {
          * end visually
          */
         Scalar phi(const Scalar& n, const Scalar& h) const {
-            return std::atan((2.0 * n * r) / h);
+            return std::atan((Scalar(2.0) * n * r) / h);
         }
 
         /**
@@ -81,7 +81,7 @@ namespace geometry {
          * @return the number of object jumps that would be required to reach the angle to the centre of the object
          */
         Scalar n(const Scalar& phi, const Scalar& h) const {
-            return (h * std::tan(phi)) / (2.0 * r);
+            return (h * std::tan(phi)) / (Scalar(2.0) * r);
         }
 
         /**
@@ -115,8 +115,8 @@ namespace geometry {
          *
          * @return Scalar the height of the centre of the object above the observation plane
          */
-        const inline Scalar& c() const {
-            return 0;
+        Scalar c() const {
+            return Scalar(0.0);
         }
 
         /**
@@ -126,13 +126,20 @@ namespace geometry {
          *  Calculates the angle in theta that an object would have if projected on the ground. This can be used for
          * radial slicing of objects so they fit around a circle.
          *
-         * @param phi  the phi value to calculate our theta value for
-         * @param h    the height of the camera above the observation plane
+         * @param n the n value for the ring we are calculating theta on
+         * @param h the height of the camera above the observation plane
          *
          * @return the angular width of the object around a phi circle
          */
-        Scalar theta(const Scalar& phi, const Scalar& h) const {
-            return 2.0 * std::asin(r / (h * std::tan(phi)));
+        Scalar theta(const Scalar& n, const Scalar& h) const {
+
+            // If n is < 0.5 then theta doesn't make sense, we interpolate from 2π to π to get a sensible approximation
+            if (n <= 0.5) {  //
+                return Scalar(2.0 * M_PI) / (1.0 + n * Scalar(2.0));
+            }
+            else {
+                return Scalar(2.0) * std::asin(r / ((h - r) * std::tan(phi(n, h))));
+            }
         }
 
         // The radius of the circle
