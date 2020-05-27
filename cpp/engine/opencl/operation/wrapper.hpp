@@ -20,9 +20,9 @@
 
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #if defined(__APPLE__) || defined(__MACOSX)
-#    include <OpenCL/opencl.h>
+#include <OpenCL/opencl.h>
 #else
-#    include <CL/opencl.h>
+#include <CL/opencl.h>
 #endif  // !__APPLE__
 
 #include <memory>

@@ -45,7 +45,7 @@ DerivePointerAlignment: false
 FixNamespaceComments: true
 IncludeBlocks: Regroup
 IndentCaseLabels: true
-IndentPPDirectives: AfterHash
+IndentPPDirectives: None
 IndentWrappedFunctionNames: true
 IndentWidth: 4
 KeepEmptyLinesAtTheStartOfBlocks: true

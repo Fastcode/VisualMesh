@@ -36,8 +36,8 @@
 #include "engine/vulkan/engine.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/network_structure.hpp"
+#include "mesh/visualmesh.hpp"
 #include "utility/fourcc.hpp"
-#include "visualmesh.hpp"
 
 template <typename Scalar>
 using Model  = visualmesh::model::Ring6<Scalar>;
@@ -87,9 +87,17 @@ int main() {
     t.measure("Built Visual Mesh");
 
     visualmesh::engine::cpu::Engine<Scalar> cpu_engine(network);
+    t.measure("Loaded CPU Engine");
+
+#if !defined(VISUALMESH_DISABLE_OPENCL)
     visualmesh::engine::opencl::Engine<Scalar> cl_engine(network);
+    t.measure("Loaded OpenCL Engine");
+#endif  // !defined(VISUALMESH_DISABLE_OPENCL)
+
+#if !defined(VISUALMESH_DISABLE_VULKAN)
     visualmesh::engine::vulkan::Engine<Scalar, false> vk_engine(network);
-    t.measure("Loaded engines");
+    t.measure("Loaded Vulkan Engine");
+#endif  // !defined(VISUALMESH_DISABLE_VULKAN)
 
     auto dataset = load_dataset<Scalar>(image_path);
     t.measure("Loaded dataset");
@@ -103,6 +111,7 @@ int main() {
         Timer t;
 
         // Run the classifiers
+#if !defined(VISUALMESH_DISABLE_OPENCL)
         {
             t.reset();
             auto classified =
@@ -111,7 +120,9 @@ int main() {
             draw("Image", element.image, classified, colours);
             if (char(cv::waitKey(0)) == 27) break;
         }
+#endif  // !defined(VISUALMESH_DISABLE_OPENCL)
 
+#if !defined(VISUALMESH_DISABLE_VULKAN)
         {
             t.reset();
             auto classified =
@@ -120,6 +131,7 @@ int main() {
             draw("Image", element.image, classified, colours);
             if (char(cv::waitKey(0)) == 27) break;
         }
+#endif  // !defined(VISUALMESH_DISABLE_VULKAN)
 
         {
             t.reset();

@@ -25,7 +25,7 @@
 #include "geometry/Sphere.hpp"
 #include "mesh/model/ring6.hpp"
 #include "mesh/network_structure.hpp"
-#include "visualmesh.hpp"
+#include "mesh/visualmesh.hpp"
 
 using Scalar = float;
 
@@ -126,11 +126,17 @@ int main() {
     auto dataset = load_dataset<Scalar>(image_path);
     t.measure("Loaded dataset");
 
-    // Do benchmarks
+// Do benchmarks
+#if !defined(VISUALMESH_DISABLE_OPENCL)
     std::cout << "Benchmarking OpenCL Engine" << std::endl;
     benchmark<visualmesh::engine::opencl::Engine<Scalar>>(network, dataset, mesh, 100, 4);
+#endif  // !defined(VISUALMESH_DISABLE_OPENCL)
+
+#if !defined(VISUALMESH_DISABLE_VULKAN)
     std::cout << "Benchmarking Vulkan Engine" << std::endl;
     benchmark<visualmesh::engine::vulkan::Engine<Scalar>>(network, dataset, mesh, 100, 4);
+#endif  // !defined(VISUALMESH_DISABLE_VULKAN)
+
     std::cout << "Benchmarking CPU Engine" << std::endl;
     benchmark<visualmesh::engine::cpu::Engine<Scalar>>(network, dataset, mesh, 2, std::thread::hardware_concurrency());
 }

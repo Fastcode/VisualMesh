@@ -18,8 +18,6 @@
 #include "Timer.hpp"
 #include "dataset.hpp"
 #include "draw.hpp"
-#include "engine/cpu/engine.hpp"
-#include "engine/opencl/engine.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/model/nmgrid4.hpp"
 #include "mesh/model/nmgrid6.hpp"
@@ -36,9 +34,30 @@
 #include "mesh/model/xygrid4.hpp"
 #include "mesh/model/xygrid6.hpp"
 #include "mesh/model/xygrid8.hpp"
-#include "visualmesh.hpp"
+#include "mesh/visualmesh.hpp"
 
 using Scalar = float;
+
+// Use OpenCL engine if available, then Vulkan then CPU
+#if defined(VISUALMESH_ENABLE_OPENCL)
+
+#include "engine/opencl/engine.hpp"
+template <typename Scalar>
+using Engine = visualmesh::engine::opencl::Engine<Scalar>;
+
+#elif defined(VISUALMESH_ENABLE_VULKAN)
+
+#include "engine/opencl/engine.hpp"
+template <typename Scalar>
+using Engine = visualmesh::engine::vulkan::Engine<Scalar, false>;
+
+#else
+
+#include "engine/cpu/engine.hpp"
+template <typename Scalar>
+using Engine = visualmesh::engine::cpu::Engine<Scalar>;
+
+#endif
 
 int main() {
     std::string image_path = "../example/images";
@@ -96,7 +115,7 @@ int main() {
     t.measure("Built NM Grid 8");
 
     // Build engines
-    visualmesh::engine::opencl::Engine<Scalar> engine;
+    Engine<Scalar> engine;
 
     // Load dataset
     auto dataset = load_dataset<Scalar>(image_path);

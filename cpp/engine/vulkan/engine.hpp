@@ -18,6 +18,9 @@
 #ifndef VISUALMESH_ENGINE_VULKAN_ENGINE_HPP
 #define VISUALMESH_ENGINE_VULKAN_ENGINE_HPP
 
+// If OpenCL is disabled then don't provide this file
+#if !defined(VISUALMESH_DISABLE_VULKAN)
+
 #include <fstream>
 #include <iomanip>
 #include <numeric>
@@ -39,6 +42,7 @@
 #include "mesh/mesh.hpp"
 #include "mesh/network_structure.hpp"
 #include "mesh/projected_mesh.hpp"
+#include "mesh/visualmesh.hpp"
 #include "utility/math.hpp"
 #include "utility/projection.hpp"
 #include "utility/static_if.hpp"
@@ -1569,4 +1573,5 @@ namespace engine {
 }  // namespace engine
 }  // namespace visualmesh
 
+#endif  // !defined(VISUALMESH_DISABLE_VULKAN)
 #endif  // VISUALMESH_ENGINE_VULKAN_ENGINE_HPP

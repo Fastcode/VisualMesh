@@ -25,8 +25,8 @@
 #include "mesh/mesh.hpp"
 #include "mesh/network_structure.hpp"
 #include "mesh/projected_mesh.hpp"
+#include "mesh/visualmesh.hpp"
 #include "utility/fourcc.hpp"
-#include "visualmesh.hpp"
 
 namespace visualmesh {
 namespace engine {

@@ -16,172 +16,30 @@
 cmake_minimum_required(VERSION 3.1.0)
 project(VisualMesh VERSION 1.0.0)
 
-# Check if we are built as a subproject
-if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-    set(TOP_LEVEL_PROJECT ON)
-
-    # Force enable diagnostic colours for clang and gcc
-    if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
-        add_compile_options(-fdiagnostics-color=always)
-    elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
-        add_compile_options(-fcolor-diagnostics)
-    endif()
-else()
-    set(TOP_LEVEL_PROJECT OFF)
+# Default to Release build
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "Setting build type to 'Release' as none was specified.")
+    set(CMAKE_BUILD_TYPE
+        Release
+        CACHE STRING "Choose the type of build." FORCE)
+    # Set the possible values of build type for cmake-gui
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-option(USE_ASAN "Enable address sanitisation" OFF)
-
-# Turn on warnings
-if(MSVC)
-    add_compile_options(/W4 /WX)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
-
-# Turn on address sanitisation
-if(USE_ASAN)
-    if(MSVC)
-        # UNTESTED
-        add_compile_options(/fsanitize=address /wholearchive:asan-i386.lib /wholearchive:asan_cxx-i386.lib)
-    else()
-        add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
-        add_link_options(-fsanitize=address -fno-omit-frame-pointer)
-        link_libraries(asan)
-    endif()
-endif()
-
-# All the header files for this library
-file(GLOB hdr "src/**.hpp")
-
-# Convert our opencl files into header files with their contents and put them in the build folder
-file(GLOB cls "src/engine/opencl/kernels/**.cl")
-foreach(cl IN LISTS cls)
-
-    file(RELATIVE_PATH cl_path ${CMAKE_CURRENT_SOURCE_DIR} ${cl})
-
-    add_custom_command(
-        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp"
-        COMMAND ${PYTHON_EXECUTABLE} ARGS "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py" "${cl}"
-                "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp"
-        DEPENDS "${cl}" "${PROJECT_SOURCE_DIR}/cmake/Scripts/wrap_opencl.py"
-        COMMENT "Wrapping OpenCL file ${cl_path} in a header")
-    list(APPEND hdr "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp")
-endforeach(cl ${cls})
-
-add_custom_target(visualmesh_sources DEPENDS ${hdr})
-
-# Define the VisualMesh library as header only but setup its links
-add_library(libvisualmesh INTERFACE)
-target_include_directories(libvisualmesh INTERFACE src)
-target_include_directories(libvisualmesh INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/src)
-add_dependencies(libvisualmesh visualmesh_sources)
-
-# Grab OpenCL if it's available
-find_package(OpenCL)
-if(OpenCL_FOUND)
-    target_include_directories(libvisualmesh INTERFACE ${OpenCL_INCLUDE_DIRS})
-    target_link_libraries(libvisualmesh INTERFACE ${OpenCL_LIBRARIES})
-endif(OpenCL_FOUND)
-
-# Add this directory so we can find the FindSPIRV.cmake
+# Add the cmake module path for custom modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
 
-find_package(SPIRV)
-find_package(Vulkan)
-if(SPIRV_FOUND AND Vulkan_FOUND)
-    target_link_libraries(libvisualmesh INTERFACE Vulkan::Vulkan SPIRV::SPIRV)
-endif(SPIRV_FOUND AND Vulkan_FOUND)
+# Configure the c++ header only library and build generated files
+add_subdirectory("cpp")
 
-if(TOP_LEVEL_PROJECT)
-    # Build the tensorflow op for training
-    option(BUILD_TENSORFLOW_OP "Build the tensorflow op used for training" ON)
-    if(BUILD_TENSORFLOW_OP)
-        # Add this directory so we can find the FindTensorflow.cmake
-        set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
-        find_package(TensorFlow REQUIRED)
+# Build the tensorflow op for training
+option(BUILD_TENSORFLOW_OP "Bu ild the tensorflow op used for training" ON)
+if(BUILD_TENSORFLOW_OP)
+    add_subdirectory("tensorflow")
+endif(BUILD_TENSORFLOW_OP)
 
-        add_library(tf_op SHARED "src/tensorflow/map.cpp" "src/tensorflow/unmap.cpp" "src/tensorflow/difference.cpp"
-                                 "src/tensorflow/project.cpp" ${hdr})
-        target_compile_options(tf_op PRIVATE -march=native -mtune=native)
-        set_target_properties(
-            tf_op PROPERTIES CXX_STANDARD 14 LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/training/op" PREFIX ""
-                             OUTPUT_NAME visualmesh_op SUFFIX ".so")
-        target_include_directories(tf_op SYSTEM PRIVATE ${TENSORFLOW_INCLUDE_DIRS})
-        target_include_directories(tf_op PRIVATE ${PROJECT_SOURCE_DIR}/src)
-        target_link_libraries(tf_op ${TENSORFLOW_LIBRARIES})
-
-    endif(BUILD_TENSORFLOW_OP)
-
-    # Build an example program that classifies using the visual mesh
-    option(BUILD_EXAMPLE "Build the example program that executes the mesh" OFF)
-    if(BUILD_EXAMPLE)
-
-        find_package(OpenCV REQUIRED core highgui imgproc)
-        find_package(YAML-CPP REQUIRED)
-        find_package(OpenCL REQUIRED)
-        find_package(fmt REQUIRED)
-
-        set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
-        set(THREADS_PREFER_PTHREAD_FLAG TRUE)
-        find_package(Threads REQUIRED)
-
-        add_executable(classified "example/classified.cpp" ${hdr})
-        target_compile_options(classified PRIVATE -march=native -mtune=native)
-        set_target_properties(classified PROPERTIES CXX_STANDARD 14)
-        target_include_directories(classified SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
-        target_include_directories(classified SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
-        target_include_directories(classified PRIVATE ${PROJECT_SOURCE_DIR}/src)
-        target_include_directories(classified PRIVATE ${PROJECT_BINARY_DIR}/src)
-        target_link_libraries(
-            classified
-            ${OpenCL_LIBRARIES}
-            Vulkan::Vulkan
-            SPIRV::SPIRV
-            ${OpenCV_LIBS}
-            ${fmt_LIBRARIES}
-            ${YAML_CPP_LIBRARIES}
-            Threads::Threads)
-
-        add_executable(mesh_types "example/mesh_types.cpp" ${hdr})
-        target_compile_options(mesh_types PRIVATE -march=native -mtune=native)
-        set_target_properties(mesh_types PROPERTIES CXX_STANDARD 14)
-        target_include_directories(mesh_types SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
-        target_include_directories(mesh_types SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
-        target_include_directories(mesh_types PRIVATE ${PROJECT_SOURCE_DIR}/src)
-        target_include_directories(mesh_types PRIVATE ${PROJECT_BINARY_DIR}/src)
-        target_link_libraries(
-            mesh_types
-            ${OpenCL_LIBRARIES}
-            Vulkan::Vulkan
-            SPIRV::SPIRV
-            ${OpenCV_LIBS}
-            ${fmt_LIBRARIES}
-            ${YAML_CPP_LIBRARIES}
-            Threads::Threads)
-
-        add_executable(benchmark "example/benchmark.cpp" ${hdr})
-        target_compile_options(benchmark PRIVATE -march=native -mtune=native)
-        set_target_properties(benchmark PROPERTIES CXX_STANDARD 14)
-        target_include_directories(benchmark SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
-        target_include_directories(benchmark SYSTEM PRIVATE ${YAML_CPP_INCLUDE_DIR})
-        target_include_directories(benchmark PRIVATE ${PROJECT_SOURCE_DIR}/src)
-        target_include_directories(benchmark PRIVATE ${PROJECT_BINARY_DIR}/src)
-        target_link_libraries(
-            benchmark
-            ${OpenCL_LIBRARIES}
-            Vulkan::Vulkan
-            SPIRV::SPIRV
-            ${OpenCV_LIBS}
-            ${fmt_LIBRARIES}
-            ${YAML_CPP_LIBRARIES}
-            Threads::Threads)
-
-        add_executable(mesh_quality "example/mesh_quality.cpp" ${hdr})
-        target_compile_options(mesh_quality PRIVATE -march=native -mtune=native)
-        set_target_properties(mesh_quality PROPERTIES CXX_STANDARD 14)
-        target_include_directories(mesh_quality PRIVATE ${PROJECT_SOURCE_DIR}/src)
-        target_include_directories(mesh_quality PRIVATE ${PROJECT_BINARY_DIR}/src)
-
-    endif(BUILD_EXAMPLE)
-endif(TOP_LEVEL_PROJECT)
+# Build the c++ examples
+option(BUILD_EXAMPLES "Build the c++ examples" OFF)
+if(BUILD_EXAMPLES)
+    add_subdirectory("example")
+endif(BUILD_EXAMPLES)

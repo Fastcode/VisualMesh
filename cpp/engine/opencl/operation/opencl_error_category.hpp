@@ -18,9 +18,9 @@
 #define VISUALMESH_ENGINE_OPENCL_OPERATION_OPENCL_ERROR_CATEGORY_HPP
 
 #if defined(__APPLE__) || defined(__MACOSX)
-#    include <OpenCL/opencl.h>
+#include <OpenCL/opencl.h>
 #else
-#    include <CL/opencl.h>
+#include <CL/opencl.h>
 #endif  // !__APPLE__
 
 #include <system_error>

@@ -18,6 +18,9 @@
 #ifndef VISUALMESH_ENGINE_OPENCL_ENGINE_HPP
 #define VISUALMESH_ENGINE_OPENCL_ENGINE_HPP
 
+// If OpenCL is disabled then don't provide this file
+#if !defined(VISUALMESH_DISABLE_OPENCL)
+
 #include <iomanip>
 #include <numeric>
 #include <sstream>
@@ -36,6 +39,7 @@
 #include "mesh/mesh.hpp"
 #include "mesh/network_structure.hpp"
 #include "mesh/projected_mesh.hpp"
+#include "mesh/visualmesh.hpp"
 #include "utility/math.hpp"
 #include "utility/projection.hpp"
 
@@ -48,8 +52,8 @@ namespace engine {
          *
          * @details
          *  The OpenCL implementation is designed to be used for high performance inference. It is able to take
-         * advantage of either GPUs from Intel, AMD, ARM, NVIDIA etc as well as multithreaded CPU implementations. This
-         * allows it to be very flexible with its deployment on devices.
+         *  advantage of either GPUs from Intel, AMD, ARM, NVIDIA etc as well as multithreaded CPU implementations.
+         *  This allows it to be very flexible with its deployment on devices.
          *
          * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
          */
@@ -705,4 +709,5 @@ namespace engine {
 }  // namespace engine
 }  // namespace visualmesh
 
+#endif  // !defined(VISUALMESH_DISABLE_OPENCL)
 #endif  // VISUALMESH_ENGINE_OPENCL_ENGINE_HPP

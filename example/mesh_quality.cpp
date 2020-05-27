@@ -23,6 +23,7 @@
 //
 #include "geometry/Circle.hpp"
 #include "geometry/Sphere.hpp"
+#include "mesh/mesh.hpp"
 #include "mesh/model/nmgrid4.hpp"
 #include "mesh/model/nmgrid6.hpp"
 #include "mesh/model/nmgrid8.hpp"
@@ -40,7 +41,6 @@
 #include "mesh/model/xygrid8.hpp"
 #include "utility/math.hpp"
 #include "utility/phi_difference.hpp"
-#include "visualmesh.hpp"
 
 template <typename Scalar>
 using vec3 = visualmesh::vec3<Scalar>;
