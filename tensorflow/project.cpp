@@ -293,7 +293,7 @@ private:
         // Extract information from our input tensors, flip x and y as tensorflow has them reversed compared to us
         auto image_dimensions                = context->input(Args::DIMENSIONS).vec<U>();
         visualmesh::vec2<int32_t> dimensions = {{int32_t(image_dimensions(1)), int32_t(image_dimensions(0))}};
-        std::string projection               = *context->input(Args::PROJECTION).flat<tensorflow::string>().data();
+        std::string projection               = *context->input(Args::PROJECTION).flat<tensorflow::tstring>().data();
         T focal_length                       = context->input(Args::FOCAL_LENGTH).scalar<T>()(0);
         auto lens_centre                     = context->input(Args::LENS_CENTRE).flat<T>();
         auto lens_distortion                 = context->input(Args::LENS_DISTORTION).flat<T>();
@@ -303,7 +303,7 @@ private:
         T n_intersections                    = context->input(Args::N_INTERSECTIONS).scalar<T>()(0);
         tensorflow::int32 cached_meshes      = context->input(Args::CACHED_MESHES).scalar<tensorflow::int32>()(0);
         T intersection_tolerance             = context->input(Args::INTERSECTION_TOLERANCE).scalar<T>()(0);
-        std::string geometry                 = *context->input(Args::GEOMETRY).flat<tensorflow::string>().data();
+        std::string geometry                 = *context->input(Args::GEOMETRY).flat<tensorflow::tstring>().data();
         T radius                             = context->input(Args::RADIUS).scalar<T>()(0);
 
         // Perform some runtime checks on the actual values to make sure they make sense
@@ -423,7 +423,7 @@ public:
                     tensorflow::errors::InvalidArgument("Model must be a single string value"));
 
         // Grab the Visual Mesh model we are using
-        std::string model = *context->input(Args::MODEL).flat<tensorflow::string>().data();
+        std::string model = *context->input(Args::MODEL).flat<tensorflow::tstring>().data();
 
         // clang-format off
         if (model == "RADIAL4") { ComputeModel<visualmesh::model::Radial4>(context); }

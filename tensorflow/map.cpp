@@ -97,7 +97,7 @@ private:
         // Extract information from our input tensors
         auto coordinates     = context->input(Args::COORDINATES).matrix<T>();
         T height             = context->input(Args::HEIGHT).scalar<T>()(0);
-        std::string geometry = *context->input(Args::GEOMETRY).flat<tensorflow::string>().data();
+        std::string geometry = *context->input(Args::GEOMETRY).flat<tensorflow::tstring>().data();
         T radius             = context->input(Args::RADIUS).scalar<T>()(0);
         auto n_elems         = context->input(Args::COORDINATES).shape().dim_size(1);
 
@@ -145,7 +145,7 @@ public:
                     tensorflow::errors::InvalidArgument("Model must be a single string value"));
 
         // Grab the Visual Mesh model we are using
-        std::string model = *context->input(Args::MODEL).flat<tensorflow::string>().data();
+        std::string model = *context->input(Args::MODEL).flat<tensorflow::tstring>().data();
 
         // clang-format off
         if (model == "RADIAL4") { ComputeModel<visualmesh::model::Radial4>(context); }

@@ -13,7 +13,7 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-FROM tensorflow/tensorflow:2.1.0-gpu-py3
+FROM tensorflow/tensorflow:2.2.0-gpu
 
 # Need cmake to build the op
 RUN apt-get update && apt-get -y install \
@@ -21,7 +21,7 @@ RUN apt-get update && apt-get -y install \
     libtcmalloc-minimal4
 
 # Need these libraries for training
-RUN pip install \
+RUN pip3 install \
     pyyaml \
     opencv-contrib-python-headless \
     matplotlib \
@@ -35,7 +35,7 @@ ENV CXXFLAGS -D_GLIBCXX_USE_CXX11_ABI=0
 RUN mkdir visualmesh/build && cd visualmesh/build \
     && cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_EXAMPLE=Off \
+    -DBUILD_EXAMPLES=Off \
     -DBUILD_TENSORFLOW_OP=On \
     && make
 
