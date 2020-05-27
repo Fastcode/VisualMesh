@@ -22,12 +22,13 @@
 #include <vector>
 
 #include "mesh/node.hpp"
+#include "polar_map.hpp"
 
 namespace visualmesh {
 namespace model {
 
     template <typename Scalar>
-    struct Radial8 {
+    struct Radial8 : public PolarMap<Scalar> {
     private:
         static inline vec3<Scalar> unit_vector(const Scalar& sin_phi, const Scalar& cos_phi, const Scalar& theta) {
             return vec3<Scalar>{{std::cos(theta) * sin_phi, std::sin(theta) * sin_phi, -cos_phi}};

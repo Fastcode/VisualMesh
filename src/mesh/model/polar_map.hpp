@@ -108,7 +108,8 @@ namespace model {
             // other offset won't work. This means it's giving the m coordinate difference within the b coordinate
             // system
 
-            // Difference in n value is just the simple difference
+            // Difference in n value is just the simple difference of ring number
+            // Negative rings are the same as positive rings, just on the other side
             const Scalar n_d = std::abs(a[0]) - std::abs(b[0]);
 
             // Calculate the angles for both m components

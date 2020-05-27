@@ -26,6 +26,9 @@
 #include "geometry/Circle.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/mesh.hpp"
+#include "mesh/model/nmgrid4.hpp"
+#include "mesh/model/nmgrid6.hpp"
+#include "mesh/model/nmgrid8.hpp"
 #include "mesh/model/radial4.hpp"
 #include "mesh/model/radial6.hpp"
 #include "mesh/model/radial8.hpp"
@@ -53,11 +56,14 @@ enum Args {
     GEOMETRY               = 10,
     RADIUS                 = 11,
     N_INTERSECTIONS        = 12,
-    INTERSECTION_TOLERANCE = 13
+    INTERSECTION_TOLERANCE = 13,
 };
 
-enum Outputs { PIXELS = 0, NEIGHBOURS = 1, GLOBAL_INDICES = 2 };
-
+enum Outputs {
+    PIXELS         = 0,
+    NEIGHBOURS     = 1,
+    GLOBAL_INDICES = 2,
+};
 
 REGISTER_OP("VisualMesh")
   .Attr("T: {float, double}")
@@ -226,7 +232,7 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> get_mesh(const Shape<Scalar>& s
 }
 
 /**
- * @brief The Visual Mesh tensorflow op
+ * @brief The Visual Mesh projection op
  *
  * @details
  *  This op will perform a projection using the visual mesh and will return the neighbourhood graph and the pixel
@@ -236,7 +242,7 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> get_mesh(const Shape<Scalar>& s
  * @tparam U The scalar type used for integer numbers
  */
 template <typename T, typename U>
-class VisualMeshOp : public tensorflow::OpKernel {
+class ProjectVisualMeshOp : public tensorflow::OpKernel {
 private:
     template <template <typename> class Model>
     void ComputeModel(tensorflow::OpKernelContext* context) {
@@ -407,14 +413,14 @@ private:
     }
 
 public:
-    explicit VisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
+    explicit ProjectVisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
 
     void Compute(tensorflow::OpKernelContext* context) override {
 
         // Check that the model is a string
         OP_REQUIRES(context,
-                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
-                    tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::MODEL).shape()),
+                    tensorflow::errors::InvalidArgument("Model must be a single string value"));
 
         // Grab the Visual Mesh model we are using
         std::string model = *context->input(Args::MODEL).flat<tensorflow::string>().data();
@@ -426,6 +432,9 @@ public:
         else if (model == "RING4") { ComputeModel<visualmesh::model::Ring4>(context); }
         else if (model == "RING6") { ComputeModel<visualmesh::model::Ring6>(context); }
         else if (model == "RING8") { ComputeModel<visualmesh::model::Ring8>(context); }
+        else if (model == "NMGRID4") { ComputeModel<visualmesh::model::NMGrid4>(context); }
+        else if (model == "NMGRID6") { ComputeModel<visualmesh::model::NMGrid6>(context); }
+        else if (model == "NMGRID8") { ComputeModel<visualmesh::model::NMGrid8>(context); }
         else if (model == "XMGRID4") { ComputeModel<visualmesh::model::XMGrid4>(context); }
         else if (model == "XMGRID6") { ComputeModel<visualmesh::model::XMGrid6>(context); }
         else if (model == "XMGRID8") { ComputeModel<visualmesh::model::XMGrid8>(context); }
@@ -444,15 +453,23 @@ public:
 };
 
 // Register a version for all the combinations of float/double and int32/int64
-REGISTER_KERNEL_BUILDER(
-  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<tensorflow::int32>("U"),
-  VisualMeshOp<float, tensorflow::int32>)
-REGISTER_KERNEL_BUILDER(
-  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<tensorflow::int64>("U"),
-  VisualMeshOp<float, tensorflow::int64>)
-REGISTER_KERNEL_BUILDER(
-  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T").TypeConstraint<tensorflow::int32>("U"),
-  VisualMeshOp<double, tensorflow::int32>)
-REGISTER_KERNEL_BUILDER(
-  Name("VisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T").TypeConstraint<tensorflow::int64>("U"),
-  VisualMeshOp<double, tensorflow::int64>)
+REGISTER_KERNEL_BUILDER(Name("ProjectVisualMesh")
+                          .Device(tensorflow::DEVICE_CPU)
+                          .TypeConstraint<float>("T")
+                          .TypeConstraint<tensorflow::int32>("U"),
+                        ProjectVisualMeshOp<float, tensorflow::int32>)
+REGISTER_KERNEL_BUILDER(Name("ProjectVisualMesh")
+                          .Device(tensorflow::DEVICE_CPU)
+                          .TypeConstraint<float>("T")
+                          .TypeConstraint<tensorflow::int64>("U"),
+                        ProjectVisualMeshOp<float, tensorflow::int64>)
+REGISTER_KERNEL_BUILDER(Name("ProjectVisualMesh")
+                          .Device(tensorflow::DEVICE_CPU)
+                          .TypeConstraint<double>("T")
+                          .TypeConstraint<tensorflow::int32>("U"),
+                        ProjectVisualMeshOp<double, tensorflow::int32>)
+REGISTER_KERNEL_BUILDER(Name("ProjectVisualMesh")
+                          .Device(tensorflow::DEVICE_CPU)
+                          .TypeConstraint<double>("T")
+                          .TypeConstraint<tensorflow::int64>("U"),
+                        ProjectVisualMeshOp<double, tensorflow::int64>)

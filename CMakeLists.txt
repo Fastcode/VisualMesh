@@ -101,11 +101,12 @@ if(TOP_LEVEL_PROJECT)
         set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
         find_package(TensorFlow REQUIRED)
 
-        add_library(tf_op SHARED "src/tf_op.cpp" ${hdr})
+        add_library(tf_op SHARED "src/tensorflow/map.cpp" "src/tensorflow/unmap.cpp" "src/tensorflow/difference.cpp"
+                                 "src/tensorflow/project.cpp" ${hdr})
         target_compile_options(tf_op PRIVATE -march=native -mtune=native)
         set_target_properties(
-            tf_op PROPERTIES CXX_STANDARD 14 LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/training/dataset"
-                             PREFIX "" OUTPUT_NAME visualmesh_op SUFFIX ".so")
+            tf_op PROPERTIES CXX_STANDARD 14 LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/training/op" PREFIX ""
+                             OUTPUT_NAME visualmesh_op SUFFIX ".so")
         target_include_directories(tf_op SYSTEM PRIVATE ${TENSORFLOW_INCLUDE_DIRS})
         target_include_directories(tf_op PRIVATE ${PROJECT_SOURCE_DIR}/src)
         target_link_libraries(tf_op ${TENSORFLOW_LIBRARIES})

@@ -29,44 +29,47 @@
 namespace visualmesh {
 namespace model {
 
-    template <int>
+    template <int, typename I>
     struct GridOffsets;
 
-    template <>
-    struct GridOffsets<4> {
-        static const std::array<vec2<int>, 4> offsets;
+    template <typename I>
+    struct GridOffsets<4, I> {
+        static const std::array<vec2<I>, 4> offsets;
     };
-    const std::array<vec2<int>, 4> GridOffsets<4>::offsets = {{
-      vec2<int>{{-1, +0}},  // Left
-      vec2<int>{{+0, +1}},  // Top
-      vec2<int>{{+1, +0}},  // Right
-      vec2<int>{{+0, -1}},  // Bottom
+    template <typename I>
+    const std::array<vec2<I>, 4> GridOffsets<4, I>::offsets = {{
+      vec2<I>{{-1, +0}},  // Left
+      vec2<I>{{+0, +1}},  // Top
+      vec2<I>{{+1, +0}},  // Right
+      vec2<I>{{+0, -1}},  // Bottom
     }};
-    template <>
-    struct GridOffsets<6> {
-        static const std::array<vec2<int>, 6> offsets;
+    template <typename I>
+    struct GridOffsets<6, I> {
+        static const std::array<vec2<I>, 6> offsets;
     };
-    const std::array<vec2<int>, 6> GridOffsets<6>::offsets = {{
-      vec2<int>{{-1, +0}},  // Left
-      vec2<int>{{-1, +1}},  // Top Left
-      vec2<int>{{-0, +1}},  // Top Right
-      vec2<int>{{+1, +0}},  // Right
-      vec2<int>{{+1, -1}},  // Bottom Right
-      vec2<int>{{+0, -1}},  // Bottom Left
+    template <typename I>
+    const std::array<vec2<I>, 6> GridOffsets<6, I>::offsets = {{
+      vec2<I>{{-1, +0}},  // Left
+      vec2<I>{{-1, +1}},  // Top Left
+      vec2<I>{{-0, +1}},  // Top Right
+      vec2<I>{{+1, +0}},  // Right
+      vec2<I>{{+1, -1}},  // Bottom Right
+      vec2<I>{{+0, -1}},  // Bottom Left
     }};
-    template <>
-    struct GridOffsets<8> {
-        static const std::array<vec2<int>, 8> offsets;
+    template <typename I>
+    struct GridOffsets<8, I> {
+        static const std::array<vec2<I>, 8> offsets;
     };
-    const std::array<vec2<int>, 8> GridOffsets<8>::offsets = {{
-      vec2<int>{{-1, +0}},  // Left
-      vec2<int>{{-1, +1}},  // Top Left
-      vec2<int>{{+0, +1}},  // Top
-      vec2<int>{{+1, +1}},  // Top Right
-      vec2<int>{{+1, +0}},  // Right
-      vec2<int>{{+1, -1}},  // Bottom Right
-      vec2<int>{{+0, -1}},  // Bottom
-      vec2<int>{{-1, -1}},  // Bottom Left
+    template <typename I>
+    const std::array<vec2<I>, 8> GridOffsets<8, I>::offsets = {{
+      vec2<I>{{-1, +0}},  // Left
+      vec2<I>{{-1, +1}},  // Top Left
+      vec2<I>{{+0, +1}},  // Top
+      vec2<I>{{+1, +1}},  // Top Right
+      vec2<I>{{+1, +0}},  // Right
+      vec2<I>{{+1, -1}},  // Bottom Right
+      vec2<I>{{+0, -1}},  // Bottom
+      vec2<I>{{-1, -1}},  // Bottom Left
     }};
 
     template <typename Scalar, template <typename> class Map, int N_NEIGHBOURS>
@@ -116,7 +119,7 @@ namespace model {
                     output.push_back(node);
 
                     // Add in each of our neighbours to be checked
-                    for (const auto& o : GridOffsets<N_NEIGHBOURS>::offsets) {
+                    for (const auto& o : GridOffsets<N_NEIGHBOURS, int>::offsets) {
                         vec2<int> n = add(e, o);
                         if (seen.count(n) == 0) {
                             seen.insert(n);
@@ -132,7 +135,7 @@ namespace model {
                 Node<Scalar, N_NEIGHBOURS>& node = output[loc.second];
 
                 for (int i = 0; i < N_NEIGHBOURS; ++i) {
-                    vec2<int> target   = add(coord, GridOffsets<N_NEIGHBOURS>::offsets[i]);
+                    vec2<int> target   = add(coord, GridOffsets<N_NEIGHBOURS, int>::offsets[i]);
                     node.neighbours[i] = locations.count(target) > 0 ? locations.find(target)->second : output.size();
                 }
             }

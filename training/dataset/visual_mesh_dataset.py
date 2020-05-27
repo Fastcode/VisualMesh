@@ -18,19 +18,7 @@ import os
 import re
 
 import tensorflow as tf
-
-# If we are in docker look for the visual mesh op in /visualmesh/training/visualmesh_op.so
-if (
-    os.path.exists("/.dockerenv")
-    or os.path.isfile("/proc/self/cgroup")
-    and any("docker" in line for line in open("/proc/self/cgroup"))
-) and os.path.isfile("/visualmesh/training/dataset/visualmesh_op.so"):
-    VisualMesh = tf.load_op_library("/visualmesh/training/dataset/visualmesh_op.so").visual_mesh
-# Otherwise check to see if we built it and it should be right next to this file
-elif os.path.isfile(os.path.join(os.path.dirname(__file__), "visualmesh_op.so")):
-    VisualMesh = tf.load_op_library(os.path.join(os.path.dirname(__file__), "visualmesh_op.so")).visual_mesh
-else:
-    raise Exception("Please build the tensorflow visual mesh op before running")
+from ..op import ProjectVisualMesh
 
 
 class VisualMeshDataset:
@@ -112,7 +100,7 @@ class VisualMeshDataset:
                 Hoc = tf.matmul(rot, Hoc)
 
         # Run the visual mesh to get our values
-        px, G, global_indices = VisualMesh(
+        px, G, global_indices = ProjectVisualMesh(
             tf.shape(args["X"])[:2],
             args["camera/projection"],
             args["camera/focal_length"],
