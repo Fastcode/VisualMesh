@@ -18,7 +18,6 @@
 #ifndef VISUALMESH_MODEL_POLAR_MAP_HPP
 #define VISUALMESH_MODEL_POLAR_MAP_HPP
 
-
 #include "grid_base.hpp"
 #include "utility/math.hpp"
 
@@ -27,7 +26,7 @@ namespace model {
 
     template <typename Scalar>
     struct PolarMap {
-
+    private:
         /**
          * @brief
          *  Converts angles into a unit vector where phi is defined as the angle from -z to the vector, and theta is
@@ -42,6 +41,7 @@ namespace model {
             return vec3<Scalar>{{std::cos(theta) * std::sin(phi), std::sin(theta) * std::sin(phi), -std::cos(phi)}};
         }
 
+    public:
         /**
          * @brief Takes a point in n, m space (jumps along x and jumps along y) and converts it into a vector to the
          * centre of the object using the x grid method
@@ -49,20 +49,25 @@ namespace model {
          * @tparam Shape the shape of the object we are mapping for
          *
          * @param shape the shape object used to calculate the angles
-         * @param nm    the coordinates in the nm space (object space)
          * @param h     the height of the camera above the observation plane
+         * @param nm    the coordinates in the nm space (object space)
          *
          * @return a vector <x, y, z> that points to the centre of the object at these coordinates
          */
         template <typename Shape>
-        static vec3<Scalar> map(const Shape& shape, const vec2<Scalar>& nm, const Scalar& h) {
+        static vec3<Scalar> map(const Shape& shape, const Scalar& h, const vec2<Scalar>& nm) {
+
+            // If n is negative it will jump us over to the other side of the origin
+            // This is the same as a positive n but with a +pi offset to theta
 
             // Work out the phi ring from the n value
-            const Scalar phi = shape.phi(nm[0], h);
+            const Scalar phi = shape.phi(std::abs(nm[0]), h);
 
             // Work out the radial value from the m value
-            const Scalar d_theta = shape.theta(nm[0], h);
-            const Scalar theta   = d_theta * nm[1];
+            const Scalar d_theta = shape.theta(std::abs(nm[0]), h);
+
+            // If n is negative, then add a pi offset as we went through the origin to the other side
+            const Scalar theta = d_theta * nm[1] + (nm[0] < 0 ? M_PI : 0.0);
 
             return unit_vector(phi, theta);
         }
@@ -73,13 +78,13 @@ namespace model {
          * @tparam Shape the shape of the object we are mapping for
          *
          * @param shape the shape object used to calculate the angles
-         * @param u     the unit vector that points towards the centre of the object
          * @param h     the height of the camera above the observation plane
+         * @param u     the unit vector that points towards the centre of the object
          *
          * @return a vector <x, y, z> that points to the centre of the object at these coordinates
          */
         template <typename Shape>
-        static vec2<Scalar> unmap(const Shape& shape, const vec3<Scalar>& u, const Scalar& h) {
+        static vec2<Scalar> unmap(const Shape& shape, const Scalar& h, const vec3<Scalar>& u) {
 
             // Phi value measured from the -z axis
             const Scalar n = shape.n(std::acos(-u[2]), h);
@@ -89,6 +94,38 @@ namespace model {
             const Scalar theta   = std::fmod(2.0 * M_PI + std::atan2(u[1], u[0]), 2.0 * M_PI);
 
             return vec2<Scalar>{{n, theta / d_theta}};
+        }
+
+        template <typename Shape>
+        static vec2<Scalar> difference(const Shape& shape,
+                                       const Scalar& h,
+                                       const vec2<Scalar>& a,
+                                       const vec2<Scalar>& b) {
+
+            // The equation we are trying to get to work is b + diff = a;
+            // Clearly that won't work properly on it's own with a weird polar coordinate system so we have to do our
+            // transforms here so that will work. Note that once we get this answer, it will only work if you add b, any
+            // other offset won't work. This means it's giving the m coordinate difference within the b coordinate
+            // system
+
+            // Difference in n value is just the simple difference
+            const Scalar n_d = std::abs(a[0]) - std::abs(b[0]);
+
+            // Calculate the angles for both m components
+            const Scalar a_dtheta = shape.theta(std::abs(a[0]), h);
+            const Scalar b_dtheta = shape.theta(std::abs(b[0]), h);
+
+            // If n is negative we went down past the origin which gives us a π offset
+            const Scalar a_theta = a[1] * a_dtheta + (a[0] < 0 ? M_PI : 0.0);
+            const Scalar b_theta = b[1] * b_dtheta + (b[0] < 0 ? M_PI : 0.0);
+
+            // Calculate the smallest distance between the two angles and convert into n_b m coordinates as a value
+            // between -π and π
+            Scalar theta_d = std::fmod(a_theta - b_theta, Scalar(2.0 * M_PI));
+            theta_d        = theta_d > M_PI ? theta_d - Scalar(2.0 * M_PI) : theta_d;
+            theta_d        = theta_d < -M_PI ? theta_d + Scalar(2.0 * M_PI) : theta_d;
+
+            return vec2<Scalar>{{n_d, theta_d * b_dtheta}};
         }
     };
 

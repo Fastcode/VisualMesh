@@ -34,13 +34,13 @@ namespace model {
          * @tparam Shape the shape of the object we are mapping for
          *
          * @param shape the shape object used to calculate the angles
-         * @param nm    the coordinates in the nm space (object space)
          * @param h     the height of the camera above the observation plane
+         * @param nm    the coordinates in the nm space (object space)
          *
          * @return a vector <x, y, z> that points to the centre of the object at these coordinates
          */
         template <typename Shape>
-        static vec3<Scalar> map(const Shape& shape, const vec2<Scalar>& nm, const Scalar& h) {
+        static vec3<Scalar> map(const Shape& shape, const Scalar& h, const vec2<Scalar>& nm) {
             const Scalar phi_x = shape.phi(nm[0], h);
             const Scalar x     = (h - shape.c()) * std::tan(phi_x);
 
@@ -56,13 +56,13 @@ namespace model {
          * @tparam Shape the shape of the object we are mapping for
          *
          * @param shape the shape object used to calculate the angles
-         * @param u     the unit vector that points towards the centre of the object
          * @param h     the height of the camera above the observation plane
+         * @param u     the unit vector that points towards the centre of the object
          *
          * @return a vector <x, y, z> that points to the centre of the object at these coordinates
          */
         template <typename Shape>
-        static vec2<Scalar> unmap(const Shape& shape, const vec3<Scalar>& u, const Scalar& h) {
+        static vec2<Scalar> unmap(const Shape& shape, const Scalar& h, const vec3<Scalar>& u) {
 
             // Height of the object above the observation plane so we can get planes from it's centre
             const Scalar& c = shape.c();

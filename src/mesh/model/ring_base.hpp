@@ -34,7 +34,7 @@ namespace model {
      * @tparam Ring     the specific ring type that is used to generate the neighbour indices
      */
     template <typename Scalar, template <typename> class Ring, int N_NEIGHBOURS>
-    struct RingBase {
+    struct RingBase : public PolarMap<Scalar> {
     public:
         /**
          * @brief Generates the visual mesh vectors and graph using the Ring4 method
@@ -89,7 +89,7 @@ namespace model {
                 start = int(nodes.size());
                 for (int j = 0; j < int(std::ceil(s_c)); ++j) {
                     Node<Scalar, N_NEIGHBOURS> n;
-                    n.ray = PolarMap<Scalar>::map(shape, vec2<Scalar>{{n_c, j * m_jump}}, h);
+                    n.ray = PolarMap<Scalar>::map(shape, h, vec2<Scalar>{{n_c, j * m_jump}});
 
                     // Get the neighbours using our specific class
                     n.neighbours.fill(start);

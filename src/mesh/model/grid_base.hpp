@@ -70,7 +70,7 @@ namespace model {
     }};
 
     template <typename Scalar, template <typename> class Map, int N_NEIGHBOURS>
-    struct GridBase {
+    struct GridBase : public Map<Scalar> {
     public:
         template <typename Shape>
         static std::vector<Node<Scalar, N_NEIGHBOURS>> generate(const Shape& shape,
@@ -104,7 +104,7 @@ namespace model {
                               "You must choose 4, 6 or 8 neighbours");
 
                 // Map the point using our mapping function
-                vec3<Scalar> vec = Map<Scalar>::map(shape, nm, h);
+                vec3<Scalar> vec = Map<Scalar>::map(shape, h, nm);
                 Scalar distance  = norm(head<2>(vec));
 
                 // We only work with this point if we didn't exceed our max distance
@@ -138,6 +138,34 @@ namespace model {
             }
 
             return output;
+        }
+
+        /**
+         * @brief Calculates the difference between two points in the visual mesh coordinate system.
+         *
+         * @details This function calculates the difference between two points in the visual mesh coordinate system. It
+         * is calculated as the distance first travelling along the first coordinate, and then travelling along the
+         * second coordinate. For many meshes this will just be the simple subtraction. However for some meshes the
+         * coordinate system is closed and will therefore have a modulo component such that the difference may be
+         * shorter forward than backward.
+         *
+         * For grid coordinate systems this is a simple subtraction that does not depend on shape or h
+         *
+         * @tparam Shape the shape of the object we are calculating the distance for
+         *
+         * @param shape the shape object used to calculate the mesh coordinates
+         * @param h     the height of the camera above the observation plane
+         * @param a     the coordinates of the first location in nm space (object space)
+         * @param b     the coordinates of the second location in nm space (object space)
+         *
+         * @return vec2<Scalar>
+         */
+        template <typename Shape>
+        static vec2<Scalar> difference(const Shape& /*shape*/,
+                                       const Scalar& /*h*/,
+                                       const vec2<Scalar>& a,
+                                       const vec2<Scalar>& b) {
+            return subtract(a, b);
         }
     };
 

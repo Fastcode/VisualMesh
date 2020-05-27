@@ -88,14 +88,13 @@ namespace model {
          * that gives the appropriate value for the second equation.
          *
          * @param shape the shape object used to calculate the angles
-         * @param n     the coordinate in the n coordinate (object jumps along the x axis)
-         * @param m     the coordinate in the m coordinate (object jumps along the y axis)
          * @param h     the height of the camera above the observation plane
+         * @param nm    the coordinates in the nm space (object space)
          *
          * @return a vector <x, y, z> that points to the centre of the object at these coordinates
          */
         template <typename Shape>
-        static vec3<Scalar> map(const Shape& shape, const vec2<Scalar>& nm, const Scalar& h) {
+        static vec3<Scalar> map(const Shape& shape, const Scalar& h, const vec2<Scalar>& nm) {
             // Abs first so we don't need to worry about quadrant, we will fix the signs at the end
             const Scalar& n = std::abs(nm[0]);
             const Scalar& m = std::abs(nm[1]);
@@ -138,13 +137,13 @@ namespace model {
          * @tparam Shape the shape of the object we are mapping for
          *
          * @param shape the shape object used to calculate the angles
-         * @param u     the unit vector that points towards the centre of the object
          * @param h     the height of the camera above the observation plane
+         * @param u     the unit vector that points towards the centre of the object
          *
          * @return a vector <x, y, z> that points to the centre of the object at these coordinates
          */
         template <typename Shape>
-        static vec2<Scalar> unmap(const Shape& shape, const vec3<Scalar>& u, const Scalar& h) {
+        static vec2<Scalar> unmap(const Shape& shape, const Scalar& h, const vec3<Scalar>& u) {
 
             // Height of the object above the observation plane so we can get planes from it's centre
             const Scalar& c = shape.c();
