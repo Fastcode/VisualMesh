@@ -15,7 +15,7 @@ elif os.path.isfile(os.path.join(os.path.dirname(__file__), "visualmesh_op.so"))
 else:
     raise Exception("Please build the tensorflow visual mesh op before running")
 
-ProjectVisualMesh = _library.project_visual_mesh
-MapVisualMesh = _library.map_visual_mesh
-UnmapVisualMesh = _library.unmap_visual_mesh
-DifferenceVisualMesh = _library.difference_visual_mesh
+project_visual_mesh = _library.project_visual_mesh
+map_visual_mesh = _library.map_visual_mesh
+unmap_visual_mesh = _library.unmap_visual_mesh
+difference_visual_mesh = _library.difference_visual_mesh

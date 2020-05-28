@@ -18,7 +18,7 @@ import os
 import re
 
 import tensorflow as tf
-from ..op import ProjectVisualMesh
+from ..op import project_visual_mesh
 
 
 class VisualMeshDataset:
@@ -100,7 +100,7 @@ class VisualMeshDataset:
                 Hoc = tf.matmul(rot, Hoc)
 
         # Run the visual mesh to get our values
-        px, G, global_indices = ProjectVisualMesh(
+        px, G, global_indices = project_visual_mesh(
             tf.shape(args["X"])[:2],
             args["camera/projection"],
             args["camera/focal_length"],

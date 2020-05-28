@@ -12,12 +12,14 @@ if(BUILD_EXAMPLES)
             -Wall
             -Wextra
             -Wpedantic
+            -Werror
             -march=native
             -mtune=native)
 
+        # Always have the colours otherwise using ninja makes them go away
         if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             list(APPEND -fcolor-diagnostics)
-        elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             list(APPEND -fdiagnostics-color=always)
         endif()
     endif()
@@ -45,12 +47,11 @@ if(BUILD_EXAMPLES)
                               Threads::Threads)
 
         add_executable(benchmark "benchmark.cpp")
-        target_compile_options(benchmark PRIVATE -march=native -mtune=native)
+        target_compile_options(benchmark PRIVATE ${compile_options})
         set_target_properties(benchmark PROPERTIES CXX_STANDARD 14)
         target_include_directories(benchmark SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS} ${YAML_CPP_INCLUDE_DIR})
         target_link_libraries(benchmark visualmesh ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES}
                               Threads::Threads)
-
     endif(OpenCV_FOUND)
 
     add_executable(mesh_quality "mesh_quality.cpp")
