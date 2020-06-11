@@ -26,7 +26,7 @@ class VisualMeshDataset:
         self.label = label
         self.keys = keys
 
-        # TODO fix these
+        # TODO these need to be provided as arguments fix these
         self.batch_size = 10
         self.prefetch = 1  # tf.data.experimental.AUTOTUNE
 
@@ -125,25 +125,12 @@ class VisualMeshDataset:
 
     def build(self):
 
-        ds = tf.data.TFRecordDataset(self.paths)
-        ds = ds.batch(self.batch_size)
-        ds = ds.map(self._reduce_batch, num_parallel_calls=self.prefetch)
+        # Load, batch and map the dataset
+        dataset = tf.data.TFRecordDataset(self.paths)
+        dataset = dataset.batch(self.batch_size)
+        dataset = dataset.map(self._reduce_batch, num_parallel_calls=self.prefetch)
 
-        for data in ds:
+        # Prefetch some elements to ensure training smoothness
+        dataset = dataset.prefetch(self.prefetch)
 
-            import pdb
-
-            pdb.set_trace()
-
-        # TODO go through each of the things we want to read and make them into a feature dataset
-        # TODO merge the feature dataset
-        # TODO map the features over to the actual dataset
-
-        # So first we grab the prefixes from the view
-
-        # Then we need to go and do an operation for each of the prefixes
-
-        # Then we need to merge the prefixes
-
-        # self.mesh_features()
-        # self.label_features()
+        return dataset
