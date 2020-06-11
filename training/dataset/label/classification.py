@@ -14,18 +14,21 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import tensorflow as tf
-from .visual_mesh_dataset import VisualMeshDataset
 
 
-class ClassificationDataset(VisualMeshDataset):
-    def __init__(self, classes, **kwargs):
-        super(ClassificationDataset, self).__init__(features={"mask": tf.io.FixedLenFeature([], tf.string)}, **kwargs)
+class Classification:
+    def __init__(self, classes, **config):
         self.classes = classes
 
-    def get_labels(self, args):
+    def features(self):
+        return {
+            "mask": tf.io.FixedLenFeature([], tf.string),
+        }
+
+    def __call__(self, mask, C, **features):
 
         # Use the nearest neighbour pixel to get the classification from the mask
-        Y = tf.gather_nd(tf.image.decode_png(args["mask"], channels=4), tf.cast(tf.round(args["px"]), tf.int32))
+        Y = tf.gather_nd(tf.image.decode_png(mask, channels=4), tf.cast(tf.round(C), tf.int32))
 
         # Expand the classes from colours into individual columns
         W = tf.image.convert_image_dtype(Y[:, 3], tf.float32)  # Alpha channel
@@ -49,4 +52,4 @@ class ClassificationDataset(VisualMeshDataset):
             )
         Y = tf.stack(cs, axis=-1)
 
-        return Y, W
+        return {"Y": Y, "W": W}

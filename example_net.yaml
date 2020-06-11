@@ -1,10 +1,60 @@
 # Section that defines the dataset files.
 dataset:
-  output:
-    # The type of the network. Depending on what kind of thing it is trying to predict this will result in different
-    # collections of metrics and dataset loading tools. Make sure your network structure outputs something that is
-    # compatible with this output
-    type: Classification
+  # Training file, used for training the network.
+  training:
+    paths:
+      - dataset/spotlight_training.tfrecord
+
+    # A map which converts internal feature keys to the external dataset keys
+    keys:
+      Hoc: camera/Hoc
+      lens/centre: camera/centre
+      lens/focal_length: camera/focal_length
+      lens/fov: camera/fov
+      lens/k: camera/k
+      lens/projection: camera/projection
+
+    # Additional configuration that will be merged into the other configurations for this dataset
+    config:
+      orientation:
+        variants:
+          # Adjustments to the height of the mesh above the observation plane.
+          height: { mean: 0, stddev: 0.05 }
+          # Adjustments to the orientation of the observation plane
+          # We choose a random axis and rotate by a random angle from this distribution
+          rotation: { mean: 0, stddev: 0.0872665 }
+
+  # Validation file, used to inspect progress of the network as it is training.
+  # It is also used as the source for progress images.
+  validation:
+    paths:
+      - dataset/spotlight_validation.tfrecord
+
+  # Test dataset, used for performing final evaluations on the performance of the network.
+  testing:
+    paths:
+      - dataset/spotlight_testing.tfrecord
+
+# What camera configuration we have (Monoscopic, Stereoscopic)
+view:
+  type: Monoscopic
+  config: {}
+
+# What kind of examples we are using for input data (Image)
+example:
+  type: Image
+  config: {}
+
+# What kind of mesh orientation we are using (Ground, Spotlight)
+orientation:
+  type: Ground
+  config: {}
+
+# The type of output we are training the network for (Classification, Seeker)
+label:
+  type: Classification
+  config:
+    # The classes we are using for classification
     classes:
       - name: ball
         colours:
@@ -18,69 +68,40 @@ dataset:
       - name: field
         colours:
           - [0, 255, 0]
-          - [255, 255, 255] # Field line is still field
       - name: environment
         colours:
           - [0, 0, 0]
 
-    # type: Spotlight
-    # options: {}
-
-  # Training file, used for training the network.
-  training:
-    paths:
-      - dataset/spotlight_training.tfrecord
-
-    # Variations to apply to the training data, note this only applies to training data and not validation.
-    # They are defined using a mean value and a standard deviation using a truncated normal distribution.
-    # If the values are greater than 2 standard deviations from the mean they will be resampled.
-    variants:
-      mesh:
-        # Adjustments to the height of the mesh above the observation plane.
-        height: { mean: 0, stddev: 0.05 }
-        # Adjustments to the orientation of the observation plane.
-        # This value is used for three euler rotations added to the camera rotation in radians.
-        rotation: { mean: 0, stddev: 0.0872665 }
-
-  # Validation file, used to inspect progress of the network as it is training.
-  # It is also used as the source for progress images.
-  validation:
-    paths:
-      - dataset/spotlight_validation.tfrecord
-
-  # Test dataset, used for performing final evaluations on the performance of the network.
-  testing:
-    paths:
-      - dataset/spotlight_testing.tfrecord
-
-# The model and geometry we are using
-model:
-  # The type of model that we are using to generate the Visual Mesh
-  mesh:
-    # The type of Visual Mesh we are generating
-    type: RING6
-    # How many distinct meshes to cache before dropping old ones
-    cached_meshes: 100
-    # The maximum distance the Visual Mesh will be projected for. This should be slightly further than the most distant
-    # object that you wish to detect to account for noises in the projection.
-    max_distance: 20
-
-  # The geometry of the object we are detecting in the Visual Mesh.
-  geometry:
-    # The shape to project, either CIRCLE or SPHERE.
-    shape: SPHERE
-    # The radius of the object to be detected.
-    radius: 0.0949996
-    # How many intersections with the target object we should have.
-    intersections: 6
-    # How many intersections the mesh can vary by before it will generate a new mesh
-    intersection_tolerance: 0.5
+# What kind of graph we are projecting (VisualMesh)
+projection:
+  type: VisualMesh
+  # The configuration for the various components of the flavour
+  config:
+    # The type of mesh we are using
+    mesh:
+      # The type of Visual Mesh we are generating
+      model: RING6
+      # How many distinct meshes to cache before dropping old ones
+      cached_meshes: 100
+      # The maximum distance the Visual Mesh will be projected for. This should be slightly further than the most distant
+      # object that you wish to detect to account for noises in the projection.
+      max_distance: 20
+      # The geometry of the object we are detecting in the Visual Mesh.
+    geometry:
+      # The shape to project, either CIRCLE or SPHERE.
+      shape: SPHERE
+      # The radius of the object to be detected.
+      radius: 0.0949996
+      # How many intersections with the target object we should have.
+      intersections: 6
+      # How many intersections the mesh can vary by before it will generate a new mesh
+      intersection_tolerance: 0.5
 
 # Configuration for the convolutional neural network.
 network:
   # The network structure defined as a graph of ops where each element will define its inputs.
   # There are two predefined inputs to the graph which are `X` and `G` which represent the input values to the network
-  # and the neighbourhood graph respecitvely.
+  # and the neighbourhood graph respectively.
   # There should exist a node named `output` that defines the final output of the network.
   # The network will start at this element and work back from there to find which components are needed and in what order.
   # For each of the elements they will define an operation they are doing, and optionally provide options for constructing

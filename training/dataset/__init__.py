@@ -13,7 +13,57 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from .classification_dataset import ClassificationDataset
+from .example import Image
+from .label import Classification, Seeker
+from .orientation import Ground, Spotlight
+from .projection import VisualMesh
+from .view import Monoscopic, Stereoscopic
+from .visual_mesh_dataset import VisualMeshDataset
+
+
+def Dataset(paths, view, example, orientation, label, projection, keys):
+
+    # Find the correct class to handle our view
+    if view["type"] == "Monoscopic":
+        view = Monoscopic(**view["config"])
+    elif view["type"] == "Stereoscopic":
+        view = Stereoscopic(**view["config"])
+    else:
+        raise RuntimeError("Unknown view type '{}'".format(view["type"]))
+
+    # Find the correct class to handle our view
+    if example["type"] == "Image":
+        example = Image(**example["config"])
+    else:
+        raise RuntimeError("Unknown example type '{}'".format(example["type"]))
+
+    # Find the correct class to handle our mesh orientation
+    if orientation["type"] == "Ground":
+        orientation = Ground(**orientation["config"])
+    elif orientation["type"] == "Spotlight":
+        orientation = Spotlight(**orientation["config"])
+    else:
+        raise RuntimeError("Unknown orientation type '{}'".format(orientation["type"]))
+
+    # Find the correct class to handle our mesh orientation
+    if projection["type"] == "VisualMesh":
+        projection = VisualMesh(**projection["config"])
+    else:
+        raise RuntimeError("Unknown projection type '{}'".format(projection["type"]))
+
+    # Find the correct dataset labelling class
+    if label["type"] == "Classification":
+        label = Classification(**label["config"])
+    elif label["type"] == "Seeker":
+        label = Seeker(**label["config"])
+    else:
+        raise RuntimeError("Unknown data labelling scheme '{}'".format(label["type"]))
+
+    # Create our dataset with these specific components
+    return VisualMeshDataset(
+        paths=paths, view=view, example=example, orientation=orientation, projection=projection, label=label, keys=keys,
+    ).build()
+
 
 # Convert a dataset into a format that will be accepted by keras fit
 def keras_dataset(args):

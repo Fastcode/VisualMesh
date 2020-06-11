@@ -50,7 +50,7 @@ enum Args {
     LENS_DISTORTION        = 4,
     FIELD_OF_VIEW          = 5,
     HOC                    = 6,
-    MODEL                  = 7,
+    MESH_MODEL             = 7,
     CACHED_MESHES          = 8,
     MAX_DISTANCE           = 9,
     GEOMETRY               = 10,
@@ -61,21 +61,22 @@ enum Args {
 
 enum Outputs {
     PIXELS         = 0,
-    NEIGHBOURS     = 1,
-    GLOBAL_INDICES = 2,
+    VECTORS        = 1,
+    NEIGHBOURS     = 2,
+    GLOBAL_INDICES = 3,
 };
 
-REGISTER_OP("VisualMesh")
+REGISTER_OP("ProjectVisualMesh")
   .Attr("T: {float, double}")
   .Attr("U: {int32, int64}")
   .Input("image_dimensions: U")
-  .Input("lens_type: string")
+  .Input("lens_projection: string")
   .Input("lens_focal_length: T")
   .Input("lens_centre: T")
   .Input("lens_distortion: T")
   .Input("lens_fov: T")
   .Input("cam_to_observation_plane: T")
-  .Input("model: string")
+  .Input("mesh_model: string")
   .Input("cached_meshes: int32")
   .Input("max_distance: T")
   .Input("geometry: string")
@@ -83,11 +84,13 @@ REGISTER_OP("VisualMesh")
   .Input("n_intersections: T")
   .Input("intersection_tolerance: T")
   .Output("pixels: T")
+  .Output("vectors: T")
   .Output("neighbours: int32")
   .Output("global_indices: int32")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
       // nx2 points on image, n+1xG neighbours (including off screen point), and n global indices
       c->set_output(Outputs::PIXELS, c->MakeShape({c->kUnknownDim, 2}));
+      c->set_output(Outputs::VECTORS, c->MakeShape({c->kUnknownDim, 3}));
       c->set_output(Outputs::NEIGHBOURS, c->MakeShape({c->kUnknownDim, c->kUnknownDim}));
       c->set_output(Outputs::GLOBAL_INDICES, c->MakeShape({c->kUnknownDim}));
       return tensorflow::Status::OK();
@@ -241,6 +244,22 @@ private:
             c(i, 1)       = p[0];
         }
 
+        // Fill in our tensorflow output matrix
+        tensorflow::Tensor* vectors = nullptr;
+        tensorflow::TensorShape vectors_shape;
+        vectors_shape.AddDim(global_indices.size());
+        vectors_shape.AddDim(3);
+        OP_REQUIRES_OK(context, context->allocate_output(Outputs::VECTORS, vectors_shape, &vectors));
+
+        // Copy across our pixel coordinates remembering to reverse the order from x,y to y,x
+        auto v = vectors->matrix<T>();
+        for (size_t i = 0; i < global_indices.size(); ++i) {
+            const auto& p = mesh->nodes[global_indices[i]].ray;
+            c(i, 0)       = p[0];
+            c(i, 1)       = p[1];
+            c(i, 2)       = p[2];
+        }
+
         // Build our tensorflow neighbourhood graph
         tensorflow::Tensor* neighbours = nullptr;
         tensorflow::TensorShape neighbours_shape;
@@ -281,11 +300,11 @@ public:
 
         // Check that the model is a string
         OP_REQUIRES(context,
-                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::MODEL).shape()),
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::MESH_MODEL).shape()),
                     tensorflow::errors::InvalidArgument("Model must be a single string value"));
 
         // Grab the Visual Mesh model we are using
-        std::string model = *context->input(Args::MODEL).flat<tensorflow::tstring>().data();
+        std::string model = *context->input(Args::MESH_MODEL).flat<tensorflow::tstring>().data();
 
         // clang-format off
         if (model == "RADIAL4") { ComputeModel<visualmesh::model::Radial4>(context); }
