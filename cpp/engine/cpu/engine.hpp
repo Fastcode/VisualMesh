@@ -110,8 +110,8 @@ namespace engine {
                         // not perfect and misses by a few pixels. So as we are projecting the points here we also need
                         // to check that they are on screen
                         auto px = ::visualmesh::project(multiply(Rco, nodes[i].ray), lens);
-                        if (0 < px[0] && px[0] + 1 < lens.dimensions[0] && 0 < px[1]
-                            && px[1] + 1 < lens.dimensions[1]) {
+                        if (0 <= px[0] && px[0] + 1 <= lens.dimensions[0] && 0 <= px[1]
+                            && px[1] + 1 <= lens.dimensions[1]) {
                             global_indices.emplace_back(i);
                             pixels.emplace_back(px);
                         }

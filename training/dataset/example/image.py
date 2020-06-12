@@ -47,9 +47,9 @@ class Image:
             for val, w in zip(
                 p_val,
                 [
-                    tf.multiply(1 - y_w, 1 - x_w),
-                    tf.multiply(1 - y_w, x_w),
-                    tf.multiply(y_w, 1 - x_w),
+                    tf.multiply(1.0 - y_w, 1.0 - x_w),
+                    tf.multiply(1.0 - y_w, x_w),
+                    tf.multiply(y_w, 1.0 - x_w),
                     tf.multiply(y_w, x_w),
                 ],
             )

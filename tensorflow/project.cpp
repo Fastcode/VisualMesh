@@ -255,9 +255,9 @@ private:
         auto v = vectors->matrix<T>();
         for (size_t i = 0; i < global_indices.size(); ++i) {
             const auto& p = mesh->nodes[global_indices[i]].ray;
-            c(i, 0)       = p[0];
-            c(i, 1)       = p[1];
-            c(i, 2)       = p[2];
+            v(i, 0)       = p[0];
+            v(i, 1)       = p[1];
+            v(i, 2)       = p[2];
         }
 
         // Build our tensorflow neighbourhood graph
