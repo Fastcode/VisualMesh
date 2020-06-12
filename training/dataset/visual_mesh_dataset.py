@@ -99,7 +99,7 @@ class VisualMeshDataset:
 
         # We need the n offsets to reposition all the graph values
         n = tf.stack([b["n"] for b in batch], axis=0)
-        cn = tf.math.cumsum(n, exclusive=True)
+        cn = tf.math.cumsum(tf.math.reduce_sum(n, axis=1), exclusive=True)
         n_elems = tf.math.reduce_sum(n)
 
         # For X we must add the "offscreen" point as a -1,-1,-1 point one past the end of the list

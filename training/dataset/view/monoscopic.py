@@ -31,5 +31,5 @@ class Monoscopic:
         # We only have a single camera so merging is just choosing the only output
         return {
             **view,
-            "n": tf.shape(view["G"])[0],
+            "n": [tf.shape(view["G"])[0]],
         }
