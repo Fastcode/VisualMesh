@@ -19,10 +19,7 @@ import tensorflow as tf
 
 import tensorflow_addons as tfa
 
-from .callbacks import ClassificationImages
-from .dataset import ClassificationDataset, keras_dataset
-from .loss import FocalLoss
-from .metrics import AveragePrecision, AverageRecall, ClassPrecision, ClassRecall
+from .dataset import keras_dataset
 from .model import VisualMeshModel
 from .flavour import get_flavour
 
@@ -32,10 +29,9 @@ def train(config, output_path):
 
     # Work out what kind of dataset we are training on and get the data
     datasets, loss, metrics, callbacks = get_flavour(config, output_path)
-    training_dataset, validation_dataset, _ = datasets
 
-    # Always repeat the validation dataset
-    validation_dataset = validation_dataset.repeat()
+    # Convert the datasets to keras datasets
+    training_dataset, validation_dataset, _ = [d.map(keras_dataset) for d in datasets]
 
     # Get the dimensionality of the Y part of the dataset
     output_dims = training_dataset.element_spec[1].shape[1]

@@ -17,7 +17,7 @@ import tensorflow as tf
 
 
 class VisualMeshDataset:
-    def __init__(self, paths, view, example, orientation, projection, label, keys):
+    def __init__(self, paths, batch_size, view, example, orientation, projection, label, keys):
         self.paths = paths
         self.view = view
         self.example = example
@@ -25,10 +25,10 @@ class VisualMeshDataset:
         self.projection = projection
         self.label = label
         self.keys = keys
+        self.batch_size = batch_size
 
-        # TODO these need to be provided as arguments fix these
-        self.batch_size = 10
-        self.prefetch = 1  # tf.data.experimental.AUTOTUNE
+        # Autotune how many elements we prefetch and map by
+        self.prefetch = tf.data.experimental.AUTOTUNE
 
         # First we need to know what features we need for each stage so we can load them from the dataset
         self.features = {}
@@ -109,7 +109,7 @@ class VisualMeshDataset:
         W = tf.concat([b["W"] for b in batch], axis=0)
         C = tf.concat([b["C"] for b in batch], axis=0)
         V = tf.concat([b["V"] for b in batch], axis=0)
-        img = tf.stack([b["jpg"] for b in batch], axis=0)
+        jpg = tf.stack([b["jpg"] for b in batch], axis=0)
 
         # For the graph we need to move along each element by where it is in the batch
         # We also must replace -1s with a new element off the end of the graph
@@ -121,7 +121,7 @@ class VisualMeshDataset:
             axis=0,
         )
 
-        return {"X": X, "Y": Y, "W": W, "G": G, "n": n, "C": C, "V": V, "img": img}
+        return {"X": X, "Y": Y, "W": W, "G": G, "n": n, "C": C, "V": V, "jpg": jpg}
 
     def build(self):
 

@@ -20,39 +20,27 @@ import warnings
 
 import cv2
 import matplotlib as mpl
+
+mpl.use("Agg")
+
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
-from training.dataset import ClassificationDataset
-
-mpl.use("Agg")
-
 
 class ClassificationImages(tf.keras.callbacks.Callback):
-    def __init__(self, output_path, dataset_paths, classes, mesh, geometry, progress_images, colours):
+    def __init__(self, output_path, dataset, colours):
         super(ClassificationImages, self).__init__()
 
         self.colours = colours
         self.writer = tf.summary.create_file_writer(os.path.join(output_path, "images"))
 
         # Load the dataset and extract a single record from it
-        for d in (
-            ClassificationDataset(
-                paths=dataset_paths,
-                classes=classes,
-                mesh=mesh,
-                geometry=geometry,
-                batch_size=progress_images,
-                prefetch=tf.data.experimental.AUTOTUNE,
-                variants={},
-            )
-            .build()
-            .take(1)
-        ):
+        for d in dataset:
             self.data = d
 
-    def mesh_image(self, img, px, X, colours):
+    @staticmethod
+    def mesh_image(img, C, X, colours):
 
         # hash of the image file for sorting later
         img_hash = hashlib.md5()
@@ -74,7 +62,7 @@ class ClassificationImages(tf.keras.callbacks.Callback):
         ax.imshow(img, interpolation="nearest")
 
         # We need at least 3 points to make a triangle
-        if px.shape[0] >= 3:
+        if C.shape[0] >= 3:
 
             # Stop matplotlib complaining
             with warnings.catch_warnings():
@@ -83,8 +71,8 @@ class ClassificationImages(tf.keras.callbacks.Callback):
                 for i, colour in enumerate(colours):
                     colour = np.array(colour) / 255
                     ax.tricontour(
-                        px[:, 1],
-                        px[:, 0],
+                        C[:, 1],
+                        C[:, 0],
                         X[:, i],
                         levels=[0.5, 0.75, 0.9],
                         colors=[(*colour, 0.33), (*colour, 0.66), (*colour, 1.0)],
@@ -119,7 +107,7 @@ class ClassificationImages(tf.keras.callbacks.Callback):
         for i, r in enumerate(ranges):
             images.append(
                 self.mesh_image(
-                    self.data["image"][i].numpy(), self.data["px"][r[0] : r[1]], predictions[r[0] : r[1]], self.colours,
+                    self.data["jpg"][i].numpy(), self.data["C"][r[0] : r[1]], predictions[r[0] : r[1]], self.colours,
                 )
             )
 

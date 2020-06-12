@@ -13,16 +13,98 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from .classification_flavour import classification_flavour
+from training.dataset import Dataset
+from training.loss import *
+from training.metrics import *
+from training.callbacks import *
+
+
+def _merge_flavour_config(base, detail):
+    def _merge(a, b):
+
+        # If they're both dictionaries we start with a and then overwrite with b
+        if type(a) == dict and type(b) == dict:
+            v = {**a}
+            for k in b:
+                if k not in v:
+                    v[k] = b[k]
+                else:
+                    v[k] = _merge(a[k], b[k])
+            return v
+
+        # Otherwise b always wins
+        return b
+
+    config = {}
+    for k in ["view", "example", "orientation", "label", "projection"]:
+        if k not in detail:
+            config[k] = base[k]
+        else:
+            config[k] = _merge(base[k], detail[k])
+
+    return config
 
 
 def get_flavour(config, output_path):
-    # Load the types based on what type of network we are trying to train
-    if config["dataset"]["output"]["type"] == "Classification":
-        return classification_flavour(config, output_path)
 
-    # elif config['dataset']['output']['type'] == "Spotlight":
-    # training_dataset =
+    training = config["dataset"]["training"]
+    validation = config["dataset"]["validation"]
+    testing = config["dataset"]["testing"]
 
-    else:
-        raise RuntimeError("Unknown classification network type {}".format(config["network"]["output"]["type"]))
+    training_config = _merge_flavour_config(config, training.get("config", {}))
+    validation_config = _merge_flavour_config(config, validation.get("config", {}))
+    testing_config = _merge_flavour_config(config, testing.get("config", {}))
+
+    # Datasets work out the flavour themselves
+    datasets = (
+        Dataset(
+            paths=training["paths"],
+            batch_size=training["batch_size"],
+            keys=training.get("keys", {}),
+            **training_config,
+        ),
+        Dataset(
+            paths=validation["paths"],
+            batch_size=validation["batch_size"],
+            keys=validation.get("keys", {}),
+            **validation_config,
+        ).repeat(),
+        Dataset(
+            paths=testing["paths"], batch_size=testing["batch_size"], keys=testing.get("keys", {}), **testing_config,
+        ),
+    )
+
+    # Flavour
+    if config["label"]["type"] == "Classification":
+        classes = validation_config["label"]["config"]["classes"]
+
+        # Classification uses focal loss
+        loss = FocalLoss()
+
+        # Class metrics
+        output_dims = datasets[0].element_spec["Y"].shape[1]
+        metrics = [
+            AveragePrecision("metrics/average_precision", output_dims),
+            AverageRecall("metrics/average_recall", output_dims),
+        ]
+        for i, c in enumerate(classes):
+            metrics.append(ClassPrecision("metrics/{}_precision".format(c["name"]), i, output_dims))
+            metrics.append(ClassRecall("metrics/{}_recall".format(c["name"]), i, output_dims))
+
+        # Callbacks
+        callbacks = [
+            ClassificationImages(
+                output_path,
+                Dataset(
+                    paths=validation["paths"],
+                    batch_size=config["training"]["validation"]["progress_images"],
+                    keys=validation.get("keys", {}),
+                    **validation_config,
+                ).take(1),
+                # Draw using the first colour in the list for each class
+                [c["colours"][0] for c in classes],
+            )
+        ]
+
+    # Callbacks
+    return datasets, loss, metrics, callbacks

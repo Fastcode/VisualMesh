@@ -4,9 +4,10 @@ dataset:
   training:
     paths:
       - dataset/spotlight_training.tfrecord
-
+    # The batch size to use when training the network
+    batch_size: 20
     # A map which converts internal feature keys to the external dataset keys
-    keys:
+    keys: &keys
       Hoc: camera/Hoc
       lens/centre: camera/centre
       lens/focal_length: camera/focal_length
@@ -14,7 +15,7 @@ dataset:
       lens/k: camera/k
       lens/projection: camera/projection
 
-    # Additional configuration that will be merged into the other configurations for this dataset
+    # Additional configuration that will be merged into the view, example, orientation, label and projection config
     config:
       orientation:
         variants:
@@ -29,11 +30,17 @@ dataset:
   validation:
     paths:
       - dataset/spotlight_validation.tfrecord
+    batch_size: 20
+    # Repeat the keys from training
+    keys: *keys
 
   # Test dataset, used for performing final evaluations on the performance of the network.
   testing:
     paths:
       - dataset/spotlight_testing.tfrecord
+    batch_size: 200
+    # Repeat the keys from training
+    keys: *keys
 
 # What camera configuration we have (Monoscopic, Stereoscopic)
 view:
@@ -138,16 +145,11 @@ network:
 
 # Testing
 testing:
-  # How many raw elements to process at a time during testing
-  batch_size: 200
   # The number of bins to use when calculating curves
   n_bins: 1000
 
 # Settings to use when training the network
 training:
-  # The batch size to use when training the network (how many images to feed in a single training step).
-  # Do not make this number too large or it will create poor gradients.
-  batch_size: 20
   # Number of batches to consider an epoch, if None then it is the length of the input dataset
   batches_per_epoch: 1000
   # Number of epochs to execute
@@ -165,8 +167,6 @@ training:
 
   # Settings for the validation step of the network.
   validation:
-    # How big the batch should be for validation step.
-    batch_size: 20
     # How many batches to load for the validation step
     samples: 10
     # How many images to show in tensorboard, they are taken as the first n images of the validation set.
