@@ -21,7 +21,7 @@ from .view import Monoscopic, Stereoscopic
 from .visual_mesh_dataset import VisualMeshDataset
 
 
-def Dataset(paths, view, example, orientation, label, projection, keys):
+def Dataset(paths, batch_size, view, example, orientation, label, projection, keys):
 
     # Find the correct class to handle our view
     if view["type"] == "Monoscopic":
@@ -61,7 +61,14 @@ def Dataset(paths, view, example, orientation, label, projection, keys):
 
     # Create our dataset with these specific components
     return VisualMeshDataset(
-        paths=paths, view=view, example=example, orientation=orientation, projection=projection, label=label, keys=keys,
+        paths=paths,
+        batch_size=batch_size,
+        view=view,
+        example=example,
+        orientation=orientation,
+        projection=projection,
+        label=label,
+        keys=keys,
     ).build()
 
 

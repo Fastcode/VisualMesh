@@ -66,8 +66,10 @@ class VisualMesh:
 
         # We actually do know the shape of G but tensorflow makes it a little hard to do in the c++ op
         # We reshape here to ensure the size is known for later shape inferences
-        # We also cut off the null point on the end and replace it with -1s for easier combining later
-        G = tf.reshape(G, (-1, self.n_neighbours))[:-1]
-        G = tf.where(G == tf.shape(G)[0], -1, G)
+        G = tf.reshape(G, (-1, self.n_neighbours))
+
+        # We also cut off the null point on the end and replace it with the lowest int for easier combining later
+        G = G[:-1]
+        G = tf.where(G == tf.shape(G)[0], G.dtype.min, G)
 
         return {"C": C, "V": V, "G": G, "I": I}

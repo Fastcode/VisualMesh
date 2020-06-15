@@ -206,8 +206,7 @@ private:
         }
 
         // Project the mesh using our engine and shape
-        visualmesh::engine::cpu::Engine<T> engine;
-        visualmesh::ProjectedMesh<T, Model<T>::N_NEIGHBOURS> projected;
+        static thread_local visualmesh::engine::cpu::Engine<T> engine;
 
         std::shared_ptr<visualmesh::Mesh<T, Model>> mesh;
         if (geometry == "SPHERE") {
@@ -221,7 +220,7 @@ private:
               shape, Hoc[2][3], n_intersections, intersection_tolerance, cached_meshes, max_distance);
         }
         // Now project the mesh
-        projected = engine.project(*mesh, Hoc, lens);
+        visualmesh::ProjectedMesh<T, Model<T>::N_NEIGHBOURS> projected = engine.project(*mesh, Hoc, lens);
 
         // Get the interesting things out of the projected mesh
         const auto& px             = projected.pixel_coordinates;

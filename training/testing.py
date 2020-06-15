@@ -16,16 +16,16 @@
 import os
 
 import matplotlib as mpl
+
+mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
 from . import dataset
-from .dataset import ClassificationDataset
+from .dataset import Dataset
 from .model import VisualMeshModel
-
-mpl.use("Agg")
 
 
 def _thresholded_confusion(X, c):

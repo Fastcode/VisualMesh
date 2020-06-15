@@ -56,79 +56,83 @@ class VisualMeshDataset:
             else:
                 raise RuntimeError("Incompatible features for {} ({} vs {})".format(key, features[key], t))
 
-    def _map_batch(self, batch):
+    def _map(self, proto):
 
-        results = []
-        for i in range(self.batch_size):
-            # Load the data and convert it to our internal format
-            features = tf.io.parse_single_example(serialized=batch[i], features=self.dataset_features)
-            features = {k: features[k if k not in self.keys else self.keys[k]] for k in self.features}
+        # Load the data and convert it to our internal format
+        features = tf.io.parse_single_example(serialized=proto, features=self.dataset_features)
+        features = {k: features[k if k not in self.keys else self.keys[k]] for k in self.features}
 
-            views = {}
-            for p in self.view.prefixes():
+        views = {}
+        for p in self.view.prefixes():
 
-                result = {}
+            result = {}
 
-                # Use orientation to work out where the mesh should be projected
-                result.update(
-                    self.orientation(**{**{k: features[p + k] for k in self.orientation.features()}, **result})
-                )
+            # Use orientation to work out where the mesh should be projected
+            result.update(self.orientation(**{**{k: features[p + k] for k in self.orientation.features()}, **result}))
 
-                # Read the input image as we need the dimensions
-                result.update(self.example.input(**{**{k: features[p + k] for k in self.example.features()}, **result}))
+            # Read the input image as we need the dimensions
+            result.update(self.example.input(**{**{k: features[p + k] for k in self.example.features()}, **result}))
 
-                # Perform the actual projection to get vectors and coordinates
-                result.update(self.projection(**{**{k: features[p + k] for k in self.projection.features()}, **result}))
+            # Perform the actual projection to get vectors and coordinates
+            result.update(self.projection(**{**{k: features[p + k] for k in self.projection.features()}, **result}))
 
-                # Get the image output using the requested features and the projection information
-                result.update(self.example(**{**{k: features[p + k] for k in self.example.features()}, **result}))
+            # Get the image output using the requested features and the projection information
+            result.update(self.example(**{**{k: features[p + k] for k in self.example.features()}, **result}))
 
-                # Get the label output using the requested features and the projection information
-                result.update(self.label(**{**{k: features[p + k] for k in self.label.features()}, **result}))
+            # Get the label output using the requested features and the projection information
+            result.update(self.label(**{**{k: features[p + k] for k in self.label.features()}, **result}))
 
-                # Put it in the prefix results
-                views[p] = result
+            # Put it in the prefix results
+            views[p] = result
 
-            # Apply the multiview merging algorithm to the results
-            results.append(self.view.merge(views))
+        # Apply the multiview merging algorithm to the results
+        return self.view.merge(views)
 
-        return results
+    def _reduce(self, batch):
 
-    def _reduce_batch(self, batch):
-        batch = self._map_batch(batch)
+        # Get n out from the ragged batch
+        n = batch["n"].to_tensor()
 
         # We need the n offsets to reposition all the graph values
-        n = tf.stack([b["n"] for b in batch], axis=0)
         cn = tf.math.cumsum(tf.math.reduce_sum(n, axis=1), exclusive=True)
         n_elems = tf.math.reduce_sum(n)
 
         # For X we must add the "offscreen" point as a -1,-1,-1 point one past the end of the list
-        X = tf.concat([*[b["X"] for b in batch], tf.constant([[-1.0, -1.0, -1.0]], dtype=tf.float32)], axis=0)
+        X = tf.concat([batch["X"].values, tf.constant([[-1.0, -1.0, -1.0]], dtype=tf.float32)], axis=0)
 
-        Y = tf.concat([b["Y"] for b in batch], axis=0)
-        W = tf.concat([b["W"] for b in batch], axis=0)
-        C = tf.concat([b["C"] for b in batch], axis=0)
-        V = tf.concat([b["V"] for b in batch], axis=0)
-        jpg = tf.stack([b["jpg"] for b in batch], axis=0)
+        Y = batch["Y"].values
+        W = batch["W"].values
+        C = batch["C"].values
+        V = batch["V"].values
+        jpg = batch["jpg"]
 
-        # For the graph we need to move along each element by where it is in the batch
-        # We also must replace -1s with a new element off the end of the graph
-        G = tf.concat(
-            [
-                *[tf.where(batch[i]["G"] == -1, n_elems, batch[i]["G"] + cn[i]) for i in range(self.batch_size)],
-                tf.fill([1, self.projection.n_neighbours], n_elems),
-            ],
-            axis=0,
-        )
+        # Add on our offset for each batch so that we get a proper result and then remove the ragged edge
+        G = (batch["G"] + tf.expand_dims(tf.expand_dims(cn, -1), -1)).values
+
+        # Replace the offscreen negative points with the offscreen point and append it to the end
+        G = tf.concat([tf.where(G < 0, n_elems, G), tf.fill([1, self.projection.n_neighbours], n_elems)], axis=0)
 
         return {"X": X, "Y": Y, "W": W, "G": G, "n": n, "C": C, "V": V, "jpg": jpg}
 
     def build(self):
 
-        # Load, batch and map the dataset
+        # Load the files
         dataset = tf.data.TFRecordDataset(self.paths)
-        dataset = dataset.batch(self.batch_size)
-        dataset = dataset.map(self._reduce_batch, num_parallel_calls=self.prefetch)
+
+        # Extract the data from the examples
+        dataset = dataset.map(self._map, num_parallel_calls=self.prefetch)
+
+        # Prefetch some elements to ensure training smoothness
+        dataset = dataset.prefetch(self.prefetch)
+
+        # Filter out any images that didn't project anything
+        dataset = dataset.filter(lambda args: tf.size(args["X"]) > 0)
+
+        # Perform a ragged batch
+        dataset = dataset.apply(tf.data.experimental.dense_to_ragged_batch(batch_size=self.batch_size))
+
+        # Perform actions needed to convert the ragged batches into training examples
+        dataset = dataset.map(self._reduce, num_parallel_calls=self.prefetch)
 
         # Prefetch some elements to ensure training smoothness
         dataset = dataset.prefetch(self.prefetch)
