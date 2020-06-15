@@ -18,7 +18,7 @@ dataset:
     # Additional configuration that will be merged into the view, example, orientation, label and projection config
     config:
       orientation:
-        variants:
+        variations:
           # Adjustments to the height of the mesh above the observation plane.
           height: { mean: 0, stddev: 0.05 }
           # Adjustments to the orientation of the observation plane

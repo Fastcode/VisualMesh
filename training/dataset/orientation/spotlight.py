@@ -15,10 +15,12 @@
 
 import tensorflow as tf
 
+from .random_rotation import random_axis, random_rotation
+
 
 class Spotlight:
     def __init__(self, **config):
-        pass
+        self.variations = {} if "variations" not in config else config["variations"]
 
     def features(self):
         return {
@@ -28,12 +30,29 @@ class Spotlight:
 
     def __call__(self, Hoc, targets, **features):
 
+        # Extract the world z that we will use to orient our mesh
+        world_z = Hoc[2, :3]
+
+        # If we are going to apply a random rotation we only need to do it to world z
+        if "rotation" in self.variations:
+            v = self.variations["rotation"]
+
+            # Apply a random axis angle rotation
+            world_z = tf.squeeze(
+                tf.matmul(random_rotation(v["mean"], v["stddev"])[:3, :3], tf.expand_dims(world_z, -1)), -1
+            )
+
         # Pick a random target
         rOCc = targets[tf.random.uniform((), 0, tf.shape(targets)[0], tf.int32)]
 
+        # Apply a random variation to the position
+        if "position" in self.variations:
+            v = self.variations["position"]
+            rOCc = rOCc + random_axis() * tf.random.truncated_normal((), v["mean"], v["stddev"])
+
         # Get our axes and height
         z, h = tf.linalg.normalize(-rOCc)
-        y, _ = tf.linalg.normalize(tf.linalg.cross(z, Hoc[2, :3]))
+        y, _ = tf.linalg.normalize(tf.linalg.cross(z, world_z))
         x, _ = tf.linalg.normalize(tf.linalg.cross(y, z))
 
         # Assemble Hoc
