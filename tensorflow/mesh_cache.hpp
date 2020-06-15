@@ -130,9 +130,9 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> get_mesh(const Shape<Scalar>& s
         if (mesh != nullptr) { return mesh; }
     }
 
-    // We couldn't find an appropriate mesh, make a new one but don't hold the mutex while we do so others can still
-    // query
-    auto new_mesh = std::make_shared<visualmesh::Mesh<Scalar, Model>>(shape, height, n_intersections, max_distance);
+    // We can't find an appropriate mesh, make a new one but don't hold the mutex while we do so others can still query
+    // Generate the mesh using double precision and then cast it over to whatever we need
+    auto generated_mesh = visualmesh::Mesh<double, Model>(shape, height, n_intersections, max_distance);
 
     /* mutex scope */ {
         std::lock_guard<std::mutex> lock(mesh_mutex);
@@ -149,8 +149,8 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> get_mesh(const Shape<Scalar>& s
             }
 
             // Add our new mesh to the cache and return
-            meshes.push_back(new_mesh);
-            return new_mesh;
+            meshes.push_back(std::make_shared<visualmesh::Mesh<Scalar, Model>>(generated_mesh));
+            return meshes.back();
         }
     }
 }

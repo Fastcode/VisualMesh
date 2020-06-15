@@ -456,6 +456,21 @@ public:
         nodes = std::move(sorted_nodes);
     }
 
+    template <typename U>
+    explicit Mesh(const Mesh<U, Model>& b)
+      : h(static_cast<Scalar>(b.h)), max_distance(static_cast<Scalar>(b.max_distance)) {
+        nodes.reserve(b.nodes.size());
+        bsp.reserve(b.bsp.size());
+
+        for (const auto& n : b.nodes) {
+            nodes.push_back(Node<Scalar, Model<Scalar>::N_NEIGHBOURS>{cast<Scalar>(n.ray), n.neighbours});
+        }
+        for (const auto& b : b.bsp) {
+            bsp.push_back(
+              BSP{b.range, b.children, std::make_pair(cast<Scalar>(b.cone.first), cast<Scalar>(b.cone.second))});
+        }
+    }
+
     /**
      * @brief Lookup which ranges in the Visual Mesh are on screen given the description of the camera lens/sensor and
      * the orientation of the camera relative to the observation plane.
@@ -562,6 +577,8 @@ public:
 
         return ranges;
     }
+
+public:
     /// The height that this mesh is designed to run at
     Scalar h;
     /// The maximum distance this mesh is setup for
@@ -572,6 +589,9 @@ public:
 private:
     /// The binary search tree that is used for looking up which points are on screen in the mesh
     std::vector<BSP> bsp;
+
+    template <typename S, template <typename> class M>
+    friend class Mesh;
 };
 
 }  // namespace visualmesh

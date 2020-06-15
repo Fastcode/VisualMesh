@@ -23,17 +23,23 @@ class Spotlight:
     def features(self):
         return {
             "Hoc": tf.io.FixedLenFeature([4, 4], tf.float32),
-            "target": tf.io.FixedLenSequenceFeature([3], tf.float32),
+            "targets": tf.io.FixedLenSequenceFeature([3], tf.float32, allow_missing=True),
         }
 
-    def __call__(self, Hoc, target, **features):
-        # Create a new Hcw via target and the original Hcw
+    def __call__(self, Hoc, targets, **features):
 
-        # Apply variations to the position of the target
+        # Pick a random target
+        rOCc = targets[tf.random.uniform((), 0, tf.shape(targets)[0], tf.int32)]
 
-        # World up is still world up so therefore world z = our z
-        # z = normalise(target vector)
-        # x = normalise(world z cross target)
-        # y = normalise(x cross z)
-        # Height = norm target vector
-        raise RuntimeError("Spotlight is not yet implemented")
+        # Get our axes and height
+        z, h = tf.linalg.normalize(-rOCc)
+        y, _ = tf.linalg.normalize(tf.linalg.cross(z, Hoc[2, :3]))
+        x, _ = tf.linalg.normalize(tf.linalg.cross(y, z))
+
+        # Assemble Hoc
+        Roc = tf.stack([x, y, z], axis=0)
+        spotlight_Hoc = tf.concat(
+            [tf.pad(Roc, [[0, 1], [0, 0]]), tf.convert_to_tensor([[0], [0], h, [1]], Roc.dtype)], axis=1
+        )
+
+        return {"Hoc": spotlight_Hoc}
