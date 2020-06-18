@@ -102,7 +102,8 @@ namespace model {
             }
 
             // Clip all neighbours that are past the end to one past the end
-            for (int i = start; i < int(nodes.size()); ++i) {
+            // We start at start - 1 as a hack so that if there is only a single point (the origin) it will be corrected
+            for (int i = start - 1; i < int(nodes.size()); ++i) {
                 for (auto& n : nodes[i].neighbours) {
                     n = std::min(n, int(nodes.size()));
                 }

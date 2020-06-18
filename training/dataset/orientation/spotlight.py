@@ -50,6 +50,17 @@ class Spotlight:
             v = self.variations["position"]
             rOCc = rOCc + random_axis() * tf.random.truncated_normal((), v["mean"], v["stddev"])
 
+            # If a minimum and/or maximum distance is given, apply them to the position
+            if "min" in v or "max" in v:
+                vec, l = tf.linalg.normalize(rOCc)
+
+                if "min" in v:
+                    l = tf.math.minimum(tf.constant(v["min"], dtype=l.dtype), l)
+                if "max" in v:
+                    l = tf.math.maximum(tf.constant(v["max"], dtype=l.dtype), l)
+
+                rOCc = tf.multiply(vec, l)
+
         # Get our axes and height
         z, h = tf.linalg.normalize(-rOCc)
         y, _ = tf.linalg.normalize(tf.linalg.cross(z, world_z))
