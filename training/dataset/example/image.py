@@ -18,8 +18,7 @@ import tensorflow as tf
 
 class Image:
     def __init__(self, **config):
-        # TODO variant config in here
-        pass
+        self.variations = {} if "variations" not in config else config["variations"]
 
     def _interpolate_gather(self, img, C):
 
@@ -64,13 +63,32 @@ class Image:
         }
 
     def input(self, image, **features):
-        # TODO apply variants to the image
+
+        # Return the image and the original compressed image
         return {
             "jpg": image,
             "image": tf.image.convert_image_dtype(tf.image.decode_image(image, channels=3), tf.float32),
         }
 
     def __call__(self, image, C, **features):
+
+        # Apply the variants that were listed
+        if "brightness" in self.variations:
+            v = self.variations["brightness"]
+            image = tf.image.adjust_brightness(image, tf.random.truncated_normal(shape=(), **v))
+        if "contrast" in self.variations:
+            v = self.variations["contrast"]
+            image = tf.image.adjust_contrast(image, tf.random.truncated_normal(shape=(), **v))
+        if "hue" in self.variations:
+            v = self.variations["hue"]
+            image = tf.image.adjust_hue(image, tf.random.truncated_normal(shape=(), **v))
+        if "saturation" in self.variations:
+            v = self.variations["saturation"]
+            image = tf.image.adjust_saturation(image, tf.random.truncated_normal(shape=(), **v))
+        if "gamma" in self.variations:
+            v = self.variations["gamma"]
+            image = tf.image.adjust_gamma(image, tf.random.truncated_normal(shape=(), **v))
+
         # Get the pixels referenced by the image
         return {
             "X": self._interpolate_gather(image, C),
