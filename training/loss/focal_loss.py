@@ -26,7 +26,7 @@ def FocalLoss(gamma=2.0):
 
         # Calculate the class weights required to balance the output
         C = tf.math.reduce_sum(y_true, axis=0, keepdims=True)
-        C = tf.divide(tf.reduce_max(C), C)
+        C = tf.math.divide_no_nan(tf.math.reduce_max(C), C)
 
         # Calculate focal loss
         p_t = tf.where(tf.equal(y_true, 1.0), y_pred, 1.0 - y_pred)
