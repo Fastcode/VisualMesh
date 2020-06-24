@@ -25,11 +25,11 @@ class Monoscopic:
 
     def merge(self, views):
 
-        # We have only one view
+        # We have only one view, so just choose it
         view = views[""]
 
-        # We only have a single camera so merging is just choosing the only output
         return {
-            **view,
-            "n": [tf.shape(view["G"])[0]],
+            **{k: v for k, v in view.items() if len(v.shape) > 0 and v.shape[0] == None},
+            **{k: tf.expand_dims(v, 0) for k, v in view.items() if len(v.shape) == 0 or v.shape[0] != None},
+            "n": tf.expand_dims(tf.shape(view["G"])[0], 0),
         }

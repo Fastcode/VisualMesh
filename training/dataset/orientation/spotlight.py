@@ -25,10 +25,12 @@ class Spotlight:
     def features(self):
         return {
             "Hoc": tf.io.FixedLenFeature([4, 4], tf.float32),
-            "targets": tf.io.FixedLenSequenceFeature([3], tf.float32, allow_missing=True),
+            "spotlight/targets": tf.io.FixedLenSequenceFeature([3], tf.float32, allow_missing=True),
         }
 
-    def __call__(self, Hoc, targets, **features):
+    def __call__(self, Hoc, **features):
+
+        targets = features["spotlight/targets"]
 
         # Extract the world z that we will use to orient our mesh
         world_z = Hoc[2, :3]
