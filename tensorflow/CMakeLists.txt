@@ -2,7 +2,7 @@
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
 find_package(TensorFlow REQUIRED)
 
-add_library(tf_op SHARED "map.cpp" "unmap.cpp" "difference.cpp" "project.cpp" ${hdr})
+add_library(tf_op SHARED "map.cpp" "unmap.cpp" "lookup.cpp" "difference.cpp" ${hdr})
 target_compile_options(tf_op PRIVATE -march=native -mtune=native)
 set_target_properties(tf_op PROPERTIES CXX_STANDARD 14 LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/training/op"
                                        PREFIX "" OUTPUT_NAME visualmesh_op SUFFIX ".so")
