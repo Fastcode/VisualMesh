@@ -19,13 +19,17 @@ import os
 import warnings
 
 import cv2
-import matplotlib as mpl
-
-mpl.use("Agg")
-
-import matplotlib.pyplot as plt
 import numpy as np
+
 import tensorflow as tf
+
+# So isort doesn't mess up the mpl.use line
+if True:
+    import matplotlib as mpl
+
+    mpl.use("Agg")
+
+    import matplotlib.pyplot as plt
 
 
 class ClassificationImages(tf.keras.callbacks.Callback):
@@ -35,12 +39,22 @@ class ClassificationImages(tf.keras.callbacks.Callback):
         self.colours = colours
         self.writer = tf.summary.create_file_writer(os.path.join(output_path, "images"))
 
-        # Load the dataset and extract a single record from it
+        # Load the dataset and extract the single record from it
         for d in dataset:
             self.data = d
 
+        self.X = data["X"]
+        self.G = data["G"]
+        self.C = data["C"]
+        self.Hoc = tf.reshape(data["Hoc"], (-1, 4, 4))
+        self.img = tf.reshape(data["jpg"], (-1,))
+
+        # Work out the data ranges
+        cs = [0] + np.cumsum(data["n"]).tolist()
+        self.ranges = list(zip(cs, cs[1:]))
+
     @staticmethod
-    def mesh_image(img, C, X, colours):
+    def image(img, C, X, colours):
 
         # hash of the image file for sorting later
         img_hash = hashlib.md5()
@@ -98,16 +112,14 @@ class ClassificationImages(tf.keras.callbacks.Callback):
         # Make a dataset that we can infer from, we need to make the input a tuple in a tuple.
         # If it is not it considers G to be Y and it fails to execute
         # Then using this dataset of images, do a prediction using the model
-        predictions = self.model((self.data["X"], self.data["G"]))
+        predictions = self.model((self.X, self.G))
 
         # Work out the valid data ranges for each of the objects
-        cs = [0] + np.cumsum(self.data["n"]).tolist()
-        ranges = list(zip(cs, cs[1:]))
         images = []
         for i, r in enumerate(ranges):
             images.append(
-                self.mesh_image(
-                    self.data["jpg"][i].numpy(), self.data["C"][r[0] : r[1]], predictions[r[0] : r[1]], self.colours,
+                img=self.image(
+                    self.jpg[i].numpy(), C=self.C[r[0] : r[1]], X=predictions[r[0] : r[1]], colours=self.colours
                 )
             )
 
