@@ -16,8 +16,8 @@
 import re
 
 import tensorflow as tf
-
-import training.op as op
+from training.op import lookup_visual_mesh
+from training.projection import project
 
 
 class VisualMesh:
@@ -46,8 +46,8 @@ class VisualMesh:
 
     def __call__(self, image, Hoc, **features):
 
-        # Run the visual mesh to get our values
-        C, V, G, I = op.project_visual_mesh(
+        # Lookup vectors in the visual mesh
+        V, G = lookup_visual_mesh(
             image_dimensions=tf.shape(image)[:2],
             lens_projection=features["lens/projection"],
             lens_focal_length=features["lens/focal_length"],
@@ -64,12 +64,27 @@ class VisualMesh:
             intersection_tolerance=self.intersection_tolerance,
         )
 
+        # Project them to pixel coordinates
+        C = project(
+            tf.einsum("ij,ki->kj", Hoc[:3, :3], V),
+            tf.shape(image)[:2],
+            features["lens/projection"],
+            features["lens/focal_length"],
+            features["lens/centre"],
+            features["lens/k"],
+        )
+
         # We actually do know the shape of G but tensorflow makes it a little hard to do in the c++ op
         # We reshape here to ensure the size is known for later shape inferences
         G = tf.reshape(G, (-1, self.n_neighbours))
 
-        # We also cut off the null point on the end and replace it with the lowest int for easier combining later
-        G = G[:-1]
-        G = tf.where(G == tf.shape(G)[0], G.dtype.min, G)
-
-        return {"C": C, "V": V, "G": G, "I": I}
+        return {
+            "C": C,
+            "V": V,
+            "G": G,
+            "lens/projection": features["lens/projection"],
+            "lens/focal_length": features["lens/focal_length"],
+            "lens/centre": features["lens/centre"],
+            "lens/k": features["lens/k"],
+            "lens/fov": features["lens/fov"],
+        }

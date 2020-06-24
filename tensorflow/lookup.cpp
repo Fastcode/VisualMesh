@@ -21,7 +21,6 @@
 
 #include <memory>
 
-#include "engine/cpu/engine.hpp"
 #include "geometry/Circle.hpp"
 #include "geometry/Sphere.hpp"
 #include "mesh/mesh.hpp"
@@ -60,13 +59,11 @@ enum Args {
 };
 
 enum Outputs {
-    PIXELS         = 0,
-    VECTORS        = 1,
-    NEIGHBOURS     = 2,
-    GLOBAL_INDICES = 3,
+    VECTORS    = 0,
+    NEIGHBOURS = 1,
 };
 
-REGISTER_OP("ProjectVisualMesh")
+REGISTER_OP("LookupVisualMesh")
   .Attr("T: {float, double}")
   .Attr("U: {int32, int64}")
   .Input("image_dimensions: U")
@@ -83,16 +80,12 @@ REGISTER_OP("ProjectVisualMesh")
   .Input("radius: T")
   .Input("n_intersections: T")
   .Input("intersection_tolerance: T")
-  .Output("pixels: T")
   .Output("vectors: T")
   .Output("neighbours: int32")
-  .Output("global_indices: int32")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-      // nx2 points on image, n+1xG neighbours (including off screen point), and n global indices
-      c->set_output(Outputs::PIXELS, c->MakeShape({c->kUnknownDim, 2}));
+      // nx2 vectors on image, n+1xG neighbours (including off screen point), and n global indices
       c->set_output(Outputs::VECTORS, c->MakeShape({c->kUnknownDim, 3}));
       c->set_output(Outputs::NEIGHBOURS, c->MakeShape({c->kUnknownDim, c->kUnknownDim}));
-      c->set_output(Outputs::GLOBAL_INDICES, c->MakeShape({c->kUnknownDim}));
       return tensorflow::Status::OK();
   });
 
@@ -107,7 +100,7 @@ REGISTER_OP("ProjectVisualMesh")
  * @tparam U The scalar type used for integer numbers
  */
 template <typename T, typename U>
-class ProjectVisualMeshOp : public tensorflow::OpKernel {
+class LookupVisualMeshOp : public tensorflow::OpKernel {
 private:
     template <template <typename> class Model>
     void ComputeModel(tensorflow::OpKernelContext* context) {
@@ -195,18 +188,12 @@ private:
         lens.centre       = {{lens_centre(1), lens_centre(0)}};  // Swap from tf coordinates to our coordinates
         lens.k            = {{lens_distortion(0), lens_distortion(1)}};
         lens.fov          = fov;
-        if (projection == "EQUISOLID") {
-            lens.projection = visualmesh::EQUISOLID;  //
-        }
-        else if (projection == "EQUIDISTANT") {
-            lens.projection = visualmesh::EQUIDISTANT;
-        }
-        else if (projection == "RECTILINEAR") {
-            lens.projection = visualmesh::RECTILINEAR;
-        }
 
-        // Project the mesh using our engine and shape
-        static thread_local visualmesh::engine::cpu::Engine<T> engine;
+        // clang-format off
+        if (projection == "EQUISOLID") lens.projection = visualmesh::EQUISOLID;
+        else if (projection == "EQUIDISTANT") lens.projection = visualmesh::EQUIDISTANT;
+        else if (projection == "RECTILINEAR") lens.projection = visualmesh::RECTILINEAR;
+        // clang-format on
 
         std::shared_ptr<visualmesh::Mesh<T, Model>> mesh;
         if (geometry == "SPHERE") {
@@ -219,81 +206,72 @@ private:
             mesh = get_mesh<T, Model, visualmesh::geometry::Circle>(
               shape, Hoc[2][3], n_intersections, intersection_tolerance, cached_meshes, max_distance);
         }
-        // Now project the mesh
-        visualmesh::ProjectedMesh<T, Model<T>::N_NEIGHBOURS> projected = engine.project(*mesh, Hoc, lens);
 
-        // Get the interesting things out of the projected mesh
-        const auto& px             = projected.pixel_coordinates;
-        const auto& neighbourhood  = projected.neighbourhood;
-        const auto& global_indices = projected.global_indices;
+        // Grab the ranges
+        auto ranges       = mesh->lookup(Hoc, lens);
+        const auto& nodes = mesh->nodes;
 
-        // Fill in our tensorflow output matrix
-        tensorflow::Tensor* coordinates = nullptr;
-        tensorflow::TensorShape coords_shape;
-        coords_shape.AddDim(px.size());
-        coords_shape.AddDim(2);
-        OP_REQUIRES_OK(context, context->allocate_output(Outputs::PIXELS, coords_shape, &coordinates));
-
-        // Copy across our pixel coordinates remembering to reverse the order from x,y to y,x
-        auto c = coordinates->matrix<T>();
-        for (size_t i = 0; i < px.size(); ++i) {
-            // Swap x and y here since tensorflow expects them reversed
-            const auto& p = px[i];
-            c(i, 0)       = p[1];
-            c(i, 1)       = p[0];
+        // Work out how many points total there are in the ranges
+        unsigned int n_points = 0;
+        for (auto& r : ranges) {
+            n_points += r.second - r.first;
         }
 
-        // Fill in our tensorflow output matrix
+
+        // Allocate our outputs
         tensorflow::Tensor* vectors = nullptr;
         tensorflow::TensorShape vectors_shape;
-        vectors_shape.AddDim(global_indices.size());
+        vectors_shape.AddDim(n_points);
         vectors_shape.AddDim(3);
         OP_REQUIRES_OK(context, context->allocate_output(Outputs::VECTORS, vectors_shape, &vectors));
 
-        // Copy across our pixel coordinates remembering to reverse the order from x,y to y,x
-        auto v = vectors->matrix<T>();
-        for (size_t i = 0; i < global_indices.size(); ++i) {
-            const auto& p = mesh->nodes[global_indices[i]].ray;
-            v(i, 0)       = p[0];
-            v(i, 1)       = p[1];
-            v(i, 2)       = p[2];
-        }
-
-        // Build our tensorflow neighbourhood graph
         tensorflow::Tensor* neighbours = nullptr;
         tensorflow::TensorShape neighbours_shape;
-        neighbours_shape.AddDim(neighbourhood.size());
+        neighbours_shape.AddDim(n_points);
         neighbours_shape.AddDim(Model<T>::N_NEIGHBOURS + 1);
         OP_REQUIRES_OK(context, context->allocate_output(Outputs::NEIGHBOURS, neighbours_shape, &neighbours));
 
-        // Copy across our neighbourhood graph, adding in a point for itself
-        auto n = neighbours->matrix<U>();
-        for (unsigned int i = 0; i < neighbourhood.size(); ++i) {
-            // Get our old neighbours from original output
-            const auto& m = neighbourhood[i];
-            // First point is ourself
-            n(i, 0) = i;
-            for (unsigned int j = 0; j < neighbourhood[i].size(); ++j) {
-                n(i, j + 1) = m[j];
+        // Build the lookup for the graph so we can find the new location of points
+        std::vector<int> r_lookup(nodes.size() + 1, std::numeric_limits<tensorflow::int32>::lowest());
+        {
+            int idx = 0;
+            for (const auto& r : ranges) {
+                for (int i = r.first; i < r.second; ++i) {
+                    r_lookup[i] = idx++;
+                }
             }
         }
 
-        // Fill in our tensorflow global_indices output matrix
-        tensorflow::Tensor* global_indices_out = nullptr;
-        tensorflow::TensorShape global_indices_shape;
-        global_indices_shape.AddDim(global_indices.size());
-        OP_REQUIRES_OK(context,
-                       context->allocate_output(Outputs::GLOBAL_INDICES, global_indices_shape, &global_indices_out));
+        // Copy across the unit vectors we looked up
+        {
+            auto v  = vectors->matrix<T>();
+            auto n  = neighbours->matrix<tensorflow::int32>();
+            int idx = 0;
+            for (const auto& r : ranges) {
+                for (int i = r.first; i < r.second; ++i) {
 
-        // Copy across our global indices
-        auto g = global_indices_out->flat<U>();
-        for (unsigned int i = 0; i < global_indices.size(); ++i) {
-            g(i) = global_indices[i];
+                    // Copy across the ray
+                    const auto& r = nodes[i].ray;
+                    v(idx, 0)     = r[0];
+                    v(idx, 1)     = r[1];
+                    v(idx, 2)     = r[2];
+
+                    // Copy across the graph points in their new position
+                    const auto& node = nodes[i];
+                    n(idx, 0)        = idx;
+                    for (int j = 0; j < Model<T>::N_NEIGHBOURS; ++j) {
+                        n(idx, j + 1) = r_lookup[node.neighbours[j]];
+                    }
+
+                    // Next value to fill
+                    ++idx;
+                }
+            }
         }
     }
 
 public:
-    explicit ProjectVisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
+    explicit LookupVisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
 
     void Compute(tensorflow::OpKernelContext* context) override {
 
@@ -333,23 +311,23 @@ public:
 };
 
 // Register a version for all the combinations of float/double and int32/int64
-REGISTER_KERNEL_BUILDER(Name("ProjectVisualMesh")
+REGISTER_KERNEL_BUILDER(Name("LookupVisualMesh")
                           .Device(tensorflow::DEVICE_CPU)
                           .TypeConstraint<float>("T")
                           .TypeConstraint<tensorflow::int32>("U"),
-                        ProjectVisualMeshOp<float, tensorflow::int32>)
-REGISTER_KERNEL_BUILDER(Name("ProjectVisualMesh")
+                        LookupVisualMeshOp<float, tensorflow::int32>)
+REGISTER_KERNEL_BUILDER(Name("LookupVisualMesh")
                           .Device(tensorflow::DEVICE_CPU)
                           .TypeConstraint<float>("T")
                           .TypeConstraint<tensorflow::int64>("U"),
-                        ProjectVisualMeshOp<float, tensorflow::int64>)
-REGISTER_KERNEL_BUILDER(Name("ProjectVisualMesh")
+                        LookupVisualMeshOp<float, tensorflow::int64>)
+REGISTER_KERNEL_BUILDER(Name("LookupVisualMesh")
                           .Device(tensorflow::DEVICE_CPU)
                           .TypeConstraint<double>("T")
                           .TypeConstraint<tensorflow::int32>("U"),
-                        ProjectVisualMeshOp<double, tensorflow::int32>)
-REGISTER_KERNEL_BUILDER(Name("ProjectVisualMesh")
+                        LookupVisualMeshOp<double, tensorflow::int32>)
+REGISTER_KERNEL_BUILDER(Name("LookupVisualMesh")
                           .Device(tensorflow::DEVICE_CPU)
                           .TypeConstraint<double>("T")
                           .TypeConstraint<tensorflow::int64>("U"),
-                        ProjectVisualMeshOp<double, tensorflow::int64>)
+                        LookupVisualMeshOp<double, tensorflow::int64>)

@@ -27,8 +27,9 @@ class Classification:
 
     def __call__(self, mask, C, **features):
 
-        # Use the nearest neighbour pixel to get the classification from the mask
-        Y = tf.gather_nd(tf.image.decode_png(mask, channels=4), tf.cast(tf.round(C), tf.int32))
+        # Use the nearest neighbour pixel to get the classification from the mask making sure the point is on the screen
+        mask = tf.image.decode_png(mask, channels=4)
+        Y = tf.gather_nd(mask, tf.clip_by_value(tf.cast(tf.round(C), tf.int32), [[0, 0]], [tf.shape(mask)[:2] - 1]))
 
         # Expand the classes from colours into individual columns
         W = tf.image.convert_image_dtype(Y[:, 3], tf.float32)  # Alpha channel
@@ -52,4 +53,4 @@ class Classification:
             )
         Y = tf.stack(cs, axis=-1)
 
-        return {"Y": Y, "W": W}
+        return {"Y": Y}

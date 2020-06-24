@@ -22,23 +22,24 @@ class Image:
 
     def _interpolate_gather(self, img, C):
 
-        # Bilinearly interpolate our image based on our floating point pixel coordinate
-        y_0 = tf.floor(C[:, 0])
-        x_0 = tf.floor(C[:, 1])
+        # Get our four surrounding coordinates
+        y_0 = tf.math.floor(C[:, 0])
+        x_0 = tf.math.floor(C[:, 1])
         y_1 = y_0 + 1
         x_1 = x_0 + 1
+
+        # Get the coordinates of the four closest pixels to this point making sure we clip to the edge of the screen
+        corners = [
+            tf.clip_by_value(tf.cast(tf.stack([a, b], axis=-1), tf.int32), [[0, 0]], [tf.shape(img)[:2] - 1])
+            for a, b in [(y_0, x_0), (y_0, x_1), (y_1, x_0), (y_1, x_1)]
+        ]
 
         # Calculate the weights of how much the x and y account for for each of the 4 corners
         y_w = C[:, 0] - y_0
         x_w = C[:, 1] - x_0
 
-        # Get the coordinates of the four closest pixels to this point
-        p_idx = [
-            tf.cast(tf.stack([a, b], axis=-1), tf.int32) for a, b in [(y_0, x_0), (y_0, x_1), (y_1, x_0), (y_1, x_1),]
-        ]
-
         # Gather the pixel values from the image
-        p_val = [tf.gather_nd(img, idx) for idx in p_idx]
+        p_val = [tf.gather_nd(img, idx) for idx in corners]
 
         # Weight each of the pixel values based on their relative distance
         p_weighted = [
@@ -67,7 +68,9 @@ class Image:
         # Return the image and the original compressed image
         return {
             "jpg": image,
-            "image": tf.image.convert_image_dtype(tf.image.decode_image(image, channels=3), tf.float32),
+            "image": tf.image.convert_image_dtype(
+                tf.image.decode_image(image, channels=3, expand_animations=False), tf.float32
+            ),
         }
 
     def __call__(self, image, C, **features):

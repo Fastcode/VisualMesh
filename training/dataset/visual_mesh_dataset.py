@@ -100,11 +100,21 @@ class VisualMeshDataset:
         # For X we must add the "offscreen" point as a -1,-1,-1 point one past the end of the list
         X = tf.concat([batch["X"].values, tf.constant([[-1.0, -1.0, -1.0]], dtype=tf.float32)], axis=0)
 
+        # Using .values removes the outer "ragged" batch which is effectively concatenating
         Y = batch["Y"].values
-        W = batch["W"].values
         C = batch["C"].values
         V = batch["V"].values
-        jpg = batch["jpg"]
+
+        # Fixed size elements are in sensible shapes
+        jpg = batch["jpg"].to_tensor()
+        Hoc = batch["Hoc"].to_tensor()
+        lens = {
+            "projection": batch["lens/projection"].to_tensor(),
+            "focal_length": batch["lens/focal_length"].to_tensor(),
+            "centre": batch["lens/centre"].to_tensor(),
+            "k": batch["lens/k"].to_tensor(),
+            "fov": batch["lens/fov"].to_tensor(),
+        }
 
         # Add on our offset for each batch so that we get a proper result and then remove the ragged edge
         G = (batch["G"] + tf.expand_dims(tf.expand_dims(cn, -1), -1)).values
@@ -112,7 +122,17 @@ class VisualMeshDataset:
         # Replace the offscreen negative points with the offscreen point and append it to the end
         G = tf.concat([tf.where(G < 0, n_elems, G), tf.fill([1, self.projection.n_neighbours], n_elems)], axis=0)
 
-        return {"X": X, "Y": Y, "W": W, "G": G, "n": n, "C": C, "V": V, "jpg": jpg}
+        return {
+            "X": X,
+            "Y": Y,
+            "G": G,
+            "n": n,
+            "C": C,
+            "V": V,
+            "Hoc": Hoc,
+            "jpg": jpg,
+            "lens": lens,
+        }
 
     def build(self):
 

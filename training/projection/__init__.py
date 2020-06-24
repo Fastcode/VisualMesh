@@ -1,0 +1,60 @@
+import tensorflow as tf
+
+
+def _inverse_coefficents(k):
+    return [
+        -k[0],
+        3.0 * (k[0] * k[0]) - k[1],
+        -12.0 * (k[0] * k[0]) * k[0] + 8.0 * k[0] * k[1],
+        55.0 * (k[0] * k[0]) * (k[0] * k[0]) - 55.0 * (k[0] * k[0]) * k[1] + 5.0 * (k[1] * k[1]),
+    ]
+
+
+def _distort(r, k):
+    ik = _inverse_coefficents(k)
+    return r * (
+        1.0
+        + ik[0] * (r * r)
+        + ik[1] * ((r * r) * (r * r))
+        + ik[2] * ((r * r) * (r * r)) * (r * r)
+        + ik[3] * ((r * r) * (r * r)) * ((r * r) * (r * r))
+    )
+
+
+def _equidistant_r(theta, f):
+    return f * theta
+
+
+def _rectilinear_r(theta, f):
+    return f * tf.math.tan(theta)
+
+
+def _equisolid_r(theta, f):
+    return 2.0 * f * tf.math.sin(theta * 0.5)
+
+
+def project(V, dimensions, projection, f, centre, k):
+
+    x = tf.clip_by_value(V[:, 0], -1.0, 1.0)
+    y = V[:, 1]
+    z = V[:, 2]
+
+    #  Perform the projection math
+    theta = tf.math.acos(x)
+    rsin_theta = tf.math.rsqrt(1.0 - tf.square(x))
+    if projection == "RECTILINEAR":
+        r_u = _rectilinear_r(theta, f)
+    elif projection == "EQUISOLID":
+        r_u = _equisolid_r(theta, f)
+    elif projection == "EQUIDISTANT":
+        r_u = _equidistant_r(theta, f)
+    else:
+        r_u = tf.zeros_like(theta)
+
+    r_d = _distort(r_u, k)
+
+    # Screen as y,x
+    screen = tf.stack([r_d * z * rsin_theta, r_d * y * rsin_theta], axis=1)
+
+    # Convert to pixel coordinates
+    return (tf.cast(dimensions, tf.float32) * 0.5) - screen - centre
