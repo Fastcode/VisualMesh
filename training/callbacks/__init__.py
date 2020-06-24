@@ -14,3 +14,4 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from .classification_images import ClassificationImages
+from .seeker_images import SeekerImages
