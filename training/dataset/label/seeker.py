@@ -14,17 +14,51 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import tensorflow as tf
+from training.op import difference_visual_mesh, map_visual_mesh, unmap_visual_mesh
 
 
 class Seeker:
-    def __init__(self, **config):
-        pass
+    def __init__(self, scale, mesh, geometry, **config):
+        self.scale = scale
+
+        # Grab our relevant fields
+        self.mesh_model = mesh["model"]
+        self.geometry = tf.constant(geometry["shape"], dtype=tf.string, name="GeometryType")
+        self.radius = geometry["radius"]
 
     def features(self):
         return {
-            "position": tf.io.FixedLenSequenceFeature([3], tf.float32),
+            "seeker/targets": tf.io.FixedLenSequenceFeature([3], tf.float32, allow_missing=True),
         }
 
-    def __call__(self, Hoc, position, **features):
+    def __call__(self, Hoc, V, **features):
 
-        raise RuntimeError("Seeker is not yet implemented")
+        targets = features["seeker/targets"]
+
+        # Transform our targets into observation plane space
+        rOCo, _ = tf.linalg.normalize(tf.einsum("ij,kj->ki", Hoc[:3, :3], targets), axis=-1)
+
+        args = {"model": self.mesh_model, "height": Hoc[2, 3], "geometry": self.geometry, "radius": self.radius}
+
+        # Get our vectors in nm coordinates
+        mesh_nm = unmap_visual_mesh(V, **args)
+        target_nm = unmap_visual_mesh(rOCo, **args)
+
+        # Replicate out the points so they are the same size
+        n_nodes = tf.shape(mesh_nm)[0]
+        n_targets = tf.shape(target_nm)[0]
+        m = tf.tile(mesh_nm, (n_targets, 1))  # [a,b,c] -> [a,b,c,a,b,c,a,b,c]
+        t = tf.reshape(tf.tile(target_nm, (1, n_nodes)), (-1, 2))  # [a,b,c] -> [a,a,a,b,b,b,c,c,c]
+
+        # Do the difference of each point and stack them up on the first axis to find the closest position for each
+        diff = tf.reshape(difference_visual_mesh(t, m, **args), (n_targets, n_nodes, 2))
+        squared_diff = tf.reduce_sum(tf.square(diff), axis=-1)
+        best_idx = tf.stack(
+            [tf.math.argmin(squared_diff, axis=0, output_type=tf.int32), tf.range(n_nodes, dtype=tf.int32)], axis=1
+        )
+        distance = tf.math.divide(tf.gather_nd(diff, best_idx), self.scale)
+
+        # Divide distance by scale so a value from 0->scale becomes 0->1
+        distance = tf.math.divide(tf.gather_nd(diff, best_idx), self.scale)
+
+        return {"Y": distance}
