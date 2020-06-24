@@ -99,7 +99,7 @@ private:
         T height             = context->input(Args::HEIGHT).scalar<T>()(0);
         std::string geometry = *context->input(Args::GEOMETRY).flat<tensorflow::tstring>().data();
         T radius             = context->input(Args::RADIUS).scalar<T>()(0);
-        auto n_elems         = context->input(Args::VECTORS).shape().dim_size(1);
+        auto n_elems         = context->input(Args::VECTORS).shape().dim_size(0);
 
         // Perform some runtime checks on the actual values to make sure they make sense
         OP_REQUIRES(context,
@@ -111,7 +111,7 @@ private:
         tensorflow::Tensor* coordinates = nullptr;
         tensorflow::TensorShape coordinates_shape;
         coordinates_shape.AddDim(n_elems);
-        coordinates_shape.AddDim(3);
+        coordinates_shape.AddDim(2);
         OP_REQUIRES_OK(context, context->allocate_output(Outputs::COORDINATES, coordinates_shape, &coordinates));
 
         // Perform the map operation for this shape

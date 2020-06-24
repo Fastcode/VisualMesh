@@ -99,7 +99,7 @@ private:
         T height             = context->input(Args::HEIGHT).scalar<T>()(0);
         std::string geometry = *context->input(Args::GEOMETRY).flat<tensorflow::tstring>().data();
         T radius             = context->input(Args::RADIUS).scalar<T>()(0);
-        auto n_elems         = context->input(Args::COORDINATES).shape().dim_size(1);
+        auto n_elems         = context->input(Args::COORDINATES).shape().dim_size(0);
 
         // Perform some runtime checks on the actual values to make sure they make sense
         OP_REQUIRES(context,
@@ -117,8 +117,8 @@ private:
         // Perform the map operation for this shape
         auto do_map = [](const auto& n, const auto& coordinates, auto& vs, const auto& shape, const auto& height) {
             for (int i = 0; i < n; ++i) {
-                visualmesh::vec3<T> v =
-                  Model<T>::map(shape, height, visualmesh::vec2<T>({coordinates(i, 0), coordinates(i, 1)}));
+                visualmesh::vec3<T> v = visualmesh::normalise(
+                  Model<T>::map(shape, height, visualmesh::vec2<T>({coordinates(i, 0), coordinates(i, 1)})));
                 vs(i, 0) = v[0];
                 vs(i, 1) = v[1];
                 vs(i, 2) = v[2];
