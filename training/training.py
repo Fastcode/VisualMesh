@@ -16,12 +16,11 @@
 import os
 
 import tensorflow as tf
-
 import tensorflow_addons as tfa
 
 from .dataset import keras_dataset
-from .model import VisualMeshModel
 from .flavour import get_flavour
+from .model import VisualMeshModel
 
 
 # Train the network
