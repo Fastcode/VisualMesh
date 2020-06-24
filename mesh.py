@@ -20,9 +20,9 @@ import os
 
 import yaml
 
+import tensorflow as tf
 import training.testing as testing
 import training.training as training
-
 
 if __name__ == "__main__":
 
@@ -42,6 +42,15 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     output_path = "output" if args.output_path is None else args.output_path
+
+    # Make all GPUs grown memory as needed
+    gpus = tf.config.experimental.list_physical_devices("GPU")
+    if gpus:
+        try:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+        except RuntimeError as e:
+            print(e)
 
     # Run the appropriate action
     if args.command == "train":
