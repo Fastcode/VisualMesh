@@ -41,7 +41,7 @@ class ClassificationImages(tf.keras.callbacks.Callback):
 
         # Load the dataset and extract the single record from it
         for d in dataset:
-            self.data = d
+            data = d
 
         self.X = data["X"]
         self.G = data["G"]
@@ -116,11 +116,9 @@ class ClassificationImages(tf.keras.callbacks.Callback):
 
         # Work out the valid data ranges for each of the objects
         images = []
-        for i, r in enumerate(ranges):
+        for i, r in enumerate(self.ranges):
             images.append(
-                img=self.image(
-                    self.jpg[i].numpy(), C=self.C[r[0] : r[1]], X=predictions[r[0] : r[1]], colours=self.colours
-                )
+                self.image(self.img[i].numpy(), C=self.C[r[0] : r[1]], X=predictions[r[0] : r[1]], colours=self.colours)
             )
 
         # Sort by hash so the images show up in the same order every time
