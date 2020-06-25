@@ -13,10 +13,10 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from training.callbacks import *
 from training.dataset import Dataset
 from training.loss import *
 from training.metrics import *
-from training.callbacks import *
 
 
 def _merge_flavour_config(base, detail):
@@ -94,15 +94,40 @@ def get_flavour(config, output_path):
         # Callbacks
         callbacks = [
             ClassificationImages(
-                output_path,
-                Dataset(
+                output_path=output_path,
+                dataset=Dataset(
                     paths=validation["paths"],
                     batch_size=config["training"]["validation"]["progress_images"],
                     keys=validation.get("keys", {}),
                     **validation_config,
                 ).take(1),
                 # Draw using the first colour in the list for each class
-                [c["colours"][0] for c in classes],
+                colours=[c["colours"][0] for c in classes],
+            )
+        ]
+
+    if config["label"]["type"] == "Seeker":
+
+        # We use seeker loss which is based around a tanh style pointer
+        loss = SeekerLoss()
+
+        # TODO metric that is the mean squared error
+        # TODO metric that describes our "precision" and "recall" (that being that when we are close we get a non 1.0 value and when we are far we get a 1.0 value)
+        metrics = []
+
+        callbacks = [
+            SeekerImages(
+                output_path=output_path,
+                dataset=Dataset(
+                    paths=validation["paths"],
+                    batch_size=config["training"]["validation"]["progress_images"],
+                    keys=validation.get("keys", {}),
+                    **validation_config,
+                ).take(1),
+                model=validation_config["projection"]["config"]["mesh"]["model"],
+                geometry=validation_config["projection"]["config"]["geometry"]["shape"],
+                radius=validation_config["projection"]["config"]["geometry"]["radius"],
+                scale=validation_config["label"]["config"]["scale"],
             )
         ]
 

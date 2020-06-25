@@ -62,7 +62,7 @@ class SeekerImages(tf.keras.callbacks.Callback):
             axis=0,
         )
 
-    def image(self, img, C, X, V, Hoc, lens, nm):
+    def image(self, img, C, X, Hoc, lens, nm):
 
         # hash of the image file for sorting later
         img_hash = hashlib.md5()
@@ -97,7 +97,7 @@ class SeekerImages(tf.keras.callbacks.Callback):
         for i, r in enumerate(self.ranges):
             images.append(
                 self.image(
-                    img=self.jpg[i].numpy(),
+                    img=self.img[i].numpy(),
                     C=self.C[r[0] : r[1]],
                     X=predictions[r[0] : r[1]],
                     Hoc=self.Hoc[i],
