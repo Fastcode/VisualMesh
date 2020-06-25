@@ -48,7 +48,7 @@ namespace visualmesh {
  * @tparam Model      the model that is used to build the Visual Mesh graph
  */
 template <typename Scalar, template <typename> class Model>
-struct Mesh {
+class Mesh {
 private:
     /**
      * @brief An element of a binary search partitioning scheme to quickly work out which points are on the screen.
