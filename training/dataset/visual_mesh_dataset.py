@@ -45,7 +45,7 @@ class VisualMeshDataset:
                 if key not in self.features or self.features[key] == t:
                     self.features[key] = t
                 else:
-                    raise RuntimeError("Incompatible features for {} ({} vs {})".format(key, features[key], t))
+                    raise RuntimeError("Incompatible features for {} ({} vs {})".format(key, self.features[key], t))
 
         # Now we build the in order to go from the keys we want to the ones that are in the dataset
         self.dataset_features = {}
@@ -54,7 +54,7 @@ class VisualMeshDataset:
             if key not in self.dataset_features or self.dataset_features[key] == t:
                 self.dataset_features[key] = t
             else:
-                raise RuntimeError("Incompatible features for {} ({} vs {})".format(key, features[key], t))
+                raise RuntimeError("Incompatible features for {} ({} vs {})".format(key, self.features[key], t))
 
     def _map(self, proto):
 
