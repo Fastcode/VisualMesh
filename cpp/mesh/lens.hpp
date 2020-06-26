@@ -38,7 +38,7 @@ struct Lens {
     std::array<int, 2> dimensions;
     /// The projection that this image is using
     LensProjection projection;
-    /// The focal length of the camera, normalised to the image width
+    /// The focal length of the camera in pixels
     Scalar focal_length;
     /// The offset required to move the centre of the lens to the centre of the image
     std::array<Scalar, 2> centre;
