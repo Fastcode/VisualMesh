@@ -54,7 +54,7 @@ private:
      * @brief An element of a binary search partitioning scheme to quickly work out which points are on the screen.
      *
      * @details
-     *  This is a node in a binary search partition. It is represented by a bounding code that can be used to work out
+     *  This is a node in a binary search partition. It is represented by a bounding cone that can be used to work out
      * if any of the elements in that cone are on the screen. These cones will be split into sub cones to further limit
      * the scope of the search until a list of a few elements are found that can be checked manually.
      */
