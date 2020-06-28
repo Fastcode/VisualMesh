@@ -254,6 +254,23 @@ inline vec3<Scalar> multiply(const mat3<Scalar>& a, const vec3<Scalar>& b) {
     return vec3<Scalar>{{dot(a[0], b), dot(a[1], b), dot(a[2], b)}};
 }
 
+
+/**
+ * Matrix Scalar multiplication
+ */
+template <typename Scalar, std::size_t L, std::size_t... I>
+inline std::array<std::array<Scalar, L>, L> multiply(const std::array<std::array<Scalar, L>, L>& a,
+                                                     const Scalar& s,
+                                                     const std::index_sequence<I...>&) {
+    return {{multiply(a[I], s)...}};
+}
+
+template <typename Scalar, std::size_t L>
+inline std::array<std::array<Scalar, L>, L> multiply(const std::array<std::array<Scalar, L>, L>& a, const Scalar& s) {
+    return multiply(a, s, std::make_index_sequence<L>());
+}
+
+
 /**
  * Matrix inverse
  */
@@ -282,6 +299,23 @@ inline mat3<Scalar> invert(const mat3<Scalar>& m) {
             vec3<Scalar>{(m[1][0] * m[2][1] - m[2][0] * m[1][1]) * idet,
                          (m[2][0] * m[0][1] - m[0][0] * m[2][1]) * idet,
                          (m[0][0] * m[1][1] - m[1][0] * m[0][1]) * idet}};
+}
+
+template <typename Scalar>
+inline mat4<Scalar> invert_affine(const mat4<Scalar>& Hab) {
+    // Invert the rotation component.
+    // R^{-1} = R^{T}
+    const mat3<Scalar> Rba = transpose(block<3, 3>(Hab));
+
+    // Invert the translation component
+    // T^{-1} = -R^{T} * T
+    const vec3<Scalar> T = multiply(multiply(Rba, Scalar(-1)), vec3<Scalar>{Hab[0][3], Hab[1][3], Hab[2][3]});
+
+    // Construct the inverted matrix
+    return {{vec4<Scalar>{Rba[0][0], Rba[0][1], Rba[0][2], T[0]},
+             vec4<Scalar>{Rba[1][0], Rba[1][1], Rba[1][2], T[1]},
+             vec4<Scalar>{Rba[2][0], Rba[2][1], Rba[2][2], T[2]},
+             vec4<Scalar>{Scalar(0), Scalar(0), Scalar(0), Scalar(1)}}};
 }
 }  // namespace visualmesh
 

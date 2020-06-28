@@ -207,6 +207,22 @@ private:
               shape, Hoc[2][3], n_intersections, intersection_tolerance, cached_meshes, max_distance);
         }
 
+        // Shift all of the unit vectors to account for the cameras offset from the observation planes origin
+        if (Hoc[0][3] != T(0) || Hoc[1][3] != T(0)) {
+            LOG(INFO) << "Shifting mesh by xyx = [" + std::to_string(Hoc[0][3]) + ", " + std::to_string(Hoc[1][3])
+                           + ", 0]";
+            const visualmesh::vec3<T> offset = {tHoc(0, 3), tHoc(1, 3), T(0)};
+            const visualmesh::mat4<T> Hco    = visualmesh::invert_affine(Hoc);
+            const visualmesh::vec3<T> t      = {Hco[0][3], Hco[0][1], Hco[0][2]};
+            const T n_t_z                    = -Hco[0][2];
+            for (int node = 0; node < int(mesh->nodes.size()); ++node) {
+                const T d = n_t_z / mesh->nodes[node].ray[2];
+                const visualmesh::vec3<T> proj =
+                  visualmesh::add(visualmesh::add(visualmesh::multiply(mesh->nodes[node].ray, d), t), offset);
+                mesh->nodes[node].ray = visualmesh::normalise(visualmesh::subtract(proj, t));
+            }
+        }
+
         // Grab the ranges
         auto ranges       = mesh->lookup(Hoc, lens);
         const auto& nodes = mesh->nodes;
