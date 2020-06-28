@@ -19,3 +19,4 @@ lookup_visual_mesh = _library.lookup_visual_mesh
 map_visual_mesh = _library.map_visual_mesh
 unmap_visual_mesh = _library.unmap_visual_mesh
 difference_visual_mesh = _library.difference_visual_mesh
+align_graphs = _library.align_graphs
