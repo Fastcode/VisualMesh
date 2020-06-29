@@ -32,14 +32,14 @@ template <typename T>
 using Tensor = Eigen::Tensor<T, 2, Eigen::RowMajor>;
 
 enum Args {
-    V_A             = 0,
-    V_B             = 1,
-    G_B             = 2,
-    HOC_A           = 3,
-    HOC_B           = 4,
-    GEOMETRY        = 5,
-    RADIUS          = 6,
-    N_INTERSECTIONS = 7,
+    V_A       = 0,
+    V_B       = 1,
+    G_B       = 2,
+    HOC_A     = 3,
+    HOC_B     = 4,
+    GEOMETRY  = 5,
+    RADIUS    = 6,
+    THRESHOLD = 7,
 };
 
 enum Outputs {
@@ -56,7 +56,7 @@ REGISTER_OP("LinkNearest")
   .Input("hoc_b: T")
   .Input("geometry: string")
   .Input("radius: T")
-  .Input("intersections: T")
+  .Input("distance_threshold: T")
   .Output("matches: U")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
       c->set_output(Outputs::MATCHES, c->input(Args::V_B));
@@ -108,11 +108,11 @@ public:
                       && context->input(Args::HOC_B).shape().dim_size(0) == 4,
                     tensorflow::errors::InvalidArgument("B Hoc must be a 4x4 matrix"));
         OP_REQUIRES(context,
-                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::N_INTERSECTIONS).shape()),
-                    tensorflow::errors::InvalidArgument("The number of intersections must be a scalar"));
+                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::THRESHOLD).shape()),
+                    tensorflow::errors::InvalidArgument("Distance threshold must be a scalar"));
 
         // Extract information from our input tensors
-        T distance_threshold      = T(1) / (context->input(Args::N_INTERSECTIONS).scalar<T>()(0) * T(1.5));
+        T distance_threshold      = context->input(Args::THRESHOLD).scalar<T>()(0);
         tensorflow::Tensor tV_a   = context->input(Args::V_A);
         tensorflow::Tensor tV_b   = context->input(Args::V_B);
         tensorflow::Tensor tG_b   = context->input(Args::G_B);
