@@ -21,25 +21,9 @@
 
 #include <memory>
 
-#include "geometry/Circle.hpp"
-#include "geometry/Sphere.hpp"
 #include "mesh/mesh.hpp"
-#include "mesh/model/nmgrid4.hpp"
-#include "mesh/model/nmgrid6.hpp"
-#include "mesh/model/nmgrid8.hpp"
-#include "mesh/model/radial4.hpp"
-#include "mesh/model/radial6.hpp"
-#include "mesh/model/radial8.hpp"
-#include "mesh/model/ring4.hpp"
-#include "mesh/model/ring6.hpp"
-#include "mesh/model/ring8.hpp"
-#include "mesh/model/xmgrid4.hpp"
-#include "mesh/model/xmgrid6.hpp"
-#include "mesh/model/xmgrid8.hpp"
-#include "mesh/model/xygrid4.hpp"
-#include "mesh/model/xygrid6.hpp"
-#include "mesh/model/xygrid8.hpp"
 #include "mesh_cache.hpp"
+#include "model_op_base.hpp"
 
 enum Args {
     DIMENSIONS             = 0,
@@ -100,10 +84,14 @@ REGISTER_OP("LookupVisualMesh")
  * @tparam U The scalar type used for integer numbers
  */
 template <typename T, typename U>
-class LookupVisualMeshOp : public tensorflow::OpKernel {
-private:
-    template <template <typename> class Model>
-    void ComputeModel(tensorflow::OpKernelContext* context) {
+class LookupVisualMeshOp
+  : public ModelOpBase<T, LookupVisualMeshOp<T, U>, Args::MESH_MODEL, Args::GEOMETRY, Args::RADIUS> {
+public:
+    explicit LookupVisualMeshOp(tensorflow::OpKernelConstruction* context)
+      : ModelOpBase<T, LookupVisualMeshOp<T, U>, Args::MESH_MODEL, Args::GEOMETRY, Args::RADIUS>(context) {}
+
+    template <template <typename> class Model, typename Shape>
+    void DoCompute(tensorflow::OpKernelContext* context, const Shape& shape) {
 
         // Check that the shape of each of the inputs is valid
         OP_REQUIRES(
@@ -141,12 +129,6 @@ private:
         OP_REQUIRES(context,
                     tensorflow::TensorShapeUtils::IsScalar(context->input(Args::MAX_DISTANCE).shape()),
                     tensorflow::errors::InvalidArgument("The maximum distance must be a scalar"));
-        OP_REQUIRES(context,
-                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
-                    tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
-        OP_REQUIRES(context,
-                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::RADIUS).shape()),
-                    tensorflow::errors::InvalidArgument("The radius must be a scalar"));
 
         // Extract information from our input tensors, flip x and y as tensorflow has them reversed compared to us
         auto image_dimensions                = context->input(Args::DIMENSIONS).vec<U>();
@@ -161,17 +143,12 @@ private:
         T n_intersections                    = context->input(Args::N_INTERSECTIONS).scalar<T>()(0);
         tensorflow::int32 cached_meshes      = context->input(Args::CACHED_MESHES).scalar<tensorflow::int32>()(0);
         T intersection_tolerance             = context->input(Args::INTERSECTION_TOLERANCE).scalar<T>()(0);
-        std::string geometry                 = *context->input(Args::GEOMETRY).flat<tensorflow::tstring>().data();
-        T radius                             = context->input(Args::RADIUS).scalar<T>()(0);
 
         // Perform some runtime checks on the actual values to make sure they make sense
         OP_REQUIRES(
           context,
           projection == "EQUISOLID" || projection == "EQUIDISTANT" || projection == "RECTILINEAR",
           tensorflow::errors::InvalidArgument("Projection must be one of EQUISOLID, EQUIDISTANT or RECTILINEAR"));
-        OP_REQUIRES(context,
-                    geometry == "SPHERE" || geometry == "CIRCLE",
-                    tensorflow::errors::InvalidArgument("Geometry must be one of SPHERE or CIRCLE"));
 
         // Create our transformation matrix
         visualmesh::mat4<T> Hoc = {{
@@ -195,17 +172,9 @@ private:
         else if (projection == "RECTILINEAR") lens.projection = visualmesh::RECTILINEAR;
         // clang-format on
 
-        std::shared_ptr<visualmesh::Mesh<T, Model>> mesh;
-        if (geometry == "SPHERE") {
-            visualmesh::geometry::Sphere<T> shape(radius);
-            mesh = get_mesh<T, Model, visualmesh::geometry::Sphere>(
-              shape, Hoc[2][3], n_intersections, intersection_tolerance, cached_meshes, max_distance);
-        }
-        else if (geometry == "CIRCLE") {
-            visualmesh::geometry::Circle<T> shape(radius);
-            mesh = get_mesh<T, Model, visualmesh::geometry::Circle>(
-              shape, Hoc[2][3], n_intersections, intersection_tolerance, cached_meshes, max_distance);
-        }
+        // Get a mesh that matches from the mesh cache
+        std::shared_ptr<visualmesh::Mesh<T, Model>> mesh =
+          get_mesh<T, Model>(shape, Hoc[2][3], n_intersections, intersection_tolerance, cached_meshes, max_distance);
 
         // Shift all of the unit vectors to account for the cameras offset from the observation planes origin
         if (Hoc[0][3] != T(0) || Hoc[1][3] != T(0)) {
@@ -232,7 +201,6 @@ private:
         for (auto& r : ranges) {
             n_points += r.second - r.first;
         }
-
 
         // Allocate our outputs
         tensorflow::Tensor* vectors = nullptr;
@@ -283,45 +251,6 @@ private:
                     ++idx;
                 }
             }
-        }
-    }
-
-public:
-    explicit LookupVisualMeshOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
-
-    void Compute(tensorflow::OpKernelContext* context) override {
-
-        // Check that the model is a string
-        OP_REQUIRES(context,
-                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::MESH_MODEL).shape()),
-                    tensorflow::errors::InvalidArgument("Model must be a single string value"));
-
-        // Grab the Visual Mesh model we are using
-        std::string model = *context->input(Args::MESH_MODEL).flat<tensorflow::tstring>().data();
-
-        // clang-format off
-        if (model == "RADIAL4") { ComputeModel<visualmesh::model::Radial4>(context); }
-        else if (model == "RADIAL6") { ComputeModel<visualmesh::model::Radial6>(context); }
-        else if (model == "RADIAL8") { ComputeModel<visualmesh::model::Radial8>(context); }
-        else if (model == "RING4") { ComputeModel<visualmesh::model::Ring4>(context); }
-        else if (model == "RING6") { ComputeModel<visualmesh::model::Ring6>(context); }
-        else if (model == "RING8") { ComputeModel<visualmesh::model::Ring8>(context); }
-        else if (model == "NMGRID4") { ComputeModel<visualmesh::model::NMGrid4>(context); }
-        else if (model == "NMGRID6") { ComputeModel<visualmesh::model::NMGrid6>(context); }
-        else if (model == "NMGRID8") { ComputeModel<visualmesh::model::NMGrid8>(context); }
-        else if (model == "XMGRID4") { ComputeModel<visualmesh::model::XMGrid4>(context); }
-        else if (model == "XMGRID6") { ComputeModel<visualmesh::model::XMGrid6>(context); }
-        else if (model == "XMGRID8") { ComputeModel<visualmesh::model::XMGrid8>(context); }
-        else if (model == "XYGRID4") { ComputeModel<visualmesh::model::XYGrid4>(context); }
-        else if (model == "XYGRID6") { ComputeModel<visualmesh::model::XYGrid6>(context); }
-        else if (model == "XYGRID8") { ComputeModel<visualmesh::model::XYGrid8>(context); }
-        // clang-format on
-
-        else {
-            OP_REQUIRES(
-              context,
-              false,
-              tensorflow::errors::InvalidArgument("The provided Visual Mesh model was not one of the known models"));
         }
     }
 };

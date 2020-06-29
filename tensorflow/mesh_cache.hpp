@@ -15,6 +15,9 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifndef VISUALMESH_TENSORFLOW_MESH_CACHE_HPP
+#define VISUALMESH_TENSORFLOW_MESH_CACHE_HPP
+
 #include <mutex>
 
 /**
@@ -154,3 +157,5 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> get_mesh(const Shape<Scalar>& s
         }
     }
 }
+
+#endif  // VISUALMESH_TENSORFLOW_MESH_CACHE_HPP

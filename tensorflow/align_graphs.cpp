@@ -22,8 +22,7 @@
 #include <Eigen/Core>
 #include <memory>
 
-#include "geometry/Circle.hpp"
-#include "geometry/Sphere.hpp"
+#include "shape_op_base.hpp"
 
 template <typename T>
 using MatrixType = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
@@ -80,11 +79,13 @@ REGISTER_OP("AlignGraphs")
  * @tparam U The scalar type used for integer numbers
  */
 template <typename T, typename U>
-class AlignGraphsOp : public tensorflow::OpKernel {
+class AlignGraphsOp : public ShapeOpBase<T, AlignGraphsOp<T, U>, Args::GEOMETRY, Args::RADIUS> {
 public:
-    explicit AlignGraphsOp(tensorflow::OpKernelConstruction* context) : OpKernel(context) {}
+    explicit AlignGraphsOp(tensorflow::OpKernelConstruction* context)
+      : ShapeOpBase<T, AlignGraphsOp<T, U>, Args::GEOMETRY, Args::RADIUS>(context) {}
 
-    void Compute(tensorflow::OpKernelContext* context) override {
+    template <typename Shape>
+    void DoCompute(tensorflow::OpKernelContext* context, const Shape& shape) {
         // Check that the shape of each of the inputs is valid
         OP_REQUIRES(context,
                     tensorflow::TensorShapeUtils::IsMatrix(context->input(Args::V_LEFT).shape())
@@ -108,12 +109,6 @@ public:
                     tensorflow::TensorShapeUtils::IsSquareMatrix(context->input(Args::HOC_RIGHT).shape())
                       && context->input(Args::HOC_RIGHT).shape().dim_size(0) == 4,
                     tensorflow::errors::InvalidArgument("Right Hoc must be a 4x4 matrix"));
-        OP_REQUIRES(context,
-                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::GEOMETRY).shape()),
-                    tensorflow::errors::InvalidArgument("Geometry must be a single string value"));
-        OP_REQUIRES(context,
-                    tensorflow::TensorShapeUtils::IsScalar(context->input(Args::RADIUS).shape()),
-                    tensorflow::errors::InvalidArgument("The radius must be a scalar"));
 
         // Extract information from our input tensors
         tensorflow::Tensor v_l   = context->input(Args::V_LEFT);
@@ -135,24 +130,9 @@ public:
         MatrixType<T> Hoc_right =
           Eigen::Map<MatrixType<T>>(Hoc_r.tensor<T, 2>().data(), Hoc_r.shape().dim_size(0), Hoc_r.shape().dim_size(1));
 
-        std::string geometry = *context->input(Args::GEOMETRY).flat<tensorflow::tstring>().data();
-        T radius             = context->input(Args::RADIUS).scalar<T>()(0);
-
-        // Perform some runtime checks on the actual values to make sure they make sense
-        OP_REQUIRES(context,
-                    geometry == "SPHERE" || geometry == "CIRCLE",
-                    tensorflow::errors::InvalidArgument("Geometry must be one of SPHERE or CIRCLE"));
 
         // Determine the height of the observation plane
-        T shape_c;
-        if (geometry == "SPHERE") {
-            visualmesh::geometry::Sphere<T> shape(radius);
-            shape_c = shape.c();
-        }
-        else if (geometry == "CIRCLE") {
-            visualmesh::geometry::Circle<T> shape(radius);
-            shape_c = shape.c();
-        }
+        T shape_c = shape.c();
 
         // Project left and right vectors on to the observation plane
         v_left  = (v_left * (Hoc_left(2, 3) - shape_c)).cwiseQuotient(Hoc_left.template rightCols<1>());
