@@ -15,15 +15,53 @@
 
 import tensorflow as tf
 
+from training.op import align_graphs
+
 
 class Stereoscopic:
     def __init__(self, **config):
-        pass
+        self.geometry = config["projection"]["config"]["geometry"]["shape"]
+        self.radius = config["projection"]["config"]["geometry"]["radius"]
+        self.intersections = config["projection"]["config"]["geometry"]["intersections"]
 
     def prefixes(self):
         return ("left/", "right/")
 
     def merge(self, views):
         # Take the left/ and right/ prefix and perform the merging operation to convert them into a single output
+
+        # return {
+        #     "X": X,        (n + 1, 3)          pixel data
+        #     "Y": Y,        (n, classes)        Class IDs
+        #     "G": G,        (n + 1, graph size) Graph connections (indexes into X)
+        #     "n": n,        (scalar)            Number of graph nodes
+        #     "C": C,        (n, 2)              Pixel coordinates
+        #     "V": V,        (n, 3)              Unit vectors
+        #     "Hoc": Hoc,
+        #     "jpg": jpg,
+        #     "lens": lens,
+        # }
+
+        # Align the graphs
+        matched_left = align_graphs(
+            v_a=views["left/"]["V"],
+            v_b=views["right/"]["V"],
+            g_b=views["right/"]["G"],
+            Hoc_a=views["left/"]["Hoc"],
+            Hoc_b=views["right/"]["Hoc"],
+            geometry=self.geometry,
+            radius=self.radius,
+            distance_threshold=1.0 / (1.5 * self.intersections),
+        )
+        matched_right = align_graphs(
+            v_a=views["right/"]["V"],
+            v_b=views["left/"]["V"],
+            g_b=views["left/"]["G"],
+            Hoc_a=views["right/"]["Hoc"],
+            Hoc_b=views["left/"]["Hoc"],
+            geometry=self.geometry,
+            radius=self.radius,
+            distance_threshold=1.0 / (1.5 * self.intersections),
+        )
 
         raise RuntimeError("Stereoscopic is not yet implemented")
