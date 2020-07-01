@@ -91,7 +91,7 @@ class VisualMeshDataset:
     def _reduce(self, batch):
 
         # Get n out from the ragged batch
-        n = tf.convert_to_tensor(batch["n"])
+        n = batch["n"].to_tensor()
 
         # We need the n offsets to reposition all the graph values
         cn = tf.math.cumsum(tf.math.reduce_sum(n, axis=1), exclusive=True)
@@ -100,7 +100,7 @@ class VisualMeshDataset:
         # For X we must add the "offscreen" point as a -1,-1,-1 point one past the end of the list
         X = tf.concat(
             [
-                tf.reshape(batch["X"].to_tensor(), shape=[-1, 3], name="vmdataset/_reduce/reshape/X"),
+                tf.reshape(batch["X"].values, shape=[-1, 3], name="vmdataset/_reduce/reshape/X"),
                 tf.constant([[-1.0, -1.0, -1.0]], dtype=tf.float32),
             ],
             axis=0,
@@ -113,14 +113,14 @@ class VisualMeshDataset:
         V = batch["V"].values
 
         # Fixed size elements are in sensible shapes
-        jpg = tf.convert_to_tensor(batch["jpg"])
-        Hoc = tf.convert_to_tensor(batch["Hoc"])
+        jpg = batch["jpg"].to_tensor()
+        Hoc = batch["Hoc"].to_tensor()
         lens = {
-            "projection": tf.convert_to_tensor(batch["lens/projection"]),
-            "focal_length": tf.convert_to_tensor(batch["lens/focal_length"]),
-            "centre": tf.convert_to_tensor(batch["lens/centre"]),
-            "k": tf.convert_to_tensor(batch["lens/k"]),
-            "fov": tf.convert_to_tensor(batch["lens/fov"]),
+            "projection": batch["lens/projection"].to_tensor(),
+            "focal_length": batch["lens/focal_length"].to_tensor(),
+            "centre": batch["lens/centre"].to_tensor(),
+            "k": batch["lens/k"].to_tensor(),
+            "fov": batch["lens/fov"].to_tensor(),
         }
 
         # Add on our offset for each batch so that we get a proper result and then remove the ragged edge
