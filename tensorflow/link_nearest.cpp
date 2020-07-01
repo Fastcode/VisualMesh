@@ -49,7 +49,7 @@ REGISTER_OP("LinkNearest")
   .Attr("U: {int32, int64}")
   .Input("v_a: T")
   .Input("v_b: T")
-  .Input("g_b: T")
+  .Input("g_b: U")
   .Input("hoc_a: T")
   .Input("hoc_b: T")
   .Input("geometry: string")
@@ -94,7 +94,7 @@ private:
     std::pair<U, T> check_neighbours(const U& index,
                                      const Eigen::Matrix<T, 3, 1>& reference,
                                      const Eigen::Matrix<T, Eigen::Dynamic, 3>& pool,
-                                     const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& neighbours,
+                                     const Eigen::Matrix<U, Eigen::Dynamic, Eigen::Dynamic>& neighbours,
                                      const Eigen::Matrix<T, 4, 4>& Hoc,
                                      const Shape& shape) {
         // Get distance to the first neighbour
@@ -123,7 +123,7 @@ private:
     Eigen::Matrix<U, Eigen::Dynamic, Eigen::Dynamic> match_vectors(
       const Eigen::Matrix<T, Eigen::Dynamic, 3>& references,
       const Eigen::Matrix<T, Eigen::Dynamic, 3>& pool,
-      const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& neighbours,
+      const Eigen::Matrix<U, Eigen::Dynamic, Eigen::Dynamic>& neighbours,
       const Eigen::Matrix<T, 4, 4>& Hoc,
       const Shape& shape,
       const T& distance_threshold) {
@@ -225,9 +225,9 @@ public:
           Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, 3>>(tV_a.tensor<T, 2>().data(), tV_a.shape().dim_size(0), 3);
         Eigen::Matrix<T, Eigen::Dynamic, 3> v_b =
           Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, 3>>(tV_b.tensor<T, 2>().data(), tV_b.shape().dim_size(0), 3);
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> g_b =
-          Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>(
-            tG_b.tensor<T, 2>().data(), tG_b.shape().dim_size(0), tG_b.shape().dim_size(1));
+        Eigen::Matrix<U, Eigen::Dynamic, Eigen::Dynamic> g_b =
+          Eigen::Map<Eigen::Matrix<U, Eigen::Dynamic, Eigen::Dynamic>>(
+            tG_b.tensor<U, 2>().data(), tG_b.shape().dim_size(0), tG_b.shape().dim_size(1));
         Eigen::Matrix<T, 4, 4> Hoc_a = Eigen::Map<Eigen::Matrix<T, 4, 4>>(
           tHoc_a.tensor<T, 2>().data(), tHoc_a.shape().dim_size(0), tHoc_a.shape().dim_size(1));
         Eigen::Matrix<T, 4, 4> Hoc_b = Eigen::Map<Eigen::Matrix<T, 4, 4>>(
@@ -279,10 +279,10 @@ public:
 // Register a version for all the combinations of float/double and int32/int64
 REGISTER_KERNEL_BUILDER(
   Name("LinkNearest").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<tensorflow::int32>("U"),
-  LinkNearestOp<double, tensorflow::int32>)
+  LinkNearestOp<float, tensorflow::int32>)
 REGISTER_KERNEL_BUILDER(
   Name("LinkNearest").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T").TypeConstraint<tensorflow::int64>("U"),
-  LinkNearestOp<double, tensorflow::int64>)
+  LinkNearestOp<float, tensorflow::int64>)
 REGISTER_KERNEL_BUILDER(
   Name("LinkNearest").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T").TypeConstraint<tensorflow::int32>("U"),
   LinkNearestOp<double, tensorflow::int32>)
