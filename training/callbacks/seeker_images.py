@@ -14,9 +14,8 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import hashlib
-import io
 import os
-import warnings
+import math
 
 import cv2
 import numpy as np
@@ -39,8 +38,8 @@ class SeekerImages(tf.keras.callbacks.Callback):
             data = d
 
         self.X = data["X"]
+        self.Y = data["Y"]
         self.G = data["G"]
-        self.C = data["C"]
         self.Hoc = tf.reshape(data["Hoc"], (-1, 4, 4))
         self.img = tf.reshape(data["jpg"], (-1,))
         self.lens = {
@@ -62,28 +61,70 @@ class SeekerImages(tf.keras.callbacks.Callback):
             axis=0,
         )
 
-    def image(self, img, C, X, Hoc, lens, nm):
+    def image(self, img, X, Y, Hoc, lens, nm):
 
         # hash of the image file for sorting later
         img_hash = hashlib.md5()
         img_hash.update(img)
         img_hash = img_hash.digest()
 
-        # Decode the image
-        img = cv2.cvtColor(cv2.imdecode(np.fromstring(img, np.uint8), cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
+        # Decode the image and convert it to float32
+        img = tf.image.convert_image_dtype(tf.image.decode_image(img, channels=3, expand_animations=False), tf.float32)
 
         # Convert the predictions into unit vectors in camera space
         rTCo = map_visual_mesh(nm + X * self.scale, height=Hoc[2, 3], **self.map_args)
         rTCc = tf.einsum("ij,ki->kj", Hoc[:3, :3], rTCo)
+        target = tf.cast(
+            tf.round(project(rTCc, img.shape[:2], lens["projection"], lens["focal_length"], lens["centre"], lens["k"])),
+            tf.int32,
+        )
 
-        target = project(rTCc, img.shape[:2], lens["projection"], lens["focal_length"], lens["centre"], lens["k"])
+        # We can't draw points that are off the screen
+        on_screen = tf.squeeze(
+            tf.where(
+                tf.logical_and(
+                    target[:, 0] >= 0,
+                    tf.logical_and(
+                        target[:, 0] < tf.shape(img)[0],
+                        tf.logical_and(target[:, 1] >= 0, target[:, 0] < tf.shape(img)[1]),
+                    ),
+                )
+            ),
+            axis=-1,
+        )
 
-        for origin, target in zip(C, target):
-            img = cv2.arrowedLine(
-                img, tuple(reversed(origin.numpy())), tuple(reversed(target.numpy())), (255, 255, 255)
-            )
+        # Gather the on screen points
+        X = tf.gather(X, on_screen)
+        Y = tf.gather(Y, on_screen)
 
-        return (img_hash, tf.convert_to_tensor(img))
+        # Work out if X or Y is close enough that this is, or should be a prediction
+        X_near = tf.reduce_all(tf.math.abs(X) <= 0.75, axis=-1)
+        Y_near = tf.reduce_all(tf.math.abs(Y) <= 0.75, axis=-1)
+
+        # Work out our various states so we can draw dots for them
+        tp = tf.squeeze(tf.where(tf.logical_and(X_near, Y_near)), axis=-1)
+        fp = tf.squeeze(tf.where(tf.logical_and(X_near, tf.logical_not(Y_near))), axis=-1)
+        fn = tf.squeeze(tf.where(tf.logical_and(tf.logical_not(X_near), Y_near)), axis=-1)
+        # tn = tf.squeeze(tf.where(tf.logical_and(tf.logical_not(X_near), tf.logical_not(Y_near))), axis=-1)
+
+        # Weight based on how close it is to the point
+        weight = tf.clip_by_value(1.0 - (tf.norm(X, axis=-1) / math.sqrt(2.0 * 0.75 ** 2.0)), 0.0, 1.0)
+
+        # Gather the weights into the image grid
+        tp = tf.scatter_nd(tf.gather(target, tp), tf.gather(weight, tp), tf.shape(img)[:2])
+        fp = tf.scatter_nd(tf.gather(target, fp), tf.gather(weight, fp), tf.shape(img)[:2])
+        fn = tf.scatter_nd(tf.gather(target, fn), tf.gather(weight, fn), tf.shape(img)[:2])
+
+        # Apply the colours
+        tp = tf.einsum("ij,k->ijk", tp, tf.constant([1.0, 1.0, 1.0]))
+        fp = tf.einsum("ij,k->ijk", fp, tf.constant([1.0, 0.0, 0.0]))
+        fn = tf.einsum("ij,k->ijk", fn, tf.constant([0.0, 0.0, 1.0]))
+
+        # Merge into an overlay
+        overlay = tf.clip_by_value(tp + fp + fn, 0, 1.0)
+        output = img * (1.0 - tf.reduce_max(overlay, axis=-1, keepdims=True)) + overlay
+
+        return (img_hash, output)
 
     def on_epoch_end(self, epoch, logs=None):
 
@@ -98,8 +139,8 @@ class SeekerImages(tf.keras.callbacks.Callback):
             images.append(
                 self.image(
                     img=self.img[i].numpy(),
-                    C=self.C[r[0] : r[1]],
                     X=predictions[r[0] : r[1]],
+                    Y=self.Y[r[0] : r[1]],
                     Hoc=self.Hoc[i],
                     lens={k: v[i] for k, v in self.lens.items()},
                     nm=self.nm[r[0] : r[1]],

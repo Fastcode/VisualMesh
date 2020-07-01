@@ -111,9 +111,10 @@ def get_flavour(config, output_path):
         # We use seeker loss which is based around a tanh style pointer
         loss = SeekerLoss()
 
-        # TODO metric that is the mean squared error
-        # TODO metric that describes our "precision" and "recall" (that being that when we are close we get a non 1.0 value and when we are far we get a 1.0 value)
-        metrics = []
+        metrics = [
+            SeekerPrecision("metrics/precision"),
+            SeekerRecall("metrics/recall"),
+        ]
 
         callbacks = [
             SeekerImages(
