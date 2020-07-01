@@ -13,9 +13,19 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from .average_precision import AveragePrecision
-from .average_recall import AverageRecall
-from .class_precision import ClassPrecision
-from .class_recall import ClassRecall
-from .seeker_precision import SeekerPrecision
-from .seeker_recall import SeekerRecall
+import tensorflow as tf
+
+from .seeker_confusion_base import SeekerConfusionBase
+
+
+class SeekerPrecision(SeekerConfusionBase):
+    def __init__(self, name, **kwargs):
+        super(SeekerPrecision, self).__init__(name, **kwargs)
+
+    def result(self):
+        # True positives (predicted and labelled true)
+        tp = tf.cast(tf.linalg.diag_part(self.confusion), self.dtype)
+        # For all labels where idx was predicted (all positives)
+        p = tf.cast(tf.reduce_sum(self.confusion, axis=0), self.dtype)
+
+        return tf.math.reduce_mean(tp / p)
