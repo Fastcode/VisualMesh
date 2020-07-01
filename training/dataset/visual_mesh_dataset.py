@@ -100,7 +100,7 @@ class VisualMeshDataset:
         # For X we must add the "offscreen" point as a -1,-1,-1 point one past the end of the list
         X = tf.concat(
             [
-                tf.reshape(batch["X"].to_tensor(), shape=[-1, 3], name="vmdataset/_reduce/reshape/X"),
+                tf.reshape(batch["X"].values, shape=[-1, 3], name="vmdataset/_reduce/reshape/X"),
                 tf.constant([[-1.0, -1.0, -1.0]], dtype=tf.float32),
             ],
             axis=0,
