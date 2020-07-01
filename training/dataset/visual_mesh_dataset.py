@@ -98,7 +98,14 @@ class VisualMeshDataset:
         n_elems = tf.math.reduce_sum(n)
 
         # For X we must add the "offscreen" point as a -1,-1,-1 point one past the end of the list
-        X = tf.concat([batch["X"].values, tf.constant([[-1.0, -1.0, -1.0]], dtype=tf.float32)], axis=0)
+        X = tf.concat(
+            [
+                tf.reshape(batch["X"].to_tensor(), shape=[-1, 3], name="vmdataset/_reduce/reshape/X"),
+                tf.constant([[-1.0, -1.0, -1.0]], dtype=tf.float32),
+            ],
+            axis=0,
+            name="vmdataset/_reduce/concat/X",
+        )
 
         # Using .values removes the outer "ragged" batch which is effectively concatenating
         Y = batch["Y"].values
@@ -120,7 +127,11 @@ class VisualMeshDataset:
         G = (batch["G"] + tf.expand_dims(tf.expand_dims(cn, -1), -1)).values
 
         # Replace the offscreen negative points with the offscreen point and append it to the end
-        G = tf.concat([tf.where(G < 0, n_elems, G), tf.fill([1, self.projection.n_neighbours], n_elems)], axis=0)
+        G = tf.concat(
+            [tf.where(G < 0, n_elems, G, name="vmdataset/_reduce/where/G"), tf.fill([1, tf.shape(G)[-1]], n_elems),],
+            axis=0,
+            name="vmdataset/_reduce/concat/G",
+        )
 
         return {
             "X": X,
