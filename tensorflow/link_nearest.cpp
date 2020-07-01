@@ -161,7 +161,7 @@ private:
             T min_distance = radial_distance(pool.row(min_index), reference, Hoc, shape);
 
             // Check distance to the neighbours of the selected index in the pool to find the neighbour to
-            // start the graph search from.
+            // start the graph search from
             U new_min_index;
             T new_min_distance;
             std::tie(new_min_index, new_min_distance) =
@@ -170,7 +170,7 @@ private:
             // Start checking the rest of the graph
             // Find the neighbour of the current index that is closest to the reference vector
             // If none of the neighbours are closer to the reference vector than the current pool vector
-            // then our search is over.
+            // then our search is over
             while (new_min_distance < min_distance) {
                 min_distance = new_min_distance;
                 min_index    = new_min_index;
@@ -178,7 +178,7 @@ private:
                   check_neighbours(min_index, reference, pool, neighbours, Hoc, shape);
             }
 
-            // Check to see if the closest point is offscreen.
+            // Check to see if the closest point is offscreen
             if (new_min_distance > distance_threshold) { min_index = -std::numeric_limits<U>::max(); }
             else {
                 min_index = new_min_index;
@@ -263,19 +263,19 @@ public:
         v_a = v_a * (Hoc_a(2, 3) - shape.c());
         v_a = (v_a.array().colwise() / v_a.template rightCols<1>().array()).matrix();
 
-        // Translate left vectors to right view and right vectors to left view and renormalise
+        // Translate A vectors to the B view and renormalise
         // Points:
-        //    A - left camera origin
-        //    B - right camera origin
+        //    A - A camera origin
+        //    B - B camera origin
         //    O - observation plane origin
         //    N - projected node position
         // Spaces:
-        //    o - observation plane origin
+        //    o - observation plane
         const Eigen::Matrix<T, 1, 3> rAOo(Hoc_a(0, 3), Hoc_a(1, 3), Hoc_a(2, 3));
         const Eigen::Matrix<T, 1, 3> rBOo(Hoc_b(0, 3), Hoc_b(1, 3), Hoc_b(2, 3));
         const Eigen::Matrix<T, 1, 3> rABo = rAOo - rBOo;
 
-        // These are the A vectors projected into the B camera
+        // These are the A vectors from the perspective of the B camera
         // rNBo = rNAo + rABo
         Eigen::Matrix<T, Eigen::Dynamic, 3> rNBo = (v_a.rowwise() + rABo).rowwise().normalized();
 
