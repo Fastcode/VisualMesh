@@ -27,7 +27,7 @@ def Dataset(paths, batch_size, view, example, orientation, label, projection, ke
     if view["type"] == "Monoscopic":
         view = Monoscopic(**view["config"])
     elif view["type"] == "Stereoscopic":
-        view = Stereoscopic(**view["config"])
+        view = Stereoscopic(projection=projection, **view["config"])
     else:
         raise RuntimeError("Unknown view type '{}'".format(view["type"]))
 
