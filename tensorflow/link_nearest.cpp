@@ -97,25 +97,41 @@ private:
                                      const Eigen::Matrix<U, Eigen::Dynamic, Eigen::Dynamic>& neighbours,
                                      const Eigen::Matrix<T, 4, 4>& Hoc,
                                      const Shape& shape) {
-        // Get distance to the first neighbour
-        U min_index    = neighbours(index, 0);
-        T min_distance = radial_distance(pool.row(min_index), reference, Hoc, shape);
+        // Get distance to the first neighbour that is not offscreen
+        U min_index;
+        U neighbour_index = 0;
+        do {
+            min_index = neighbours(index, neighbour_index);
+            neighbour_index++;
+        } while (min_index < 0 && neighbour_index < neighbours.cols());
 
-        // Now find the minumum distance over all neighbours
-        for (U neighbour_index = 1; neighbour_index < neighbours.cols(); ++neighbour_index) {
-            U new_index                      = neighbours(index, neighbour_index);
-            Eigen::Matrix<T, 3, 1> neighbour = pool.row(new_index).transpose();
+        // Make sure we found an onscreen neighbour
+        if (min_index >= 0) {
+            T min_distance = radial_distance(pool.row(min_index).transpose(), reference, Hoc, shape);
 
-            T new_distance = radial_distance(neighbour, reference, Hoc, shape);
+            // Now find the minumum distance over all neighbours
+            for (; neighbour_index < neighbours.cols(); ++neighbour_index) {
+                // Get next neighbour
+                U new_index = neighbours(index, neighbour_index);
+                if (new_index >= 0) {
+                    Eigen::Matrix<T, 3, 1> neighbour = pool.row(new_index).transpose();
 
-            if (new_distance < min_distance) {
-                min_index    = new_index;
-                min_distance = new_distance;
+                    // Calculate distance to neighbour
+                    T new_distance = radial_distance(neighbour, reference, Hoc, shape);
+
+                    // Update minimum distance
+                    if (new_distance < min_distance) {
+                        min_index    = new_index;
+                        min_distance = new_distance;
+                    }
+                }
             }
+            // Return the node index and distance for the neighbour with the smallest distance
+            return std::make_pair(min_index, min_distance);
         }
 
-        // Return the node index and distance for the neighbour with the smallest distance
-        return std::make_pair(min_index, min_distance);
+        // Infinite distance for offscreen points
+        return std::make_pair(-std::numeric_limits<U>::max(), std::numeric_limits<T>::infinity());
     }
 
     // For each reference vector find the index to the vector in the pool that is closest to it
@@ -127,9 +143,13 @@ private:
       const Eigen::Matrix<T, 4, 4>& Hoc,
       const Shape& shape,
       const T& distance_threshold) {
+        // Create output matrix
+        // Populate it with -intmax so that if we happen to miss one it defaults to offscreen
         Eigen::Matrix<U, Eigen::Dynamic, Eigen::Dynamic> matches =
-          Eigen::Matrix<U, Eigen::Dynamic, Eigen::Dynamic>::Zero(references.rows(), 1);
+          Eigen::Matrix<U, Eigen::Dynamic, Eigen::Dynamic>::Constant(
+            references.rows(), 1, -std::numeric_limits<U>::max());
 
+        // Match each reference vector to a vector in the pool
         for (U reference_index = 0; reference_index < references.rows(); ++reference_index) {
             // Extract the reference vector
             const Eigen::Matrix<T, 3, 1> reference = references.row(reference_index).transpose();
