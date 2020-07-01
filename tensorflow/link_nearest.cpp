@@ -57,7 +57,7 @@ REGISTER_OP("LinkNearest")
   .Input("distance_threshold: T")
   .Output("matches: U")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-      c->set_output(Outputs::MATCHES, c->input(Args::V_B));
+      c->set_output(Outputs::MATCHES, c->MakeShape({c->Dim(c->input(Args::V_A), 0), 1}));
       return tensorflow::Status::OK();
   });
 
@@ -267,12 +267,14 @@ public:
 
         // Create the output matrix to hold the matching indices
         tensorflow::Tensor* matches = nullptr;
-        OP_REQUIRES_OK(context, context->allocate_output(Outputs::MATCHES, tV_b.shape(), &matches));
+        tensorflow::TensorShape matches_shape;
+        matches_shape.AddDim(tV_a.shape().dim_size(0));
+        matches_shape.AddDim(1);
+        OP_REQUIRES_OK(context, context->allocate_output(Outputs::MATCHES, matches_shape, &matches));
 
         // Find the matching indices for each vector in the right view
         matches->matrix<U>() = Eigen::TensorMap<Tensor<U>, Eigen::Aligned>(
-          match_vectors(rNBo, v_b, g_b, Hoc_b, shape, distance_threshold).data(),
-          {tV_b.shape().dim_size(0), tV_b.shape().dim_size(1)});
+          match_vectors(rNBo, v_b, g_b, Hoc_b, shape, distance_threshold).data(), {tV_a.shape().dim_size(0), 1});
     }
 };
 
