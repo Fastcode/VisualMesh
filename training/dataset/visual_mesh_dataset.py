@@ -65,7 +65,7 @@ class VisualMeshDataset:
         views = {}
         for p in self.view.prefixes():
 
-            result = {}
+            result = {"valid": True}
 
             # Use orientation to work out where the mesh should be projected
             result.update(self.orientation(**{**{k: features[p + k] for k in self.orientation.features()}, **result}))
@@ -156,8 +156,8 @@ class VisualMeshDataset:
         # Prefetch some elements to ensure training smoothness
         dataset = dataset.prefetch(self.prefetch)
 
-        # Filter out any images that didn't project anything
-        dataset = dataset.filter(lambda args: tf.size(args["X"]) > 0)
+        # Filter out any samples that have been flagged as invalid
+        dataset = dataset.filter(lambda args: tf.reduce_all(args["valid"]))
 
         # Perform a ragged batch
         dataset = dataset.apply(tf.data.experimental.dense_to_ragged_batch(batch_size=self.batch_size))

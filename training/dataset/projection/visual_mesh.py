@@ -44,7 +44,7 @@ class VisualMesh:
             "lens/fov": tf.io.FixedLenFeature([], tf.float32),
         }
 
-    def __call__(self, image, Hoc, **features):
+    def __call__(self, image, Hoc, valid, **features):
 
         # Lookup vectors in the visual mesh
         V, G = lookup_visual_mesh(
@@ -87,4 +87,5 @@ class VisualMesh:
             "lens/centre": features["lens/centre"],
             "lens/k": features["lens/k"],
             "lens/fov": features["lens/fov"],
+            "valid": tf.logical_and(valid, tf.size(C) > 0),
         }

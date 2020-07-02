@@ -15,6 +15,7 @@
 
 import tensorflow as tf
 from training.op import difference_visual_mesh, map_visual_mesh, unmap_visual_mesh
+from training.projection import project
 
 
 class Seeker:
@@ -31,7 +32,7 @@ class Seeker:
             "seeker/targets": tf.io.FixedLenSequenceFeature([3], tf.float32, allow_missing=True),
         }
 
-    def __call__(self, Hoc, V, **features):
+    def __call__(self, image, Hoc, V, valid, **features):
 
         targets = features["seeker/targets"]
 
@@ -61,4 +62,25 @@ class Seeker:
         # Divide distance by scale so a value from 0->scale becomes 0->1
         distance = tf.math.divide(tf.gather_nd(diff, best_idx), self.scale)
 
-        return {"Y": distance}
+        # Work out of any of the points are on screen so we can throw out samples which
+        px = tf.cast(
+            tf.round(
+                project(
+                    targets,
+                    tf.shape(image)[:2],
+                    features["lens/projection"],
+                    features["lens/focal_length"],
+                    features["lens/centre"],
+                    features["lens/k"],
+                )
+            ),
+            tf.int32,
+        )
+        on_screen = tf.reduce_any(
+            tf.logical_and(
+                tf.logical_and(px[:, 0] >= 0, px[:, 0] < tf.shape(image)[0]),
+                tf.logical_and(px[:, 1] >= 0, px[:, 1] < tf.shape(image)[1]),
+            )
+        )
+
+        return {"Y": distance, "valid": tf.logical_and(valid, on_screen)}
