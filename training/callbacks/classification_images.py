@@ -50,7 +50,7 @@ class ClassificationImages(tf.keras.callbacks.Callback):
         self.img = tf.reshape(data["jpg"], (-1,))
 
         # Work out the data ranges
-        cs = [0] + np.cumsum(data["n"]).tolist()
+        cs = [0] + np.cumsum(tf.reshape(data["n"], (-1,))).tolist()
         self.ranges = list(zip(cs, cs[1:]))
 
     @staticmethod
