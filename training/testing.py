@@ -19,8 +19,8 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
-from . import dataset
-from .dataset import Dataset
+from .dataset import keras_dataset
+from .flavour import get_flavour
 from .model import VisualMeshModel
 
 if True:
@@ -163,12 +163,17 @@ def _reduce_curve(X, c, n_bins, x_func, y_func):
 
 def test(config, output_path):
 
-    classes = config["dataset"]["output"]["classes"]
-    n_classes = len(classes)
-    n_bins = config["testing"]["n_bins"]
+    # Work out what kind of dataset we are training on and get the data
+    datasets, _, metrics, _ = get_flavour(config, output_path)
+
+    # Convert the datasets to keras datasets
+    testing_dataset = datasets[-1].map(keras_dataset)
+
+    # Get the dimensionality of the Y part of the dataset
+    output_dims = testing_dataset.element_spec[1].shape[1]
 
     # Define the model
-    model = VisualMeshModel(structure=config["network"]["structure"], output_dims=n_classes)
+    model = VisualMeshModel(structure=config["network"]["structure"], output_dims=output_dims)
 
     # Find the latest checkpoint file and load it
     checkpoint_file = tf.train.latest_checkpoint(output_path)
@@ -181,26 +186,15 @@ def test(config, output_path):
     n_records = sum(
         1
         for _ in tqdm(
-            tf.data.TFRecordDataset(config["dataset"]["testing"]),
+            tf.data.TFRecordDataset(config["dataset"]["testing"]["paths"]),
             dynamic_ncols=True,
             leave=False,
             unit=" records",
             desc="Counting records in test dataset",
         )
     )
-    n_batches = n_records // max(1, config["testing"]["batch_size"])
+    n_batches = n_records // max(1, config["dataset"]["testing"]["batch_size"])
     print("Testing using {} records in {} batches".format(n_records, n_batches))
-
-    # Load the testing dataset
-    testing_dataset = ClassificationDataset(
-        input_files=config["dataset"]["testing"],
-        classes=classes,
-        mesh=config["model"]["mesh"],
-        geometry=config["model"]["geometry"],
-        batch_size=config["testing"]["batch_size"],
-        prefetch=tf.data.experimental.AUTOTUNE,
-        variants={},
-    ).build()
 
     curve_types = [
         ("pr", _recall, _precision),
@@ -214,14 +208,17 @@ def test(config, output_path):
         ("mcc", _threshold, _mcc),
     ]
 
+    # Get the number of bins to use
+    n_bins = config["testing"]["n_bins"]
+
     # Storage for the metric information
-    confusion = tf.Variable(tf.zeros(shape=(n_classes, n_classes), dtype=tf.int64))
-    curves = [{c: [] for c, x, y in curve_types} for i in range(n_classes)]
+    confusion = tf.Variable(tf.zeros(shape=(output_dims, output_dims), dtype=tf.int64))
+    curves = [{c: [] for c, x, y in curve_types} for i in range(output_dims)]
 
     for e in tqdm(testing_dataset, dynamic_ncols=True, unit=" batches", leave=True, total=n_batches):
         # Run the predictions
-        X = model.predict_on_batch((e["X"], e["G"]))
-        Y = e["Y"]
+        X = model.predict_on_batch((e[0][0], e[0][1]))
+        Y = e[1]
 
         # Strip down all the elements that don't have a label
         idx = tf.squeeze(tf.where(tf.reduce_any(tf.greater(Y, 0.0), axis=-1)), axis=-1)
@@ -235,7 +232,7 @@ def test(config, output_path):
         # Build the threshold curves for each class
         tp = tf.cast(Y, tf.int64)
         fp = 1 - tp
-        for i in range(n_classes):
+        for i in range(output_dims):
             # Extract the relevant information
             X_c = X[:, i]
             tp_c = tp[:, i]
@@ -248,13 +245,13 @@ def test(config, output_path):
 
     # Go through our output and calculate the metrics we can
     metrics = []
-    for i in range(n_classes):
+    for i in range(output_dims):
 
         # Calculate interclass precision and recall
         tp_fn = tf.reduce_sum(confusion[i, :])
         p = tf.reduce_sum(confusion[:, i])
-        class_recall = tf.stack([confusion[i, j] / tp_fn for j in range(n_classes)])
-        class_precision = tf.stack([confusion[j, i] / p for j in range(n_classes)])
+        class_recall = tf.stack([confusion[i, j] / tp_fn for j in range(output_dims)])
+        class_precision = tf.stack([confusion[j, i] / p for j in range(output_dims)])
 
         # Reduce the curves down
         for name, x_func, y_func in curve_types:
@@ -283,6 +280,9 @@ def test(config, output_path):
             }
         )
 
+    # Get a handle to the label classes
+    classes = config["label"]["config"]["classes"]
+
     # Write out the mAP and ap for each class
     os.makedirs(os.path.join(output_path, "test"), exist_ok=True)
     with open(os.path.join(output_path, "test", "pr.txt"), "w") as f:
@@ -293,9 +293,9 @@ def test(config, output_path):
 
         # Global metrics
         write("Global:")
-        write("\tmAP: {}".format(sum([m["ap"] for m in metrics]) / n_classes))
-        write("\tAverage Precision: {}".format(sum([m["precision"][i] for i, m in enumerate(metrics)]) / n_classes))
-        write("\tAverage Recall: {}".format(sum([m["recall"][i] for i, m in enumerate(metrics)]) / n_classes))
+        write("\tmAP: {}".format(sum([m["ap"] for m in metrics]) / output_dims))
+        write("\tAverage Precision: {}".format(sum([m["precision"][i] for i, m in enumerate(metrics)]) / output_dims))
+        write("\tAverage Recall: {}".format(sum([m["recall"][i] for i, m in enumerate(metrics)]) / output_dims))
         write("")
 
         # Individual precisions
@@ -308,10 +308,10 @@ def test(config, output_path):
             write("\tPrecision: {}".format(m["precision"][i]))
             write("\tRecall: {}".format(m["recall"][i]))
             write("\tPredicted {} samples are really:".format(name.title()))
-            for j in range(n_classes):
+            for j in range(output_dims):
                 write("\t\t{}: {:.3f}%".format(classes[j]["name"].title(), 100 * m["precision"][j]))
             write("\tReal {} samples are predicted as:".format(name.title()))
-            for j in range(n_classes):
+            for j in range(output_dims):
                 write("\t\t{}: {:.3f}%".format(classes[j]["name"].title(), 100 * m["recall"][j]))
 
             for curve_name, x_func, y_func in curve_types:
