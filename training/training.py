@@ -14,6 +14,7 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import os
+import pickle
 
 import tensorflow as tf
 import tensorflow_addons as tfa
@@ -65,7 +66,7 @@ def train(config, output_path):
         training_dataset = training_dataset.repeat()
 
     # Fit the model
-    model.fit(
+    history = model.fit(
         training_dataset,
         epochs=config["training"]["epochs"],
         steps_per_epoch=(
@@ -86,3 +87,7 @@ def train(config, output_path):
             *callbacks,
         ],
     )
+
+    # Pickle the history object
+    with open("history.pkl", "wb") as f:
+        pickle.dump(history, f)
