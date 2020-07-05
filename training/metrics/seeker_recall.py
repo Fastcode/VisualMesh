@@ -19,8 +19,8 @@ from .seeker_confusion_base import SeekerConfusionBase
 
 
 class SeekerRecall(SeekerConfusionBase):
-    def __init__(self, name, **kwargs):
-        super(SeekerRecall, self).__init__(name, **kwargs)
+    def __init__(self, name, threshold, **kwargs):
+        super(SeekerRecall, self).__init__(name, threshold, **kwargs)
 
     def result(self):
         # True positives (predicted and labelled true)

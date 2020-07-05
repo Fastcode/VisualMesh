@@ -25,7 +25,13 @@ class ConfusionBase(tf.keras.metrics.Metric):
     def update_state(self, y_true, y_pred, sample_weight=None):
 
         # Build up an index list that maps each class
-        idx = tf.stack([tf.argmax(input=y_true, axis=-1), tf.argmax(input=y_pred, axis=-1)], axis=-1)
+        idx = tf.stack(
+            [
+                tf.argmax(input=y_true, axis=-1, output_type=self.confusion.dtype),
+                tf.argmax(input=y_pred, axis=-1, output_type=self.confusion.dtype),
+            ],
+            axis=-1,
+        )
 
         # Trim down the indexes to only those that have a class label
         idx = tf.gather(idx, tf.squeeze(tf.where(tf.reduce_any(tf.greater(y_true, 0.0), axis=-1)), axis=-1))

@@ -19,3 +19,4 @@ from .class_precision import ClassPrecision
 from .class_recall import ClassRecall
 from .seeker_precision import SeekerPrecision
 from .seeker_recall import SeekerRecall
+from .seeker_stddev import SeekerStdDev

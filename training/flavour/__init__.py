@@ -112,8 +112,12 @@ def get_flavour(config, output_path):
         loss = SeekerLoss()
 
         metrics = [
-            SeekerPrecision("metrics/precision"),
-            SeekerRecall("metrics/recall"),
+            SeekerPrecision("metrics/precision75", 0.75),
+            SeekerRecall("metrics/recall75", 0.75),
+            SeekerStdDev("metrics/stddev75", 0.75),
+            SeekerPrecision("metrics/precision50", 0.5),
+            SeekerRecall("metrics/recall50", 0.5),
+            SeekerStdDev("metrics/stddev50", 0.5),
         ]
 
         callbacks = [

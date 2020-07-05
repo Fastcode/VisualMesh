@@ -19,8 +19,8 @@ from .seeker_confusion_base import SeekerConfusionBase
 
 
 class SeekerPrecision(SeekerConfusionBase):
-    def __init__(self, name, **kwargs):
-        super(SeekerPrecision, self).__init__(name, **kwargs)
+    def __init__(self, name, threshold, **kwargs):
+        super(SeekerPrecision, self).__init__(name, threshold, **kwargs)
 
     def result(self):
         # True positives (predicted and labelled true)

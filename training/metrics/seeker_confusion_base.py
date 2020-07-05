@@ -19,14 +19,15 @@ from .confusion_base import ConfusionBase
 
 
 class SeekerConfusionBase(ConfusionBase):
-    def __init__(self, name, **kwargs):
+    def __init__(self, name, threshold, **kwargs):
         super(SeekerConfusionBase, self).__init__(name, size=2, **kwargs)
+        self.threshold = threshold
 
     def update_state(self, y_true, y_pred, sample_weight=None):
 
         # Our labels for this confusion matrix are based on if the points are near enough
-        y_true = tf.where(tf.reduce_all(tf.math.abs(y_true) <= 0.75, axis=-1), 1.0, 0.0)
-        y_pred = tf.where(tf.reduce_all(tf.math.abs(y_pred) <= 0.75, axis=-1), 1.0, 0.0)
+        y_true = tf.where(tf.reduce_all(tf.math.abs(y_true) <= self.threshold, axis=-1), 1.0, 0.0)
+        y_pred = tf.where(tf.reduce_all(tf.math.abs(y_pred) <= self.threshold, axis=-1), 1.0, 0.0)
 
         super(SeekerConfusionBase, self).update_state(
             tf.stack([y_true, 1.0 - y_true], axis=1), tf.stack([y_pred, 1.0 - y_pred], axis=1)
