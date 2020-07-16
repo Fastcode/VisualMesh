@@ -40,7 +40,7 @@ class ClassificationImages(tf.keras.callbacks.Callback):
         self.writer = tf.summary.create_file_writer(os.path.join(output_path, "images"))
 
         # Load the dataset and extract the single record from it
-        for d in dataset:
+        for d in dataset.take(1):
             data = d
 
         self.X = data["X"]
