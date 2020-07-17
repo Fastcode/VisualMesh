@@ -42,6 +42,8 @@ def train(config, output_path):
     # Setup the optimiser
     if config["training"]["optimiser"]["type"] == "Adam":
         optimiser = tf.optimizers.Adam(learning_rate=float(config["training"]["optimiser"]["learning_rate"]))
+    elif config["training"]["optimiser"]["type"] == "SGD":
+        optimiser = tf.optimizers.SGD(learning_rate=float(config["training"]["optimiser"]["learning_rate"]))
     elif config["training"]["optimiser"]["type"] == "Ranger":
         optimiser = tfa.optimizers.Lookahead(
             tfa.optimizers.RectifiedAdam(learning_rate=float(config["training"]["optimiser"]["learning_rate"])),

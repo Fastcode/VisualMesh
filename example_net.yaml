@@ -165,6 +165,27 @@ training:
   #   type: Adam
   #   learning_rate: 1e-3
 
+  # optimiser:
+  #   type: SGD
+  #   learning_rate: 1e-3
+
+  # What learning policy should be used
+  lr_policy:
+    # Find LR policy, this involves starting the learning rate at a min value and slowly increasing it to a max value
+    # while at the same time monitoring the training loss. Loss and LR values are dumped to a CSV file for the purposes
+    # of finding a maximum LR value
+    find_lr:
+      enabled: False
+      # Learning rate to start the search from
+      min_lr: 1e-6
+      # Learning rate to end the search at
+      max_lr: 1e2
+      # The number of iterations to increase the learning rate over over
+      num_iterations: 1000
+      # Set to true to track the loss through an exponential moving average, otherwise the raw loss is tracked
+      use_smoothed_loss: True
+      # Weighting factor to use in the exponential moving average (only applies if use_smoothed_loss is true)
+      exp_beta: 0.98
   # Settings for the validation step of the network.
   validation:
     # How many batches to load for the validation step

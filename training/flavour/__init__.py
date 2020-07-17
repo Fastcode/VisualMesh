@@ -136,5 +136,8 @@ def get_flavour(config, output_path):
             )
         ]
 
+    if config["training"]["lr_policy"]["find_lr"]["enabled"]:
+        callbacks.append(FindLearningRate(config["training"]["lr_policy"]["find_lr"], output_path))
+
     # Callbacks
     return datasets, loss, metrics, callbacks
