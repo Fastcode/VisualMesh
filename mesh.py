@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
     output_path = "output" if args.output_path is None else args.output_path
 
-    # Make all GPUs grown memory as needed
+    # Make all GPUs grow memory as needed
     gpus = tf.config.experimental.list_physical_devices("GPU")
     if gpus:
         try:

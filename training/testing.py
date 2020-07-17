@@ -16,11 +16,12 @@
 import os
 
 import numpy as np
-import tensorflow as tf
 from tqdm import tqdm
 
+import tensorflow as tf
+
 from .dataset import keras_dataset
-from .flavour import get_flavour
+from .flavour import Dataset
 from .model import VisualMeshModel
 
 if True:
@@ -163,11 +164,8 @@ def _reduce_curve(X, c, n_bins, x_func, y_func):
 
 def test(config, output_path):
 
-    # Work out what kind of dataset we are training on and get the data
-    datasets, _, metrics, _ = get_flavour(config, output_path)
-
-    # Convert the datasets to keras datasets
-    testing_dataset = datasets[-1].map(keras_dataset)
+    # Get the testing dataset
+    testing_dataset = Dataset(config, "testing").map(keras_dataset)
 
     # Get the dimensionality of the Y part of the dataset
     output_dims = testing_dataset.element_spec[1].shape[1]

@@ -14,15 +14,15 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import hashlib
-import os
 import math
+import os
 
 import cv2
 import numpy as np
 
-from training.projection import project
 import tensorflow as tf
 from training.op import difference_visual_mesh, map_visual_mesh, unmap_visual_mesh
+from training.projection import project
 
 
 class SeekerImages(tf.keras.callbacks.Callback):

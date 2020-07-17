@@ -13,7 +13,28 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from .classification_images import ClassificationImages
-from .find_lr import FindLearningRate
-from .one_cycle import OneCycle
-from .seeker_images import SeekerImages
+
+def merge_configuration(base, detail):
+    def _merge(a, b):
+
+        # If they're both dictionaries we start with a and then overwrite with b
+        if type(a) == dict and type(b) == dict:
+            v = {**a}
+            for k in b:
+                if k not in v:
+                    v[k] = b[k]
+                else:
+                    v[k] = _merge(a[k], b[k])
+            return v
+
+        # Otherwise b always wins
+        return b
+
+    config = {}
+    for k in ["view", "example", "orientation", "label", "projection"]:
+        if k not in detail:
+            config[k] = base[k]
+        else:
+            config[k] = _merge(base[k], detail[k])
+
+    return config

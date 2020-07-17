@@ -13,7 +13,16 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from .classification_images import ClassificationImages
-from .find_lr import FindLearningRate
-from .one_cycle import OneCycle
-from .seeker_images import SeekerImages
+from ..loss import *
+
+
+def Loss(config):
+
+    if config["label"]["type"] == "Classification":
+        return FocalLoss()
+
+    elif config["label"]["type"] == "Seeker":
+        return SeekerLoss()
+
+    else:
+        raise RuntimeError("Cannot create loss function, {} is not a supported type".format(config["label"]["type"]))

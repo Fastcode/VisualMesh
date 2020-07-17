@@ -17,21 +17,22 @@ import os
 import pickle
 
 import tensorflow as tf
-import tensorflow_addons as tfa
 
 from .dataset import keras_dataset
-from .flavour import get_flavour
+from .flavour import Dataset, ImageCallback, Loss, Metrics
 from .model import VisualMeshModel
 
 
 # Train the network
 def train(config, output_path):
 
-    # Work out what kind of dataset we are training on and get the data
-    datasets, loss, metrics, callbacks = get_flavour(config, output_path)
+    # Open the two datasets for training and validation
+    training_dataset = Dataset(config, "training").map(keras_dataset)
+    validation_dataset = Dataset(config, "validation").map(keras_dataset)
 
-    # Convert the datasets to keras datasets
-    training_dataset, validation_dataset, _ = [d.map(keras_dataset) for d in datasets]
+    # If we are using batches_per_epoch as a number rather than the whole dataset
+    if "batches_per_epoch" in config["training"]:
+        training_dataset = training_dataset.repeat()
 
     # Get the dimensionality of the Y part of the dataset
     output_dims = training_dataset.element_spec[1].shape[1]
@@ -45,6 +46,8 @@ def train(config, output_path):
     elif config["training"]["optimiser"]["type"] == "SGD":
         optimiser = tf.optimizers.SGD(learning_rate=float(config["training"]["optimiser"]["learning_rate"]))
     elif config["training"]["optimiser"]["type"] == "Ranger":
+        import tensorflow_addons as tfa
+
         optimiser = tfa.optimizers.Lookahead(
             tfa.optimizers.RectifiedAdam(learning_rate=float(config["training"]["optimiser"]["learning_rate"])),
             sync_period=int(config["training"]["optimiser"]["sync_period"]),
@@ -53,19 +56,13 @@ def train(config, output_path):
     else:
         raise RuntimeError("Unknown optimiser type" + config["training"]["optimiser"]["type"])
 
-    # Compile the model
-    model.compile(
-        optimizer=optimiser, loss=loss, metrics=metrics,
-    )
+    # Compile the model grabbing the flavours for the loss and metrics
+    model.compile(optimizer=optimiser, loss=Loss(config), metrics=Metrics(config))
 
     # Find the latest checkpoint file and load it
     checkpoint_file = tf.train.latest_checkpoint(output_path)
     if checkpoint_file is not None:
         model.load_weights(checkpoint_file)
-
-    # If we are using batches_per_epoch as a number rather than the whole dataset
-    if "batches_per_epoch" in config["training"]:
-        training_dataset = training_dataset.repeat()
 
     # Fit the model
     history = model.fit(
@@ -87,10 +84,10 @@ def train(config, output_path):
                 save_best_only=True,
             ),
             tf.keras.callbacks.TerminateOnNaN(),
-            *callbacks,
+            ImageCallback(config, output_path),
         ],
     )
 
     # Pickle the history object
-    with open("history.pkl", "wb") as f:
+    with open(os.path.join(output_path, "history.pkl"), "wb") as f:
         pickle.dump(history, f)
