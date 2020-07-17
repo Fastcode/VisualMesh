@@ -18,9 +18,9 @@ import numpy as np
 import tensorflow as tf
 
 
-class OneCycleLearningRate(tf.keras.callbacks.Callback):
+class OneCycle(tf.keras.callbacks.Callback):
     def __init__(self, config, **kwargs):
-        super(OneCycleLearningRate, self).__init__()
+        super(OneCycle, self).__init__()
 
         self.learning_rate = lr
 

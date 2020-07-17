@@ -16,4 +16,4 @@
 from .classification_images import ClassificationImages
 from .seeker_images import SeekerImages
 from .find_lr import FindLearningRate
-from .one_cycle import OneCycleLearningRate
+from .one_cycle import OneCycle
