@@ -186,6 +186,24 @@ training:
       use_smoothed_loss: True
       # Weighting factor to use in the exponential moving average (only applies if use_smoothed_loss is true)
       exp_beta: 0.98
+    # One cycle policy, this involves a linear increase, and then decrease of the learning rate followed by a decay
+    one_cycle:
+      enabled: False
+      # Minimum learning rate to cycle up from
+      min_learning_rate: 0.0004
+      # Maximum learning rate at peak
+      max_learning_rate: 0.004
+      # Learning rate to decay down to during the decay step
+      decay_learning_rate: 0.00004
+      # Number of batches to do in the cycle
+      cycle_batches: 100000
+      # Number of batches to spend decaying the learning rate
+      decay_batches: 50000
+      # If hot_start is true, the training will restart it's training as if beginning at 0 without resetting the network
+      # This means the one cycle will begin again treating the current global_step as the 0 point and going
+      # cycle_batches + decay_batches more
+      hot_start: False
+
   # Settings for the validation step of the network.
   validation:
     # How many batches to load for the validation step
