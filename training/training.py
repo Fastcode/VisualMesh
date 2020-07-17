@@ -86,6 +86,7 @@ def train(config, output_path):
                 save_weights_only=True,
                 save_best_only=True,
             ),
+            tf.keras.callbacks.TerminateOnNaN(),
             *callbacks,
         ],
     )
