@@ -18,6 +18,7 @@ import pickle
 
 import tensorflow as tf
 
+from .callbacks import FindLearningRate, OneCycle
 from .dataset import keras_dataset
 from .flavour import Dataset, ImageCallback, Loss, Metrics
 from .model import VisualMeshModel
@@ -56,6 +57,14 @@ def train(config, output_path):
     else:
         raise RuntimeError("Unknown optimiser type" + config["training"]["optimiser"]["type"])
 
+    # Add learning rate policy callbacks
+    lr_policy = []
+    if config["training"]["lr_policy"]["find_lr"]["enabled"]:
+        lr_policy.append(FindLearningRate(config["training"]["lr_policy"]["find_lr"], output_path))
+
+    if config["training"]["lr_policy"]["one_cycle"]["enabled"]:
+        lr_policy.append(OneCycle(config["training"]["lr_policy"]["one_cycle"]))
+
     # Compile the model grabbing the flavours for the loss and metrics
     model.compile(optimizer=optimiser, loss=Loss(config), metrics=Metrics(config))
 
@@ -85,6 +94,7 @@ def train(config, output_path):
             ),
             tf.keras.callbacks.TerminateOnNaN(),
             ImageCallback(config, output_path),
+            *lr_policy,
         ],
     )
 
