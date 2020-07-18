@@ -154,55 +154,53 @@ training:
   batches_per_epoch: 1000
   # Number of epochs to execute
   epochs: 500
+
   # Optimiser settings
   optimiser:
     type: Ranger
-    learning_rate: 1e-3
     sync_period: 6
     slow_step_size: 0.5
-
   # optimiser:
   #   type: Adam
-  #   learning_rate: 1e-3
-
   # optimiser:
   #   type: SGD
-  #   learning_rate: 1e-3
 
-  # What learning policy should be used
-  lr_policy:
-    # Find LR policy, this involves starting the learning rate at a min value and slowly increasing it to a max value
-    # while at the same time monitoring the training loss. Loss and LR values are dumped to a CSV file for the purposes
-    # of finding a maximum LR value
-    find_lr:
-      enabled: False
-      # Learning rate to start the search from
-      min_lr: 1e-6
-      # Learning rate to end the search at
-      max_lr: 1e2
-      # The number of iterations to increase the learning rate over over
-      num_iterations: 1000
-      # Set to true to track the loss through an exponential moving average, otherwise the raw loss is tracked
-      use_smoothed_loss: True
-      # Weighting factor to use in the exponential moving average (only applies if use_smoothed_loss is true)
-      exp_beta: 0.98
-    # One cycle policy, this involves a linear increase, and then decrease of the learning rate followed by a decay
-    one_cycle:
-      enabled: False
-      # Minimum learning rate to cycle up from
-      min_learning_rate: 0.0004
-      # Maximum learning rate at peak
-      max_learning_rate: 0.004
-      # Learning rate to decay down to during the decay step
-      decay_learning_rate: 0.00004
-      # Number of batches to do in the cycle
-      cycle_batches: 100000
-      # Number of batches to spend decaying the learning rate
-      decay_batches: 50000
-      # If hot_start is true, the training will restart it's training as if beginning at 0 without resetting the network
-      # This means the one cycle will begin again treating the current global_step as the 0 point and going
-      # cycle_batches + decay_batches more
-      hot_start: False
+  # Learning rate settings
+  learning_rate:
+    type: static
+    value: 1e-3
+  # learning_rate:
+  #   # Find LR policy, this involves starting the learning rate at a min value and slowly increasing it to a max value
+  #   # while at the same time monitoring the training loss. Loss and LR values are dumped to a CSV file for the purposes
+  #   # of finding a maximum LR value
+  #   type: find_lr
+  #   # Learning rate to start the search from
+  #   min_lr: 1e-6
+  #   # Learning rate to end the search at
+  #   max_lr: 1e2
+  #   # The number of iterations to increase the learning rate over over
+  #   num_iterations: 1000
+  #   # Set to true to track the loss through an exponential moving average, otherwise the raw loss is tracked
+  #   use_smoothed_loss: True
+  #   # Weighting factor to use in the exponential moving average (only applies if use_smoothed_loss is true)
+  #   exp_beta: 0.98
+
+  # learning_rate:
+  #   type: one_cycle
+  #   # Minimum learning rate to cycle up from
+  #   min_learning_rate: 0.0004
+  #   # Maximum learning rate at peak
+  #   max_learning_rate: 0.004
+  #   # Learning rate to decay down to during the decay step
+  #   decay_learning_rate: 0.00004
+  #   # Number of batches to do in the cycle
+  #   cycle_batches: 100000
+  #   # Number of batches to spend decaying the learning rate
+  #   decay_batches: 50000
+  #   # If hot_start is true, the training will restart it's training as if beginning at 0 without resetting the network
+  #   # This means the one cycle will begin again treating the current global_step as the 0 point and going
+  #   # cycle_batches + decay_batches more
+  #   hot_start: False
 
   # Settings for the validation step of the network.
   validation:

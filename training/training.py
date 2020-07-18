@@ -41,29 +41,32 @@ def train(config, output_path):
     # Define the model
     model = VisualMeshModel(structure=config["network"]["structure"], output_dims=output_dims)
 
+    # Determine the learning rate policy to use
+    if config["training"]["learning_rate"]["type"] == "static":
+        learning_rate = float(config["training"]["learning_rate"]["value"])
+        lr_callback = []
+    elif config["training"]["learning_rate"]["type"] == "find_lr":
+        learning_rate = float(config["training"]["learning_rate"]["min_lr"])
+        lr_callback = [FindLearningRate(config=config["training"]["learning_rate"], output_path=output_path)]
+    elif config["training"]["learning_rate"]["type"] == "one_cycle":
+        learning_rate = float(config["training"]["learning_rate"]["min_learning_rate"])
+        lr_callback = [OneCycle(config=config["training"]["learning_rate"])]
+
     # Setup the optimiser
     if config["training"]["optimiser"]["type"] == "Adam":
-        optimiser = tf.optimizers.Adam(learning_rate=float(config["training"]["optimiser"]["learning_rate"]))
+        optimiser = tf.optimizers.Adam(learning_rate=learning_rate)
     elif config["training"]["optimiser"]["type"] == "SGD":
-        optimiser = tf.optimizers.SGD(learning_rate=float(config["training"]["optimiser"]["learning_rate"]))
+        optimiser = tf.optimizers.SGD(learning_rate=learning_rate)
     elif config["training"]["optimiser"]["type"] == "Ranger":
         import tensorflow_addons as tfa
 
         optimiser = tfa.optimizers.Lookahead(
-            tfa.optimizers.RectifiedAdam(learning_rate=float(config["training"]["optimiser"]["learning_rate"])),
+            tfa.optimizers.RectifiedAdam(learning_rate=learning_rate),
             sync_period=int(config["training"]["optimiser"]["sync_period"]),
             slow_step_size=float(config["training"]["optimiser"]["slow_step_size"]),
         )
     else:
         raise RuntimeError("Unknown optimiser type" + config["training"]["optimiser"]["type"])
-
-    # Add learning rate policy callbacks
-    lr_policy = []
-    if config["training"]["lr_policy"]["find_lr"]["enabled"]:
-        lr_policy.append(FindLearningRate(config["training"]["lr_policy"]["find_lr"], output_path))
-
-    if config["training"]["lr_policy"]["one_cycle"]["enabled"]:
-        lr_policy.append(OneCycle(config["training"]["lr_policy"]["one_cycle"]))
 
     # Compile the model grabbing the flavours for the loss and metrics
     model.compile(optimizer=optimiser, loss=Loss(config), metrics=Metrics(config))
@@ -94,7 +97,7 @@ def train(config, output_path):
             ),
             tf.keras.callbacks.TerminateOnNaN(),
             ImageCallback(config, output_path),
-            *lr_policy,
+            *lr_callback,
         ],
     )
 
