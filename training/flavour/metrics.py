@@ -20,7 +20,7 @@ def Metrics(config):
 
     if config["label"]["type"] == "Classification":
 
-        classes = validation_config["label"]["config"]["classes"]
+        classes = config["label"]["config"]["classes"]
         metrics = [
             AveragePrecision("metrics/average_precision", len(classes)),
             AverageRecall("metrics/average_recall", len(classes)),
