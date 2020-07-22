@@ -30,7 +30,7 @@ dataset:
   validation:
     paths:
       - dataset/spotlight_validation.tfrecord
-    batch_size: 20
+    batch_size: 50
     # Repeat the keys from training
     keys: *keys
 
@@ -145,8 +145,8 @@ network:
 
 # Testing
 testing:
-  # The number of bins to use when calculating curves
-  n_bins: 1000
+  # The number of points that will be used on curves
+  n_points: 1000
 
 # Settings to use when training the network
 training:
