@@ -13,8 +13,16 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from .dataset import Dataset
-from .image_callback import ImageCallback
-from .loss import Loss
-from .metrics import Metrics
-from .test_metrics import TestMetrics
+import tensorflow as tf
+
+
+def curve_bucket(x, y):
+    return tf.math.sqrt(tf.add(tf.math.squared_difference(x[:-1], x[1:]), tf.math.squared_difference(y[:-1], y[1:]),))
+
+
+def x_bucket(x, y):
+    return tf.math.abs(x[1:] - x[:-1])
+
+
+def y_bucket(x, y):
+    return tf.math.abs(x[1:] - x[:-1])

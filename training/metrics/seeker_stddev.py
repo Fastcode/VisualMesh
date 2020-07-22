@@ -22,40 +22,28 @@ class SeekerStdDev(tf.keras.metrics.Metric):
 
         self.threshold = threshold
 
-        self.n_a = self.add_weight(name="n_a", shape=(), initializer="zeros", dtype=tf.int32)
-        self.x_a = self.add_weight(name="x_a", shape=(), initializer="zeros", dtype=tf.float32)
-        self.s_a = self.add_weight(name="s_a", shape=(), initializer="zeros", dtype=tf.float32)
+        self.n = self.add_weight(name="n", shape=(), initializer="zeros", dtype=tf.int64)
+        self.s = self.add_weight(name="s", shape=(), initializer="zeros", dtype=tf.float64)
 
     def update_state(self, y_true, y_pred, sample_weight=None):
+        y_true = tf.clip_by_value(y_true, -1.0, 1.0)
 
         # For standard deviation we only want to look at how we went for the truth samples
-        idx = tf.squeeze(tf.where(tf.reduce_all(y_true <= self.threshold, axis=-1)), axis=-1)
-        y_true = tf.gather(y_true, idx)
-        y_pred = tf.gather(y_pred, idx)
-
-        # Get the difference value we will be getting stddev from
-        # We're going to assume that both n and m are the same
-        b = tf.reshape(y_pred - y_true, (-1,))
+        idx = tf.squeeze(tf.where(tf.reduce_all(tf.abs(y_pred) <= self.threshold, axis=-1)), axis=-1)
+        y_true = tf.cast(tf.gather(y_true, idx), dtype=tf.float64)
+        y_pred = tf.cast(tf.gather(y_pred, idx), dtype=tf.float64)
 
         # Get the properties we care about from the sample we just received
-        x_b = tf.math.reduce_mean(b)
-        n_b = tf.size(b)
-        s_b = tf.math.reduce_sum(tf.square(b - x_b))
-
-        # Combine this new data with the existing data
-        n_ab = self.n_a + n_b
-        x_ab = (self.x_a * tf.cast(self.n_a, self.dtype) + x_b * tf.cast(n_b, self.dtype)) / tf.cast(n_ab, self.dtype)
-        s_ab = self.s_a + s_b + (x_b - self.x_a) ** 2 * tf.cast(self.n_a * n_b, self.dtype) / tf.cast(n_ab, self.dtype)
+        n = tf.shape(y_true, out_type=tf.int64)[0]
+        s = tf.math.reduce_sum(tf.math.squared_difference(y_pred, y_true))
 
         # First time we just assign the b numbers
-        self.x_a.assign(tf.where(self.n_a == 0, x_b, x_ab))
-        self.s_a.assign(tf.where(self.n_a == 0, s_b, s_ab))
-        self.n_a.assign(n_ab)
+        self.s.assign_add(s)
+        self.n.assign_add(n)
 
     def result(self):
-        return tf.math.sqrt(self.s_a / tf.cast(self.n_a - 1, self.dtype))
+        return tf.math.sqrt(self.s / tf.cast(self.n - 1, tf.float64))
 
     def reset_states(self):
-        self.n_a.assign(tf.zeros_like(self.n_a))
-        self.x_a.assign(tf.zeros_like(self.x_a))
-        self.s_a.assign(tf.zeros_like(self.s_a))
+        self.n.assign(tf.zeros_like(self.n))
+        self.s.assign(tf.zeros_like(self.s))
