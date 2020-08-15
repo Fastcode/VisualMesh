@@ -34,7 +34,7 @@ def test(config, output_path):
 
     # Get the testing dataset
     testing_dataset = (
-        Dataset(config, "validation")
+        Dataset(config, "testing")
         .map(keras_dataset, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         .prefetch(tf.data.experimental.AUTOTUNE)
     )
