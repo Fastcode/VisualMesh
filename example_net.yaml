@@ -206,5 +206,7 @@ training:
   validation:
     # How many batches to load for the validation step
     samples: 10
+    # Whether to log metrics to tensorflow per batch or per epoch
+    log_frequency: "epoch"
     # How many images to show in tensorboard, they are taken as the first n images of the validation set.
     progress_images: 20
