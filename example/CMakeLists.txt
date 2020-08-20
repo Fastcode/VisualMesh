@@ -18,9 +18,9 @@ if(BUILD_EXAMPLES)
 
         # Always have the colours otherwise using ninja makes them go away
         if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-            list(APPEND -fcolor-diagnostics)
+            list(APPEND compile_options -fcolor-diagnostics)
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-            list(APPEND -fdiagnostics-color=always)
+            list(APPEND compile_options -fdiagnostics-color=always)
         endif()
     endif()
 
