@@ -456,9 +456,15 @@ public:
         nodes = std::move(sorted_nodes);
     }
 
+    /**
+     * @brief Converts a Mesh object of a different Scalar to this Scalar type
+     *
+     * @tparam U the Scalar type of the other Mesh object
+     *
+     * @param b the other Mesh object to convert from
+     */
     template <typename U>
-    explicit Mesh(const Mesh<U, Model>& b)
-      : h(static_cast<Scalar>(b.h)), max_distance(static_cast<Scalar>(b.max_distance)) {
+    Mesh(const Mesh<U, Model>& b) : h(static_cast<Scalar>(b.h)), max_distance(static_cast<Scalar>(b.max_distance)) {
         nodes.reserve(b.nodes.size());
         bsp.reserve(b.bsp.size());
 

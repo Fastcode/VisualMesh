@@ -93,6 +93,21 @@ public:
     }
 
     /**
+     * @brief Converts a VisualMesh object of a different Scalar to this Scalar type
+     *
+     * @tparam U the Scalar type of the other VisualMesh object
+     *
+     * @param b the other VisualMesh object to convert from
+     */
+    template <typename U>
+    VisualMesh(const VisualMesh<U, Model>& b) {
+        for (const auto& lut : b.luts) {
+            luts.insert(
+              std::make_pair(static_cast<Scalar>(lut.first), static_cast<const Mesh<Scalar, Model>>(lut.second)));
+        }
+    }
+
+    /**
      * Find a visual mesh that exists at a specific height above the observation plane.
      * This only looks up meshes that were created during instantiation.
      * If this lookup is out of range, it will return the highest or lowest mesh (whichever is closer)
@@ -138,6 +153,9 @@ public:
 private:
     /// A map from heights to visual mesh tables
     std::map<Scalar, const Mesh<Scalar, Model>> luts;
+
+    template <typename S, template <typename> class M>
+    friend class VisualMesh;
 };
 
 }  // namespace visualmesh
