@@ -87,7 +87,11 @@ def train(config, output_path):
         validation_steps=config["training"]["validation"]["samples"],
         callbacks=[
             tf.keras.callbacks.TensorBoard(
-                log_dir=output_path, update_freq="batch", profile_batch=0, write_graph=True, histogram_freq=1
+                log_dir=output_path,
+                update_freq=config["training"]["validation"]["log_frequency"],
+                profile_batch=0,
+                write_graph=True,
+                histogram_freq=1,
             ),
             tf.keras.callbacks.ModelCheckpoint(
                 filepath=os.path.join(output_path, "model"),
