@@ -61,7 +61,7 @@ def export(config, output_path):
             stages[-1].append(
                 {
                     "weights": op.weights[0].numpy().tolist(),
-                    "bias": op.weights[0].numpy().tolist(),
+                    "biases": op.weights[1].numpy().tolist(),
                     "activation": op.activation.__name__,
                 }
             )
@@ -69,5 +69,13 @@ def export(config, output_path):
             print("Error: currently we can only export GraphConvolution and Dense layers")
             exit(1)
 
+    # While we have a 3 values on our input, all the c++ take 4 due to alignment issues
+    # Therefore for that weights we need to increase it to 4
+    first = tf.convert_to_tensor(stages[0][0]["weights"])
+    first = tf.reshape(first, (-1, 3, first.shape[-1]))
+    first = tf.pad(first, [[0, 0], [0, 1], [0, 0]])
+    first = tf.reshape(first, (-1, first.shape[-1]))
+    stages[0][0]["weights"] = first.numpy().tolist()
+
     with open(os.path.join(output_path, "model.yaml"), "w") as out:
-        out.write(yaml.dump(stages, width=120))
+        yaml.dump(stages, out)
