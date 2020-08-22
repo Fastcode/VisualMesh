@@ -1,0 +1,14 @@
+{
+    "recommendations": [
+        "ms-vscode.cpptools",
+        "twxs.cmake",
+        "ms-vscode.cmake-tools",
+        "cheshirekow.cmake-format",
+        "ms-azuretools.vscode-docker",
+        "galarius.vscode-opencl",
+        "ms-python.python",
+        "redhat.vscode-yaml",
+        "streetsidesoftware.code-spell-checker",
+        "cschlosser.doxdocgen"
+    ]
+}
