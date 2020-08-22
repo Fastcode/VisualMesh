@@ -41,7 +41,7 @@ namespace engine {
              * @return the OpenCL source code for the kernels to be built
              */
             template <typename Scalar>
-            std::string make_network(const network_structure_t<Scalar>& structure) {
+            std::string make_network(const NetworkStructure<Scalar>& structure) {
                 // Generate the OpenCL kernels for the network
                 std::stringstream code;
 
@@ -49,7 +49,7 @@ namespace engine {
                 if (structure.empty() || structure.front().empty()) { return ""; }
 
                 // First layer has 4 inputs, so that tells us how many neighbours we have (minus ourself)
-                const unsigned int n_neighbours = (structure.front().front().first.size() / 4) - 1;
+                const unsigned int n_neighbours = (structure.front().front().weights.size() / 4) - 1;
 
                 // Set our precision for how many digits our scalar has
                 code << std::setprecision(std::numeric_limits<Scalar>::digits10 + 2);
@@ -108,8 +108,9 @@ namespace engine {
 
                     // Now we have to do our layer operations
                     for (unsigned int layer_no = 0; layer_no < conv.size(); ++layer_no) {
-                        const auto& weights = conv[layer_no].first;
-                        const auto& biases  = conv[layer_no].second;
+                        const auto& weights    = conv[layer_no].weights;
+                        const auto& biases     = conv[layer_no].biases;
+                        const auto& activation = conv[layer_no].activation;
 
                         // Update our output dimensions
                         output_dimensions = biases.size();
@@ -137,40 +138,57 @@ namespace engine {
                         // Apply our activation function
                         code << "  // Apply the activation function" << std::endl;
 
-                        // selu constants
-                        constexpr const Scalar lambda = 1.0507009873554804934193349852946;
-                        constexpr const Scalar alpha  = 1.6732632423543772848170429916717;
+                        switch (activation) {
+                            case ActivationFunction::SELU: {
+                                // selu constants
+                                constexpr const Scalar lambda = 1.0507009873554804934193349852946;
+                                constexpr const Scalar alpha  = 1.6732632423543772848170429916717;
 
-                        // Apply selu
-                        if (conv_no + 1 < structure.size() || layer_no + 1 < conv.size()) {
-                            for (unsigned int i = 0; i < output_dimensions; ++i) {
-                                std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
-                                code << "  " << e << " = " << lambda << "f * (" << e << " > 0 ? " << e << " : " << alpha
-                                     << "f * exp(" << e << ") - " << alpha << "f);" << std::endl;
-                            }
+                                code << "  // Apply selu" << std::endl;
+                                for (unsigned int i = 0; i < output_dimensions; ++i) {
+                                    std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
+                                    code << "  " << e << " = " << lambda << "f * (" << e << " > 0 ? " << e << " : "
+                                         << alpha << "f * exp(" << e << ") - " << alpha << "f);" << std::endl;
+                                }
+                            } break;
+                            case ActivationFunction::RELU: {
+                                code << "  // Apply relu" << std::endl;
+                                for (unsigned int i = 0; i < output_dimensions; ++i) {
+                                    std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
+                                    code << "  " << e << " = " << e << " > 0 ? " << e << " : 0;" << std::endl;
+                                }
+                            } break;
+                            case ActivationFunction::TANH: {
+                                code << "  // Apply tanh" << std::endl;
+                                for (unsigned int i = 0; i < output_dimensions; ++i) {
+                                    std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
+                                    code << "  " << e << " = tanh(" << e << ");" << std::endl;
+                                }
+                            } break;
+                            case ActivationFunction::SOFTMAX: {
+                                code << "  // Apply softmax" << std::endl;
+
+                                // Apply exp to each of the elements
+                                for (unsigned int i = 0; i < output_dimensions; ++i) {
+                                    std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
+                                    code << "  " << e << " = exp(" << e << ");" << std::endl;
+                                }
+
+                                // Sum up all the values
+                                code << "Scalar exp_sum = 0;" << std::endl;
+                                for (unsigned int i = 0; i < output_dimensions; ++i) {
+                                    std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
+                                    code << "  exp_sum += " << e << ";" << std::endl;
+                                }
+
+                                // Divide all the values
+                                for (unsigned int i = 0; i < output_dimensions; ++i) {
+                                    std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
+                                    code << "  " << e << " /= exp_sum;" << std::endl;
+                                }
+                            } break;
                         }
-                        else {  // If this is our last layer, apply softmax
-                            code << "  // Apply softmax to our final output" << std::endl;
 
-                            // Apply exp to each of the elements
-                            for (unsigned int i = 0; i < output_dimensions; ++i) {
-                                std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
-                                code << "  " << e << " = exp(" << e << ");" << std::endl;
-                            }
-
-                            // Sum up all the values
-                            code << "Scalar exp_sum = 0;" << std::endl;
-                            for (unsigned int i = 0; i < output_dimensions; ++i) {
-                                std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
-                                code << "  exp_sum += " << e << ";" << std::endl;
-                            }
-
-                            // Divide all the values
-                            for (unsigned int i = 0; i < output_dimensions; ++i) {
-                                std::string e = "in" + std::to_string(layer_no + 1) + "[" + std::to_string(i) + "]";
-                                code << "  " << e << " /= exp_sum;" << std::endl;
-                            }
-                        }
                         code << std::endl;
 
                         // Update our input size for the next loop

@@ -23,6 +23,7 @@
 #include "engine/opencl/engine.hpp"
 #include "engine/vulkan/engine.hpp"
 #include "geometry/Sphere.hpp"
+#include "load_model.hpp"
 #include "mesh/model/ring6.hpp"
 #include "mesh/network_structure.hpp"
 #include "mesh/visualmesh.hpp"
@@ -32,7 +33,7 @@ using Scalar = float;
 template <typename Engine, typename Mesh>
 class Benchmarker {
 public:
-    Benchmarker(const visualmesh::network_structure_t<Scalar>& network,
+    Benchmarker(const visualmesh::NetworkStructure<Scalar>& network,
                 const Mesh& mesh,
                 const std::vector<dataset_element<Scalar>>& dataset,
                 const int& loops)
@@ -65,7 +66,7 @@ private:
 };
 
 template <typename Engine, typename Mesh>
-void benchmark(const visualmesh::network_structure_t<Scalar>& network,
+void benchmark(const visualmesh::NetworkStructure<Scalar>& network,
                const std::vector<dataset_element<Scalar>>& dataset,
                const Mesh& mesh,
                const int loops,
@@ -103,17 +104,7 @@ int main() {
     Timer t;
 
     // Load the classification network
-    visualmesh::network_structure_t<Scalar> network;
-    YAML::Node config = YAML::LoadFile(model_path);
-    for (const auto& conv : config) {
-        network.emplace_back();
-        auto& net_conv = network.back();
-
-        for (const auto& layer : conv) {
-            net_conv.emplace_back(layer["weights"].as<std::vector<std::vector<Scalar>>>(),
-                                  layer["biases"].as<std::vector<Scalar>>());
-        }
-    }
+    visualmesh::NetworkStructure<Scalar> network = load_model<Scalar>(model_path);
     t.measure("Loaded network from YAML file");
 
     // Build Mesh

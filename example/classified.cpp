@@ -35,6 +35,7 @@
 #include "engine/opencl/engine.hpp"
 #include "engine/vulkan/engine.hpp"
 #include "geometry/Sphere.hpp"
+#include "load_model.hpp"
 #include "mesh/network_structure.hpp"
 #include "mesh/visualmesh.hpp"
 #include "utility/fourcc.hpp"
@@ -69,17 +70,7 @@ int main() {
     Timer t;
 
     // Build our classification network
-    visualmesh::network_structure_t<Scalar> network;
-    YAML::Node config = YAML::LoadFile(model_path);
-    for (const auto& conv : config) {
-        network.emplace_back();
-        auto& net_conv = network.back();
-
-        for (const auto& layer : conv) {
-            net_conv.emplace_back(layer["weights"].as<std::vector<std::vector<Scalar>>>(),
-                                  layer["biases"].as<std::vector<Scalar>>());
-        }
-    }
+    visualmesh::NetworkStructure<Scalar> network = load_model<Scalar>(model_path);
     t.measure("Loaded network from YAML file");
 
     visualmesh::geometry::Sphere<Scalar> sphere(0.0949996);

@@ -22,20 +22,32 @@ namespace visualmesh {
 
 /// Weights are a matrix (vector of vectors)
 template <typename Scalar>
-using weights_t = std::vector<std::vector<Scalar>>;
+using Weights = std::vector<std::vector<Scalar>>;
 /// Biases are a vector
 template <typename Scalar>
-using biases_t = std::vector<Scalar>;
+using Biases = std::vector<Scalar>;
 
-/// A layer is made up of a pair of weights and biases
+enum ActivationFunction {
+    SELU,
+    RELU,
+    SOFTMAX,
+    TANH,
+};
+
+/// A layer is made up of weights biases and activation function
 template <typename Scalar>
-using layer_t = std::pair<weights_t<Scalar>, biases_t<Scalar>>;
+struct Layer {
+    Weights<Scalar> weights;
+    Biases<Scalar> biases;
+    ActivationFunction activation;
+};
+
 /// A convolutional layer is made up of a list of network layers
 template <typename Scalar>
-using conv_layer_t = std::vector<layer_t<Scalar>>;
+using ConvolutionalGroup = std::vector<Layer<Scalar>>;
 /// A network is a list of convolutional layers
 template <typename Scalar>
-using network_structure_t = std::vector<conv_layer_t<Scalar>>;
+using NetworkStructure = std::vector<ConvolutionalGroup<Scalar>>;
 
 }  // namespace visualmesh
 

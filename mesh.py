@@ -23,13 +23,14 @@ import yaml
 import tensorflow as tf
 import training.testing as testing
 import training.training as training
+import training.export as export
 
 if __name__ == "__main__":
 
     # Parse our command line arguments
     command = argparse.ArgumentParser(description="Utility for training a Visual Mesh network")
 
-    command.add_argument("command", choices=["train", "test"], action="store")
+    command.add_argument("command", choices=["train", "test", "export"], action="store")
     command.add_argument("config", action="store", help="Path to the configuration file for training")
     command.add_argument(
         "output_path", nargs="?", action="store", help="Output directory to store the logs and models",
@@ -58,3 +59,6 @@ if __name__ == "__main__":
 
     elif args.command == "test":
         testing.test(config, output_path)
+
+    elif args.command == "export":
+        export.export(config, output_path)

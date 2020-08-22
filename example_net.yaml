@@ -93,7 +93,7 @@ projection:
       # The maximum distance the Visual Mesh will be projected for. This should be slightly further than the most distant
       # object that you wish to detect to account for noises in the projection.
       max_distance: 20
-      # The geometry of the object we are detecting in the Visual Mesh.
+    # The geometry of the object we are detecting in the Visual Mesh.
     geometry:
       # The shape to project, either CIRCLE or SPHERE.
       shape: SPHERE

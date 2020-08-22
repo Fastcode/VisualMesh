@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <numeric>
 
+#include "apply_activation.hpp"
 #include "mesh/classified_mesh.hpp"
 #include "mesh/mesh.hpp"
 #include "mesh/network_structure.hpp"
@@ -51,12 +52,12 @@ namespace engine {
              *
              * @param structure the network structure to use classification
              */
-            Engine(const network_structure_t<Scalar>& structure = {}) : structure(structure) {
+            Engine(const NetworkStructure<Scalar>& structure = {}) : structure(structure) {
                 // Transpose all the weights matrices to make it easier for us to multiply against
                 for (auto& conv : this->structure) {
                     for (auto& layer : conv) {
-                        auto& w = layer.first;
-                        weights_t<Scalar> new_weights(w.front().size(), std::vector<Scalar>(w.size()));
+                        auto& w = layer.weights;
+                        Weights<Scalar> new_weights(w.front().size(), std::vector<Scalar>(w.size()));
                         for (unsigned int i = 0; i < w.size(); ++i) {
                             for (unsigned int j = 0; j < w[i].size(); ++j) {
                                 new_weights[j][i] = w[i][j];
@@ -251,8 +252,9 @@ namespace engine {
 
                     // For each network layer
                     for (unsigned int layer_no = 0; layer_no < conv.size(); ++layer_no) {
-                        const auto& weights = conv[layer_no].first;
-                        const auto& biases  = conv[layer_no].second;
+                        const auto& weights    = conv[layer_no].weights;
+                        const auto& biases     = conv[layer_no].biases;
+                        const auto& activation = conv[layer_no].activation;
 
                         // Setup the shapes
                         output_dimensions = biases.size();
@@ -269,27 +271,13 @@ namespace engine {
                             in_point += input_dimensions;
                         }
 
-                        // If we are not on our last layer apply selu
-                        if (conv_no + 1 < structure.size() || layer_no + 1 < conv.size()) {
-                            std::transform(output.begin(), output.end(), output.begin(), [](const Scalar& s) {
-                                constexpr const Scalar lambda = 1.0507009873554804934193349852946;
-                                constexpr const Scalar alpha  = 1.6732632423543772848170429916717;
-                                return lambda * (s >= 0 ? s : alpha * std::exp(s) - alpha);
-                            });
-                        }
+                        // Apply the activation function
+                        apply_activation(activation, output, output_dimensions);
 
                         // Swap our values over
                         std::swap(input, output);
                         input_dimensions = output_dimensions;
                     }
-                }
-
-                // Apply softmax
-                std::transform(input.begin(), input.end(), input.begin(), [](const Scalar& s) { return std::exp(s); });
-                for (auto it = input.begin(); it < input.end(); std::advance(it, input_dimensions)) {
-                    const auto end = std::next(it, input_dimensions);
-                    Scalar total   = std::accumulate(it, end, Scalar(0.0));
-                    std::transform(it, end, it, [total](const Scalar& s) { return s / total; });
                 }
 
                 return ClassifiedMesh<Scalar, N_NEIGHBOURS>{std::move(projected.pixel_coordinates),
@@ -323,7 +311,7 @@ namespace engine {
 
         private:
             /// The network structure used to perform the operations
-            network_structure_t<Scalar> structure;
+            NetworkStructure<Scalar> structure;
 
             /// An input buffer used to ping/pong when doing classification so we don't have to remake them
             mutable std::vector<Scalar> input;

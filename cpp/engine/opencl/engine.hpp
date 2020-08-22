@@ -65,7 +65,7 @@ namespace engine {
              *
              * @param structure the network structure to use classification
              */
-            Engine(const network_structure_t<Scalar>& structure = {}) : max_width(4) {
+            Engine(const NetworkStructure<Scalar>& structure = {}) : max_width(4) {
 
                 // Create the OpenCL context and command queue
                 cl_int error = CL_SUCCESS;
@@ -124,7 +124,7 @@ namespace engine {
                 // Grab all the kernels that were generated
                 for (unsigned int i = 0; i < structure.size(); ++i) {
                     std::string kernel       = "conv" + std::to_string(i);
-                    unsigned int output_size = structure[i].back().second.size();
+                    unsigned int output_size = structure[i].back().biases.size();
 
                     cl::kernel k(::clCreateKernel(program, kernel.c_str(), &error), ::clReleaseKernel);
                     throw_cl_error(error, "Failed to create kernel " + kernel);
