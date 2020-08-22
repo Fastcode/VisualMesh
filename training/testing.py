@@ -17,7 +17,6 @@ import os
 
 import numpy as np
 import tensorflow as tf
-from tqdm import tqdm
 
 from .dataset import keras_dataset
 from .flavour import TestMetrics, Dataset, Loss, Metrics

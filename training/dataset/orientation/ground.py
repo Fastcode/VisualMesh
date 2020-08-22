@@ -36,7 +36,7 @@ class Ground:
             Hoc = tf.tensor_scatter_nd_add(
                 Hoc,
                 [[3, 2]],
-                tf.expand_dims(tf.random.truncated_normal(shape=(), mean=v["mean"], stddev=v["stddev"]), 0,),
+                tf.expand_dims(tf.random.truncated_normal(shape=(), mean=v["mean"], stddev=v["stddev"]), 0),
             )
 
         if "rotation" in self.variations:
