@@ -121,21 +121,21 @@ int main() {
     auto dataset = load_dataset<Scalar>(image_path);
 
     for (const auto& element : dataset) {
-        draw("Radial 4", element.image, engine.project(radial4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("Radial 6", element.image, engine.project(radial6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("Radial 8", element.image, engine.project(radial8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("Ring 4", element.image, engine.project(ring4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("Ring 6", element.image, engine.project(ring6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("Ring 8", element.image, engine.project(ring8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("XM Grid 4", element.image, engine.project(xmgrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("XM Grid 6", element.image, engine.project(xmgrid6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("XM Grid 8", element.image, engine.project(xmgrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("XY Grid 4", element.image, engine.project(xygrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("XY Grid 6", element.image, engine.project(xygrid6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("XY Grid 8", element.image, engine.project(xygrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("NM Grid 4", element.image, engine.project(nmgrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("NM Grid 6", element.image, engine.project(nmgrid6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("NM Grid 8", element.image, engine.project(nmgrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("Radial 4", element.image, engine(radial4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("Radial 6", element.image, engine(radial6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("Radial 8", element.image, engine(radial8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("Ring 4", element.image, engine(ring4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("Ring 6", element.image, engine(ring6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("Ring 8", element.image, engine(ring8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("XM Grid 4", element.image, engine(xmgrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("XM Grid 6", element.image, engine(xmgrid6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("XM Grid 8", element.image, engine(xmgrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("XY Grid 4", element.image, engine(xygrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("XY Grid 6", element.image, engine(xygrid6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("XY Grid 8", element.image, engine(xygrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("NM Grid 4", element.image, engine(nmgrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("NM Grid 6", element.image, engine(nmgrid6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
+        draw("NM Grid 8", element.image, engine(nmgrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         if (char(cv::waitKey(0)) == 27) break;
     }
 

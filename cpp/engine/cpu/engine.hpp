@@ -80,9 +80,9 @@ namespace engine {
              * @return a projected mesh for the provided arguments
              */
             template <template <typename> class Model>
-            ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Model>& mesh,
-                                                                       const mat4<Scalar>& Hoc,
-                                                                       const Lens<Scalar>& lens) const {
+            ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> operator()(const Mesh<Scalar, Model>& mesh,
+                                                                          const mat4<Scalar>& Hoc,
+                                                                          const Lens<Scalar>& lens) const {
                 static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 // Lookup the on screen ranges
@@ -110,7 +110,7 @@ namespace engine {
                         // Even though we have already gone through a bsp to remove out of range points, sometimes it's
                         // not perfect and misses by a few pixels. So as we are projecting the points here we also need
                         // to check that they are on screen
-                        auto px = ::visualmesh::project(multiply(Rco, nodes[i].ray), lens);
+                        auto px = project(multiply(Rco, nodes[i].ray), lens);
                         if (0 <= px[0] && px[0] + 1 < lens.dimensions[0] && 0 <= px[1]
                             && px[1] + 1 < lens.dimensions[1]) {
                             global_indices.emplace_back(i);
@@ -156,10 +156,10 @@ namespace engine {
              * @return a projected mesh for the provided arguments
              */
             template <template <typename> class Model>
-            inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const VisualMesh<Scalar, Model>& mesh,
-                                                                              const mat4<Scalar>& Hoc,
-                                                                              const Lens<Scalar>& lens) const {
-                return project(mesh.height(Hoc[2][3]), Hoc, lens);
+            inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> operator()(const VisualMesh<Scalar, Model>& mesh,
+                                                                                 const mat4<Scalar>& Hoc,
+                                                                                 const Lens<Scalar>& lens) const {
+                return operator()(mesh.height(Hoc[2][3]), Hoc, lens);
             }
 
             /**
@@ -184,7 +184,7 @@ namespace engine {
                 static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 // Project the pixels to the display
-                ProjectedMesh<Scalar, N_NEIGHBOURS> projected = project(mesh, Hoc, lens);
+                ProjectedMesh<Scalar, N_NEIGHBOURS> projected = operator()(mesh, Hoc, lens);
                 auto& neighbourhood                           = projected.neighbourhood;
                 unsigned int n_points                         = neighbourhood.size();
 

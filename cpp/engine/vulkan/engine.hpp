@@ -641,9 +641,9 @@ namespace engine {
              * @return a projected mesh for the provided arguments
              */
             template <template <typename> class Model>
-            inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const Mesh<Scalar, Model>& mesh,
-                                                                              const mat4<Scalar>& Hoc,
-                                                                              const Lens<Scalar>& lens) const {
+            inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> operator()(const Mesh<Scalar, Model>& mesh,
+                                                                                 const mat4<Scalar>& Hoc,
+                                                                                 const Lens<Scalar>& lens) const {
                 static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 std::vector<std::array<int, N_NEIGHBOURS>> neighbourhood;
@@ -692,10 +692,10 @@ namespace engine {
              * @return a projected mesh for the provided arguments
              */
             template <template <typename> class Model>
-            inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> project(const VisualMesh<Scalar, Model>& mesh,
-                                                                              const mat4<Scalar>& Hoc,
-                                                                              const Lens<Scalar>& lens) const {
-                return project(mesh.height(Hoc[2][3]), Hoc, lens);
+            inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> operator()(const VisualMesh<Scalar, Model>& mesh,
+                                                                                 const mat4<Scalar>& Hoc,
+                                                                                 const Lens<Scalar>& lens) const {
+                return operator()(mesh.height(Hoc[2][3]), Hoc, lens);
             }
 
             /**
