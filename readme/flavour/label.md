@@ -22,7 +22,7 @@ The loss function that is used by the visual mesh for classification is a class 
 In this loss function, the impact of each class is balanced so the number of examples in each class is weighted so all classes have equal impact on the loss function.
 This loss function is able to be used when the final layer in the network is either `softmax` (for cases where there is a single correct class for each point) or `sigmoid` (where a class may have multiple layers simultaneously).
 
-Focal loss is used here as it helps to emphisise the rarer cases in what would otherwise be homogenous data.
+Focal loss is used here as it helps to emphasise the rarer cases in what would otherwise be homogenous data.
 For example in the environment class in the example image, most of the environment is either carpet or wall.
 Focal loss will de-emphasize these areas in order to get a better outcome.
 

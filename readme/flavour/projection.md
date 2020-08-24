@@ -55,7 +55,6 @@ This metric is defined as the number of objects that you would have to stack wit
 The second is the angle that is subtended from the point of view of the camera for points at a constant distance.
 
 ### Sphere
-
 The `n` metric for spheres is based on the positions of the tangents in a sphere.
 `n=0` is defined as the point at which a sphere is directly below the camera.
 
@@ -65,7 +64,6 @@ The tangents to this ellipse happen to be identical to the shadow of the sphere 
 ![Sphere](geometry/sphere.svg)
 
 ### Circle
-
 The `n` metric for circles is based on increasing radius of the circles on the ground.
 It forms a flat planar space and therefore standard 2d tessellations work on it.
 `n=0` is defined when the circle is directly below the camera

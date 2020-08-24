@@ -37,4 +37,6 @@ docs/doxygen_sqlite3.db
 # Location for raw input data
 /dataset/
 
+# Miscellaneous
+.DS_Store
 \.vscode/ipch/

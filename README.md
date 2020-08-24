@@ -1,5 +1,4 @@
 # Visual Mesh 2
-
 [![Join the chat at https://gitter.im/Fastcode/VisualMesh](https://badges.gitter.im/Fastcode/VisualMesh.svg)](https://gitter.im/Fastcode/VisualMesh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 If you have any questions or discussions while using the visual mesh, feel free to ask on gitter.
 
@@ -8,6 +7,10 @@ It utilises the geometry of objects to create a mesh structure that ensures that
 The result is that networks can be much smaller and simpler while still achieving high levels of accuracy.
 Additionally it is very capable when it comes to detecting distant objects.
 Normally distant objects become too small for a network to detect accurately, but as the visual mesh normalises its size detections are still accurate.
+
+ | | |
+ |:-:|:-:|
+ |![](readme/distant.png)|![](readme/mesh.jpg)|
 
 This codebase provides two components, one is a TensorFlow 2.0 based training and testing system that allows you to build and train networks.
 The other component is a c++ api that is designed to operate as a high performance inference engine using OpenCL.
@@ -44,8 +47,8 @@ Once this is done you can run training code by using
 ```
 
 ### Docker
-The prefered way to build and run the training code is to use docker.
-Using docker will prevent having a different version of tensorflow etc from impacting on the running of the code.
+The preferred way to build and run the training code is to use docker.
+Using docker will prevent having a different version of TensorFlow etc from impacting on the running of the code.
 If you are running on linux you can also forward GPUs through to docker by using nvidia-container-runtime.
 
 ```sh
@@ -72,7 +75,7 @@ The specific requirements for each engine can be found in their description in t
 ### Flavours
 The Visual Mesh code is designed to easily be able to implement new ideas for how to use it.
 It allows this by providing several different components that can be combined to make a vision system.
-In the code these components are refered to as flavours.
+In the code these components are referred to as flavours.
 There are five different categories for these that are each discussed on their own pages.
 
 [View](readme/flavour/view.md) describes how the system is set up in terms of cameras.
@@ -143,23 +146,39 @@ To make a simple dataset you can follow the instructions in [Quick Start Guide](
 
 ## Training
 TODO discuss how to run the training
+- Create a config.yaml file in the output directory
+- run the training code
+
+- TODO Talk about batch size
+- TODO Talk about optimisers
+- TODO talk about the learning rate schedule
+- TODO Talk about the images
+- TODO talk about tensorboard
 
 ## Testing
-TODO discuss how to run the testing
+- TODO talk about how to run testing
+- TODO talk about where it outputs
+- TODO talk about the curves
 
 ## Inference API
-TODO discuss how to do inference of the network
+TODO discuss how to do inference of the network using the c++ api
 
 ### Mesh
-TODO what is mesh object
+- TODO mesh object
+- TODO visualmesh object
+- TODO height and number of intersections control
+- TODO these objects are fed into engines in order to perform the visual mesh operations
 
 ### Engines
-TODO what is an engine
+- TODO describe what engines do (projection and classification)
+- TODO describe how to make an engine instance
+- TODO describe how to use an engine instance (operator)
 
-TODO describe each engine
-CPU
-OpenCL
-Vulkan (NOT READY YET)
+- TODO describe each engine
+- CPU
+- OpenCL
+- Vulkan (NOT READY YET)
 
 ### Multithreading
-TODO Make multiple engines and cycle through them for best performance
+- TODO Make multiple engines and cycle through them for best performance
+- TODO describe the pattern for providing multiple engine instances and use different ones in different threads

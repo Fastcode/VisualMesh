@@ -1,14 +1,13 @@
-# Quickstart Guide
-
+# Quick Start Guide
 This guide is designed to get a classification network training for your dataset asap.
-If you need something more specific read through the rest of these readmes and feel free to ask on Gitter [![Join the chat at https://gitter.im/Fastcode/VisualMesh](https://badges.gitter.im/Fastcode/VisualMesh.svg)](https://gitter.im/Fastcode/VisualMesh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge).
+If you need something more specific read through the rest of these readme files and feel free to ask on Gitter [![Join the chat at https://gitter.im/Fastcode/VisualMesh](https://badges.gitter.im/Fastcode/VisualMesh.svg)](https://gitter.im/Fastcode/VisualMesh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge).
 
 This guide assumes you're using docker and have already installed it.
 
 ## Setting up
 To setup with docker once you have docker installed all you need to do is build the docker image.
 ```sh
-docker build . -t visualmesh:latest
+docker build . --pull -t visualmesh:latest
 ```
 
 ## Making a dataset
