@@ -1,7 +1,7 @@
 # Orientation
 
 A systems orientation describes where the observation plane is as related to the camera.
-The expected output from this flavour is a key `Hoc: [4, 4]`.
+The expected output from this flavour is a key `Hoc: float[4, 4]`.
 This key is a homogenous transformation matrix which if used like `Hoc * (a,b,c,1)` would convert a vector in the cameras coordinate system into one measured in the observation planes coordinate system.
 In this matrix, the visual mesh only cares about the z component of the translation for height.
 ```
@@ -22,7 +22,7 @@ In this set up the Hoc provided by the dataset is forwarded on as `Hoc` for the 
 ### Dataset Keys
 The only dataset key required by the Ground flavour is `Hoc` which will be forwarded on as Hoc for the network.
 ```python
-"Hoc": [4, 4]
+"Hoc": float[4, 4]
 ```
 
 ### Configuration
@@ -50,8 +50,8 @@ The spotlight networks requires a `Hoc` which describes the orientation of the c
 It additionally requires targets to points that the mesh will be projected to.
 The targets are measured in the cameras coordinate system.
 ```python
-"Hoc": [4, 4]
-"spotlight/targets": [n, 3] # n >= 1
+"Hoc": float[4, 4]
+"spotlight/targets": float[n, 3] # n >= 1
 ```
 
 ### Configuration

@@ -89,8 +89,11 @@ class Image:
             v = self.variations["saturation"]
             image = tf.image.adjust_saturation(image, tf.random.truncated_normal(shape=(), **v))
         if "gamma" in self.variations:
-            v = self.variations["gamma"]
-            image = tf.image.adjust_gamma(image, tf.random.truncated_normal(shape=(), **v))
+            v_gamma = self.variations["gamma"]["gamma"]
+            v_gain = self.variations["gamma"]["gain"]
+            image = tf.image.adjust_gamma(
+                image, tf.random.truncated_normal(shape=(), **v_gamma), tf.random.truncated_normal(shape=(), **v_gain)
+            )
 
         # Get the pixels referenced by the image
         return {

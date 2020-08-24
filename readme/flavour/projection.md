@@ -14,11 +14,11 @@ Cartesian networksGrid networks
 
 ## Dataset Keys
 ```python
-    "lens/projection": ['RECTILINEAR' | 'EQUISOLID' | 'EQUIDISTANT']
-    "lens/focal_length": []
-    "lens/fov": []
-    "lens/centre": [2]
-    "lens/k": [2]
+"lens/projection": bytes[1] # ['RECTILINEAR' | 'EQUISOLID' | 'EQUIDISTANT']
+"lens/focal_length": float[1]
+"lens/fov": float[1]
+"lens/centre": float[2]
+"lens/k": float[2]
 ```
 
 ## Configuration
