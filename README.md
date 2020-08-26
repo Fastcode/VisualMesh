@@ -2,7 +2,7 @@
 [![Join the chat at https://gitter.im/Fastcode/VisualMesh](https://badges.gitter.im/Fastcode/VisualMesh.svg)](https://gitter.im/Fastcode/VisualMesh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 If you have any questions or discussions while using the visual mesh, feel free to ask on gitter.
 
-The Visual Mesh is an input transformation that uses knowledge a cameras orientation and position relative to an observation plane to greatly increase the performance and accuracy of a convolutional neural network.
+The Visual Mesh is an input transformation that uses knowledge of a cameras orientation and position relative to an observation plane to greatly increase the performance and accuracy of a convolutional neural network.
 It utilises the geometry of objects to create a mesh structure that ensures that a similar number of samples points are selected regardless of distance.
 The result is that networks can be much smaller and simpler while still achieving high levels of accuracy.
 Additionally it is very capable when it comes to detecting distant objects.
@@ -14,8 +14,8 @@ Normally distant objects become too small for a network to detect accurately, bu
  | | |
 
 This codebase provides two components, one is a TensorFlow 2.0 based training and testing system that allows you to build and train networks.
-The other component is a c++ api that is designed to operate as a high performance inference engine using OpenCL.
-This allows you to get high performance on systems with devices like integrated intel GPUs with hundreds of frames per second.
+The other component is a C++ API that is designed to operate as a high performance inference engine using OpenCL.
+This allows you to get high performance on systems with devices like Intel integrated GPUs with hundreds of frames per second.
 
 ## [Quick Start Guide](readme/quickstart.md)
 If all you want to do is train a simple classification network for your own dataset take a look at the [Quick Start Guide](readme/quickstart.md)
@@ -44,13 +44,13 @@ More information about the training process as well as the influence of differen
 
 ## [Testing](readme/testing.md)
 This codebase provides a suite of testing tools in order to determine the efficacy of a trained network.
-It outputs both metrics and has a system for drawing charts from combinations of properties.
+It outputs metrics (e.g. precision and recall) and has a system for drawing charts from combinations of properties.
 More information about the testing and the graphs that it outputs can be foundat the **[Testing Page](readme/testing.md)**
 
 ## [Inference](readme/inference.md)
-The visual mesh codebase also provides a custom c++ inference engine that is able to be executed on a wide variety of devices.
+The visual mesh codebase also provides a custom C++ inference engine that is able to be executed on a wide variety of devices.
 The inference code is based on several different engines.
 Each of these engines has a different requirement in order to build code using it.
-For example, the OpenCL engine requires that you have an OpenCL implementation when you build and run the code.
+For example, the OpenCL engine requires that you have an OpenCL implementation and appropriate drivers installed when you build and run the code.
 If you don't have these the code will still work, however you will not have access to those engines.
 For more information see the **[Inference Page](readme/inference.md)**
