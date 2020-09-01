@@ -1,5 +1,5 @@
 # Quick Start Guide
-This guide is designed to get a classification network training for your dataset asap.
+This guide is designed to get a classification network training for your dataset ASAP.
 If you need something more specific read through the rest of these readme files and feel free to ask on Gitter [![Join the chat at https://gitter.im/Fastcode/VisualMesh](https://badges.gitter.im/Fastcode/VisualMesh.svg)](https://gitter.im/Fastcode/VisualMesh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge).
 
 This guide assumes you're using docker and have already installed it.

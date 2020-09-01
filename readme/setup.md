@@ -51,5 +51,11 @@ This will build a docker image that can be used to run the visual mesh training 
 You can then run training code by using the following command, forwarding all GPUs using the nvidia-container-runtime.
 
 ```sh
+# To only use the CPU
+docker run -u $(id -u):$(id -g) -it --rm --volume $(pwd):/workspace visualmesh:latest ./mesh.py  train <config.yaml> <output_dir>
+
+# To use all available GPUs
 docker run --gpus all -u $(id -u):$(id -g) -it --rm --volume $(pwd):/workspace visualmesh:latest ./mesh.py  train <config.yaml> <output_dir>
-```
+
+# To only use GPU0
+docker run --gpus device=0 -u $(id -u):$(id -g) -it --rm --volume $(pwd):/workspace visualmesh:latest ./mesh.py  train <config.yaml> <output_dir>

@@ -1,5 +1,5 @@
 # Flavours
-The Visual Mesh code is designed to easily be able to implement new ideas for how to use it.
+The Visual Mesh code is designed to allow the easy implementation of new use cases.
 It allows this by providing several different components that can be combined to make a vision system.
 In the code these components are referred to as flavours.
 There are five different categories for these that are each discussed on their own pages.

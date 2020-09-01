@@ -1,14 +1,14 @@
 # Label
 Label describes how the final labels for each of the visual mesh points will be provided.
-These flavours also decide the loss function that will be used by the network when training.
+This flavour also decides the loss function that will be used by the network when training.
 
 ## Classification
 The classification label flavour is the typical method that is used when labelling each visual mesh point as a distinct class.
-It works by providing a png image where each pixel has a unique rgb colour assigned to it.
+It works by providing a png image where each pixel has a unique RGB colour assigned to it.
 Each class will be made up of one or more of these colours.
 
 If a pixel has 0 opacity (is transparent) then that pixel is considered "unlabelled" and the contents of that pixel will not influence the training output.
-This will also occur if a pixel has a colour that is not "claimed" by a specific class.
+This will also occur if a pixel has a colour that is not assigned to a specific class.
 Take care with this as if you want multiple classes to be assigned to a background "environment" class
 
 Below is an example of an image and the associated mask for that image.
@@ -65,9 +65,9 @@ It is typically used with a `tanh` activation layer as the final layer of the ne
 
 ### Loss Function
 The loss function for the seeker network is made up of three components that are blended together in order to get an accurate result.
-For close (`<0.5`)) points we do the mean squared error of our prediction and the target.
+For close (`<0.5`) points we do the mean squared error of our prediction and the target.
 For points that are between 0.5 and 0.75 we calculate the distance of the absolute values, thereby ensuring that the magnitude is correct but ignoring the sign.
-For the final far points we only check if the network has predicted them as having a distance of 0.75 or above.
+For the far points (`>=0.75`) we only check if the network has predicted them as having a distance of 0.75 or above.
 If so we calculate the loss as being 0, otherwise we push it to be the correct value.
 
 Once the object has gotten further than the receptive field of the network, it is impossible for it to predict where that object is.

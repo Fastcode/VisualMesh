@@ -1,7 +1,7 @@
 # Training
 Training in the visual mesh code is handled by Tensorflow 2.0.
 You perform training by creating a configuration file `config.yaml`, putting it an output directory and running training on that directory.
-The training will then then train the network and put the output in the same directory as the configuration file.
+The training will then train the network and put the output in the same directory as the configuration file.
 The output of the network will be a trained weights file and TensorBoard log files.
 
 ## Configuration File
@@ -15,11 +15,12 @@ The specific options which are relevant for the training process are documented 
 ### Network Section
 The design of the network is configured in the `network: { structure: {}}` section of the yaml file.
 The network is defined using a graph of elements that you can assemble until a final node `output`.
-Currently for the case of the inference system they are only able to handle feed forward networks of Dense and Convolutional layers.
+Currently for the case of the inference system they are only able to handle feed forward networks of Dense and Convolutional layers with no skip connections.
 Anywhere in the network you can use the variable `$output_dims` and this will be replaced with the dimensionality of labels you are using.
 
 There will be two default inputs provided, `X` and `G` that you can use as inputs to your network layers.
 These correspond to the input values from the image, and the graph indices that form the graph network.
+`GraphConvolution` layers always require `G` as an input along with the output of the previous layer.
 
 For example a very simple two layer network would look like the following
 ```yaml
@@ -28,7 +29,7 @@ network:
     g1: { op: GraphConvolution, inputs: [X, G] }
     d1: { op: Dense, inputs: [g1], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
     g2: { op: GraphConvolution, inputs: [d1, G] }
-    d2: { op: Dense, inputs: [g2], options: { units: $output_dims, activation: softmax } }
+    output: { op: Dense, inputs: [g2], options: { units: $output_dims, activation: softmax } }
 ```
 
 ### Training Section

@@ -12,7 +12,7 @@ In this matrix, the visual mesh only cares about the z component of the translat
 └            ┘
 ```
 
-For the purposes of the visual mesh, the cameras coordinate system is defined with the X axis travelling along the optical axis (direction of view) the Y axis pointing to the left of the camera, and the Z axis pointing upward from the camera.
+For the purposes of the visual mesh, the cameras coordinate system is defined as a right-handed coordinate system with the X axis travelling along the optical axis (direction of view) the Y axis pointing to the left of the camera, and the Z axis pointing upward from the camera.
 
 ## Ground
 The ground orientation is the most typical use case for the visual mesh.
@@ -45,9 +45,9 @@ When this projection is done, the X axis of the visual mesh will always be align
 This ensures consistent results regardless of where the target is looking
 
 ### Dataset Keys
-The spotlight networks requires a `Hoc` which describes the orientation of the camera relative to the observation plane the same as in Ground.
+The spotlight network requires a `Hoc` which describes the orientation of the camera relative to the observation plane, the same as in Ground.
 It additionally requires targets to points that the mesh will be projected to.
-The targets are measured in the cameras coordinate system.
+The targets are 3D vectors measured in the cameras coordinate system.
 ```python
 "Hoc": float[4, 4]
 "spotlight/targets": float[n, 3] # n >= 1

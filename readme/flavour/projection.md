@@ -7,7 +7,7 @@ This makes it impossible to design a sampling that is both consistent in the num
 Fortunately the neural networks are able to continue to function with these distortions provided they are not significant.
 To account for this, several different models have been developed to try to preserve different properties.
 
-Whether you use are polar or cartesian coordinate system to present the points to the mesh makes a significant difference in how the network is able to perform.
+Whether you use a polar or cartesian coordinate system to present the points to the mesh makes a significant difference in how the network is able to perform.
 Polar networks such as Ring and Radial work well for Ground networks where you are looking at objects at a distance.
 In these systems having further in distance be a consistent direction in the graph means orientation of upright objects is preserved.
 Grid networks work better for spotlight systems where having a consistent coordinate system for the object is beneficial.
@@ -52,7 +52,7 @@ projection:
 These geometry models are based on one or both of two properties of the objects.
 Firstly is the `n` distance metric.
 This metric is defined as the number of objects that you would have to stack without overlapping in the camera's view to get between two points.
-The second is the angle that is subtended from the point of view of the camera for points at a constant distance.
+The second is the angle, `θ`, that is subtended from the point of view of the camera for points at a constant distance.
 
 ### Sphere
 The `n` metric for spheres is based on the positions of the tangents in a sphere.
@@ -65,7 +65,7 @@ The tangents to this ellipse happen to be identical to the shadow of the sphere 
 
 ### Circle
 The `n` metric for circles is based on increasing radius of the circles on the ground.
-It forms a flat planar space and therefore standard 2d tessellations work on it.
+It forms a flat planar space and therefore standard 2D tessellations work on it.
 `n=0` is defined when the circle is directly below the camera
 
 The `θ` metric is calculated using the tangents to the circle from above.

@@ -1,14 +1,14 @@
 # Inference
-The c++ inference engine is split into two main components, the mesh components and the engine components.
+The C++ inference engine is split into two main components, the mesh components and the engine components.
 The mesh components are for building up a visual mesh object based on the position of the observation plane relative to the camera.
 The engines take these mesh objects and run projection and inference code on them.
 
 ## Exporting to YAML
-If you have trained a network and wish to output it the a yaml format that most of the examples use you can use the export function.
+If you have trained a network and wish to output it to a YAML format that most of the examples use you can use the export function.
 ```sh
 ./mesh.py export <path/to/output>
 ```
-This will create a yaml file with the weights and network in it ready for use.
+This will create a YAML file with the weights of the network in it ready for use.
 
 ## Mesh
 The mesh objects generate a single look up table of the entire graph.
@@ -21,7 +21,7 @@ There are two main mesh objects that are available in the visual mesh codebase.
 The first is the `visualmesh::Mesh` class.
 This class holds a single visual mesh for a specific height.
 The second is the `visualmesh::VisualMesh` which holds multiple different `visualmesh::Mesh` objects for different heights that ensure that the error in number of intersections does not grow beyond a target value.
-They both can be used with engines in the same way, and if using `visualmesh::VisualMesh` it will select the closest matching height for the Hoc used.
+They both can be used with engines in the same way, and if using `visualmesh::VisualMesh` it will select the closest matching height for the `Hoc` used.
 
 It is created via a template `visualmesh::Mesh<Scalar, Model>` where the Scalar is the datatype that the mesh will be created with (for example `float` or `double`).
 The model is the specific visual mesh generation model that will be used.
@@ -59,13 +59,13 @@ This engine generates OpenCL kernels on the fly which it uses to run the inferen
 You can use this engine to run on a wide variety of CPU and GPU hardware and it is high performance.
 
 ### Vulkan Engine (incomplete)
-The vulkan engine is based on the Vulkan GPU api.
+The vulkan engine is based on the Vulkan GPU API.
 It is not yet complete and will occasionally cause your entire computer to freeze up and become unresponsive.
 Use at your own risk.
 
 ### Future Engines
 In the future there are plans to implement a TensorRT engine and a CUDA engine.
-Pull request welcome!
+Pull requests are welcome!
 
 ## Multithreading
 **The engine instances are not thread safe!**
@@ -73,5 +73,5 @@ Each of the engine instances are designed not to be thread safe to allow for max
 When executing the network, you will find the utilisation of your platform is low as quite a bit of time is spent enqueueing kernels and uploading/downloading data from devices.
 Because of this you need to interleave your requests on the device.
 To do this make multiple engine instances for your same network and ensure that only a single thread is using one at a time.
-This allows multiple threads to be enqueuing/running data ont he device at the same time and will greatly improve your performance.
+This allows multiple threads to be enqueuing/running data on the device at the same time and will greatly improve your performance.
 For an example of this you can look at the `benchmark.cpp` example code which uses this principle to achieve higher framerates.
