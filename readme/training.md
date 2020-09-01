@@ -52,6 +52,10 @@ This selects which optimiser will be used and sets any non learning rate paramet
 The current options are Adam, SGD and Ranger (RAdam with Lookahead).
 Any option that is accepted by the constructor of these is available as configuration options.
 
+[Adam](https://www.tensorflow.org/api_docs/python/tf/keras/optimizers/Adam)
+[SGD](https://www.tensorflow.org/api_docs/python/tf/keras/optimizers/SGD)
+[RectifiedAdam](https://www.tensorflow.org/addons/api_docs/python/tfa/optimizers/RectifiedAdam)
+
 #### `training: learning_rate`
 The learning rate options is for setting the learning rate scheduler.
 It provides several different options for how to control the learning rate during training.

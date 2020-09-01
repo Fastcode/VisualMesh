@@ -2,7 +2,7 @@
 A systems orientation describes where the observation plane is as related to the camera.
 The expected output from this flavour is a key `Hoc: float[4, 4]`.
 This key is a homogenous transformation matrix which if used like `Hoc * (a,b,c,1)` would convert a vector in the cameras coordinate system into one measured in the observation planes coordinate system.
-In this matrix, the visual mesh only cares about the z component of the translation for height.
+In this matrix, the visual mesh only cares about rotation and the z component of the translation for height.
 ```
 ┌            ┐
 │          0 │

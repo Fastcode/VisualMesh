@@ -9,7 +9,7 @@ Each class will be made up of one or more of these colours.
 
 If a pixel has 0 opacity (is transparent) then that pixel is considered "unlabelled" and the contents of that pixel will not influence the training output.
 This will also occur if a pixel has a colour that is not assigned to a specific class.
-Take care with this as if you want multiple classes to be assigned to a background "environment" class
+Take care with this as if you want multiple classes to be assigned to a background "environment" class as each colour will need to be explicitly assigned.
 
 Below is an example of an image and the associated mask for that image.
 
@@ -19,8 +19,9 @@ Image|Mask
 
 ### Loss Function
 The loss function that is used by the visual mesh for classification is a class balanced focal loss [https://arxiv.org/abs/1708.02002](https://arxiv.org/abs/1708.02002).
-In this loss function, the impact of each class is balanced so the number of examples in each class is weighted so all classes have equal impact on the loss function.
-This loss function is able to be used when the final layer in the network is either `softmax` (for cases where there is a single correct class for each point) or `sigmoid` (where a class may have multiple layers simultaneously).
+In this loss function, the impact of each class is balanced.
+The examples of each are weighted so all classes have equal impact on the loss function.
+This loss function is able to be used when the final layer in the network is either `softmax` for cases when there is a single correct class for each point or `sigmoid` when a class may have multiple classes simultaneously.
 
 Focal loss is used here as it helps to emphasise the rarer cases in what would otherwise be homogenous data.
 For example in the environment class in the example image, most of the environment is either carpet or wall.
@@ -56,6 +57,7 @@ label:
       - name: environment
         colours:
           - [0, 0, 0]
+          - [255, 0, 255]
 ```
 
 ## Seeker
@@ -76,9 +78,9 @@ By having these three tiers for the loss function, we ensure that there is a smo
 
 |Distance|Function|
 |-|-|
-|`0.0  < x < 0.5` |`(x - y)²`|
-|`0.5  < x < 0.75`|`(|x| - |y|)²`|
-|`0.75 < x < 1.0` |`|x| > 0.75 ? 0 : (|x| - |y|)²`|
+|`0.0  <= y < 0.5` |`(x - y)²`|
+|`0.5  <= y < 0.75`|`(|x| - |y|)²`|
+|`0.75 <= y < 1.0` |`|x| > 0.75 ? 0 : (|x| - |y|)²`|
 
 ### Dataset Keys
 The seeker flavour requires targets to points that will be predicted.
