@@ -186,10 +186,10 @@ void print_quality(const std::vector<NodeQuality<Scalar, N_NEIGHBOURS>>& nodes, 
 
 int main(int argc, const char* argv[]) {
 
-    const float h            = argc > 1 ? std::stof(argv[1]) : 1;
-    const float r            = argc > 2 ? std::stof(argv[2]) : 0.0949996;
-    const float k            = argc > 3 ? std::stof(argv[3]) : 1;
-    const float max_distance = argc > 4 ? std::stof(argv[4]) : 20;
+    const double h            = argc > 1 ? std::stof(argv[1]) : 1;
+    const double r            = argc > 2 ? std::stof(argv[2]) : 0.0949996;
+    const double k            = argc > 3 ? std::stof(argv[3]) : 1;
+    const double max_distance = argc > 4 ? std::stof(argv[4]) : 20;
 
     visualmesh::geometry::Sphere<double> shape(r);
 
