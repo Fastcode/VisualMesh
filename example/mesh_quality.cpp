@@ -95,7 +95,8 @@ std::vector<NodeQuality<Scalar, Model<Scalar>::N_NEIGHBOURS>> check_quality(
                 const auto& r1 = mesh.nodes[n1].ray;
 
                 // Radial difference to our neighbour
-                auto r_d          = visualmesh::util::phi_difference(mesh.h, shape.c(), r0, r1);
+                using namespace visualmesh;
+                auto r_d          = util::phi_difference(mesh.h, shape.c(), r0, r1);
                 quality.radial[i] = std::abs(shape.n(r_d.phi_0, r_d.h_prime) - shape.n(r_d.phi_1, r_d.h_prime));
 
                 // Ignore points that go off the screen
@@ -103,12 +104,13 @@ std::vector<NodeQuality<Scalar, Model<Scalar>::N_NEIGHBOURS>> check_quality(
                     const auto& r2 = mesh.nodes[n2].ray;
 
                     // The distance difference between the two neighbour rays
-                    auto c_d            = visualmesh::util::phi_difference<Scalar>(mesh.h, shape.c(), r1, r2);
+                    auto c_d            = util::phi_difference<Scalar>(mesh.h, shape.c(), r1, r2);
                     quality.cyclical[i] = std::abs(shape.n(c_d.phi_0, c_d.h_prime) - shape.n(c_d.phi_1, c_d.h_prime));
 
                     // The angular difference between two neighbourhood rays
-                    quality.angular[i] = std::acos(visualmesh::dot(visualmesh::normalise(visualmesh::cross(r0, r1)),
-                                                                   visualmesh::normalise(visualmesh::cross(r0, r2))));
+                    auto u             = normalise(cross(r0, r1));
+                    auto v             = normalise(cross(r0, r2));
+                    quality.angular[i] = Scalar(2.0) * std::atan2(norm(subtract(u, v)), norm(add(u, v)));
                 }
             }
         }
@@ -189,11 +191,11 @@ int main(int argc, const char* argv[]) {
     const float k            = argc > 3 ? std::stof(argv[3]) : 1;
     const float max_distance = argc > 4 ? std::stof(argv[4]) : 20;
 
-    visualmesh::geometry::Sphere<float> shape(r);
+    visualmesh::geometry::Sphere<double> shape(r);
 
     {
         std::cout << "Ring 4 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::Ring4> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::Ring4> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -201,7 +203,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "Ring 6 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::Ring6> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::Ring6> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -209,7 +211,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "Ring 8 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::Ring8> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::Ring8> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -217,7 +219,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "Radial 4 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::Radial4> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::Radial4> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -225,7 +227,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "Radial 6 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::Radial6> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::Radial6> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -233,7 +235,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "Radial 8 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::Radial8> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::Radial8> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -241,7 +243,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "XM Grid 4 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::XMGrid4> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::XMGrid4> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -249,7 +251,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "XM Grid 6 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::XMGrid6> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::XMGrid6> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -257,7 +259,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "XM Grid 8 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::XMGrid8> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::XMGrid8> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -265,7 +267,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "XY Grid 4 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::XYGrid4> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::XYGrid4> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -273,7 +275,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "XY Grid 6 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::XYGrid6> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::XYGrid6> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -281,7 +283,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "XY Grid 8 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::XYGrid8> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::XYGrid8> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -289,7 +291,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "NM Grid 4 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::NMGrid4> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::NMGrid4> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -297,7 +299,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "NM Grid 6 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::NMGrid6> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::NMGrid6> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;
@@ -305,7 +307,7 @@ int main(int argc, const char* argv[]) {
 
     {
         std::cout << "NM Grid 8 Quality:" << std::endl;
-        visualmesh::Mesh<float, visualmesh::model::NMGrid8> mesh(shape, h, k, max_distance);
+        visualmesh::Mesh<double, visualmesh::model::NMGrid8> mesh(shape, h, k, max_distance);
         auto quality = check_quality(shape, mesh);
         print_quality(quality, k);
         std::cout << std::endl;

@@ -79,11 +79,11 @@ namespace util {
         const Scalar h_prime = a_u == b_u ? (h - c) : norm(cross(a_c, b_c)) / norm(subtract(a_c, b_c));
 
         // Calculate phi_0 and phi_1 in this new observation plane
-        const Scalar phi0 = std::acos(h_prime / norm(a_c));
-        const Scalar phi1 = std::acos(h_prime / norm(b_c));
+        const Scalar phi0 = std::acos(std::min(std::max(h_prime / norm(a_c), Scalar(-1.0)), Scalar(1.0)));
+        const Scalar phi1 = std::acos(std::min(std::max(h_prime / norm(b_c), Scalar(-1.0)), Scalar(1.0)));
 
         // Actual angle between a and b so we can check if we crossed from negative to positive
-        const Scalar theta = std::acos(dot(a_u, b_u));
+        const Scalar theta = Scalar(2.0) * std::atan2(norm(subtract(a_u, b_u)), norm(add(a_u, b_u)));
 
         // Choose the combination of phi0 and phi1 that give the angle closest to the true angle of theta
         return PhiDifference<Scalar>{

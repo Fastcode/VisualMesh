@@ -308,8 +308,8 @@ inline mat4<Scalar> invert_affine(const mat4<Scalar>& Hab) {
     const mat3<Scalar> Rba = transpose(block<3, 3>(Hab));
 
     // Invert the translation component
-    // T^{-1} = -R^{T} * T
-    const vec3<Scalar> T = multiply(multiply(Rba, Scalar(-1)), vec3<Scalar>{Hab[0][3], Hab[1][3], Hab[2][3]});
+    // T^{-1} = R^{T} * -T
+    const vec3<Scalar> T = multiply(Rba, vec3<Scalar>{-Hab[0][3], -Hab[1][3], -Hab[2][3]});
 
     // Construct the inverted matrix
     return {{vec4<Scalar>{Rba[0][0], Rba[0][1], Rba[0][2], T[0]},

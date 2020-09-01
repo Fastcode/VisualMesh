@@ -46,8 +46,8 @@ namespace geometry {
          *
          * @details
          *  This equation gives the phi angle that results from a number of radial jumps of circles on the observation
-         *  plane. It measures from the centre of the circle on the ground, although this gives identical results to
-         *  measuring to the tangents.
+         *  plane. It measures from the edges of the circle on the ground, although this gives identical results to
+         *  measuring from the centres.
          *
          *             -1 ⎛2 n r⎞
          *  φ(n) =  tan   ⎜─────⎟
@@ -69,8 +69,7 @@ namespace geometry {
          * @details
          *  This equation can also be used to calculate the n difference between any two objects by calculating the
          *  augmented height above the ground h' and the two φ' angles and using those in this equation instead of the
-         * real values
-         *
+         *  real values
          *
          *         h tan(φ)
          *  n(φ) = ────────

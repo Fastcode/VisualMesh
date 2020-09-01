@@ -40,23 +40,11 @@ namespace geometry {
         Sphere(const Scalar& radius) : r(radius) {}
 
         /**
-         * @brief Given a number of radial jumps (n) give the phi angle required
+         * @brief Given a number of radial jumps (n), give the phi angle required to reach this point
          *
-         * @details
-         *  To calculate the angle to the base of the object we can use the following equation to find the next
-         * tangential sphere. However for the visual mesh we would rather work in the sphere centres
-         *
-         *                      ⎛         n⎞
-         *          π        -1 ⎜⎛    2 r⎞ ⎟
-         *  φₜ(n) = ─ - 2 tan   ⎜⎜1 - ───⎟ ⎟
-         *          2           ⎝⎝     h ⎠ ⎠
-         *
-         * Then to get the equation for the centre of the sphere, we calculate given the average angle of n ± 0.5
-         *
-         *
-         *         φ(n - 0.5) + φ(n + 0.5)
-         *  φ(n) = ───────────────────────
-         *                   2
+         *             -1 ⎛    ⎛    ⎛    2 r⎞⎞
+         *  φ(n) = -tan   ⎜sinh⎜n ln⎜1 - ───⎟⎟
+         *                ⎝    ⎝    ⎝     h ⎠⎠
          *
          * @param n the number of whole objects to jump from the origin to reach this point (from object centres)
          * @param h the height of the camera above the observation plane
@@ -65,8 +53,7 @@ namespace geometry {
          * end visually
          */
         Scalar phi(const Scalar& n, const Scalar& h) const {
-            const Scalar v = Scalar(1.0) - Scalar(2.0) * r / h;
-            return M_PI_2 - std::atan(std::pow(v, n - Scalar(0.5))) - std::atan(std::pow(v, n + Scalar(0.5)));
+            return -std::atan(std::sinh(n * std::log1p(-Scalar(2.0) * r / h)));
         }
 
         /**
@@ -77,34 +64,20 @@ namespace geometry {
          *  augmented height above the ground h' and the two φ' angles and using those in this equation instead of the
          * real values. The following equation is for the tangent form of the equation found by inverting it
          *
-         *               ⎛   ⎛φ   π⎞⎞
-         *            log⎜cot⎜─ + ─⎟⎟
-         *               ⎝   ⎝2   4⎠⎠
-         *  n(φₜ) = ─────────────────────
-         *          log(h - 2 r) - log(h)
-         *
-         *  However for inverting the centre form of the equation we must use its inversion
-         *
-         *            ⎛                         _________________________⎞
-         *            ⎜                        ╱  2            2    2    ⎟
-         *            ⎜r sin(φ) - h sin(φ) + ╲╱  h  - 2 h r + r  sin (φ) ⎟
-         *         log⎜──────────────────────────────────────────────────⎟
-         *            ⎝                     h cos(φ)                     ⎠    1
-         *  n(φ) = ───────────────────────────────────────────────────────  - ─
-         *                         log(h - 2 r) -log(h)                       2
-         *
+         *             -1 ⎛       ⎞
+         *         sinh   ⎜tan(-φ)⎟
+         *                ⎝       ⎠
+         *  n(φ) = ────────────────
+         *             ⎛    2 r⎞
+         *           ln⎜1 - ───⎟
+         *             ⎝     h ⎠
          * @param phi the phi angle measured from below the camera
          * @param h   the height that the camera is above the observation plane
          *
          * @return the number of object jumps that would be required to reach the angle to the centre of the object
          */
         Scalar n(const Scalar& phi, const Scalar& h) const {
-            const Scalar sp = std::sin(phi);
-            const Scalar cp = std::cos(phi);
-
-            return std::log((r * sp - h * sp + std::sqrt(h * h - Scalar(2.0) * h * r + r * r * sp * sp)) / (h * cp))
-                     / (std::log(h - Scalar(2.0) * r) - std::log(h))
-                   - Scalar(0.5);
+            return std::asinh(std::tan(-phi)) / std::log1p(-Scalar(2.0) * r / h);
         }
 
         /**
@@ -116,9 +89,9 @@ namespace geometry {
          * Mesh will be appropriate for use when the height of the camera changes. The result of this function is a
          * ratio which gives the number of intersections that will result from changing the height.
          *
-         *              log(h₁ - 2 r) - log(h₁)
-         *  k(h₀, h₁) = ───────────────────────
-         *              log(h₀ - 2 r) - log(h₀)
+         *              ln(h₁ - 2 r) - ln(h₁)
+         *  k(h₀, h₁) = ─────────────────────
+         *              ln(h₀ - 2 r) - ln(h₀)
          *
          * @param h_0 the height above the observation plane that the original mesh was generated for
          * @param h_1 the height above the observation plane that we want to check to see how much k varies by
