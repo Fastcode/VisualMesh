@@ -46,3 +46,11 @@ dataset:
 ```
 
 To make a simple dataset you can follow the instructions in [Quick Start Guide](readme/quickstart.md) or read the code in [training/dataset.py](training/dataset.py)
+
+## Batching
+For the visual mesh, the method used for batching is very different to how most batching systems work.
+Because of the projection, each image that is loaded into the network will likely have a different number of pixels that are projected onto the image.
+This results in a variable length that would go into the beatch.
+Therefore instead of adding a new dimension and batching over that dimension we instead concatenate all the samples together.
+Then to fix the network we update their graph indies by offsetting them based on their position in the concatenation.
+This way the graph will ensure that the ragged length batches will continue to interact properly once concatenated.

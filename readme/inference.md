@@ -3,6 +3,13 @@ The c++ inference engine is split into two main components, the mesh components 
 The mesh components are for building up a visual mesh object based on the position of the observation plane relative to the camera.
 The engines take these mesh objects and run projection and inference code on them.
 
+## Exporting to YAML
+If you have trained a network and wish to output it the a yaml format that most of the examples use you can use the export function.
+```sh
+./mesh.py export <path/to/output>
+```
+This will create a yaml file with the weights and network in it ready for use.
+
 ## Mesh
 The mesh objects generate
 The mesh objects are able to look up which of the points in the visual mesh are on screen.
@@ -48,7 +55,7 @@ It is not the fastest engine and does not take advantage of multithreading or ot
 Use this engine if you don't care about performance and just want to test networks
 
 ### OpenCL Engine
-This engine generates OpenCL kernels .
+This engine generates OpenCL kernels on the fly which it uses to run the inference.
 You can use this engine to run on a wide variety of CPU and GPU hardware and it is high performance.
 
 ### Vulkan Engine (incomplete)
@@ -59,11 +66,6 @@ Use at your own risk.
 ### Future Engines
 In the future there are plans to implement a TensorRT engine and a CUDA engine.
 Pull request welcome!
-
-- TODO describe each engine
-- CPU
-- OpenCL
-- Vulkan (NOT READY YET)
 
 ## Multithreading
 **The engine instances are not thread safe!**
