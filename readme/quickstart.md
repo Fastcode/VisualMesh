@@ -37,7 +37,7 @@ Hoc:
 - **`Hoc`** is a homogenous transformation matrix which if used like `Hoc * (a,b,c,1)` would convert a vector in the cameras coordinate system into one from the ground.
 In this matrix, only the z component of translation matters (the cameras height above the ground).
 In this example the units are measured in meters (m).
-However, the unit that you use this measurement don't matter, so long as the units you use for the radius of your geometry are the same.
+However, the unit that you use for this measurement don't matter, so long as the units you use for the radius of your geometry are the same.
 ```
 ┌            ┐
 │          0 │

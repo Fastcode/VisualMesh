@@ -20,7 +20,7 @@ cmake ..
 make
 ```
 
-You also need some python libraries installed using your favourite method of installing python libraries may be (e.g. pip).
+You also need some python libraries installed using whatever your favourite method of installing python libraries may be (e.g. pip).
 ```yaml
 matplotlib
 numpy
