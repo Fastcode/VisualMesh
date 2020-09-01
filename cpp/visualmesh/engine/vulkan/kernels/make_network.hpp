@@ -23,8 +23,8 @@
 #include <utility>
 #include <vector>
 
+#include "visualmesh/engine/vulkan/vulkan_compute.hpp"
 #include "visualmesh/network_structure.hpp"
-#include "visualmesh/utility/vulkan_compute.hpp"
 
 namespace visualmesh {
 namespace engine {
@@ -43,7 +43,7 @@ namespace engine {
              */
             template <typename Scalar, bool debug>
             std::vector<std::pair<uint32_t, std::vector<uint32_t>>> make_network(
-              const network_structure_t<Scalar>& structure) {
+              const NetworkStructure<Scalar>& structure) {
                 std::vector<std::pair<uint32_t, std::vector<uint32_t>>> programs;
 
                 // If our structure has no layers, return empty code
@@ -55,7 +55,7 @@ namespace engine {
                 uint32_t output_dimensions = 0;
 
                 // First layer has 4 inputs, so that tells us how many neighbours we have (minus ourself)
-                const uint32_t n_neighbours = (structure.front().front().first.size() / 4) - 1;
+                const uint32_t n_neighbours = (structure.front().front().weights.size() / 4) - 1;
 
                 for (uint32_t conv_no = 0; conv_no < structure.size(); ++conv_no) {
                     auto& conv = structure[conv_no];
@@ -148,10 +148,10 @@ namespace engine {
                             program.add_pointer(
                               program.add_array_type(
                                 float_type,
-                                program.add_constant(uint_type, {static_cast<uint32_t>(conv[layer_no].second.size())})),
+                                program.add_constant(uint_type, {static_cast<uint32_t>(conv[layer_no].biases.size())})),
                               spv::StorageClass::Function),
                             spv::StorageClass::Function),
-                          compose_string<debug>("in{}[{}]", layer_no + 1, conv[layer_no].second.size())));
+                          compose_string<debug>("in{}[{}]", layer_no + 1, conv[layer_no].biases.size())));
                     }
 
                     program.add_source_line(__FILE__, __LINE__, conv_no);
@@ -278,8 +278,8 @@ namespace engine {
 
                     // Now we have to do our layer operations
                     for (uint32_t layer_no = 0; layer_no < conv.size(); ++layer_no) {
-                        const auto& weights = conv[layer_no].first;
-                        const auto& biases  = conv[layer_no].second;
+                        const auto& weights = conv[layer_no].weights;
+                        const auto& biases  = conv[layer_no].biases;
 
                         output_dimensions = biases.size();
 

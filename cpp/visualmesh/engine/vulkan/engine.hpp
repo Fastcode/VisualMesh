@@ -69,7 +69,7 @@ namespace engine {
              *
              * @param structure the network structure to use classification
              */
-            Engine(const network_structure_t<Scalar>& structure = {}) : max_width(4) {
+            Engine(const NetworkStructure<Scalar>& structure = {}) : max_width(4) {
                 // Get a Vulkan instance
                 const VkApplicationInfo app_info = {
                   VK_STRUCTURE_TYPE_APPLICATION_INFO, 0, "VisualMesh", 0, "", 0, VK_MAKE_VERSION(1, 1, 0)};
@@ -598,7 +598,7 @@ namespace engine {
                     VkPipeline pipeline;
                     throw_vk_error(vkCreateComputePipelines(context.device, 0, 1, &conv_pipeline_info, 0, &pipeline),
                                    "Failed to create conv pipeline");
-                    conv_layers.emplace_back(pipeline, structure[conv_source.first].back().second.size());
+                    conv_layers.emplace_back(pipeline, structure[conv_source.first].back().biases.size());
                 }
 
                 // Work out what the widest network layer is
