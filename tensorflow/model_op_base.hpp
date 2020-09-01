@@ -18,22 +18,22 @@
 #ifndef VISUALMESH_TENSORFLOW_MODEL_OP_BASE_HPP
 #define VISUALMESH_TENSORFLOW_MODEL_OP_BASE_HPP
 
-#include "mesh/model/nmgrid4.hpp"
-#include "mesh/model/nmgrid6.hpp"
-#include "mesh/model/nmgrid8.hpp"
-#include "mesh/model/radial4.hpp"
-#include "mesh/model/radial6.hpp"
-#include "mesh/model/radial8.hpp"
-#include "mesh/model/ring4.hpp"
-#include "mesh/model/ring6.hpp"
-#include "mesh/model/ring8.hpp"
-#include "mesh/model/xmgrid4.hpp"
-#include "mesh/model/xmgrid6.hpp"
-#include "mesh/model/xmgrid8.hpp"
-#include "mesh/model/xygrid4.hpp"
-#include "mesh/model/xygrid6.hpp"
-#include "mesh/model/xygrid8.hpp"
 #include "shape_op_base.hpp"
+#include "visualmesh/model/nmgrid4.hpp"
+#include "visualmesh/model/nmgrid6.hpp"
+#include "visualmesh/model/nmgrid8.hpp"
+#include "visualmesh/model/radial4.hpp"
+#include "visualmesh/model/radial6.hpp"
+#include "visualmesh/model/radial8.hpp"
+#include "visualmesh/model/ring4.hpp"
+#include "visualmesh/model/ring6.hpp"
+#include "visualmesh/model/ring8.hpp"
+#include "visualmesh/model/xmgrid4.hpp"
+#include "visualmesh/model/xmgrid6.hpp"
+#include "visualmesh/model/xmgrid8.hpp"
+#include "visualmesh/model/xygrid4.hpp"
+#include "visualmesh/model/xygrid6.hpp"
+#include "visualmesh/model/xygrid8.hpp"
 
 template <typename T, typename Subclass, int MESH_MODEL, int GEOMETRY, int RADIUS>
 class ModelOpBase : public ShapeOpBase<T, ModelOpBase<T, Subclass, MESH_MODEL, GEOMETRY, RADIUS>, GEOMETRY, RADIUS> {

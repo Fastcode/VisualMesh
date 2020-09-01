@@ -22,8 +22,8 @@
 #include <tensorflow/core/framework/op_kernel.h>
 #include <tensorflow/core/framework/shape_inference.h>
 
-#include "geometry/Circle.hpp"
-#include "geometry/Sphere.hpp"
+#include "visualmesh/geometry/Circle.hpp"
+#include "visualmesh/geometry/Sphere.hpp"
 
 template <typename T, typename Subclass, int GEOMETRY, int RADIUS>
 class ShapeOpBase : public tensorflow::OpKernel {

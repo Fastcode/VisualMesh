@@ -22,7 +22,7 @@
 #include <utility>
 #include <vector>
 
-#include "mesh/network_structure.hpp"
+#include "visualmesh/network_structure.hpp"
 #include "wrapper.hpp"
 
 namespace visualmesh {

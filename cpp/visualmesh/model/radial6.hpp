@@ -21,8 +21,8 @@
 #include <array>
 #include <vector>
 
-#include "mesh/node.hpp"
 #include "polar_map.hpp"
+#include "visualmesh/node.hpp"
 
 namespace visualmesh {
 namespace model {

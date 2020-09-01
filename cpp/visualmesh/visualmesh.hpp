@@ -23,8 +23,8 @@
 #include <memory>
 #include <vector>
 
-#include "mesh/mesh.hpp"
-#include "mesh/model/ring6.hpp"
+#include "visualmesh/mesh.hpp"
+#include "visualmesh/model/ring6.hpp"
 
 namespace visualmesh {
 

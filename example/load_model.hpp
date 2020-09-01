@@ -20,7 +20,7 @@
 
 #include <yaml-cpp/yaml.h>
 
-#include "mesh/network_structure.hpp"
+#include "visualmesh/network_structure.hpp"
 
 visualmesh::ActivationFunction activation_function(const std::string& name) {
     // clang-format off

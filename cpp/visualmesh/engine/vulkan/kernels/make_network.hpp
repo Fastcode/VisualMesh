@@ -23,9 +23,8 @@
 #include <utility>
 #include <vector>
 
-// #include "engine/vulkan/operation/wrapper.hpp"
-#include "mesh/network_structure.hpp"
-#include "utility/vulkan_compute.hpp"
+#include "visualmesh/network_structure.hpp"
+#include "visualmesh/utility/vulkan_compute.hpp"
 
 namespace visualmesh {
 namespace engine {

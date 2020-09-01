@@ -18,8 +18,7 @@
 #ifndef VISUALMESH_MODEL_POLAR_MAP_HPP
 #define VISUALMESH_MODEL_POLAR_MAP_HPP
 
-#include "grid_base.hpp"
-#include "utility/math.hpp"
+#include "visualmesh/utility/math.hpp"
 
 namespace visualmesh {
 namespace model {

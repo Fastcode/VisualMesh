@@ -24,7 +24,7 @@
 #include <utility>
 
 #include "shape_op_base.hpp"
-#include "utility/phi_difference.hpp"
+#include "visualmesh/utility/phi_difference.hpp"
 
 template <typename T>
 using Tensor = Eigen::Tensor<T, 2, Eigen::RowMajor>;

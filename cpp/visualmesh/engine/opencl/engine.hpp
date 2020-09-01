@@ -26,22 +26,22 @@
 #include <sstream>
 #include <tuple>
 
-#include "engine/opencl/kernels/load_image.cl.hpp"
-#include "engine/opencl/kernels/project_equidistant.cl.hpp"
-#include "engine/opencl/kernels/project_equisolid.cl.hpp"
-#include "engine/opencl/kernels/project_rectilinear.cl.hpp"
-#include "engine/opencl/operation/make_context.hpp"
-#include "engine/opencl/operation/make_network.hpp"
-#include "engine/opencl/operation/make_queue.hpp"
-#include "engine/opencl/operation/opencl_error_category.hpp"
-#include "engine/opencl/operation/scalar_defines.hpp"
-#include "engine/opencl/operation/wrapper.hpp"
-#include "mesh/mesh.hpp"
-#include "mesh/network_structure.hpp"
-#include "mesh/projected_mesh.hpp"
-#include "mesh/visualmesh.hpp"
-#include "utility/math.hpp"
-#include "utility/projection.hpp"
+#include "visualmesh/engine/opencl/kernels/load_image.cl.hpp"
+#include "visualmesh/engine/opencl/kernels/project_equidistant.cl.hpp"
+#include "visualmesh/engine/opencl/kernels/project_equisolid.cl.hpp"
+#include "visualmesh/engine/opencl/kernels/project_rectilinear.cl.hpp"
+#include "visualmesh/engine/opencl/operation/make_context.hpp"
+#include "visualmesh/engine/opencl/operation/make_network.hpp"
+#include "visualmesh/engine/opencl/operation/make_queue.hpp"
+#include "visualmesh/engine/opencl/operation/opencl_error_category.hpp"
+#include "visualmesh/engine/opencl/operation/scalar_defines.hpp"
+#include "visualmesh/engine/opencl/operation/wrapper.hpp"
+#include "visualmesh/mesh.hpp"
+#include "visualmesh/network_structure.hpp"
+#include "visualmesh/projected_mesh.hpp"
+#include "visualmesh/utility/math.hpp"
+#include "visualmesh/utility/projection.hpp"
+#include "visualmesh/visualmesh.hpp"
 
 namespace visualmesh {
 namespace engine {

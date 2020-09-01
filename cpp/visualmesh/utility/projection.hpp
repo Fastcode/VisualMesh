@@ -19,7 +19,7 @@
 #define VISUALMESH_UTILITY_PROJECTION_HPP
 
 #include "math.hpp"
-#include "mesh/lens.hpp"
+#include "visualmesh/lens.hpp"
 
 namespace visualmesh {
 

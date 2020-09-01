@@ -22,8 +22,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include "mesh/classified_mesh.hpp"
-#include "mesh/projected_mesh.hpp"
+#include "visualmesh/classified_mesh.hpp"
+#include "visualmesh/projected_mesh.hpp"
 
 template <typename Scalar, int N_NEIGHBOURS>
 void draw(const std::string& window,

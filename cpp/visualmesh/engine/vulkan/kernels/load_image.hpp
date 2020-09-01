@@ -20,7 +20,7 @@
 
 #include <vector>
 
-#include "utility/vulkan_compute.hpp"
+#include "visualmesh/engine/vulkan/vulkan_compute.hpp"
 
 namespace visualmesh {
 namespace engine {

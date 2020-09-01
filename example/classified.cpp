@@ -31,14 +31,14 @@
 #include "Timer.hpp"
 #include "dataset.hpp"
 #include "draw.hpp"
-#include "engine/cpu/engine.hpp"
-#include "engine/opencl/engine.hpp"
-#include "engine/vulkan/engine.hpp"
-#include "geometry/Sphere.hpp"
 #include "load_model.hpp"
-#include "mesh/network_structure.hpp"
-#include "mesh/visualmesh.hpp"
-#include "utility/fourcc.hpp"
+#include "visualmesh/engine/cpu/engine.hpp"
+#include "visualmesh/engine/opencl/engine.hpp"
+#include "visualmesh/engine/vulkan/engine.hpp"
+#include "visualmesh/geometry/Sphere.hpp"
+#include "visualmesh/network_structure.hpp"
+#include "visualmesh/utility/fourcc.hpp"
+#include "visualmesh/visualmesh.hpp"
 
 template <typename Scalar>
 using Model  = visualmesh::model::Ring6<Scalar>;

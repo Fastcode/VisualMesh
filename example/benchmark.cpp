@@ -19,14 +19,14 @@
 
 #include "Timer.hpp"
 #include "dataset.hpp"
-#include "engine/cpu/engine.hpp"
-#include "engine/opencl/engine.hpp"
-#include "engine/vulkan/engine.hpp"
-#include "geometry/Sphere.hpp"
 #include "load_model.hpp"
-#include "mesh/model/ring6.hpp"
-#include "mesh/network_structure.hpp"
-#include "mesh/visualmesh.hpp"
+#include "visualmesh/engine/cpu/engine.hpp"
+#include "visualmesh/engine/opencl/engine.hpp"
+#include "visualmesh/engine/vulkan/engine.hpp"
+#include "visualmesh/geometry/Sphere.hpp"
+#include "visualmesh/model/ring6.hpp"
+#include "visualmesh/network_structure.hpp"
+#include "visualmesh/visualmesh.hpp"
 
 using Scalar = float;
 

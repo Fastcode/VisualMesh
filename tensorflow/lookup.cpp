@@ -21,9 +21,9 @@
 
 #include <memory>
 
-#include "mesh/mesh.hpp"
 #include "mesh_cache.hpp"
 #include "model_op_base.hpp"
+#include "visualmesh/mesh.hpp"
 
 enum Args {
     DIMENSIONS             = 0,

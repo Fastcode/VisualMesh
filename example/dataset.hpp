@@ -28,8 +28,8 @@
 #include <utility>
 #include <vector>
 
-#include "mesh/lens.hpp"
-#include "utility/math.hpp"
+#include "visualmesh/lens.hpp"
+#include "visualmesh/utility/math.hpp"
 
 template <typename Scalar>
 struct dataset_element {

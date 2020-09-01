@@ -20,8 +20,8 @@
 
 #include <array>
 
-#include "mesh/node.hpp"
 #include "ring_base.hpp"
+#include "visualmesh/node.hpp"
 
 namespace visualmesh {
 namespace model {

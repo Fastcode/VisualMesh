@@ -18,7 +18,11 @@
 #ifndef VISUALMESH_TENSORFLOW_MESH_CACHE_HPP
 #define VISUALMESH_TENSORFLOW_MESH_CACHE_HPP
 
+#include <memory>
 #include <mutex>
+#include <vector>
+
+#include "visualmesh/mesh.hpp"
 
 /**
  * @brief Given a shape, two heights and a k value, calculate the absolute number of intersections difference given

@@ -18,42 +18,42 @@
 #include "Timer.hpp"
 #include "dataset.hpp"
 #include "draw.hpp"
-#include "geometry/Sphere.hpp"
-#include "mesh/model/nmgrid4.hpp"
-#include "mesh/model/nmgrid6.hpp"
-#include "mesh/model/nmgrid8.hpp"
-#include "mesh/model/radial4.hpp"
-#include "mesh/model/radial6.hpp"
-#include "mesh/model/radial8.hpp"
-#include "mesh/model/ring4.hpp"
-#include "mesh/model/ring6.hpp"
-#include "mesh/model/ring8.hpp"
-#include "mesh/model/xmgrid4.hpp"
-#include "mesh/model/xmgrid6.hpp"
-#include "mesh/model/xmgrid8.hpp"
-#include "mesh/model/xygrid4.hpp"
-#include "mesh/model/xygrid6.hpp"
-#include "mesh/model/xygrid8.hpp"
-#include "mesh/visualmesh.hpp"
+#include "visualmesh/geometry/Sphere.hpp"
+#include "visualmesh/model/nmgrid4.hpp"
+#include "visualmesh/model/nmgrid6.hpp"
+#include "visualmesh/model/nmgrid8.hpp"
+#include "visualmesh/model/radial4.hpp"
+#include "visualmesh/model/radial6.hpp"
+#include "visualmesh/model/radial8.hpp"
+#include "visualmesh/model/ring4.hpp"
+#include "visualmesh/model/ring6.hpp"
+#include "visualmesh/model/ring8.hpp"
+#include "visualmesh/model/xmgrid4.hpp"
+#include "visualmesh/model/xmgrid6.hpp"
+#include "visualmesh/model/xmgrid8.hpp"
+#include "visualmesh/model/xygrid4.hpp"
+#include "visualmesh/model/xygrid6.hpp"
+#include "visualmesh/model/xygrid8.hpp"
+#include "visualmesh/visualmesh.hpp"
 
 using Scalar = float;
 
 // Use OpenCL engine if available, then Vulkan then CPU
 #if defined(VISUALMESH_ENABLE_OPENCL)
 
-#include "engine/opencl/engine.hpp"
+#include "visualmesh/engine/opencl/engine.hpp"
 template <typename Scalar>
 using Engine = visualmesh::engine::opencl::Engine<Scalar>;
 
 #elif defined(VISUALMESH_ENABLE_VULKAN)
 
-#include "engine/opencl/engine.hpp"
+#include "visualmesh/engine/opencl/engine.hpp"
 template <typename Scalar>
 using Engine = visualmesh::engine::vulkan::Engine<Scalar, false>;
 
 #else
 
-#include "engine/cpu/engine.hpp"
+#include "visualmesh/engine/cpu/engine.hpp"
 template <typename Scalar>
 using Engine = visualmesh::engine::cpu::Engine<Scalar>;
 

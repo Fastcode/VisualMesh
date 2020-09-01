@@ -22,12 +22,12 @@
 #include <numeric>
 
 #include "apply_activation.hpp"
-#include "mesh/classified_mesh.hpp"
-#include "mesh/mesh.hpp"
-#include "mesh/network_structure.hpp"
-#include "mesh/projected_mesh.hpp"
-#include "mesh/visualmesh.hpp"
-#include "utility/fourcc.hpp"
+#include "visualmesh/classified_mesh.hpp"
+#include "visualmesh/mesh.hpp"
+#include "visualmesh/network_structure.hpp"
+#include "visualmesh/projected_mesh.hpp"
+#include "visualmesh/utility/fourcc.hpp"
+#include "visualmesh/visualmesh.hpp"
 
 namespace visualmesh {
 namespace engine {

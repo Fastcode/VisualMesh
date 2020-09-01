@@ -24,7 +24,7 @@
 #include <stack>
 #include <vector>
 
-#include "mesh/node.hpp"
+#include "visualmesh/node.hpp"
 
 namespace visualmesh {
 namespace model {
