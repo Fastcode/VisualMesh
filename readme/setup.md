@@ -34,7 +34,7 @@ tqdm
 
 Once this is done you can run training code by using
 ```sh
-./mesh.py train <config.yaml> <output_dir>
+./mesh.py train <output_dir>
 ```
 
 ### Docker
@@ -52,10 +52,10 @@ You can then run training code by using the following command, forwarding all GP
 
 ```sh
 # To only use the CPU
-docker run -u $(id -u):$(id -g) -it --rm --volume $(pwd):/workspace visualmesh:latest ./mesh.py  train <config.yaml> <output_dir>
+docker run -u $(id -u):$(id -g) -it --rm --volume $(pwd):/workspace visualmesh:latest ./mesh.py  train <output_dir>
 
 # To use all available GPUs
-docker run --gpus all -u $(id -u):$(id -g) -it --rm --volume $(pwd):/workspace visualmesh:latest ./mesh.py  train <config.yaml> <output_dir>
+docker run --gpus all -u $(id -u):$(id -g) -it --rm --volume $(pwd):/workspace visualmesh:latest ./mesh.py  train <output_dir>
 
 # To only use GPU0
-docker run --gpus device=0 -u $(id -u):$(id -g) -it --rm --volume $(pwd):/workspace visualmesh:latest ./mesh.py  train <config.yaml> <output_dir>
+docker run --gpus device=0 -u $(id -u):$(id -g) -it --rm --volume $(pwd):/workspace visualmesh:latest ./mesh.py  train <output_dir>
