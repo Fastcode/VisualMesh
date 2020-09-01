@@ -59,7 +59,8 @@ label:
 ```
 
 ## Seeker
-Seeker networks take a vector that is measured in camera space and for each point in the visual mesh, predict where the mesh that object is.
+Seeker networks predict where in the visual mesh an object is.
+The label takes a vector that is measured in camera space and for each point in the visual mesh predicts where in the mesh that object is as a relative offset.
 It is typically used with a `tanh` activation layer as the final layer of the network.
 
 ### Loss Function

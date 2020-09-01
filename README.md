@@ -36,9 +36,13 @@ See the [Dataset Page](readme/dataset.md) for more information.
 
 ## [Training](readme/training.md)
 In order to train a network using the visual mesh, you need to place a configuration file in your output folder.
-Then you are able to run the following command to train the network
+Then you are able to run the following command to train the network.
 ```sh
 ./mesh.py train <path/to/output>
+```
+Or using docker:
+```sh
+./docker run --gpus all -u $(id -u):$(id -g) -it --rm --volume $(pwd):/workspace visualmesh:latest ./mesh.py train <path/to/output>
 ```
 More information about the training process as well as the influence of different parameters in the configuration can be found on the **[Training Page](readme/training.md)**
 

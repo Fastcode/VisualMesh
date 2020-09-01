@@ -20,6 +20,18 @@ cmake ..
 make
 ```
 
+You also need some python libraries installed using your favourite method of installing python libraries may be (e.g. pip).
+```yaml
+matplotlib
+numpy
+opencv-python
+pyyaml
+tensorflow
+tensorflow-addons # For using the Ranger optimiser
+tqdm
+
+```
+
 Once this is done you can run training code by using
 ```sh
 ./mesh.py train <config.yaml> <output_dir>

@@ -10,7 +10,7 @@ To account for this, several different models have been developed to try to pres
 Whether you use are polar or cartesian coordinate system to present the points to the mesh makes a significant difference in how the network is able to perform.
 Polar networks such as Ring and Radial work well for Ground networks where you are looking at objects at a distance.
 In these systems having further in distance be a consistent direction in the graph means orientation of upright objects is preserved.
-Cartesian networksGrid networks
+Grid networks work better for spotlight systems where having a consistent coordinate system for the object is beneficial.
 
 ## Dataset Keys
 ```python
@@ -91,6 +91,9 @@ X--X--X   X--X--X   X-X-X
 In the images that are shown below, each node displays it's connection to another with a line that is half the distance to that node. If that node also connects back it will form a complete line.
 When the connection is only one way, you will see half a line shown.
 
+If you have a graph node that does not connect to a nearby point, that neighbour will be set as one past the end of the number of points in the graph.
+These will not be drawn.
+
 ### Ring
 The ring networks are built using concentric rings where each node is connected to the nodes to its left and right in the same ring, and nearest nodes in the previous and next ring.
 This is the traditional visual mesh model as first proposed.
@@ -119,8 +122,6 @@ This model can be better when you are using deeper networks and looking at large
 ### XY Grid
 The XY grid is built by taking plane slices along two orthogonal axes.
 These plane slices are calculated using the number of object `n` jumps.
-This method gets significant errors as you get further away from the origin as the angle of objects near the origin on one axis is very inaccurate once you move away.
-However, the angle is maintained very well at the cost of object scale not being maintained with distance.
 
 #### Errors
 - Significant errors away from the origin due to scaling
@@ -140,12 +141,13 @@ It suffers from similar problems as the NM Grid, however not quite as bad so it 
 ### NM Grid
 This model is here as a warning so that when you come up with this idea in the future you know it is a dead end.
 One day you will think you have a great idea how to solve the visual mesh graph problem.
-If you took one axis, and then calculated
+If you took one axis, and then calculated the other axis as in the XM grid.
+That is taking two orthogonal planes and calculating jumps from each to draw grid lines.
 What you will realise if you try it is that on the diagonals you must stretch your square grid until the lines are almost parallel.
 Once your X and Y axes are travelling in almost the same direction you end up with a useless grid.
 
 #### Errors
 - On the diagonals with very little distance the density increases to absurd levels
-- On the diagonal angles become highly distorted resulting in odd shapes
+- On the diagonal angles become highly distorted resulting in odd shapes due to the x and y axis being almost parallel
 
 ![NM Grid](mesh_models/nm_grid.jpg)

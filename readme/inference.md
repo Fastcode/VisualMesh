@@ -11,7 +11,7 @@ If you have trained a network and wish to output it the a yaml format that most 
 This will create a yaml file with the weights and network in it ready for use.
 
 ## Mesh
-The mesh objects generate
+The mesh objects generate a single look up table of the entire graph.
 The mesh objects are able to look up which of the points in the visual mesh are on screen.
 They do this using a binary search partition tree to quickly narrow down which points are valid.
 However, since this tree isn't perfect you may occasionally get points that are slightly off screen.
@@ -24,8 +24,8 @@ The second is the `visualmesh::VisualMesh` which holds multiple different `visua
 They both can be used with engines in the same way, and if using `visualmesh::VisualMesh` it will select the closest matching height for the Hoc used.
 
 It is created via a template `visualmesh::Mesh<Scalar, Model>` where the Scalar is the datatype that the mesh will be created with (for example `float` or `double`).
-The model is the exact visual mesh generation model that will be used.
-For example the
+The model is the specific visual mesh generation model that will be used.
+For example `visualmesh::model::Ring6` would select the six neighbour ring model.
 You can find more about the models that are available and their advantages and disadvantages [here](flavour/projection.md).
 Make sure that you use the same model that you trained the network for.
 It is often advantageous to create the Mesh object using double precision, and then convert it to single precision float.

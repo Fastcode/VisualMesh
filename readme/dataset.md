@@ -10,10 +10,10 @@ For example if you were to make a dataset for a Monoscopic Image Ground Classifi
 "image": bytes[1] # Compressed image
 "mask": bytes[1] # png image
 "lens/projection": bytes[1] # 'RECTILINEAR' | 'EQUISOLID' | 'EQUIDISTANT'
-"lens/focal_length": float[1]
-"lens/fov": float[1]
-"lens/centre": float[2]
-"lens/k": float[2]
+"lens/focal_length": float[1] # pixels
+"lens/fov": float[1] # radians
+"lens/centre": float[2] # pixels
+"lens/k": float[2] # pixels
 ```
 
 If you have a TFRecord dataset which has the correct data types in it, but the keys are incorrect you are able to use the keys field in order to map the keys across.
@@ -50,7 +50,7 @@ To make a simple dataset you can follow the instructions in [Quick Start Guide](
 ## Batching
 For the visual mesh, the method used for batching is very different to how most batching systems work.
 Because of the projection, each image that is loaded into the network will likely have a different number of pixels that are projected onto the image.
-This results in a variable length that would go into the beatch.
+This results in a variable length that would go into the batch.
 Therefore instead of adding a new dimension and batching over that dimension we instead concatenate all the samples together.
 Then to fix the network we update their graph indies by offsetting them based on their position in the concatenation.
 This way the graph will ensure that the ragged length batches will continue to interact properly once concatenated.

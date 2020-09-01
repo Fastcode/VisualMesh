@@ -53,7 +53,7 @@ If you don't know set it to `[0, 0]`
 - **`k`** is the two component radial distortion values for the lens as per a polynomial series.
 If you don't know set it to `[0, 0]`
 
-- **`fov`** is the field of view of the camera, for many rectilinear lenses it will be the full field of view, but for lenses with black circles (like above) it will be less.
+- **`fov`** is the field of view of the camera, for many rectilinear lenses it will be the full diagonal field of view, but for lenses with black circles (like above) it will be the field of view of that black circle.
 
 ### Building the dataset
 Once you have these in a folder make sure they are named `imageX.jpg`, `maskX.jpg` and `lensX.yaml` where `X` is replaced with a unique number per example.
@@ -67,7 +67,7 @@ and it will create a training, validation and testing TFRecord file containing t
 ## Training
 In order to do training you must create a configuration file.
 To start with you can copy `example_net.yaml`.
-You must place this configuration file and put it in the output folder.
+You must place this configuration file in the output folder under the name `config.yaml`.
 For example, copy over `example_net.yaml` to `output/quickstart/v1/config.yaml`
 
 Running the following command will then begin training the network.

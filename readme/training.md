@@ -74,11 +74,3 @@ When running training the network will output the training outputs to TensorBoar
 To see the progress and graphs of training you can run `tensorboard --log_dir=<path_to_output>`
 
 Depending on the flavour you use, there will be different graphs and images that are shown in TensorBoard.
-
-Read about those in the [Configuration Options](#Configuration) of this page.
-- TODO discuss how to run the training
-- Create a config.yaml file in the output directory
-- run the training code
-
-- TODO Talk about the images
-- TODO talk about tensorboard
