@@ -20,7 +20,7 @@ from .random_rotation import random_rotation
 
 class Ground:
     def __init__(self, **config):
-        self.variations = {} if "variations" not in config else config["variations"]
+        self.augmentations = {} if "augmentations" not in config else config["augmentations"]
 
     def features(self):
         return {
@@ -29,9 +29,9 @@ class Ground:
 
     def __call__(self, Hoc, **features):
 
-        # If we have a height variation, apply it
-        if "height" in self.variations:
-            v = self.variations["height"]
+        # If we have a height augmentation, apply it
+        if "height" in self.augmentations:
+            v = self.augmentations["height"]
 
             Hoc = tf.tensor_scatter_nd_add(
                 Hoc,
@@ -39,8 +39,8 @@ class Ground:
                 tf.expand_dims(tf.random.truncated_normal(shape=(), mean=v["mean"], stddev=v["stddev"]), 0),
             )
 
-        if "rotation" in self.variations:
-            v = self.variations["rotation"]
+        if "rotation" in self.augmentations:
+            v = self.augmentations["rotation"]
 
             # Apply a random axis angle rotation
             Hoc = tf.matmul(random_rotation(v["mean"], v["stddev"]), Hoc)

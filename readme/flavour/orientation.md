@@ -29,7 +29,7 @@ The only dataset key required by the Ground flavour is `Hoc` which will be forwa
 orientation:
   type: Ground
   config:
-    variations:
+    augmentations:
       # Adjust the height above the observation plane.
       height: { mean: 0, stddev: 0.05 }
       # Rotate around a random axis by this angle
@@ -58,7 +58,7 @@ The targets are 3D vectors measured in the cameras coordinate system.
 orientation:
   type: Spotlight
   config:
-    variations:
+    augmentations:
       # Rotate around a random axis by this angle
       rotation: { mean: 0, stddev: 0.0872665 }
       # Adjust the position of the spotlight target

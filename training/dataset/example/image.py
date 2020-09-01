@@ -18,7 +18,7 @@ import tensorflow as tf
 
 class Image:
     def __init__(self, **config):
-        self.variations = {} if "variations" not in config else config["variations"]
+        self.augmentations = {} if "augmentations" not in config else config["augmentations"]
 
     def _interpolate_gather(self, img, C):
 
@@ -75,22 +75,22 @@ class Image:
 
     def __call__(self, image, C, **features):
 
-        # Apply the variants that were listed
-        if "brightness" in self.variations:
-            v = self.variations["brightness"]
+        # Apply the augmentations that were listed
+        if "brightness" in self.augmentations:
+            v = self.augmentations["brightness"]
             image = tf.image.adjust_brightness(image, tf.random.truncated_normal(shape=(), **v))
-        if "contrast" in self.variations:
-            v = self.variations["contrast"]
+        if "contrast" in self.augmentations:
+            v = self.augmentations["contrast"]
             image = tf.image.adjust_contrast(image, tf.random.truncated_normal(shape=(), **v))
-        if "hue" in self.variations:
-            v = self.variations["hue"]
+        if "hue" in self.augmentations:
+            v = self.augmentations["hue"]
             image = tf.image.adjust_hue(image, tf.random.truncated_normal(shape=(), **v))
-        if "saturation" in self.variations:
-            v = self.variations["saturation"]
+        if "saturation" in self.augmentations:
+            v = self.augmentations["saturation"]
             image = tf.image.adjust_saturation(image, tf.random.truncated_normal(shape=(), **v))
-        if "gamma" in self.variations:
-            v_gamma = self.variations["gamma"]["gamma"]
-            v_gain = self.variations["gamma"]["gain"]
+        if "gamma" in self.augmentations:
+            v_gamma = self.augmentations["gamma"]["gamma"]
+            v_gain = self.augmentations["gamma"]["gain"]
             image = tf.image.adjust_gamma(
                 image, tf.random.truncated_normal(shape=(), **v_gamma), tf.random.truncated_normal(shape=(), **v_gain)
             )

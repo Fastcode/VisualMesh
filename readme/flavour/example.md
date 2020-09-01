@@ -14,14 +14,14 @@ It can accept a wide variety of compressed image formats (anything that is accep
 ```
 
 ### Configuration
-Any or all of the variations can be left out if you do not wish to apply image variations when running.
-All variations are done with pixel values as floats which means that they go from 0->1 not 0->255.
+Any or all of the augmentations can be left out if you do not wish to apply image augmentations when running.
+All augmentations are done with pixel values as floats which means that they go from 0->1 not 0->255.
 
 ```yaml
 example:
   type: Image
   config:
-    variations:
+    augmentations:
       # Adjust the brightness `x + delta`
       brightness:  { mean: 0, stddev: 0.05 }
       # Adjust the contrast `(x - mean) * delta + mean`

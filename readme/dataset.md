@@ -29,7 +29,7 @@ dataset:
 This would allow the dataset to look for the data needed by `lens/fov` in the field `camera/field_of_view`
 
 You are also able to override any of the settings for the flavours for only a specific dataset using a config tag.
-This is typically used if you want to provide variations to your training data using the variants feature of some of the flavours, but not apply them when validating or testing the network.
+This is typically used if you want to provide augmentations to your training data, but not apply them when validating or testing the network.
 
 For example, to manipulate the ground plane from the Ground orientation flavour only in training:
 
@@ -40,7 +40,7 @@ dataset:
       - dataset/training.tfrecord
     config:
       orientation:
-        variations:
+        augmentations:
           height: { mean: 0, stddev: 0.05 }
           rotation: { mean: 0, stddev: 0.0872665 }
 ```

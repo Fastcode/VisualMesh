@@ -20,7 +20,7 @@ from .random_rotation import random_axis, random_rotation
 
 class Spotlight:
     def __init__(self, **config):
-        self.variations = {} if "variations" not in config else config["variations"]
+        self.augmentations = {} if "augmentations" not in config else config["augmentations"]
 
     def features(self):
         return {
@@ -36,8 +36,8 @@ class Spotlight:
         world_z = Hoc[2, :3]
 
         # If we are going to apply a random rotation we only need to do it to world z
-        if "rotation" in self.variations:
-            v = self.variations["rotation"]
+        if "rotation" in self.augmentations:
+            v = self.augmentations["rotation"]
 
             # Apply a random axis angle rotation
             world_z = tf.squeeze(
@@ -47,17 +47,17 @@ class Spotlight:
         # Pick a random target
         rOCc = targets[tf.random.uniform((), 0, tf.shape(targets)[0], tf.int32)]
 
-        # Apply a random variation to the position
-        if "position" in self.variations:
-            v = self.variations["position"]
+        # Apply a random augmentation to the position
+        if "position" in self.augmentations:
+            v = self.augmentations["position"]
             rOCc = rOCc + random_axis() * tf.random.truncated_normal((), v["mean"], v["stddev"])
 
         # Get our axes and height
         z, h = tf.linalg.normalize(-rOCc)
 
         # If a minimum and/or maximum distance is given, apply them to the position
-        if "position" in self.variations:
-            v = self.variations["position"]
+        if "position" in self.augmentations:
+            v = self.augmentations["position"]
             if "min" in v:
                 h = tf.math.maximum(tf.constant(v["min"], dtype=h.dtype), h)
             if "max" in v:
