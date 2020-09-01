@@ -19,6 +19,7 @@ You will need three files per image:
 |`imageX.jpg`|`maskX.png`|
 |:-:|:-:|
 |![Image](flavour/label/image.jpg)| ![Mask](flavour/label/mask.png)|
+
 **Lens.yaml**
 ```yaml
 projection: EQUISOLID
