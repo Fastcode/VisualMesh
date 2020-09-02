@@ -62,8 +62,9 @@ It provides several different options for how to control the learning rate durin
 
 - `static` will keep the same learning rate for the entire training.
 With static, you only need to set the learning rate as an option
-- `lr_finder` is not designed to be used for training and instead will run through the learning rate finder algorithm to find an upper bound for valid learning rates
 - `one_cycle` will use the one cycle learning rate scheduler, which will start the learning rate at some low value, ramp it up to a higher value, and then back down.
+
+If you are using the `one_cycle` training scheme, you can use the learning rate finder `./mesh.py lr_finder <output_folder>` to find an appropriate upper bound for your learning rate.
 
 ## Running training
 Running training is done by executing the `./mesh.py train` command on the output folder with `config.yaml` in it.
