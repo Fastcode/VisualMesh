@@ -20,7 +20,8 @@ class Image:
     def __init__(self, **config):
         self.augmentations = {} if "augmentations" not in config else config["augmentations"]
 
-    def _interpolate_gather(self, img, C):
+    @staticmethod
+    def _interpolate_gather(img, C):
 
         # Get our four surrounding coordinates
         y_0 = tf.math.floor(C[:, 0])
@@ -65,12 +66,15 @@ class Image:
 
     def input(self, image, **features):
 
+        # For some reason in tensorflow 2.3, setting channels=3 doesn't set the last dimension as 3 anymore
+        decoded = tf.io.decode_image(image, channels=3, expand_animations=False, dtype=tf.float32)
+        dimensions = tf.shape(decoded)
+        decoded = tf.reshape(decoded, (dimensions[0], dimensions[1], 3))
+
         # Return the image and the original compressed image
         return {
             "jpg": image,
-            "image": tf.image.convert_image_dtype(
-                tf.image.decode_image(image, channels=3, expand_animations=False), tf.float32
-            ),
+            "image": decoded,
         }
 
     def __call__(self, image, C, **features):
@@ -97,5 +101,5 @@ class Image:
 
         # Get the pixels referenced by the image
         return {
-            "X": self._interpolate_gather(image, C),
+            "X": Image._interpolate_gather(image, C),
         }

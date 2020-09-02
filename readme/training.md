@@ -1,5 +1,5 @@
 # Training
-Training in the visual mesh code is handled by Tensorflow 2.0.
+Training in the visual mesh code is handled by TensorFlow 2.
 You perform training by creating a configuration file `config.yaml`, putting it an output directory and running training on that directory.
 The training will then train the network and put the output in the same directory as the configuration file.
 The output of the network will be a trained weights file and TensorBoard log files.

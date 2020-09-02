@@ -2,7 +2,8 @@
 In order to setup the training and inference code, you will need to provide the required libraries to build the code.
 
 ### Training/Testing
-In order to train a network using the visual mesh, you need to have TensorFlow 2.0+ and have built the custom op.
+In order to train a network using the visual mesh, you need to have TensorFlow 2.3 and have built the custom op.
+TensorFlow 2.3 is needed as currently how ragged batching is done is experimental and visual mesh needs updating to match that progress.
 You have two options for how you go about this, you can either install these on your host system and train from there, or you can use the preferred method and use the provided `Dockerfile` to build a docker image you can use.
 
 ### Host System
@@ -10,7 +11,7 @@ In order to install directly on the host system, you need to have CMake 3.1.0 or
 You can't build the custom op directly on windows since TensorFlow does not provide their library on windows systems.
 The dependencies for building the custom op are
 - Python 3
-- TensorFlow 2.X
+- TensorFlow 2.3
 - C++ compiler that can build c++14 code
 
 ```sh

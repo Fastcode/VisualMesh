@@ -13,7 +13,7 @@ Normally distant objects become too small for a network to detect accurately, bu
  |![](readme/distant.png)|![](readme/mesh.jpg)|
  | | |
 
-This codebase provides two components, one is a TensorFlow 2.0 based training and testing system that allows you to build and train networks.
+This codebase provides two components, one is a TensorFlow 2 based training and testing system that allows you to build and train networks.
 The other component is a C++ API that is designed to operate as a high performance inference engine using OpenCL.
 This allows you to get high performance on systems with devices like Intel integrated GPUs with hundreds of frames per second.
 

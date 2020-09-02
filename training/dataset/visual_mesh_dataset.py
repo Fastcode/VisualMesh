@@ -91,7 +91,7 @@ class VisualMeshDataset:
     def _reduce(self, batch):
 
         # Get n out from the ragged batch
-        n = batch["n"].to_tensor()
+        n = batch["n"]
 
         # We need the n offsets to reposition all the graph values
         cn = tf.math.cumsum(tf.math.reduce_sum(n, axis=1), exclusive=True)
@@ -113,14 +113,14 @@ class VisualMeshDataset:
         V = batch["V"].values
 
         # Fixed size elements are in sensible shapes
-        jpg = batch["jpg"].to_tensor()
-        Hoc = batch["Hoc"].to_tensor()
+        jpg = batch["jpg"]
+        Hoc = batch["Hoc"]
         lens = {
-            "projection": batch["lens/projection"].to_tensor(),
-            "focal_length": batch["lens/focal_length"].to_tensor(),
-            "centre": batch["lens/centre"].to_tensor(),
-            "k": batch["lens/k"].to_tensor(),
-            "fov": batch["lens/fov"].to_tensor(),
+            "projection": batch["lens/projection"],
+            "focal_length": batch["lens/focal_length"],
+            "centre": batch["lens/centre"],
+            "k": batch["lens/k"],
+            "fov": batch["lens/fov"],
         }
 
         # Add on our offset for each batch so that we get a proper result and then remove the ragged edge
