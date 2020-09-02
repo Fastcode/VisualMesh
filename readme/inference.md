@@ -64,7 +64,7 @@ It is not yet complete and will occasionally cause your entire computer to freez
 Use at your own risk.
 
 ### Future Engines
-In the future there are plans to implement a TensorRT engine and a CUDA engine.
+In the future, there are plans to implement a TensorRT engine and a CUDA engine.
 Pull requests are welcome!
 
 ## Multithreading

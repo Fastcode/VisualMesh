@@ -5,7 +5,7 @@ Often the expanded keys will have some overlap and different views will have the
 In this case, you can use the keys field in the dataset to remap the features from multiple views back to a single input.
 
 ## Monoscopic
-Monoscopic view is the traditional single camera visual mesh mode with no fancy multi camera options.
+The monoscopic view is the traditional single-camera visual mesh mode with no fancy multi-camera options.
 There is no configuration for this view and it does not impact the keys required by other flavour components.
 
 ### Dataset Keys
