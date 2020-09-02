@@ -28,6 +28,10 @@ RUN pip3 install \
     tensorflow-addons \
     tqdm
 
+# Matplotlib wants /.{config,cache}/matplotlib to be writable
+RUN install -d -m 0777 /.config/matplotlib
+RUN install -d -m 0777 /.cache/matplotlib
+
 # Build the tensorflow op and put it in /visualmesh
 RUN mkdir visualmesh
 COPY . visualmesh/
@@ -40,6 +44,9 @@ RUN mkdir visualmesh/build && cd visualmesh/build \
     && make
 
 ENV LD_PRELOAD /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
+
+# Make tensorflow only print out info and above logs
+ENV TF_CPP_MIN_LOG_LEVEL 1
 
 RUN mkdir /workspace
 WORKDIR /workspace
