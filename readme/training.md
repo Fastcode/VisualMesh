@@ -15,8 +15,8 @@ The specific options which are relevant for the training process are documented 
 ### Network Section
 The design of the network is configured in the `network: { structure: {}}` section of the yaml file.
 The network is defined using a graph of elements that you can assemble until a final node `output`.
-Currently for the case of the inference system they are only able to handle feed forward networks of Dense and Convolutional layers with no skip connections.
-Anywhere in the network you can use the variable `$output_dims` and this will be replaced with the dimensionality of labels you are using.
+Currently, for the case of the inference system, they are only able to handle feed-forward networks of Dense and Convolutional layers with no skip connections.
+Anywhere in the network, you can use the variable `$output_dims` and this will be replaced with the dimensionality of labels you are using.
 
 There will be two default inputs provided, `X` and `G` that you can use as inputs to your network layers.
 These correspond to the input values from the image, and the graph indices that form the graph network.
@@ -45,10 +45,10 @@ If you don't set this field then the entire dataset will be used as an epoch.
 #### `training: epochs`
 This is the number of epochs that will be trained for before finishing.
 If `batches_per_epoch` is not set it will be the number of times the dataset is seen.
-Otherwise it will be the number of `batchs_per_epoch` loops to do.
+Otherwise, it will be the number of `batchs_per_epoch` loops to do.
 
 #### `training: optimiser`
-This selects which optimiser will be used and sets any non learning rate parameters that it has.
+This selects which optimiser will be used and sets any non-learning rate parameters that it has.
 The current options are Adam, SGD and Ranger (RAdam with Lookahead).
 Any option that is accepted by the constructor of these is available as configuration options.
 
@@ -61,7 +61,7 @@ The learning rate options is for setting the learning rate scheduler.
 It provides several different options for how to control the learning rate during training.
 
 - `static` will keep the same learning rate for the entire training.
-With static you only need to set the learning rate as an option
+With static, you only need to set the learning rate as an option
 - `lr_finder` is not designed to be used for training and instead will run through the learning rate finder algorithm to find an upper bound for valid learning rates
 - `one_cycle` will use the one cycle learning rate scheduler, which will start the learning rate at some low value, ramp it up to a higher value, and then back down.
 

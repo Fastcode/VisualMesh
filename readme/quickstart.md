@@ -35,8 +35,8 @@ Hoc:
 ```
 
 - **`Hoc`** is a homogenous transformation matrix which if used like `Hoc * (a,b,c,1)` would convert a vector in the cameras coordinate system into one from the ground.
-In this matrix, only the z component of translation matters (the cameras height above the ground).
-In this example the units are measured in meters (m).
+In this matrix, only the z component of translation matters (the height of the camera above the ground).
+In this example, the units are measured in meters (m).
 However, the unit that you use for this measurement don't matter, so long as the units you use for the radius of your geometry are the same.
 ```
 ┌            ┐
@@ -68,7 +68,7 @@ You can then run
 and it will create a training, validation and testing TFRecord file containing the data.
 
 ## Training
-In order to do training you must create a configuration file.
+In order to train, you must create a configuration file.
 To start with you can copy `example_net.yaml`.
 You must place this configuration file in the output folder under the name `config.yaml`.
 For example, copy over `example_net.yaml` to `output/quickstart/v1/config.yaml`

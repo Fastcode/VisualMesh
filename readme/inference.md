@@ -12,15 +12,15 @@ This will create a YAML file with the weights of the network in it ready for use
 
 ## Mesh
 The mesh objects generate a single look up table of the entire graph.
-The mesh objects are able to look up which of the points in the visual mesh are on screen.
+The mesh objects are able to lookup which of the points in the visual mesh are on screen.
 They do this using a binary search partition tree to quickly narrow down which points are valid.
-However, since this tree isn't perfect you may occasionally get points that are slightly off screen.
-If it is important that you do not have any points off screen you should add some code to check for this.
+However, since this tree isn't perfect you may occasionally get points that are slightly off-screen.
+If it is important that you do not have any points off-screen you should add some code to check for this.
 
 There are two main mesh objects that are available in the visual mesh codebase.
 The first is the `visualmesh::Mesh` class.
 This class holds a single visual mesh for a specific height.
-The second is the `visualmesh::VisualMesh` which holds multiple different `visualmesh::Mesh` objects for different heights that ensure that the error in number of intersections does not grow beyond a target value.
+The second is the `visualmesh::VisualMesh` which holds multiple different `visualmesh::Mesh` objects for different heights that ensure that the error in the number of intersections does not grow beyond a target value.
 They both can be used with engines in the same way, and if using `visualmesh::VisualMesh` it will select the closest matching height for the `Hoc` used.
 
 It is created via a template `visualmesh::Mesh<Scalar, Model>` where the Scalar is the datatype that the mesh will be created with (for example `float` or `double`).
@@ -71,7 +71,7 @@ Pull requests are welcome!
 **The engine instances are not thread safe!**
 Each of the engine instances are designed not to be thread safe to allow for maximum performance.
 When executing the network, you will find the utilisation of your platform is low as quite a bit of time is spent enqueueing kernels and uploading/downloading data from devices.
-Because of this you need to interleave your requests on the device.
+Because of this, you need to interleave your requests on the device.
 To do this make multiple engine instances for your same network and ensure that only a single thread is using one at a time.
 This allows multiple threads to be enqueuing/running data on the device at the same time and will greatly improve your performance.
-For an example of this you can look at the `benchmark.cpp` example code which uses this principle to achieve higher framerates.
+For an example of this, you can look at the `benchmark.cpp` example code which uses this principle to achieve higher framerates.

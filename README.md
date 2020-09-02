@@ -21,7 +21,7 @@ This allows you to get high performance on systems with devices like Intel integ
 If all you want to do is train a simple classification network for your own dataset take a look at the [Quick Start Guide](readme/quickstart.md)
 
 ## [Setup](readme/setup.md)
-For setup you can either build the custom training op using CMake, or you can build a docker image to train with via docker.
+For setup, you can either build the custom training op using CMake, or you can build a docker image to train with via docker.
 You can get a more detailed description on the [Setup Page](readme/setup.md).
 
 ## [Architecture](readme/architecture.md)
@@ -49,14 +49,14 @@ More information about the training process as well as the influence of differen
 ## [Testing](readme/testing.md)
 This codebase provides a suite of testing tools in order to determine the efficacy of a trained network.
 It outputs metrics (e.g. precision and recall) and has a system for drawing charts from combinations of properties.
-More information about the testing and the graphs that it outputs can be foundat the **[Testing Page](readme/testing.md)**
+More information about the testing and the graphs that it outputs can be found at the **[Testing Page](readme/testing.md)**
 
 ## [Inference](readme/inference.md)
 The visual mesh codebase also provides a custom C++ inference engine that is able to be executed on a wide variety of devices.
 The inference code is based on several different engines.
 Each of these engines has a different requirement in order to build code using it.
 For example, the OpenCL engine requires that you have an OpenCL implementation and appropriate drivers installed when you build and run the code.
-If you don't have these the code will still work, however you will not have access to those engines.
+If you don't have these the code will still work, however, you will not have access to those engines.
 For more information see the **[Inference Page](readme/inference.md)**
 
 ## Contributing

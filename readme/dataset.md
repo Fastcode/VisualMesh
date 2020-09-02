@@ -3,7 +3,7 @@ The dataset for the visual mesh should be provided as at least three TFRecord fi
 
 Each of the flavours used in the network will add requirements for the data that needs to be provided.
 You can look these up in each of the individual flavours and how they influence the dataset on the [Architecture Page](./architecture.md).
-For example if you were to make a dataset for a Monoscopic Image Ground Classification Mesh it would need to have the following keys in it:
+For example, if you were to make a dataset for a Monoscopic Image Ground Classification Mesh it would need to have the following keys in it:
 
 ```python
 "Hoc": float[4, 4] # 3D Affine transformation from camera space to observation space
@@ -48,9 +48,9 @@ dataset:
 To make a simple dataset you can follow the instructions in [Quick Start Guide](readme/quickstart.md) or read the code in [training/dataset.py](training/dataset.py)
 
 ## Batching
-For the visual mesh, the method used for batching is very different to how most batching systems work.
+For the visual mesh, the method used for batching is very different from how most batching systems work.
 Because of the projection, each image that is loaded into the network will likely have a different number of pixels that are projected onto the image.
-This results in a variable length that would go into the batch.
+This results in a variable-length that would go into the batch.
 Therefore instead of adding a new dimension and batching over that dimension we instead concatenate all the samples together.
 Then to fix the network we update their graph indices by offsetting them based on their position in the concatenation.
 This way the graph will ensure that the ragged length batches will continue to interact properly once concatenated.

@@ -1,8 +1,8 @@
 # Example
-Example flavours describes how the input image data will be provided to the network.
+Example flavours describe how the input image data will be provided to the network.
 They provide two essential functions.
 Firstly, via their `input` function, they describe how to generate the initial input data loaded from the dataset.
-Secondly, they take the projection from the visual mesh that describes which pixels are targeted, and load those specific pixels from the input image.
+Secondly, they take the projection from the visual mesh that describes which pixels are targeted and load those specific pixels from the input image.
 
 ## Image
 Image flavour takes an image that is stored in the dataset and provides it to the visual mesh.
@@ -15,7 +15,7 @@ It can accept a wide variety of compressed image formats (anything that is accep
 
 ### Configuration
 Any or all of the augmentations can be left out if you do not wish to apply image augmentations when running.
-All augmentations are done with pixel values as floats which means that they go from 0->1 not 0->255.
+All augmentations are done with pixel values as floats which means that they go from 0->1, not 0->255.
 
 ```yaml
 example:

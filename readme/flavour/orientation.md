@@ -41,7 +41,7 @@ The spotlight mesh is based on the idea of projecting a visual mesh plane at som
 It is given a list of targets and will choose one of these targets at random.
 When training over multiple epochs this random selection is done each time the example is shown.
 This object is projected and used as the origin for a visual mesh observation plane that is tangential to the location of the object.
-When this projection is done, the X axis of the visual mesh will always be aligned with the Z axis of the observation plane.
+When this projection is done, the X-axis of the visual mesh will always be aligned with the Z-axis of the observation plane.
 This ensures consistent results regardless of where the target is looking
 
 ### Dataset Keys

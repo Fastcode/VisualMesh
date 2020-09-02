@@ -1,15 +1,15 @@
 # Projection
 The visual mesh projection is based on two components.
 The geometry of the object that we are looking at and the geometry of the mesh that we view it through.
-Ideally the visual mesh would give a perfect regular covering of the target geometry.
-However the geometry of some of the shapes such as spheres do not give a flat geometry.
+Ideally, the visual mesh would give a perfect regular covering of the target geometry.
+However, the geometry of some of the shapes such as spheres do not give a flat geometry.
 This makes it impossible to design a sampling that is both consistent in the number and position of points.
-Fortunately the neural networks are able to continue to function with these distortions provided they are not significant.
+Fortunately, the neural networks are able to continue to function with these distortions provided they are not significant.
 To account for this, several different models have been developed to try to preserve different properties.
 
 Whether you use a polar or cartesian coordinate system to present the points to the mesh makes a significant difference in how the network is able to perform.
 Polar networks such as Ring and Radial work well for Ground networks where you are looking at objects at a distance.
-In these systems having further in distance be a consistent direction in the graph means orientation of upright objects is preserved.
+In these systems, an increase in distance is represented as a consistent direction in the graph, hence the orientation of upright objects are preserved.
 Grid networks work better for spotlight systems where having a consistent coordinate system for the object is beneficial.
 
 ## Dataset Keys
@@ -140,8 +140,8 @@ It suffers from similar problems as the NM Grid, however not quite as bad so it 
 
 ### NM Grid
 This model is here as a warning so that when you come up with this idea in the future you know it is a dead end.
-One day you will think you have a great idea how to solve the visual mesh graph problem.
-If you took one axis, and then calculated the other axis as in the XM grid.
+One day you will think you have a great idea on how to solve the visual mesh graph problem.
+If you took one axis and then calculated the other axis as in the XM grid.
 That is taking two orthogonal planes and calculating jumps from each to draw grid lines.
 What you will realise if you try it is that on the diagonals you must stretch your square grid until the lines are almost parallel.
 Once your X and Y axes are travelling in almost the same direction you end up with a useless grid.

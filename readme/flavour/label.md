@@ -20,7 +20,7 @@ Image|Mask
 ### Loss Function
 The loss function that is used by the visual mesh for classification is a class balanced focal loss [https://arxiv.org/abs/1708.02002](https://arxiv.org/abs/1708.02002).
 In this loss function, the impact of each class is balanced.
-The examples of each are weighted so all classes have equal impact on the loss function.
+The examples of each are weighted so all classes have an equal impact on the loss function.
 This loss function is able to be used when the final layer in the network is either `softmax` for cases when there is a single correct class for each point or `sigmoid` when a point may have multiple classes simultaneously.
 
 Focal loss is used here as it helps to emphasise the rarer cases in what would otherwise be homogenous data.
@@ -61,16 +61,17 @@ label:
 ```
 
 ## Seeker
-Seeker networks predict where in the visual mesh an object is.
-The label takes a vector that is measured in camera space and for each point in the visual mesh predicts where in the mesh that object is as a relative offset.
+Seeker networks predict the location of an object in the visual mesh.
+The label consists of a vector to an object that is measured in camera space. 
+For each point in the visual mesh, it predicts a relative offset towards the measured object in the mesh.
 It is typically used with a `tanh` activation layer as the final layer of the network.
 
 ### Loss Function
 The loss function for the seeker network is made up of three components that are blended together in order to get an accurate result.
 For close (`<0.5`) points we do the mean squared error of our prediction and the target.
-For points that are between 0.5 and 0.75 we calculate the distance of the absolute values, thereby ensuring that the magnitude is correct but ignoring the sign.
-For the far points (`>=0.75`) we only check if the network has predicted them as having a distance of 0.75 or above.
-If so we calculate the loss as being 0, otherwise we push it to be the correct value.
+For points that are between 0.5 and 0.75, we calculate the distance of the absolute values, thereby ensuring that the magnitude is correct but ignoring the sign.
+For the far points (`>=0.75`), we only check if the network has predicted them as having a distance of 0.75 or above.
+If so, we calculate the loss as being 0, otherwise we push it to be the correct value.
 
 Once the object has gotten further than the receptive field of the network, it is impossible for it to predict where that object is.
 In this case, the direction that the network predicts is less important than the network describing the point as "far away".
