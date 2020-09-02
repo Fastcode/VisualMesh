@@ -31,18 +31,21 @@ if __name__ == "__main__":
     command = argparse.ArgumentParser(description="Utility for training a Visual Mesh network")
 
     command.add_argument("command", choices=["train", "test", "export"], action="store")
-    command.add_argument("config", action="store", help="Path to the configuration file for training")
-    command.add_argument(
-        "output_path", nargs="?", action="store", help="Output directory to store the logs and models",
-    )
+    command.add_argument("network_path", action="store", help="Path to the network folder")
+    command.add_argument("-c", "--config", help="Override for the configuration path, default is <network>/config.yaml")
 
     args = command.parse_args()
 
-    # Load our yaml file and convert it to an object
-    with open(args.config) as f:
-        config = yaml.safe_load(f)
+    network_path = args.network_path
+    config_path = args.config if args.config is not None else os.path.join(network_path, "config.yaml")
 
-    output_path = "output" if args.output_path is None else args.output_path
+    if not os.path.exists(config_path) or not os.path.isfile(config_path):
+        print("The configuration file {} does not exist".format(config_path))
+        exit(1)
+
+    # Load our yaml file and convert it to an object
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
 
     # Make all GPUs grow memory as needed
     gpus = tf.config.experimental.list_physical_devices("GPU")
@@ -55,10 +58,10 @@ if __name__ == "__main__":
 
     # Run the appropriate action
     if args.command == "train":
-        training.train(config, output_path)
+        training.train(config, network_path)
 
     elif args.command == "test":
-        testing.test(config, output_path)
+        testing.test(config, network_path)
 
     elif args.command == "export":
-        export.export(config, output_path)
+        export.export(config, network_path)
