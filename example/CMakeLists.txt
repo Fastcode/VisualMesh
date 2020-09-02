@@ -36,19 +36,16 @@ if(BUILD_EXAMPLES)
     if(OpenCV_FOUND)
         add_executable(classified "classified.cpp")
         target_compile_options(classified PRIVATE ${compile_options})
-        set_target_properties(classified PROPERTIES CXX_STANDARD 14)
         target_link_libraries(classified visualmesh ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES}
                               Threads::Threads)
 
         add_executable(mesh_types "mesh_types.cpp")
         target_compile_options(mesh_types PRIVATE ${compile_options})
-        set_target_properties(mesh_types PROPERTIES CXX_STANDARD 14)
         target_link_libraries(mesh_types visualmesh ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES}
                               Threads::Threads)
 
         add_executable(benchmark "benchmark.cpp")
         target_compile_options(benchmark PRIVATE ${compile_options})
-        set_target_properties(benchmark PROPERTIES CXX_STANDARD 14)
         target_include_directories(benchmark SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS} ${YAML_CPP_INCLUDE_DIR})
         target_link_libraries(benchmark visualmesh ${OpenCV_LIBS} ${fmt_LIBRARIES} ${YAML_CPP_LIBRARIES}
                               Threads::Threads)
@@ -56,7 +53,6 @@ if(BUILD_EXAMPLES)
 
     add_executable(mesh_quality "mesh_quality.cpp")
     target_compile_options(mesh_quality PRIVATE ${compile_options})
-    set_target_properties(mesh_quality PROPERTIES CXX_STANDARD 14)
     target_link_libraries(mesh_quality visualmesh)
 
 endif(BUILD_EXAMPLES)

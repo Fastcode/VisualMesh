@@ -17,7 +17,7 @@ from .example import Image
 from .label import Classification, Seeker
 from .orientation import Ground, Spotlight
 from .projection import VisualMesh
-from .view import Monoscopic, Stereoscopic
+from .view import Monoscopic
 from .visual_mesh_dataset import VisualMeshDataset
 
 
@@ -26,8 +26,6 @@ def Dataset(paths, batch_size, view, example, orientation, label, projection, ke
     # Find the correct class to handle our view
     if view["type"] == "Monoscopic":
         view = Monoscopic(**view["config"])
-    elif view["type"] == "Stereoscopic":
-        view = Stereoscopic(projection=projection, **view["config"])
     else:
         raise RuntimeError("Unknown view type '{}'".format(view["type"]))
 

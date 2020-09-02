@@ -18,4 +18,3 @@
 # and a merge function that will take the results from the individual stages and merge them into a single training example
 
 from .monoscopic import Monoscopic
-from .stereoscopic import Stereoscopic

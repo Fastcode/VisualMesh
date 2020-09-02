@@ -23,6 +23,7 @@ target_include_directories(visualmesh INTERFACE $<BUILD_INTERFACE:${CMAKE_CURREN
 target_include_directories(visualmesh INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
                                                 $<INSTALL_INTERFACE:include>)
 add_dependencies(visualmesh visualmesh_sources)
+target_compile_features(visualmesh INTERFACE cxx_std_14)
 
 # Find engine libraries so we can link to them
 option(BUILD_OPENCL_ENGINE "Should we build the OpenCL engine" ON)
