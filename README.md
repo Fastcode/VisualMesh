@@ -58,3 +58,13 @@ Each of these engines has a different requirement in order to build code using i
 For example, the OpenCL engine requires that you have an OpenCL implementation and appropriate drivers installed when you build and run the code.
 If you don't have these the code will still work, however you will not have access to those engines.
 For more information see the **[Inference Page](readme/inference.md)**
+
+## Contributing
+Contributions to this project are welcome via pull request.
+Style guides are enforced by clang-format for c++ and black for python.
+
+## Citing
+If you use the VisualMesh in your work, please cite it
+```
+Houliston T., Chalup S.K. (2019) Visual Mesh: Real-Time Object Detection Using Constant Sample Density. In: Holz D., Genter K., Saad M., von Stryk O. (eds) RoboCup 2018: Robot World Cup XXII. RoboCup 2018. Lecture Notes in Computer Science, vol 11374. Springer, Cham
+```
