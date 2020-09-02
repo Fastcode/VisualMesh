@@ -18,7 +18,7 @@ import pickle
 
 import tensorflow as tf
 
-from .callbacks import FindLearningRate, OneCycle
+from .callbacks import OneCycle
 from .dataset import keras_dataset
 from .flavour import Dataset, ImageCallback, Loss, Metrics
 from .model import VisualMeshModel
@@ -45,12 +45,9 @@ def train(config, output_path):
     if config["training"]["learning_rate"]["type"] == "static":
         learning_rate = float(config["training"]["learning_rate"]["value"])
         lr_callback = []
-    elif config["training"]["learning_rate"]["type"] == "find_lr":
-        learning_rate = float(config["training"]["learning_rate"]["min_lr"])
-        lr_callback = [FindLearningRate(config=config["training"]["learning_rate"], output_path=output_path)]
     elif config["training"]["learning_rate"]["type"] == "one_cycle":
         learning_rate = float(config["training"]["learning_rate"]["min_learning_rate"])
-        lr_callback = [OneCycle(config=config["training"]["learning_rate"])]
+        lr_callback = [OneCycle(config=config)]
 
     # Setup the optimiser
     if config["training"]["optimiser"]["type"] == "Adam":

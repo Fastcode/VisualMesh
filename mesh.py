@@ -24,13 +24,14 @@ import tensorflow as tf
 import training.testing as testing
 import training.training as training
 import training.export as export
+import training.find_lr as find_lr
 
 if __name__ == "__main__":
 
     # Parse our command line arguments
     command = argparse.ArgumentParser(description="Utility for training a Visual Mesh network")
 
-    command.add_argument("command", choices=["train", "test", "export"], action="store")
+    command.add_argument("command", choices=["train", "test", "export", "find_lr"], action="store")
     command.add_argument("network_path", action="store", help="Path to the network folder")
     command.add_argument("-c", "--config", help="Override for the configuration path, default is <network>/config.yaml")
 
@@ -65,3 +66,6 @@ if __name__ == "__main__":
 
     elif args.command == "export":
         export.export(config, network_path)
+
+    elif args.command == "find_lr":
+        find_lr.find_lr(config, network_path)

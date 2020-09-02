@@ -22,12 +22,6 @@ from .dataset import keras_dataset
 from .flavour import TestMetrics, Dataset, Loss, Metrics
 from .model import VisualMeshModel
 
-if True:
-    import matplotlib as mpl
-
-    mpl.use("Agg")
-    import matplotlib.pyplot as plt
-
 
 def test(config, output_path):
 
