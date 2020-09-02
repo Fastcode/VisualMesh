@@ -49,26 +49,28 @@ else()
     target_compile_definitions(visualmesh INTERFACE VISUALMESH_DISABLE_VULKAN)
 endif(BUILD_VULKAN_ENGINE)
 
+# Create the VisualMeshConfig files
+include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
-write_basic_package_version_file(
-    "${PROJECT_BINARY_DIR}/VisualMeshConfigVersion.cmake"
-    VERSION ${PACKAGE_VERSION}
-    COMPATIBILITY AnyNewerVersion)
-configure_package_config_file("${PROJECT_SOURCE_DIR}/cmake/VisualMeshConfig.cmake.in"
-                              "${PROJECT_BINARY_DIR}/VisualMeshConfig.cmake" INSTALL_DESTINATION lib/cmake/VisualMesh)
+set(INSTALL_INCLUDE_DIR ${CMAKE_INSTALL_FULL_INCLUDEDIR})
+write_basic_package_version_file(${PROJECT_BINARY_DIR}/VisualMeshConfigVersion.cmake COMPATIBILITY SameMajorVersion)
+configure_package_config_file(
+    ${PROJECT_SOURCE_DIR}/cmake/VisualMeshConfig.cmake.in ${PROJECT_BINARY_DIR}/VisualMeshConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/VisualMesh PATH_VARS INSTALL_INCLUDE_DIR)
 
+# Install version, config and target files.
+install(FILES "${PROJECT_BINARY_DIR}/VisualMeshConfigVersion.cmake" "${PROJECT_BINARY_DIR}/VisualMeshConfig.cmake"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/VisualMesh")
+install(
+    EXPORT VisualMeshTargets
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/VisualMesh"
+    NAMESPACE visualmesh::)
+
+# Install headers and targets
 install(
     TARGETS visualmesh
     EXPORT VisualMeshTargets
-    LIBRARY DESTINATION lib COMPONENT Runtime
-    ARCHIVE DESTINATION lib COMPONENT Development
-    RUNTIME DESTINATION bin COMPONENT Runtime
-    PUBLIC_HEADER DESTINATION include COMPONENT Development
-    BUNDLE DESTINATION bin COMPONENT Runtime)
-
-install(EXPORT VisualMeshTargets DESTINATION lib/cmake/VisualMesh)
-install(FILES "${PROJECT_BINARY_DIR}/VisualMeshConfigVersion.cmake" "${PROJECT_BINARY_DIR}/VisualMeshConfig.cmake"
-        DESTINATION lib/cmake/VisualMesh)
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/visualmesh"
     DESTINATION include
