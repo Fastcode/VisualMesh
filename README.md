@@ -61,7 +61,7 @@ For more information see the **[Inference Page](readme/inference.md)**
 
 ## Contributing
 Contributions to this project are welcome via pull request.
-Style guides are enforced by clang-format for c++ and black for python.
+Style guides are enforced by clang-format for C++ and black for Python.
 
 ## Citing
 If you use the VisualMesh in your work, please cite it
