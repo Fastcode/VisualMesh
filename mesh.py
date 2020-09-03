@@ -21,10 +21,10 @@ import os
 import yaml
 
 import tensorflow as tf
-import training.testing as testing
-import training.training as training
 import training.export as export
 import training.find_lr as find_lr
+import training.testing as testing
+import training.training as training
 
 if __name__ == "__main__":
 
