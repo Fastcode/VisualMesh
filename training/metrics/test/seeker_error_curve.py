@@ -13,10 +13,12 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import tensorflow as tf
 import math
-from .curve import Curve
+
+import tensorflow as tf
+
 from .bucket import x_bucket
+from .curve import Curve
 
 
 class SeekerErrorCurve(Curve):

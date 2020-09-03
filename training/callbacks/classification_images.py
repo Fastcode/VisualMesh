@@ -19,17 +19,13 @@ import os
 import warnings
 
 import cv2
+import matplotlib as mpl
 import numpy as np
 
 import tensorflow as tf
 
-# So isort doesn't mess up the mpl.use line
-if True:
-    import matplotlib as mpl
-
-    mpl.use("Agg")
-
-    import matplotlib.pyplot as plt
+mpl.use("Agg")
+import matplotlib.pyplot as plt  # isort:skip
 
 
 class ClassificationImages(tf.keras.callbacks.Callback):

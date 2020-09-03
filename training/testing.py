@@ -16,10 +16,11 @@
 import os
 
 import numpy as np
+
 import tensorflow as tf
 
 from .dataset import keras_dataset
-from .flavour import TestMetrics, Dataset, Loss, Metrics
+from .flavour import Dataset, Loss, Metrics, TestMetrics
 from .model import VisualMeshModel
 
 

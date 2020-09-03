@@ -15,15 +15,15 @@
 
 import os
 
+import matplotlib as mpl
 import numpy as np
+
 import tensorflow as tf
+
 from .bucket import curve_bucket
 
-if True:
-    import matplotlib as mpl
-
-    mpl.use("Agg")
-    import matplotlib.pyplot as plt
+mpl.use("Agg")
+import matplotlib.pyplot as plt  # isort:skip
 
 
 class Curve(tf.keras.metrics.Metric):

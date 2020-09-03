@@ -17,19 +17,18 @@ import math
 import os
 import pickle
 
+import matplotlib as mpl
 import numpy as np
-import tensorflow as tf
 from tqdm import tqdm
+
+import tensorflow as tf
 
 from .dataset import keras_dataset
 from .flavour import Dataset, Loss
 from .model import VisualMeshModel
 
-if True:
-    import matplotlib as mpl
-
-    mpl.use("Agg")
-    import matplotlib.pyplot as plt
+mpl.use("Agg")
+import matplotlib.pyplot as plt  # isort:skip
 
 
 class LRProgress(tf.keras.callbacks.Callback):

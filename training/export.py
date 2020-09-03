@@ -16,8 +16,9 @@
 import os
 
 import numpy as np
-import tensorflow as tf
 import yaml
+
+import tensorflow as tf
 
 from .dataset import keras_dataset
 from .flavour import Dataset

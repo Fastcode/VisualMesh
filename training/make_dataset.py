@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 
 import argparse
-import yaml
 import os
 import re
 import sys
-import numpy as np
 from glob import glob
 
-import tensorflow as tf
+import numpy as np
+import yaml
 from tqdm import tqdm
+
+import tensorflow as tf
 
 
 def float_feature(value):
