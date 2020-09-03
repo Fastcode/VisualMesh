@@ -28,15 +28,39 @@ import training.training as training
 
 if __name__ == "__main__":
 
-    # Parse our command line arguments
+    # Add command parsers
     command = argparse.ArgumentParser(description="Utility for training a Visual Mesh network")
+    subcommands = command.add_subparsers(
+        dest="command", help="The command to run from the script. See each help for more information."
+    )
 
-    command.add_argument("command", choices=["train", "test", "export", "find_lr"], action="store")
-    command.add_argument("network_path", action="store", help="Path to the network folder")
-    command.add_argument("-c", "--config", help="Override for the configuration path, default is <network>/config.yaml")
+    # List of commands
+    train_command = subcommands.add_parser("train")
+    test_command = subcommands.add_parser("test")
+    export_command = subcommands.add_parser("export")
+    find_lr_command = subcommands.add_parser("find_lr")
+
+    # Add common arguments
+    for c in [train_command, test_command, export_command, find_lr_command]:
+        c.add_argument("network_path", action="store", help="Path to the network folder")
+        c.add_argument(
+            "-c", "--config", help="Override for the configuration path, default is <output_path/config.yaml>"
+        )
+
+    # Find LR command
+    find_lr_command.add_argument("--min_lr", type=int, default=1e-6, help="The minimum learning rate to search from")
+    find_lr_command.add_argument("--max_lr", type=int, default=1e2, help="The maximum learning rate to search to")
+    find_lr_command.add_argument(
+        "--steps",
+        type=int,
+        default=10000,
+        help="The number of steps to take while searching from the minimum to maximum learning rate",
+    )
+    find_lr_command.add_argument(
+        "--window_size", type=int, default=250, help="The size of the averaging window used for smoothing the loss"
+    )
 
     args = command.parse_args()
-
     network_path = args.network_path
     config_path = args.config if args.config is not None else os.path.join(network_path, "config.yaml")
 
@@ -68,4 +92,4 @@ if __name__ == "__main__":
         export.export(config, network_path)
 
     elif args.command == "find_lr":
-        find_lr.find_lr(config, network_path)
+        find_lr.find_lr(config, network_path, args.min_lr, args.max_lr, args.steps, args.window_size)

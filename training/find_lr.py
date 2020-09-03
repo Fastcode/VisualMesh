@@ -83,7 +83,7 @@ class LRProgress(tf.keras.callbacks.Callback):
 
 
 # Find valid learning rates for
-def find_lr(config, output_path):
+def find_lr(config, output_path, min_lr, max_lr, n_steps, window_size):
 
     # Open the training dataset and put it on repeat
     training_dataset = Dataset(config, "validation").map(keras_dataset).repeat()
@@ -93,12 +93,6 @@ def find_lr(config, output_path):
 
     # Define the model
     model = VisualMeshModel(structure=config["network"]["structure"], output_dims=output_dims)
-
-    # The max and min lr that we will be searching from
-    min_lr = 1e-6
-    max_lr = 1e2
-    n_steps = 10000
-    average_window = 250
 
     def lr_schedule(epoch, lr):
         return min_lr * (max_lr / min_lr) ** (epoch / n_steps)
@@ -140,14 +134,14 @@ def find_lr(config, output_path):
     lr = np.array(history.history["lr"][:-1])
 
     # Make a smoothed version of the loss
-    smooth_loss = np.convolve(loss, np.ones(average_window), "same") / np.convolve(
-        np.ones_like(loss), np.ones(average_window), "same"
+    smooth_loss = np.convolve(loss, np.ones(window_size), "same") / np.convolve(
+        np.ones_like(loss), np.ones(window_size), "same"
     )
 
     # Find the point where the loss goes statistically off for the first time
     # We then add half our average window since that is where the spike actually starts
     delta = np.log10(smooth_loss)[1:] - np.log10(smooth_loss)[:-1]
-    exploding = (average_window // 2) + np.argmax(delta > 3.0 * np.std(delta))
+    exploding = (window_size // 2) + np.argmax(delta > 3.0 * np.std(delta))
 
     # Work out the suggested maximum learning rate
     suggested_max = lr[exploding] / 10
