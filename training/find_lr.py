@@ -45,6 +45,7 @@ class LRProgress(tf.keras.callbacks.Callback):
         # Progress bar settings
         self.n_history = 20
         self.lr_progress = None
+        self.loss_title = None
         self.loss_progress = None
 
     def on_epoch_end(self, epoch, logs=None):
@@ -60,10 +61,11 @@ class LRProgress(tf.keras.callbacks.Callback):
         if self.lr_progress is None:
             self.lr_progress = tqdm(total=self.n_steps, dynamic_ncols=True)
         self.lr_progress.update()
-        self.lr_progress.set_description("LR:   {:.1e}".format(self.model.optimizer.lr.numpy()))
+        self.lr_progress.set_description("LR:   {:.3e}".format(self.model.optimizer.lr.numpy()))
 
         # Create our series of moving loss graphs
         if self.loss_progress is None:
+            self.loss_title = tqdm(bar_format="{desc}", desc="Loss Graph")
             self.loss_progress = [
                 tqdm(bar_format="{desc}|{bar}|", total=self.losses[-1], dynamic_ncols=True,)
                 for i in range(self.n_history)
@@ -77,7 +79,7 @@ class LRProgress(tf.keras.callbacks.Callback):
         for bar, loss in zip(self.loss_progress[valid_i:], self.losses[valid_i:]):
             bar.total = loss_max
             bar.n = loss
-            bar.set_description("{:.1e}".format(math.expm1(loss)))
+            bar.set_description("{:.3e}".format(math.expm1(loss)))
 
 
 # Find valid learning rates for
@@ -145,7 +147,7 @@ def find_lr(config, output_path):
     # Find the point where the loss goes statistically off for the first time
     # We then add half our average window since that is where the spike actually starts
     delta = np.log10(smooth_loss)[1:] - np.log10(smooth_loss)[:-1]
-    exploding = (average_window // 2) + np.where(delta > 3.0 * np.std(delta))[0][0]
+    exploding = (average_window // 2) + np.argmax(delta > 3.0 * np.std(delta))
 
     # Work out the suggested maximum learning rate
     suggested_max = lr[exploding] / 10
