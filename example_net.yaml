@@ -104,32 +104,19 @@ network:
   # This variable name if placed anywhere in the structure options will be replaced with the integer number of outputs
   # the dataset will produce
   structure:
-    g1: { op: GraphConvolution, inputs: [X, G] }
-    d1: { op: Dense, inputs: [g1], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g2: { op: GraphConvolution, inputs: [d1, G] }
-    d2: { op: Dense, inputs: [g2], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g3: { op: GraphConvolution, inputs: [d2, G] }
-    d3: { op: Dense, inputs: [g3], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g4: { op: GraphConvolution, inputs: [d3, G] }
-    d4: { op: Dense, inputs: [g4], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g5: { op: GraphConvolution, inputs: [d4, G] }
-    d5: { op: Dense, inputs: [g5], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g6: { op: GraphConvolution, inputs: [d5, G] }
-    d6: { op: Dense, inputs: [g6], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g7: { op: GraphConvolution, inputs: [d6, G] }
-    d7: { op: Dense, inputs: [g7], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
-    g8: { op: GraphConvolution, inputs: [d7, G] }
-    d8: { op: Dense, inputs: [g8], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
-    g9: { op: GraphConvolution, inputs: [d8, G] }
-    d9: { op: Dense, inputs: [g9], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
-    g10: { op: GraphConvolution, inputs: [d9, G] }
-    d10: { op: Dense, inputs: [g10], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
-    g11: { op: GraphConvolution, inputs: [d10, G] }
-    d11: { op: Dense, inputs: [g11], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
-    g12: { op: GraphConvolution, inputs: [d11, G] }
-    d12: { op: Dense, inputs: [g12], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
-    g13: { op: GraphConvolution, inputs: [d12, G] }
-    output: { op: Dense, inputs: [g13], options: { units: $output_dims, activation: softmax } }
+    l1: { op: GraphConvolution, inputs: [X, G], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    l2: { op: GraphConvolution, inputs: [l1, G], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    l3: { op: GraphConvolution, inputs: [l2, G], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    l4: { op: GraphConvolution, inputs: [l3, G], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    l5: { op: GraphConvolution, inputs: [l4, G], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    l6: { op: GraphConvolution, inputs: [l5, G], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    l7: { op: GraphConvolution, inputs: [l6, G], options: { units: 16, activation: selu, kernel_initializer: lecun_normal } }
+    l8: { op: GraphConvolution, inputs: [l7, G], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
+    l9: { op: GraphConvolution, inputs: [l8, G], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
+    l10: { op: GraphConvolution, inputs: [l9, G], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
+    l11: { op: GraphConvolution, inputs: [l10, G], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
+    l12: { op: GraphConvolution, inputs: [l11, G], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
+    l13: { op: GraphConvolution, inputs: [l12, G], options: { units: $output_dims, activation: softmax } }
 
 # Testing
 testing:

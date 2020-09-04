@@ -14,3 +14,4 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from .graph_convolution import GraphConvolution
+from .depthwise_seperable_graph_convolution import DepthwiseSeparableGraphConvolution

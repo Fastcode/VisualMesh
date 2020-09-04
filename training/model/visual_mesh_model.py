@@ -14,7 +14,7 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import tensorflow as tf
-from training.layer import GraphConvolution
+from training.layer import GraphConvolution, DepthwiseSeparableGraphConvolution
 
 
 class VisualMeshModel(tf.keras.Model):
@@ -40,6 +40,8 @@ class VisualMeshModel(tf.keras.Model):
 
         if op == "GraphConvolution":
             return GraphConvolution(**options)
+        elif op == "DepthwiseSeparableGraphConvolution":
+            return DepthwiseSeparableGraphConvolution(**options)
         elif hasattr(tf.keras.layers, op):
             return getattr(tf.keras.layers, op)(**options)
         else:

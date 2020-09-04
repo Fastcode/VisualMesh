@@ -16,11 +16,32 @@
 import tensorflow as tf
 
 
-class GraphConvolution(tf.keras.layers.Layer):
+class Depthwise(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
-        super(GraphConvolution, self).__init__()
-        self.dense = tf.keras.layers.Dense(**kwargs)
+        super(Depthwise, self).__init__()
+        self.pointwise = tf.keras.layers.Dense(**kwargs)
+
+    def build(self, input_shape):
+        # Copy whatever we have on our pointwise kernel
+        self.depthwise_weights = self.add_weight(
+            "depthwise_kernel",
+            input_shape[1:],
+            dtype=self.dtype,
+            initializer=self.pointwise.kernel_initializer,
+            regularizer=self.pointwise.kernel_regularizer,
+            constraint=self.pointwise.kernel_constraint,
+        )
+
+    def call(self, X):
+        depthwise = tf.einsum("ijk,jk->ik", X, self.depthwise_weights)
+        return self.pointwise(depthwise)
+
+
+class DepthwiseSeparableGraphConvolution(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(DepthwiseSeparableGraphConvolution, self).__init__()
+        self.depthwise = Depthwise(**kwargs)
 
     def call(self, X, G):
-        # Call the dense layer with the gathered data
-        return self.dense(tf.reshape(tf.gather(X, G, name="NetworkGather"), shape=[-1, X.shape[-1] * G.shape[-1]]))
+        convolved = tf.reshape(tf.gather(X, G, name="NetworkGather"), shape=[-1, G.shape[-1], X.shape[-1]])
+        return self.depthwise(convolved)
