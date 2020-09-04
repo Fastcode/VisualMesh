@@ -91,4 +91,4 @@ def export(config, output_path):
     stages[0][0]["weights"] = first.numpy().tolist()
 
     with open(os.path.join(output_path, "model.yaml"), "w") as out:
-        yaml.dump(stages, out, default_flow_style=None, width=1000000)
+        yaml.dump(stages, out, default_flow_style=None, width=float("inf"))
