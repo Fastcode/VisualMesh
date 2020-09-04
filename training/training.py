@@ -47,7 +47,7 @@ def train(config, output_path):
         lr_callback = []
     elif config["training"]["learning_rate"]["type"] == "one_cycle":
         learning_rate = float(config["training"]["learning_rate"]["min_learning_rate"])
-        lr_callback = [OneCycle(config=config)]
+        lr_callback = [OneCycle(config=config, verbose=True)]
 
     # Setup the optimiser
     if config["training"]["optimiser"]["type"] == "Adam":
