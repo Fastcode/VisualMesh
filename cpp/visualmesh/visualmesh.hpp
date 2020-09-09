@@ -141,8 +141,8 @@ public:
      *
      * @return the mesh that was used for this lookup and a vector of start/end indices that are on the screen.
      */
-    std::pair<const Mesh<Scalar, Model>&, std::vector<std::pair<uint, uint>>> lookup(const mat4<Scalar>& Hoc,
-                                                                                     const Lens<Scalar>& lens) const {
+    std::pair<const Mesh<Scalar, Model>&, std::vector<std::pair<int, int>>> lookup(const mat4<Scalar>& Hoc,
+                                                                                   const Lens<Scalar>& lens) const {
 
         // z height from the transformation matrix
         const Scalar& h = Hoc[2][3];
