@@ -14,9 +14,9 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-import pickle
 
 import tensorflow as tf
+import yaml
 
 from .callbacks import OneCycle
 from .dataset import keras_dataset
@@ -103,5 +103,5 @@ def train(config, output_path):
     )
 
     # Pickle the history object
-    with open(os.path.join(output_path, "history.pkl"), "wb") as f:
-        pickle.dump(history, f)
+    with open(os.path.join(output_path, "history.yaml"), "w") as out:
+        yaml.dump(history.history, out, default_flow_style=None, width=float("inf"))
