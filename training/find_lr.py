@@ -86,7 +86,7 @@ class LRProgress(tf.keras.callbacks.Callback):
 def find_lr(config, output_path, min_lr, max_lr, n_steps, window_size):
 
     # Open the training dataset and put it on repeat
-    training_dataset = Dataset(config, "validation").map(keras_dataset).repeat()
+    training_dataset = Dataset(config, "training").map(keras_dataset).repeat()
 
     # Get the dimensionality of the Y part of the dataset
     output_dims = training_dataset.element_spec[1].shape[1]
