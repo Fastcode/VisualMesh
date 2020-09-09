@@ -116,7 +116,7 @@ network:
     l10: { op: GraphConvolution, inputs: [l9, G], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
     l11: { op: GraphConvolution, inputs: [l10, G], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
     l12: { op: GraphConvolution, inputs: [l11, G], options: { units: 8, activation: selu, kernel_initializer: lecun_normal } }
-    l13: { op: GraphConvolution, inputs: [l12, G], options: { units: $output_dims, activation: softmax } }
+    output: { op: GraphConvolution, inputs: [l12, G], options: { units: $output_dims, activation: softmax, kernel_initializer: lecun_normal } }
 
 # Testing
 testing:
