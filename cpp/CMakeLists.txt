@@ -35,6 +35,8 @@ if(BUILD_OPENCL_ENGINE)
     else()
         target_compile_definitions(visualmesh INTERFACE VISUALMESH_DISABLE_OPENCL)
     endif(OpenCL_FOUND)
+else()
+    target_compile_definitions(visualmesh INTERFACE VISUALMESH_DISABLE_OPENCL)
 endif(BUILD_OPENCL_ENGINE)
 
 option(BUILD_VULKAN_ENGINE "Should we build the Vulkan engine" OFF)
@@ -56,8 +58,9 @@ include(CMakePackageConfigHelpers)
 set(INSTALL_INCLUDE_DIR ${CMAKE_INSTALL_FULL_INCLUDEDIR})
 write_basic_package_version_file(${PROJECT_BINARY_DIR}/VisualMeshConfigVersion.cmake COMPATIBILITY SameMajorVersion)
 configure_package_config_file(
-    ${PROJECT_SOURCE_DIR}/cmake/VisualMeshConfig.cmake.in ${PROJECT_BINARY_DIR}/VisualMeshConfig.cmake
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/VisualMesh PATH_VARS INSTALL_INCLUDE_DIR)
+    "${PROJECT_SOURCE_DIR}/cmake/VisualMeshConfig.cmake.in" "${PROJECT_BINARY_DIR}/VisualMeshConfig.cmake"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/VisualMesh"
+    PATH_VARS INSTALL_INCLUDE_DIR)
 
 # Install version, config and target files.
 install(FILES "${PROJECT_BINARY_DIR}/VisualMeshConfigVersion.cmake" "${PROJECT_BINARY_DIR}/VisualMeshConfig.cmake"
