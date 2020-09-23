@@ -19,9 +19,11 @@
 #include <tensorflow/core/framework/op_kernel.h>
 #include <tensorflow/core/framework/shape_inference.h>
 
-#include <memory>
+#include <cmath>
+#include <functional>
 
 #include "model_op_base.hpp"
+#include "visualmesh/utility/math.hpp"
 
 enum Args {
     COORDINATES_A = 0,

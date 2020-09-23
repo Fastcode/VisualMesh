@@ -19,11 +19,20 @@
 #include <tensorflow/core/framework/op_kernel.h>
 #include <tensorflow/core/framework/shape_inference.h>
 
+#include <array>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <map>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "mesh_cache.hpp"
 #include "model_op_base.hpp"
+#include "visualmesh/lens.hpp"
 #include "visualmesh/mesh.hpp"
+#include "visualmesh/utility/math.hpp"
 
 enum Args {
     DIMENSIONS             = 0,

@@ -15,12 +15,16 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <array>
+#include <cmath>
+#include <cstdint>
 #include <iomanip>
 #include <iostream>
+#include <limits>
+#include <map>
+#include <string>
+#include <vector>
 
-#include "ArrayPrint.hpp"
-#include "Timer.hpp"
-//
 #include "visualmesh/geometry/Circle.hpp"
 #include "visualmesh/geometry/Sphere.hpp"
 #include "visualmesh/mesh.hpp"

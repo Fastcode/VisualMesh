@@ -15,6 +15,13 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <array>
+#include <map>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <string>
+#include <vector>
+
 #include "Timer.hpp"
 #include "dataset.hpp"
 #include "draw.hpp"

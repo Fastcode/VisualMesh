@@ -15,7 +15,14 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <array>
+#include <chrono>
+#include <iostream>
+#include <map>
+#include <string>
 #include <thread>
+#include <type_traits>
+#include <vector>
 
 #include "Timer.hpp"
 #include "dataset.hpp"
@@ -26,6 +33,7 @@
 #include "visualmesh/geometry/Sphere.hpp"
 #include "visualmesh/model/ring6.hpp"
 #include "visualmesh/network_structure.hpp"
+#include "visualmesh/utility/fourcc.hpp"
 #include "visualmesh/visualmesh.hpp"
 
 using Scalar = float;

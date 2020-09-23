@@ -18,6 +18,8 @@
 #ifndef VISUALMESH_NETWORKSTRUCTURE_HPP
 #define VISUALMESH_NETWORKSTRUCTURE_HPP
 
+#include <vector>
+
 namespace visualmesh {
 
 /// Weights are a matrix (vector of vectors)

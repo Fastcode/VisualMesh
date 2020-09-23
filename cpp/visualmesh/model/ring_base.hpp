@@ -19,10 +19,12 @@
 #define VISUALMESH_MODEL_RING_BASE_HPP
 
 #include <array>
+#include <cmath>
 #include <vector>
 
 #include "polar_map.hpp"
 #include "visualmesh/node.hpp"
+#include "visualmesh/utility/math.hpp"
 
 namespace visualmesh {
 namespace model {

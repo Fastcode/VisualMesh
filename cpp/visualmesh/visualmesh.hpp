@@ -18,13 +18,16 @@
 #ifndef VISUALMESH_HPP
 #define VISUALMESH_HPP
 
-#include <algorithm>
+#include <cmath>
+#include <iterator>
 #include <map>
-#include <memory>
+#include <utility>
 #include <vector>
 
+#include "visualmesh/lens.hpp"
 #include "visualmesh/mesh.hpp"
 #include "visualmesh/model/ring6.hpp"
+#include "visualmesh/utility/math.hpp"
 
 namespace visualmesh {
 
