@@ -57,7 +57,6 @@ class Seeker:
         best_idx = tf.stack(
             [tf.math.argmin(squared_diff, axis=0, output_type=tf.int32), tf.range(n_nodes, dtype=tf.int32)], axis=1
         )
-        distance = tf.math.divide(tf.gather_nd(diff, best_idx), self.scale)
 
         # Divide distance by scale so a value from 0->scale becomes 0->1
         distance = tf.math.divide(tf.gather_nd(diff, best_idx), self.scale)

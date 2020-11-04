@@ -15,19 +15,14 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <dirent.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <yaml-cpp/yaml.h>
-
-#include <algorithm>
-#include <fstream>
+#include <array>
 #include <iostream>
+#include <map>
 #include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
 #include <string>
-#include <system_error>
+#include <vector>
 
-#include "ArrayPrint.hpp"
 #include "Timer.hpp"
 #include "dataset.hpp"
 #include "draw.hpp"
@@ -36,7 +31,7 @@
 #include "visualmesh/engine/opencl/engine.hpp"
 #include "visualmesh/engine/vulkan/engine.hpp"
 #include "visualmesh/geometry/Sphere.hpp"
-#include "visualmesh/network_structure.hpp"
+#include "visualmesh/model/ring6.hpp"
 #include "visualmesh/utility/fourcc.hpp"
 #include "visualmesh/visualmesh.hpp"
 

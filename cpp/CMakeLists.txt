@@ -1,5 +1,5 @@
 # All the header files for this library
-file(GLOB hdr "**.hpp")
+file(GLOB hdr "**/*.hpp")
 
 # Convert our opencl files into header files with their contents and put them in the build folder
 file(GLOB cls "visualmesh/engine/opencl/kernels/**.cl")
@@ -60,8 +60,7 @@ set(INSTALL_INCLUDE_DIR ${CMAKE_INSTALL_FULL_INCLUDEDIR})
 write_basic_package_version_file(${PROJECT_BINARY_DIR}/VisualMeshConfigVersion.cmake COMPATIBILITY SameMajorVersion)
 configure_package_config_file(
     "${PROJECT_SOURCE_DIR}/cmake/VisualMeshConfig.cmake.in" "${PROJECT_BINARY_DIR}/VisualMeshConfig.cmake"
-    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/VisualMesh"
-    PATH_VARS INSTALL_INCLUDE_DIR)
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/VisualMesh" PATH_VARS INSTALL_INCLUDE_DIR)
 
 # Install version, config and target files.
 install(FILES "${PROJECT_BINARY_DIR}/VisualMeshConfigVersion.cmake" "${PROJECT_BINARY_DIR}/VisualMeshConfig.cmake"
