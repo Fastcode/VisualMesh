@@ -50,7 +50,7 @@ namespace equisolid {
 namespace rectilinear {
     template <typename Scalar>
     inline Scalar r(const Scalar& theta, const Scalar& f) {
-        return f * std::tan(theta);
+        return f * std::tan(std::min(std::max(theta, Scalar(0.0)), Scalar(M_PI_2)));
     }
 
     template <typename Scalar>

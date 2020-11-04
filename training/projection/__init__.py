@@ -1,3 +1,5 @@
+import math
+
 import tensorflow as tf
 
 
@@ -26,7 +28,7 @@ def _equidistant_r(theta, f):
 
 
 def _rectilinear_r(theta, f):
-    return f * tf.math.tan(theta)
+    return f * tf.math.tan(tf.clip_by_value(theta, 0.0, math.pi * 0.5))
 
 
 def _equisolid_r(theta, f):

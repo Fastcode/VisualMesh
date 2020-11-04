@@ -15,6 +15,10 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifndef M_PI_2
+#define M_PI_2 1.57079632679489661923132169163975144
+#endif
+
 /**
  * Projects visual mesh points to a rectilinear camera
  *
@@ -52,7 +56,7 @@ kernel void project_rectilinear(global const Scalar4* points,
     // Calculate some intermediates
     const Scalar theta      = acos(ray.x);
     const Scalar rsin_theta = rsqrt((Scalar)(1.0) - ray.x * ray.x);
-    const Scalar r_u        = f * tan(theta);
+    const Scalar r_u        = f * tan(clamp(theta, 0.0, M_PI_2));
     const Scalar r_d        = r_u
                        * (1.0                                                                  //
                           + k.x * (r_u * r_u)                                                  //
