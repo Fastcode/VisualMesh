@@ -503,14 +503,8 @@ namespace engine {
                 }
 
                 // Create buffers for indices map
-                cl::mem indices_map(
-                  ::clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(cl_int) * points, nullptr, &error),
-                  ::clReleaseMemObject);
-                throw_cl_error(error, "Error allocating indices_map buffer");
-                cl::mem pixel_coordinates(
-                  ::clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(std::array<Scalar, 2>) * points, nullptr, &error),
-                  ::clReleaseMemObject);
-                throw_cl_error(error, "Error allocating pixel_coordinates buffer");
+                cl::mem indices_map       = get_indices_map_memory(points);
+                cl::mem pixel_coordinates = get_pixel_coordinates_memory(points);
 
                 // Upload our indices map
                 cl::event indices_event;
@@ -598,6 +592,33 @@ namespace engine {
                                        projected);                      // GPU event
             }
 
+            cl::mem get_indices_map_memory(const int& max_size) const {
+
+                if (indices_map_memory.max_size < max_size) {
+                    cl_int error;
+                    indices_map_memory.memory =
+                      cl::mem(::clCreateBuffer(context, CL_MEM_READ_WRITE, max_size * sizeof(int), nullptr, &error),
+                              ::clReleaseMemObject);
+                    throw_cl_error(error, "Error allocating indices map buffer on device");
+                    indices_map_memory.max_size = max_size;
+                }
+                return indices_map_memory.memory;
+            }
+
+            cl::mem get_pixel_coordinates_memory(const int& max_size) const {
+
+                if (pixel_coordinates_memory.max_size < max_size) {
+                    cl_int error;
+                    pixel_coordinates_memory.memory =
+                      cl::mem(::clCreateBuffer(
+                                context, CL_MEM_READ_WRITE, max_size * sizeof(std::array<Scalar, 2>), nullptr, &error),
+                              ::clReleaseMemObject);
+                    throw_cl_error(error, "Error allocating pixel coordinates buffer on device");
+                    pixel_coordinates_memory.max_size = max_size;
+                }
+                return pixel_coordinates_memory.memory;
+            }
+
             cl::mem get_image_memory(vec2<int> dimensions, uint32_t format) const {
 
                 // If our dimensions and format haven't changed from last time we can reuse the same memory location
@@ -681,6 +702,16 @@ namespace engine {
             cl::kernel load_image;
             /// A list of kernels to run in sequence to run the network
             std::vector<std::pair<cl::kernel, size_t>> conv_layers;
+
+            mutable struct {
+                int max_size = 0;
+                cl::mem memory;
+            } indices_map_memory;
+
+            mutable struct {
+                int max_size = 0;
+                cl::mem memory;
+            } pixel_coordinates_memory;
 
             mutable struct {
                 vec2<int> dimensions = {0, 0};
