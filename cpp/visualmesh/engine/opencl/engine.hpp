@@ -136,6 +136,24 @@ namespace engine {
                 for (const auto& k : conv_layers) {
                     max_width = std::max(max_width, k.second);
                 }
+
+                // Function to get the preferred workgroup size for a kernel
+                auto workgroup_size_for_kernel = [&device](auto k) {
+                    size_t t = 0;
+                    ::clGetKernelWorkGroupInfo(
+                      k, device, CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE, sizeof(t), &t, nullptr);
+                    return t;
+                };
+
+                // Go through each of our kernels and see which is the largest preferred size
+                workgroup_size = 1;
+                workgroup_size = std::max(workgroup_size, workgroup_size_for_kernel(project_rectilinear));
+                workgroup_size = std::max(workgroup_size, workgroup_size_for_kernel(project_equisolid));
+                workgroup_size = std::max(workgroup_size, workgroup_size_for_kernel(project_equidistant));
+                workgroup_size = std::max(workgroup_size, workgroup_size_for_kernel(load_image));
+                for (const auto& k : conv_layers) {
+                    workgroup_size = std::max(workgroup_size, workgroup_size_for_kernel(k.first));
+                }
             }
 
             /**
@@ -251,7 +269,7 @@ namespace engine {
                 int n_points = neighbourhood.size();
 
                 // Get the neighbourhood memory from cache
-                cl::mem cl_neighbourhood = get_neighbourhood_memory(n_points * N_NEIGHBOURS);
+                cl::mem cl_neighbourhood = get_neighbourhood_memory(n_points, N_NEIGHBOURS);
 
                 // Upload the neighbourhood buffer
                 cl::event cl_neighbourhood_loaded;
@@ -273,22 +291,6 @@ namespace engine {
                 cl::mem cl_conv_input  = cl_conv_buffers[0];
                 cl::mem cl_conv_output = cl_conv_buffers[1];
 
-                // The offscreen point gets a value of -1.0 to make it easy to distinguish
-                cl::event offscreen_fill_event;
-                Scalar minus_one(-1.0);
-                ev    = nullptr;
-                error = ::clEnqueueFillBuffer(queue,
-                                              cl_conv_input,
-                                              &minus_one,
-                                              sizeof(Scalar),
-                                              (n_points - 1) * sizeof(std::array<Scalar, 4>),
-                                              sizeof(std::array<Scalar, 4>),
-                                              0,
-                                              nullptr,
-                                              &ev);
-                if (ev) offscreen_fill_event = cl::event(ev, ::clReleaseEvent);
-                throw_cl_error(error, "Error setting the offscreen pixel values");
-
                 // Read the pixels into the buffer
                 cl::event img_load_event;
                 cl::event network_complete;
@@ -306,14 +308,33 @@ namespace engine {
                 error = ::clSetKernelArg(load_image, 3, sizeof(arg), &arg);
                 throw_cl_error(error, "Error setting kernel argument 3 for image load kernel");
 
+                // When calculating global_size we round to the nearest workgroup size
                 size_t offset[1]       = {0};
-                size_t global_size[1]  = {size_t(n_points - 1)};  // -1 as we don't project the offscreen point
+                size_t global_size[1]  = {(((n_points - 1) / workgroup_size) + 1) * workgroup_size};
                 cl_event event_list[2] = {cl_pixels_loaded, cl_image_loaded};
                 ev                     = nullptr;
-                error =
-                  ::clEnqueueNDRangeKernel(queue, load_image, 1, offset, global_size, nullptr, 2, event_list, &ev);
+                error                  = ::clEnqueueNDRangeKernel(
+                  queue, load_image, 1, offset, global_size, &workgroup_size, 2, event_list, &ev);
                 if (ev) img_load_event = cl::event(ev, ::clReleaseEvent);
                 throw_cl_error(error, "Error queueing the image load kernel");
+
+                // The offscreen point gets a value of -1.0 to make it easy to distinguish
+                std::array<cl_event, 1> img_loaded_events = {img_load_event};
+                cl::event offscreen_fill_event;
+                Scalar minus_one(-1.0);
+                ev    = nullptr;
+                error = ::clEnqueueFillBuffer(queue,
+                                              cl_conv_input,
+                                              &minus_one,
+                                              sizeof(Scalar),
+                                              (n_points - 1) * sizeof(std::array<Scalar, 4>),
+                                              sizeof(std::array<Scalar, 4>),
+                                              1,
+                                              img_loaded_events.data(),
+                                              &ev);
+                if (ev) offscreen_fill_event = cl::event(ev, ::clReleaseEvent);
+                throw_cl_error(error, "Error setting the offscreen pixel values");
+
 
                 // These events are required for our first convolution
                 std::vector<cl::event> events({img_load_event, offscreen_fill_event, cl_neighbourhood_loaded});
@@ -330,13 +351,21 @@ namespace engine {
                     error = ::clSetKernelArg(conv.first, 2, sizeof(arg), &arg);
                     throw_cl_error(error, "Error setting argument 2 for convolution kernel");
 
+                    // When calculating global_size we round to the nearest workgroup size
                     size_t offset[1]      = {0};
-                    size_t global_size[1] = {size_t(n_points)};
+                    size_t global_size[1] = {(((n_points - 1) / workgroup_size) + 1) * workgroup_size};
                     cl::event event;
                     ev = nullptr;
                     std::vector<cl_event> cl_events(events.begin(), events.end());
-                    error = ::clEnqueueNDRangeKernel(
-                      queue, conv.first, 1, offset, global_size, nullptr, cl_events.size(), cl_events.data(), &ev);
+                    error = ::clEnqueueNDRangeKernel(queue,
+                                                     conv.first,
+                                                     1,
+                                                     offset,
+                                                     global_size,
+                                                     &workgroup_size,
+                                                     cl_events.size(),
+                                                     cl_events.data(),
+                                                     &ev);
                     if (ev) event = cl::event(ev, ::clReleaseEvent);
                     throw_cl_error(error, "Error queueing convolution kernel");
 
@@ -416,13 +445,17 @@ namespace engine {
 
             void clear_cache() {
                 device_points_cache.clear();
-                image_memory.memory           = nullptr;
-                image_memory.dimensions       = {0, 0};
-                image_memory.format           = 0;
-                neighbourhood_memory.memory   = nullptr;
-                neighbourhood_memory.max_size = 0;
-                network_memory.memory         = {nullptr, nullptr};
-                network_memory.max_size       = 0;
+                indices_map_memory.memory         = nullptr;
+                indices_map_memory.n_points       = 0;
+                pixel_coordinates_memory.memory   = nullptr;
+                pixel_coordinates_memory.n_points = 0;
+                neighbourhood_memory.memory       = nullptr;
+                neighbourhood_memory.n_points     = 0;
+                network_memory.memory             = {nullptr, nullptr};
+                network_memory.n_points           = 0;
+                image_memory.memory               = nullptr;
+                image_memory.dimensions           = {0, 0};
+                image_memory.format               = 0;
             }
 
         private:
@@ -481,20 +514,20 @@ namespace engine {
                 }
 
                 // First count the size of the buffer we will need to allocate
-                int points = 0;
+                int n_points = 0;
                 for (const auto& range : ranges) {
-                    points += range.second - range.first;
+                    n_points += range.second - range.first;
                 }
 
                 // No point processing if we have no points, return an empty mesh
-                if (points == 0) {
+                if (n_points == 0) {
                     return std::make_tuple(
                       std::vector<std::array<int, N_NEIGHBOURS>>(), std::vector<int>(), cl::mem(), cl::event());
                 }
 
                 // Build up our list of indices for OpenCL
                 // Use iota to fill in the numbers
-                std::vector<int> indices(points);
+                std::vector<int> indices(n_points);
                 auto it = indices.begin();
                 for (const auto& range : ranges) {
                     auto n = std::next(it, range.second - range.first);
@@ -503,8 +536,8 @@ namespace engine {
                 }
 
                 // Create buffers for indices map
-                cl::mem indices_map       = get_indices_map_memory(points);
-                cl::mem pixel_coordinates = get_pixel_coordinates_memory(points);
+                cl::mem indices_map       = get_indices_map_memory(n_points);
+                cl::mem pixel_coordinates = get_pixel_coordinates_memory(n_points);
 
                 // Upload our indices map
                 cl::event indices_event;
@@ -552,24 +585,25 @@ namespace engine {
                 throw_cl_error(error, "Error setting kernel argument 7 for projection kernel");
 
                 // Project!
+                // When calculating global_size we round to the nearest workgroup size
                 size_t offset[1]      = {0};
-                size_t global_size[1] = {size_t(points)};
+                size_t global_size[1] = {(((n_points - 1) / workgroup_size) + 1) * workgroup_size};
                 ev                    = nullptr;
                 cl_event iev          = indices_event;
-                error =
-                  ::clEnqueueNDRangeKernel(queue, projection_kernel, 1, offset, global_size, nullptr, 1, &iev, &ev);
+                error                 = ::clEnqueueNDRangeKernel(
+                  queue, projection_kernel, 1, offset, global_size, &workgroup_size, 1, &iev, &ev);
                 if (ev) projected = cl::event(ev, ::clReleaseEvent);
                 throw_cl_error(error, "Error queueing the projection kernel");
 
                 // This can happen on the CPU while the OpenCL device is busy
                 // Build the reverse lookup map where the offscreen point is one past the end
-                std::vector<int> r_indices(nodes.size() + 1, points);
+                std::vector<int> r_indices(nodes.size() + 1, n_points);
                 for (unsigned int i = 0; i < indices.size(); ++i) {
                     r_indices[indices[i]] = i;
                 }
 
                 // Build the packed neighbourhood map with an extra offscreen point at the end
-                std::vector<std::array<int, N_NEIGHBOURS>> local_neighbourhood(points + 1);
+                std::vector<std::array<int, N_NEIGHBOURS>> local_neighbourhood(n_points + 1);
                 for (unsigned int i = 0; i < indices.size(); ++i) {
                     const auto& node = nodes[indices[i]];
                     for (unsigned int j = 0; j < node.neighbours.size(); ++j) {
@@ -578,7 +612,7 @@ namespace engine {
                     }
                 }
                 // Fill in the final offscreen point which connects only to itself
-                local_neighbourhood[points].fill(points);
+                local_neighbourhood[n_points].fill(n_points);
 
                 // This ensures that all elements in the queue have been issued to the device NOT that they are all
                 // finished If we don't do this here, some of our buffers can go out of scope before the queue picks
@@ -592,31 +626,62 @@ namespace engine {
                                        projected);                      // GPU event
             }
 
-            cl::mem get_indices_map_memory(const int& max_size) const {
+            cl::mem get_indices_map_memory(const int& n_points) const {
 
-                if (indices_map_memory.max_size < max_size) {
+                if (indices_map_memory.n_points < n_points) {
+                    // Align the size to the nearest workgroup size
+                    size_t size = ((n_points - 1) / workgroup_size + 1) * workgroup_size * sizeof(int);
                     cl_int error;
-                    indices_map_memory.memory =
-                      cl::mem(::clCreateBuffer(context, CL_MEM_READ_WRITE, max_size * sizeof(int), nullptr, &error),
-                              ::clReleaseMemObject);
+                    indices_map_memory.memory = cl::mem(
+                      ::clCreateBuffer(context, CL_MEM_READ_WRITE, size, nullptr, &error), ::clReleaseMemObject);
                     throw_cl_error(error, "Error allocating indices map buffer on device");
-                    indices_map_memory.max_size = max_size;
+                    indices_map_memory.n_points = n_points;
                 }
                 return indices_map_memory.memory;
             }
 
-            cl::mem get_pixel_coordinates_memory(const int& max_size) const {
+            cl::mem get_pixel_coordinates_memory(const int& n_points) const {
 
-                if (pixel_coordinates_memory.max_size < max_size) {
+                if (pixel_coordinates_memory.n_points < n_points) {
+                    // Align the size to the nearest workgroup size
+                    size_t size = ((n_points - 1) / workgroup_size + 1) * workgroup_size * sizeof(Scalar) * 2;
                     cl_int error;
-                    pixel_coordinates_memory.memory =
-                      cl::mem(::clCreateBuffer(
-                                context, CL_MEM_READ_WRITE, max_size * sizeof(std::array<Scalar, 2>), nullptr, &error),
-                              ::clReleaseMemObject);
+                    pixel_coordinates_memory.memory = cl::mem(
+                      ::clCreateBuffer(context, CL_MEM_READ_WRITE, size, nullptr, &error), ::clReleaseMemObject);
                     throw_cl_error(error, "Error allocating pixel coordinates buffer on device");
-                    pixel_coordinates_memory.max_size = max_size;
+                    pixel_coordinates_memory.n_points = n_points;
                 }
                 return pixel_coordinates_memory.memory;
+            }
+
+            std::array<cl::mem, 2> get_network_memory(const int& n_points) const {
+                if (network_memory.n_points < n_points) {
+                    // Align the size to the nearest workgroup size
+                    size_t size = ((n_points - 1) / workgroup_size + 1) * workgroup_size * sizeof(Scalar) * max_width;
+                    cl_int error;
+                    network_memory.memory[0] = cl::mem(
+                      ::clCreateBuffer(context, CL_MEM_READ_WRITE, size, nullptr, &error), ::clReleaseMemObject);
+                    throw_cl_error(error, "Error allocating ping pong buffer 1 on device");
+                    network_memory.memory[1] = cl::mem(
+                      ::clCreateBuffer(context, CL_MEM_READ_WRITE, size, nullptr, &error), ::clReleaseMemObject);
+                    network_memory.n_points = n_points;
+                    throw_cl_error(error, "Error allocating ping pong buffer 2 on device");
+                }
+                return network_memory.memory;
+            }
+
+            cl::mem get_neighbourhood_memory(const int& n_points, int n_neighbours) const {
+
+                if (neighbourhood_memory.n_points < n_points) {
+                    // Align the size to the nearest workgroup size
+                    size_t size = ((n_points - 1) / workgroup_size + 1) * workgroup_size * sizeof(int) * n_neighbours;
+                    cl_int error;
+                    neighbourhood_memory.memory = cl::mem(
+                      ::clCreateBuffer(context, CL_MEM_READ_WRITE, size, nullptr, &error), ::clReleaseMemObject);
+                    throw_cl_error(error, "Error allocating neighbourhood buffer on device");
+                    neighbourhood_memory.n_points = n_points;
+                }
+                return neighbourhood_memory.memory;
             }
 
             cl::mem get_image_memory(vec2<int> dimensions, uint32_t format) const {
@@ -655,35 +720,6 @@ namespace engine {
                 return image_memory.memory;
             }
 
-            std::array<cl::mem, 2> get_network_memory(const int& max_size) const {
-                if (network_memory.max_size < max_size) {
-                    cl_int error;
-                    network_memory.memory[0] =
-                      cl::mem(::clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(Scalar) * max_size, nullptr, &error),
-                              ::clReleaseMemObject);
-                    throw_cl_error(error, "Error allocating ping pong buffer 1 on device");
-                    network_memory.memory[1] =
-                      cl::mem(::clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(Scalar) * max_size, nullptr, &error),
-                              ::clReleaseMemObject);
-                    network_memory.max_size = max_size;
-                    throw_cl_error(error, "Error allocating ping pong buffer 2 on device");
-                }
-                return network_memory.memory;
-            }
-
-            cl::mem get_neighbourhood_memory(const int& max_size) const {
-
-                if (neighbourhood_memory.max_size < max_size) {
-                    cl_int error;
-                    neighbourhood_memory.memory =
-                      cl::mem(::clCreateBuffer(context, CL_MEM_READ_WRITE, max_size * sizeof(int), nullptr, &error),
-                              ::clReleaseMemObject);
-                    throw_cl_error(error, "Error allocating neighbourhood buffer on device");
-                    neighbourhood_memory.max_size = max_size;
-                }
-                return neighbourhood_memory.memory;
-            }
-
             /// OpenCL context
             cl::context context;
 
@@ -703,38 +739,47 @@ namespace engine {
             /// A list of kernels to run in sequence to run the network
             std::vector<std::pair<cl::kernel, size_t>> conv_layers;
 
+            /// A location to cache the GPU memory allocated for indices map so we don't reallocate between runs
             mutable struct {
-                int max_size = 0;
+                int n_points = 0;
                 cl::mem memory;
             } indices_map_memory;
 
+            /// A location to cache the GPU memory allocated for pixel coordinates so we don't reallocate between runs
             mutable struct {
-                int max_size = 0;
+                int n_points = 0;
                 cl::mem memory;
             } pixel_coordinates_memory;
 
+            /// A location to cache the GPU memory allocated for the ping pong network buffers so we don't reallocate
+            /// between runs
+            mutable struct {
+                int n_points = 0;
+                std::array<cl::mem, 2> memory;
+            } network_memory;
+
+            /// A location to cache the GPU memory allocated for the local graph so we don't reallocate between runs
+            mutable struct {
+                int n_points = 0;
+                cl::mem memory;
+            } neighbourhood_memory;
+
+            /// A location to cache the GPU memory allocated for the image so we don't reallocate between runs
             mutable struct {
                 vec2<int> dimensions = {0, 0};
                 uint32_t format      = 0;
                 cl::mem memory;
             } image_memory;
 
-            mutable struct {
-                int max_size = 0;
-                std::array<cl::mem, 2> memory;
-            } network_memory;
-
-            mutable struct {
-                int max_size = 0;
-                cl::mem memory;
-            } neighbourhood_memory;
-
-            // The width of the maximumally wide layer in the network
+            /// The width of the maximumally wide layer in the network
             size_t max_width;
 
-            // Cache of opencl buffers from mesh objects
+            /// The largest preferred workgroup size so we can overallocate memory
+            size_t workgroup_size;
+
+            /// Cache of opencl buffers from mesh objects
             mutable std::map<const void*, cl::mem> device_points_cache;
-        };  // namespace opencl
+        };
 
     }  // namespace opencl
 }  // namespace engine
