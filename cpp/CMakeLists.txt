@@ -14,7 +14,8 @@ foreach(cl IN LISTS cls)
     list(APPEND hdr "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp")
 endforeach(cl ${cls})
 
-add_custom_target(visualmesh_sources DEPENDS ${hdr})
+# Add to ALL target so that the wrapped header files are always generated, even if nothing else (e.g. examples) is being built
+add_custom_target(visualmesh_sources ALL DEPENDS ${hdr})
 
 # Define the VisualMesh library as header only but setup its links
 add_library(visualmesh INTERFACE)
