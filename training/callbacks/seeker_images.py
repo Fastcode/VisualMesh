@@ -147,9 +147,8 @@ class SeekerImages(tf.keras.callbacks.Callback):
                 )
             )
 
+        # Write out the images to tensorboard
         # Sort by hash so the images show up in the same order every time
-        images = tf.stack([i for h, i in sorted(images, key=lambda image: image[0])], axis=0)
-
         with self.writer.as_default():
-            # Write the images
-            tf.summary.image("images", images, step=epoch, max_outputs=images.shape[0])
+            for i, img in enumerate(sorted(images, key=lambda image: image[0])):
+                tf.summary.image("images/{}".format(i), tf.expand_dims(img[1], axis=0), step=epoch, max_outputs=1)
