@@ -42,7 +42,7 @@ Then you are able to run the following command to train the network.
 ```
 Or using docker:
 ```sh
-./docker run --gpus all -u $(id -u):$(id -g) -it --rm --volume $(pwd):/workspace visualmesh:latest ./mesh.py train <path/to/output>
+docker run --gpus all -u $(id -u):$(id -g) -it --rm --volume $(pwd):/workspace visualmesh:latest ./mesh.py train <path/to/output>
 ```
 More information about the training process as well as the influence of different parameters in the configuration can be found on the **[Training Page](readme/training.md)**
 
