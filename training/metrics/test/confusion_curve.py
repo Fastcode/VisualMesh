@@ -24,7 +24,7 @@ class ConfusionCurve(Curve):
         super(ConfusionCurve, self).__init__(**kwargs)
         self.class_index = class_index
 
-    def update_state(self, y_true, y_pred):
+    def update_state(self, y_true, y_pred, sample_weight=None):
 
         # Strip out any values that are unlabelled
         idx = tf.squeeze(tf.where(tf.reduce_any(y_pred != 0, axis=-1)), axis=-1)
