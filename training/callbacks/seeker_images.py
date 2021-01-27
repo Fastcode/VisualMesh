@@ -148,7 +148,7 @@ class SeekerImages(tf.keras.callbacks.Callback):
             )
 
         # Sort by hash so the images show up in the same order every time
-        images = tf.stack([i for h, i in sorted(images)], axis=0)
+        images = tf.stack([i for h, i in sorted(images, key=lambda image: image[0])], axis=0)
 
         with self.writer.as_default():
             # Write the images
