@@ -58,10 +58,10 @@ class Spotlight:
         # If a minimum and/or maximum distance is given, apply them to the position
         if "position" in self.augmentations:
             v = self.augmentations["position"]
-            if "min" in v:
-                h = tf.math.maximum(tf.constant(v["min"], dtype=h.dtype), h)
-            if "max" in v:
-                h = tf.math.minimum(tf.constant(v["max"], dtype=h.dtype), h)
+            if "limits" in v:
+                h = tf.clip_by_value(
+                    h, tf.constant(v["limits"][0], dtype=h.dtype), tf.constant(v["limits"][1], dtype=h.dtype)
+                )
 
         y, _ = tf.linalg.normalize(tf.linalg.cross(z, world_z))
         x, _ = tf.linalg.normalize(tf.linalg.cross(y, z))
