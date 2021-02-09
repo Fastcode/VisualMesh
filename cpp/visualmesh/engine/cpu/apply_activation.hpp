@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "visualmesh/network_structure.hpp"
+#include "visualmesh/utility/math.hpp"
 
 namespace visualmesh {
 namespace engine {

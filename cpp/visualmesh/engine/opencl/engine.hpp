@@ -695,6 +695,9 @@ namespace engine {
                         case fourcc("RGGB"):
                         case fourcc("GBRG"):
                         case fourcc("BGGR"): fmt = cl_image_format{CL_R, CL_UNORM_INT8}; break;
+                        case fourcc("GRAY"):
+                        case fourcc("GREY"):
+                        case fourcc("Y8  "): fmt = cl_image_format{CL_LUMINANCE, CL_UNORM_INT8}; break;
                         case fourcc("BGRA"): fmt = cl_image_format{CL_BGRA, CL_UNORM_INT8}; break;
                         case fourcc("RGBA"): fmt = cl_image_format{CL_RGBA, CL_UNORM_INT8}; break;
                         // Oh no...

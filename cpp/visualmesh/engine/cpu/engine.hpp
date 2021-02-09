@@ -22,11 +22,13 @@
 #include <numeric>
 
 #include "apply_activation.hpp"
+#include "pixel.hpp"
 #include "visualmesh/classified_mesh.hpp"
 #include "visualmesh/mesh.hpp"
 #include "visualmesh/network_structure.hpp"
 #include "visualmesh/projected_mesh.hpp"
 #include "visualmesh/utility/fourcc.hpp"
+#include "visualmesh/utility/math.hpp"
 #include "visualmesh/visualmesh.hpp"
 
 namespace visualmesh {
@@ -192,30 +194,12 @@ namespace engine {
 
                 // Based on the fourcc code, load the data from the image into input
                 input.reserve(n_points * 4);
-                const int R     = ('R' == (format & 0xFF) ? 0 : 2);
-                const int B     = ('R' == (format & 0xFF) ? 2 : 0);
-                const int depth = ('A' == ((format >> 24) & 0xFF) ? 4 : 3);
-                switch (format) {
-                    case fourcc("RGB8"):
-                    case fourcc("RGB3"):
-                    case fourcc("BGR8"):
-                    case fourcc("BGR3"):
-                    case fourcc("RGBA"):
-                    case fourcc("BGRA"): break;
-                    default:
-                        throw std::runtime_error("The CPU classifier is unable to decode the format "
-                                                 + fourcc_text(format));
-                }
 
                 for (const auto& px : projected.pixel_coordinates) {
                     const uint8_t* const im = reinterpret_cast<const uint8_t*>(image);
 
-                    const vec4<Scalar> p = interpolate(px, im, lens.dimensions, depth);
-
-                    input.emplace_back(p[R]);
-                    input.emplace_back(p[1]);
-                    input.emplace_back(p[B]);
-                    input.emplace_back(p[3]);
+                    const vec4<Scalar> p = interpolate(px, im, lens.dimensions, format);
+                    input.insert(input.end(), p.begin(), p.end());
                 }
 
                 // Four -1 values for the offscreen point
@@ -317,48 +301,6 @@ namespace engine {
             mutable std::vector<Scalar> input;
             /// An output buffer used to ping/pong when doing classification so we don't have to remake them
             mutable std::vector<Scalar> output;
-
-            vec4<Scalar> get_pixel(const vec2<Scalar>& px,
-                                   const uint8_t* const image,
-                                   const vec2<int>& dimensions,
-                                   const int& depth) const {
-                int c              = (px[1] * dimensions[0] + px[0]) * depth;
-                vec4<Scalar> pixel = {image[c + 0] * Scalar(1.0 / 255.0),
-                                      image[c + 1] * Scalar(1.0 / 255.0),
-                                      image[c + 2] * Scalar(1.0 / 255.0),
-                                      (depth == 3) ? Scalar(0) : image[c + 3] * Scalar(1.0 / 255.0)};
-                return pixel;
-            };
-
-            vec4<Scalar> interpolate(const vec2<Scalar>& P,
-                                     const uint8_t* const image,
-                                     const vec2<int>& dimensions,
-                                     const int& depth) const {
-
-                // (x1, y1) -------------- (x2, y1)
-                //    |                       |
-                //    |                       |
-                //    |                       |
-                //    |           P           |
-                //    |                       |
-                //    |                       |
-                // (x1, y2) -------------- (x2, y2)
-                const Scalar x        = P[0];
-                const Scalar y        = P[1];
-                const Scalar x1       = std::floor(P[0]);
-                const Scalar x2       = std::ceil(P[0]);
-                const Scalar y1       = std::floor(P[1]);
-                const Scalar y2       = std::ceil(P[1]);
-                const vec4<Scalar> Q1 = get_pixel(vec2<Scalar>{x1, y1}, image, dimensions, depth);
-                const vec4<Scalar> Q2 = get_pixel(vec2<Scalar>{x2, y1}, image, dimensions, depth);
-                const vec4<Scalar> Q3 = get_pixel(vec2<Scalar>{x1, y2}, image, dimensions, depth);
-                const vec4<Scalar> Q4 = get_pixel(vec2<Scalar>{x2, y2}, image, dimensions, depth);
-
-                const vec4<Scalar> R1 = add(multiply(Q1, ((x2 - x) / (x2 - x1))), multiply(Q2, ((x - x1) / (x2 - x1))));
-                const vec4<Scalar> R2 = add(multiply(Q3, ((x2 - x) / (x2 - x1))), multiply(Q4, ((x - x1) / (x2 - x1))));
-
-                return add(multiply(R1, ((y2 - y) / (y2 - y1))), multiply(R2, ((y - y1) / (y2 - y1))));
-            };
         };
 
     }  // namespace cpu
