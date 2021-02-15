@@ -80,22 +80,17 @@ namespace engine {
 
             template <typename Scalar>
             inline vec4<Scalar> demosaic(const std::array<int32_t, 5 * 5>& p, const BayerPixelType type) {
-                constexpr Scalar factor = 1.0 / (64.0 * 255.0);
+                vec4<int32_t> output;
                 switch (type) {
-                    case R:
-                        return multiply(vec4<Scalar>{Scalar(p[13]), Scalar(dot(p, G_R)), Scalar(dot(p, B_R)), 0.0},
-                                        factor);
-                    case GR:
-                        return multiply(vec4<Scalar>{Scalar(dot(p, R_GR)), Scalar(p[13]), Scalar(dot(p, B_GR)), 0.0},
-                                        factor);
-                    case GB:
-                        return multiply(vec4<Scalar>{Scalar(dot(p, R_GB)), Scalar(p[13]), Scalar(dot(p, B_GB)), 0.0},
-                                        factor);
-                    case B:
-                        return multiply(vec4<Scalar>{Scalar(dot(p, R_B)), Scalar(dot(p, G_B)), Scalar(p[13]), 0.0},
-                                        factor);
-                    default: throw std::runtime_error("Unknown bayer pixel type");
+                    case R: output = vec4<int32_t>{{p[12], dot(p, G_R) / 64, dot(p, B_R) / 64, 255}}; break;
+                    case GR: output = vec4<int32_t>{{dot(p, R_GR) / 64, p[12], dot(p, B_GR) / 64, 255}}; break;
+                    case GB: output = vec4<int32_t>{{dot(p, R_GB) / 64, p[12], dot(p, B_GB) / 64, 255}}; break;
+                    case B: output = vec4<int32_t>{{dot(p, R_B) / 64, dot(p, G_B) / 64, p[12], 255}}; break;
+                    default: throw std::runtime_error("Unknown bayer pixel type"); break;
                 }
+
+                // Normalise to 0->1
+                return multiply(cast<Scalar>(output), Scalar(1.0 / 255.0));
             }
 
             template <typename Scalar>
@@ -111,9 +106,9 @@ namespace engine {
                 // Read the image patch into a flat array
                 std::array<int32_t, 5 * 5> patch;
                 for (int y = 0; y < 5; ++y) {
-                    int y_c = std::min(std::max(y + y_s, 0), dimensions[1] - 1);
+                    int y_c = std::min(std::max(y_s + y, 0), dimensions[1] - 1);
                     for (int x = 0; x < 5; ++x) {
-                        int x_c          = std::min(std::max(x + x_s, 0), dimensions[0] - 1);
+                        int x_c          = std::min(std::max(x_s + x, 0), dimensions[0] - 1);
                         patch[y * 5 + x] = image[y_c * dimensions[0] + x_c];
                     }
                 }
@@ -121,6 +116,13 @@ namespace engine {
                 bool row = px[0] % 2 == 1;
                 bool col = px[1] % 2 == 1;
                 switch (format) {
+                    // We can map row/col to get the colour from the character code
+                    // e.g. RGGB becomes
+                    //       | col=0 | col=1
+                    // row=0 |   R   |   G
+                    // row=1 |   G   |   B
+                    //
+                    // Therefore the mapping of letters in this boolean is         4th  3rd       2nd  1st
                     case fourcc("GRBG"): return demosaic<Scalar>(patch, row ? col ? GB : B : col ? R : GR);
                     case fourcc("RGGB"): return demosaic<Scalar>(patch, row ? col ? B : GB : col ? GR : R);
                     case fourcc("GBRG"): return demosaic<Scalar>(patch, row ? col ? GR : R : col ? B : GB);

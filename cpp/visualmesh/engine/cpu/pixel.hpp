@@ -54,27 +54,29 @@ namespace engine {
                 case fourcc("BGGR"): {
                     return bayer::get_pixel<Scalar>(px, image, dimensions, format);
                 }
+                case fourcc("BGR3"):
                 case fourcc("BGR8"): {
                     int c = (px[1] * dimensions[0] + px[0]) * 3;
                     return vec4<Scalar>{image[c + 2] * Scalar(1.0 / 255.0),
                                         image[c + 1] * Scalar(1.0 / 255.0),
                                         image[c + 0] * Scalar(1.0 / 255.0),
-                                        0.0};
+                                        1.0};
                 }
-                case fourcc("RGB8"): {
-                    int c = (px[1] * dimensions[0] + px[0]) * 3;
-                    return vec4<Scalar>{image[c + 2] * Scalar(1.0 / 255.0),
-                                        image[c + 1] * Scalar(1.0 / 255.0),
-                                        image[c + 0] * Scalar(1.0 / 255.0),
-                                        0.0};
-                }
-
                 case fourcc("BGRA"): {
                     int c = (px[1] * dimensions[0] + px[0]) * 4;
                     return vec4<Scalar>{image[c + 2] * Scalar(1.0 / 255.0),
                                         image[c + 1] * Scalar(1.0 / 255.0),
                                         image[c + 0] * Scalar(1.0 / 255.0),
                                         image[c + 3] * Scalar(1.0 / 255.0)};
+                }
+
+                case fourcc("RGB3"):
+                case fourcc("RGB8"): {
+                    int c = (px[1] * dimensions[0] + px[0]) * 3;
+                    return vec4<Scalar>{image[c + 0] * Scalar(1.0 / 255.0),
+                                        image[c + 1] * Scalar(1.0 / 255.0),
+                                        image[c + 2] * Scalar(1.0 / 255.0),
+                                        1.0};
                 }
                 case fourcc("RGBA"): {
                     int c = (px[1] * dimensions[0] + px[0]) * 4;
@@ -91,7 +93,7 @@ namespace engine {
                     return vec4<Scalar>{image[c] * Scalar(1.0 / 255.0),
                                         image[c] * Scalar(1.0 / 255.0),
                                         image[c] * Scalar(1.0 / 255.0),
-                                        0.0};
+                                        1.0};
                 }
 
                 // Oh no...
