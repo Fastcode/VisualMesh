@@ -37,31 +37,30 @@ class Seeker:
         targets = features["seeker/targets"]
 
         # Transform our targets into observation plane space
-        rOCo, _ = tf.linalg.normalize(tf.einsum("ij,kj->ki", Hoc[:3, :3], targets), axis=-1)
+        uOCo, _ = tf.linalg.normalize(tf.einsum("ij,kj->ki", Hoc[:3, :3], targets), axis=-1)
+
+        # Remove any points that are above the camera in observation plane space as they can never be projected down
+        uOCo = tf.gather(uOCo, tf.squeeze(tf.where(uOCo[:, 2] < 0), axis=-1))
 
         args = {"model": self.mesh_model, "height": Hoc[2, 3], "geometry": self.geometry, "radius": self.radius}
 
         # Get our vectors in nm coordinates
         mesh_nm = unmap_visual_mesh(V, **args)
-        target_nm = unmap_visual_mesh(rOCo, **args)
+        target_nm = unmap_visual_mesh(uOCo, **args)
 
         # Replicate out the points so they are the same size
         n_nodes = tf.shape(mesh_nm)[0]
         n_targets = tf.shape(target_nm)[0]
-        m = tf.tile(mesh_nm, (n_targets, 1))  # [a,b,c] -> [a,b,c,a,b,c,a,b,c]
-        t = tf.reshape(tf.tile(target_nm, (1, n_nodes)), (-1, 2))  # [a,b,c] -> [a,a,a,b,b,b,c,c,c]
+        m = tf.reshape(tf.tile(mesh_nm, (1, n_targets)), (-1, 2))  # [a,b,c] -> [a,a,a,b,b,b,c,c,c]
+        t = tf.tile(target_nm, (n_nodes, 1))  # [a,b,c] -> [a,b,c,a,b,c,a,b,c]
 
-        # Do the difference of each point and stack them up on the first axis to find the closest position for each
-        diff = tf.reshape(difference_visual_mesh(t, m, **args), (n_targets, n_nodes, 2))
-        squared_diff = tf.reduce_sum(tf.square(diff), axis=-1)
-        best_idx = tf.stack(
-            [tf.math.argmin(squared_diff, axis=0, output_type=tf.int32), tf.range(n_nodes, dtype=tf.int32)], axis=1
-        )
+        # Calculate the difference that we will be predicting for each of the values
+        diff = tf.reshape(difference_visual_mesh(t, m, **args), (n_nodes, n_targets, 2))
 
         # Divide distance by scale so a value from 0->scale becomes 0->1
-        distance = tf.math.divide(tf.gather_nd(diff, best_idx), self.scale)
+        distance = diff / self.scale
 
-        # Work out of any of the points are on screen so we can throw out samples which
+        # Work out if any of the points are on screen so we can throw out samples which we can't see
         px = tf.cast(
             tf.round(
                 project(
@@ -82,4 +81,4 @@ class Seeker:
             )
         )
 
-        return {"Y": distance, "valid": tf.logical_and(valid, on_screen)}
+        return {"Y": distance, "valid": tf.logical_and(tf.logical_and(valid, on_screen), tf.shape(uOCo)[0] > 0)}

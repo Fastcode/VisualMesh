@@ -63,6 +63,23 @@ class SeekerImages(tf.keras.callbacks.Callback):
 
     def image(self, img, X, Y, Hoc, lens, nm):
 
+        # Y true contains a list of all the possible answers, we are ranked on how close we are to the closest one\
+        # This code works out the closest point to our prediction for each case so we can use that for training
+        Y = tf.gather_nd(
+            Y,
+            tf.stack(
+                [
+                    tf.range(tf.shape(Y)[0], dtype=tf.int32),
+                    tf.math.argmin(
+                        tf.reduce_sum(tf.math.squared_difference(tf.expand_dims(X, axis=-2), Y), axis=-1),
+                        axis=-1,
+                        output_type=tf.int32,
+                    ),
+                ],
+                axis=1,
+            ),
+        )
+
         # hash of the image file for sorting later
         img_hash = hashlib.md5()
         img_hash.update(img)

@@ -14,6 +14,7 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import tensorflow as tf
+import math
 
 
 class VisualMeshDataset:
@@ -111,6 +112,10 @@ class VisualMeshDataset:
         Y = batch["Y"].values
         C = batch["C"].values
         V = batch["V"].values
+
+        # If Y has multiple values per label we need to expand them out so the loss function doesn't cry
+        if isinstance(Y, tf.RaggedTensor):
+            Y = Y.to_tensor(default_value=math.nan)
 
         # Fixed size elements are in sensible shapes
         jpg = batch["jpg"]

@@ -36,7 +36,7 @@ def export(config, output_path):
     )
 
     # Get the dimensionality of the Y part of the dataset
-    output_dims = training_dataset.element_spec[1].shape[1]
+    output_dims = training_dataset.element_spec[1].shape[-1]
 
     # Define the model
     model = VisualMeshModel(structure=config["network"]["structure"], output_dims=output_dims)
