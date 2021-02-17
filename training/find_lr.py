@@ -67,7 +67,7 @@ class LRProgress(tf.keras.callbacks.Callback):
         if self.loss_progress is None:
             self.loss_title = tqdm(bar_format="{desc}", desc="Loss Graph")
             self.loss_progress = [
-                tqdm(bar_format="{desc}|{bar}|", total=self.losses[-1], dynamic_ncols=True,)
+                tqdm(bar_format="{desc}|{bar}|", total=self.losses[-1], dynamic_ncols=True)
                 for i in range(self.n_history)
             ]
 

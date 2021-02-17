@@ -77,11 +77,7 @@ class Confusion(tf.keras.metrics.Metric):
 
                 self._write(f, "\tPredicted {} samples are really:".format(name.title()))
                 for j, k in enumerate(self.classes):
-                    self._write(
-                        f, "\t\t{}: {:.3f}%".format(k["name"].title(), 100 * (self.confusion[j, i] / p)),
-                    )
+                    self._write(f, "\t\t{}: {:.3f}%".format(k["name"].title(), 100 * (self.confusion[j, i] / p)))
                 self._write(f, "\tReal {} samples are predicted as:".format(name.title()))
                 for j, k in enumerate(self.classes):
-                    self._write(
-                        f, "\t\t{}: {:.3f}%".format(k["name"].title(), 100 * (self.confusion[i, j] / tp_fn)),
-                    )
+                    self._write(f, "\t\t{}: {:.3f}%".format(k["name"].title(), 100 * (self.confusion[i, j] / tp_fn)))

@@ -132,11 +132,7 @@ class VisualMeshDataset:
         G = (batch["G"] + tf.expand_dims(tf.expand_dims(cn, -1), -1)).values
 
         # Replace the offscreen negative points with the offscreen point and append it to the end
-        G = tf.concat(
-            [tf.where(G < 0, n_elems, G, name="vmdataset/_reduce/where/G"), tf.fill([1, tf.shape(G)[-1]], n_elems),],
-            axis=0,
-            name="vmdataset/_reduce/concat/G",
-        )
+        G = tf.concat([tf.where(G < 0, n_elems, G), tf.fill([1, tf.shape(G)[-1]], n_elems)], axis=0)
 
         return {
             "X": X,

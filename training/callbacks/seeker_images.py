@@ -133,7 +133,7 @@ class SeekerImages(tf.keras.callbacks.Callback):
         fn = tf.scatter_nd(tf.gather(target, fn), tf.gather(weight, fn), tf.shape(img)[:2])
 
         # Apply the colours
-        tp = tf.einsum("ij,k->ijk", tp, tf.constant([1.0, 1.0, 1.0]))
+        tp = tf.einsum("ij,k->ijk", tp, tf.constant([1.0, 1.0, 0.0]))
         fp = tf.einsum("ij,k->ijk", fp, tf.constant([1.0, 0.0, 0.0]))
         fn = tf.einsum("ij,k->ijk", fn, tf.constant([0.0, 0.0, 1.0]))
 
