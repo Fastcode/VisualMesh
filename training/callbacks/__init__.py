@@ -16,3 +16,4 @@
 from .classification_images import ClassificationImages
 from .one_cycle import OneCycle
 from .seeker_images import SeekerImages
+from .image_tensorboard import ImageTensorBoard

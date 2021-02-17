@@ -15,10 +15,12 @@
 
 import os
 
-import tensorflow as tf
 import yaml
+from tqdm import tqdm
 
-from .callbacks import OneCycle
+import tensorflow as tf
+
+from .callbacks import ImageTensorBoard, OneCycle
 from .dataset import keras_dataset
 from .flavour import Dataset, ImageCallback, Loss, Metrics
 from .model import VisualMeshModel
@@ -36,7 +38,7 @@ def train(config, output_path):
         training_dataset = training_dataset.repeat()
 
     # Get the dimensionality of the Y part of the dataset
-    output_dims = training_dataset.element_spec[1].shape[1]
+    output_dims = training_dataset.element_spec[1].shape[-1]
 
     # Define the model
     model = VisualMeshModel(structure=config["network"]["structure"], output_dims=output_dims)
@@ -83,7 +85,7 @@ def train(config, output_path):
         validation_data=validation_dataset,
         validation_steps=config["training"]["validation"]["samples"],
         callbacks=[
-            tf.keras.callbacks.TensorBoard(
+            ImageTensorBoard(
                 log_dir=output_path,
                 update_freq=config["training"]["validation"]["log_frequency"],
                 profile_batch=0,
