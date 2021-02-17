@@ -37,7 +37,7 @@ visualmesh::NetworkStructure<Scalar> load_model(const std::string& path) {
 
     visualmesh::NetworkStructure<Scalar> model;
     YAML::Node config = YAML::LoadFile(path);
-    for (const auto& conv : config) {
+    for (const auto& conv : config["network"]) {
         model.emplace_back();
         auto& net_conv = model.back();
 

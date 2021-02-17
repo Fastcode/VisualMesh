@@ -83,7 +83,7 @@ def export(config, output_path):
             exit(1)
 
     # While we have a 3 values on our input, all the c++ take 4 due to alignment issues
-    # Therefore for that weights we need to increase it to 4
+    # Therefore for those weights we need to increase it to 4
     first = tf.convert_to_tensor(stages[0][0]["weights"])
     first = tf.reshape(first, (-1, 3, first.shape[-1]))
     first = tf.pad(first, [[0, 0], [0, 1], [0, 0]])
@@ -91,4 +91,17 @@ def export(config, output_path):
     stages[0][0]["weights"] = first.numpy().tolist()
 
     with open(os.path.join(output_path, "model.yaml"), "w") as out:
-        yaml.dump(stages, out, default_flow_style=None, width=float("inf"))
+        yaml.dump(
+            {
+                "mesh": config["projection"]["config"]["mesh"]["model"],
+                "geometry": {
+                    "shape": config["projection"]["config"]["geometry"]["shape"],
+                    "radius": config["projection"]["config"]["geometry"]["radius"],
+                    "intersections": config["projection"]["config"]["geometry"]["intersections"],
+                },
+                "network": stages,
+            },
+            out,
+            default_flow_style=None,
+            width=float("inf"),
+        )
