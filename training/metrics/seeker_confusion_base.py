@@ -30,5 +30,7 @@ class SeekerConfusionBase(ConfusionBase):
         y_pred = tf.where(tf.reduce_all(tf.math.abs(y_pred) <= self.threshold, axis=-1), 1.0, 0.0)
 
         super(SeekerConfusionBase, self).update_state(
-            tf.stack([y_true, 1.0 - y_true], axis=1), tf.stack([y_pred, 1.0 - y_pred], axis=1)
+            tf.stack([y_true, 1.0 - y_true], axis=1),
+            tf.stack([y_pred, 1.0 - y_pred], axis=1),
+            sample_weight=sample_weight,
         )
