@@ -14,6 +14,7 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from ..metrics import *
+from ..metrics.test import SeekerHourglass
 
 
 def Metrics(config):
@@ -39,6 +40,7 @@ def Metrics(config):
             SeekerPrecision("metrics/precision50", 0.5),
             SeekerRecall("metrics/recall50", 0.5),
             SeekerStdDev("metrics/stddev50", 0.5),
+            SeekerHourglass("metrics/hourglass"),
         ]
 
     else:
