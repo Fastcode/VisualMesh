@@ -25,41 +25,35 @@ def SeekerLoss():
         signed_end = 0.5
         unsigned_end = 0.75
 
-        # Y should be between -1 and 1 but from the dataset it's the full value
+        # Y should be between -1 and 1 but from the dataset it's the full scale value
         y_true = tf.clip_by_value(y_true, -1.0, 1.0)
 
-        # Calculate the loss given signed and unsigned differences
-        # As we get further from the origin we care less about the direction to near nearest object
-        # and more about the fact that it is more distant than we can measure
-        signed_loss = tf.math.squared_difference(y_true, y_pred)
-        unsigned_loss = tf.math.squared_difference(tf.math.abs(y_true), tf.math.abs(y_pred))
+        # Calculate the loss for when the point is not far away
+        # from 0.0->signed_end we use the squared error so we get an accurate prediction of the result
+        # from signed_end->unsigned_end we use squared error of the absolute values so magnitude is more important than sign
+        loss_factor = tf.clip_by_value(tf.divide(tf.math.abs(y_true) - signed_end, unsigned_end - signed_end), 0.0, 1.0)
+        near_loss = tf.reduce_mean(
+            tf.add(
+                tf.multiply(tf.math.squared_difference(y_true, y_pred), 1.0 - loss_factor),
+                tf.multiply(tf.math.squared_difference(tf.math.abs(y_true), tf.math.abs(y_pred)), loss_factor),
+            ),
+            axis=-1,
+        )
 
-        # We blend the signed and unsigned loss together in order to make sign less important with distance
-        # Value will go from 0 when signed, to 1 when unsigned
-        loss_factor = tf.clip_by_value(tf.divide(tf.math.abs(y_pred) - signed_end, unsigned_end - signed_end), 0.0, 1.0)
-        near_loss = tf.multiply(signed_loss, 1.0 - loss_factor) + tf.multiply(unsigned_loss, loss_factor)
+        # For far loss, if either value is greater than unsigned_end
+        # then we check that one of the predictions is greater than unsigned end
+        far_loss = tf.math.squared_difference(
+            tf.reduce_max(tf.abs(y_true), axis=-1), tf.reduce_max(tf.abs(y_pred), axis=-1)
+        )
 
-        # Once we exceed the unsigned region we don't care how far we are from the object we just care that we are "far"
-        # So for loss we will try to push to the edge of the unsigned region and if we are greater, loss is 0
-        far_loss = tf.where(tf.math.abs(y_pred) > unsigned_end, tf.zeros_like(y_pred), unsigned_loss)
+        # For our far loss, if we predict over unsigned_end then set the loss for this to 0 (correctly predicted)
+        far_loss = tf.where(tf.reduce_max(tf.abs(y_pred), axis=-1) < unsigned_end, far_loss, tf.zeros_like(far_loss))
 
-        # We apply different losses depending on the label of both x and y
-        # If one of our losses is far but not both, we ignore the non far loss
-        # | X | Y | XL | YL |
-        # |---|---|----|----|
-        # | N | N | NL | NL |
-        # | N | F | IL | FL |
-        # | F | N | FL | IL |
-        # | F | F | FL | FL |
-
-        # Select the correct loss function depending on location
-        near_mean = tf.reduce_mean(near_loss, axis=-1)
-        far_mean = tf.reduce_mean(far_loss, axis=-1)
-        near = tf.math.abs(y_true) <= unsigned_end
-        loss = tf.where(
-            tf.reduce_any(near, axis=-1),
-            tf.where(tf.reduce_all(near, axis=-1), near_mean, tf.where(near[:, 0], far_loss[:, 1], far_loss[:, 0])),
-            far_mean,
+        # Based on our categories create each of the three loss zones
+        loss = tf.reduce_mean(
+            tf.where(
+                tf.reduce_all(tf.abs(y_true) < unsigned_end, axis=-1), tf.reduce_mean(near_loss, axis=-1), far_loss
+            )
         )
 
         return loss
