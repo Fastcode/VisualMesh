@@ -113,8 +113,8 @@ namespace engine {
                     }
                 }
 
-                bool row = px[0] % 2 == 1;
-                bool col = px[1] % 2 == 1;
+                bool col = px[0] % 2 == 1;
+                bool row = px[1] % 2 == 1;
                 switch (format) {
                     // We can map row/col to get the colour from the character code
                     // e.g. RGGB becomes
