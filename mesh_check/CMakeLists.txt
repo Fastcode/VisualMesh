@@ -2,8 +2,8 @@ option(BUILD_MESH_CHECK "Build the mesh check tool" OFF)
 if(BUILD_MESH_CHECK)
 
     # Find our dependencies
-    find_package(OpenCV COMPONENTS core highgui imgproc)
-    find_package(YAML-CPP)
+    find_package(OpenCV COMPONENTS core highgui imgproc REQUIRED)
+    find_package(YAML-CPP REQUIRED)
 
     # Compile the executable
     add_executable(mesh_check "mesh_check.cpp")
