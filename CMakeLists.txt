@@ -43,3 +43,8 @@ option(BUILD_EXAMPLES "Build the c++ examples" OFF)
 if(BUILD_EXAMPLES)
     add_subdirectory("example")
 endif(BUILD_EXAMPLES)
+
+option(BUILD_MESH_CHECK "Build the mesh check tool" OFF)
+if(BUILD_MESH_CHECK)
+    add_subdirectory("mesh_check")
+endif(BUILD_MESH_CHECK)
