@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2020 Trent Houliston <trent@houliston.me>
+ * Copyright (C) 2017-2021 Trent Houliston <trent@houliston.me>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -16,6 +16,7 @@
  */
 
 #include <array>
+#include <iostream>
 #include <map>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
@@ -66,7 +67,7 @@ using Engine = visualmesh::engine::cpu::Engine<Scalar>;
 #endif
 
 int main() {
-    std::string image_path = "../example/images";
+    std::string image_path = "images";
 
     // Create windows
     cv::namedWindow("Radial 4", cv::WINDOW_AUTOSIZE);
@@ -87,6 +88,7 @@ int main() {
 
     visualmesh::geometry::Sphere<Scalar> sphere(0.0949996);
 
+    std::cout << "Building Meshes" << std::endl;
     // Build meshes
     visualmesh::VisualMesh<Scalar, visualmesh::model::Radial4> radial4(sphere, 0.5, 1.5, 4, 0.5, 20);
     visualmesh::VisualMesh<Scalar, visualmesh::model::Radial6> radial6(sphere, 0.5, 1.5, 4, 0.5, 20);
@@ -110,6 +112,8 @@ int main() {
     // Load dataset
     auto dataset = load_dataset<Scalar>(image_path);
 
+    std::cout << "Drawing images" << std::endl;
+
     for (const auto& element : dataset) {
         draw("Radial 4", element.image, engine(radial4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         draw("Radial 6", element.image, engine(radial6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
@@ -128,6 +132,4 @@ int main() {
         draw("NM Grid 8", element.image, engine(nmgrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         if (char(cv::waitKey(0)) == 27) break;
     }
-
-    // Run through the images doing projections
 }
