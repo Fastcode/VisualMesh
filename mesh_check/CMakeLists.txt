@@ -6,8 +6,8 @@ if(BUILD_MESH_CHECK)
     find_package(YAML-CPP)
 
     # Compile the executable
-    add_executable(mesh_types "mesh_types.cpp")
-    target_compile_options(mesh_types PRIVATE ${compile_options})
-    target_link_libraries(mesh_types visualmesh ${OpenCV_LIBS} ${YAML_CPP_LIBRARIES})
+    add_executable(mesh_check "mesh_check.cpp")
+    target_compile_options(mesh_check PRIVATE ${compile_options})
+    target_link_libraries(mesh_check visualmesh ${OpenCV_LIBS} ${YAML_CPP_LIBRARIES})
 
 endif(BUILD_MESH_CHECK)
