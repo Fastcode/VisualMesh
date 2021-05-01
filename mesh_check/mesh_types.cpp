@@ -22,7 +22,6 @@
 #include <string>
 #include <vector>
 
-#include "Timer.hpp"
 #include "dataset.hpp"
 #include "draw.hpp"
 #include "visualmesh/geometry/Sphere.hpp"
@@ -89,37 +88,21 @@ int main() {
     visualmesh::geometry::Sphere<Scalar> sphere(0.0949996);
 
     // Build meshes
-    Timer t;
     visualmesh::VisualMesh<Scalar, visualmesh::model::Radial4> radial4(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built Radial 4");
     visualmesh::VisualMesh<Scalar, visualmesh::model::Radial6> radial6(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built Radial 6");
     visualmesh::VisualMesh<Scalar, visualmesh::model::Radial8> radial8(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built Radial 8");
     visualmesh::VisualMesh<Scalar, visualmesh::model::Ring4> ring4(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built Ring 4");
     visualmesh::VisualMesh<Scalar, visualmesh::model::Ring6> ring6(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built Ring 6");
     visualmesh::VisualMesh<Scalar, visualmesh::model::Ring8> ring8(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built Ring 8");
     visualmesh::VisualMesh<Scalar, visualmesh::model::XMGrid4> xmgrid4(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built XM Grid 4");
     visualmesh::VisualMesh<Scalar, visualmesh::model::XMGrid6> xmgrid6(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built XM Grid 6");
     visualmesh::VisualMesh<Scalar, visualmesh::model::XMGrid8> xmgrid8(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built XM Grid 8");
     visualmesh::VisualMesh<Scalar, visualmesh::model::XYGrid4> xygrid4(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built XY Grid 4");
     visualmesh::VisualMesh<Scalar, visualmesh::model::XYGrid6> xygrid6(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built XY Grid 6");
     visualmesh::VisualMesh<Scalar, visualmesh::model::XYGrid8> xygrid8(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built XY Grid 8");
     visualmesh::VisualMesh<Scalar, visualmesh::model::NMGrid4> nmgrid4(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built NM Grid 4");
     visualmesh::VisualMesh<Scalar, visualmesh::model::NMGrid6> nmgrid6(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built NM Grid 6");
     visualmesh::VisualMesh<Scalar, visualmesh::model::NMGrid8> nmgrid8(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built NM Grid 8");
 
     // Build engines
     Engine<Scalar> engine;
