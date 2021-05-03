@@ -29,7 +29,7 @@ class VisualMeshDataset:
         self.batch_size = batch_size
 
         # Autotune how many elements we prefetch and map by
-        self.prefetch = tf.data.experimental.AUTOTUNE
+        self.prefetch = tf.data.AUTOTUNE
 
         # First we need to know what features we need for each stage so we can load them from the dataset
         self.features = {}
