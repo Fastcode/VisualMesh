@@ -27,6 +27,7 @@ class VisualMesh:
         self.mesh_model = mesh["model"]
         self.cached_meshes = mesh["cached_meshes"]
         self.max_distance = mesh["max_distance"]
+        self.edge_type = mesh["edge_type"]
         self.geometry = tf.constant(geometry["shape"], dtype=tf.string, name="GeometryType")
         self.radius = geometry["radius"]
         self.n_intersections = geometry["intersections"]
@@ -77,6 +78,15 @@ class VisualMesh:
         # We actually do know the shape of G but tensorflow makes it a little hard to do in the c++ op
         # We reshape here to ensure the size is known for later shape inferences
         G = tf.reshape(G, (-1, self.n_neighbours))
+
+        # Hard edge types are handled by default
+        if self.edge_type == "HARD":
+            pass
+        # If we are using the SAME edge type, set all negative values to the first column of the node
+        elif self.edge_type == "SAME":
+            G = tf.where(G < 0, tf.expand_dims(G[:, 0], 1), G)
+        else:
+            raise RuntimeError("Unknown edge type {}".format(self.edge_type))
 
         return {
             "C": C,
