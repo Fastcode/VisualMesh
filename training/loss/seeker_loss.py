@@ -54,7 +54,7 @@ def SeekerLoss():
                 tf.multiply(tf.math.squared_difference(y_true, y_pred), 1.0 - loss_factor),
                 tf.multiply(tf.math.squared_difference(tf.math.abs(y_true), tf.math.abs(y_pred)), loss_factor),
             ),
-            axis=-1,
+            axis=[-1, -2],
         )
 
         # For far loss, if either value is greater than unsigned_end
@@ -67,11 +67,7 @@ def SeekerLoss():
         far_loss = tf.where(tf.reduce_max(tf.abs(y_pred), axis=-1) < unsigned_end, far_loss, tf.zeros_like(far_loss))
 
         # Based on our categories create each of the three loss zones
-        loss = tf.reduce_mean(
-            tf.where(
-                tf.reduce_all(tf.abs(y_true) < unsigned_end, axis=-1), tf.reduce_mean(near_loss, axis=-1), far_loss
-            )
-        )
+        loss = tf.reduce_mean(tf.where(tf.reduce_all(tf.abs(y_true) < unsigned_end, axis=-1), near_loss, far_loss))
 
         return loss
 
