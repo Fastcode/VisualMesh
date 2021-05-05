@@ -146,10 +146,19 @@ class VisualMeshDataset:
             "lens": lens,
         }
 
+    def _interleave(self, *values):
+        ds = tf.data.Dataset.from_tensors(values[0])
+        for d in values[1:]:
+            ds = ds.concatenate(tf.data.Dataset.from_tensors(d))
+        return ds
+
     def build(self):
 
-        # Load the files
-        dataset = tf.data.TFRecordDataset(self.paths)
+        # Load the files and zip them into a tuple set
+        dataset = tf.data.Dataset.zip(tuple([tf.data.TFRecordDataset(p) for p in self.paths]))
+
+        # Flat map the dataset so it gets interleaved
+        dataset = dataset.flat_map(self._interleave)
 
         # Extract the data from the examples
         dataset = dataset.map(self._map, num_parallel_calls=self.prefetch)
