@@ -25,7 +25,7 @@ class SeekerConfusionBase(ConfusionBase):
 
     def update_state(self, y_true, y_pred, sample_weight=None):
 
-        # Y true contains a list of all the possible answers, we are ranked on how close we are to the closest one\
+        # Y true contains a list of all the possible answers, we are ranked on how close we are to the closest one
         # This code works out the closest point to our prediction for each case so we can use that for training
         y_true = tf.gather_nd(
             y_true,
