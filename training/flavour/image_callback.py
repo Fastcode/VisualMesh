@@ -42,6 +42,7 @@ def ImageCallback(config, output_path):
             output_path=output_path,
             dataset=Dataset(config, "validation", batch_size=n_images).take(1),
             model=validation_config["projection"]["config"]["mesh"]["model"],
+            max_distance=validation_config["projection"]["config"]["mesh"]["max_distance"],
             geometry=validation_config["projection"]["config"]["geometry"]["shape"],
             radius=validation_config["projection"]["config"]["geometry"]["radius"],
             scale=validation_config["label"]["config"]["scale"],
