@@ -54,7 +54,7 @@ def SeekerLoss():
                 tf.multiply(tf.math.squared_difference(y_true, y_pred), 1.0 - loss_factor),
                 tf.multiply(tf.math.squared_difference(tf.math.abs(y_true), tf.math.abs(y_pred)), loss_factor),
             ),
-            axis=[-1, -2],
+            axis=-1,
         )
 
         # For far loss, if either value is greater than unsigned_end
@@ -66,9 +66,13 @@ def SeekerLoss():
         # For our far loss, if we predict over unsigned_end then set the loss for this to 0 (correctly predicted)
         far_loss = tf.where(tf.reduce_max(tf.abs(y_pred), axis=-1) < unsigned_end, far_loss, tf.zeros_like(far_loss))
 
-        # Based on our categories create each of the three loss zones
-        loss = tf.reduce_mean(tf.where(tf.reduce_all(tf.abs(y_true) < unsigned_end, axis=-1), near_loss, far_loss))
+        # We need to balance near loss and far loss elements so they have equal weight in the loss
+        near = tf.reduce_all(tf.abs(y_true) < unsigned_end, axis=-1)
+        far = tf.logical_not(near)
+        near_weights = tf.where(near, tf.math.reciprocal_no_nan(tf.math.count_nonzero(near, dtype=near_loss.dtype)), 0)
+        far_weights = tf.where(far, tf.math.reciprocal_no_nan(tf.math.count_nonzero(far, dtype=near_loss.dtype)), 0)
 
-        return loss
+        # Sum up our two loss components so they have equal weight
+        return tf.reduce_sum(near_loss * near_weights + far_loss * far_weights)
 
     return seeker_loss
