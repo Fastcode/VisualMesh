@@ -53,7 +53,7 @@ public:
         std::string m = *context->input(MESH_MODEL).flat<tensorflow::tstring>().data();
 
         // clang-format off
-        using namespace visualmesh::model;
+        using namespace visualmesh::model; // NOLINT(google-build-using-namespace) function scope is fine
         if (m == "RADIAL4") { static_cast<Subclass*>(this)->template DoCompute<Radial4>(context, shape); }
         else if (m == "RADIAL6") { static_cast<Subclass*>(this)->template DoCompute<Radial6>(context, shape); }
         else if (m == "RADIAL8") { static_cast<Subclass*>(this)->template DoCompute<Radial8>(context, shape); }

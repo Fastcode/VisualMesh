@@ -34,8 +34,8 @@ namespace engine {
              * @return a reference counted tracker of a command queue
              */
             inline cl::command_queue make_queue(cl_context context, cl_device_id device) {
-                cl_command_queue queue;
-                cl_int error;
+                cl_command_queue queue = nullptr;
+                cl_int error           = 0;
                 // Use out of order execution if we can
                 queue = ::clCreateCommandQueue(context, device, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &error);
                 if (error == CL_INVALID_VALUE) { queue = ::clCreateCommandQueue(context, device, 0, &error); }

@@ -69,16 +69,16 @@ namespace engine {
                 }
 
                 // Print information about our selected device
-                if (!best_device) {
+                if (best_device == nullptr) {
                     throw std::system_error(
                       CL_INVALID_DEVICE, opencl_error_category(), "Error selecting an OpenCL device");
                 }
 
                 // Make context
-                cl_int error;
+                cl_int error        = 0;
                 cl::context context = cl::context(::clCreateContext(nullptr, 1, &best_device, nullptr, nullptr, &error),
                                                   ::clReleaseContext);
-                if (error) {
+                if (error != 0) {
                     throw std::system_error(error, opencl_error_category(), "Error creating the OpenCL context");
                 }
                 return std::make_pair(context, best_device);

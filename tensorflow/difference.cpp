@@ -38,6 +38,7 @@ enum Outputs {
     DIFFERENCES = 0,
 };
 
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_OP("DifferenceVisualMesh")
   .Attr("T: {float, double}")
   .Input("coordinates_a: T")
@@ -112,7 +113,9 @@ public:
 };
 
 // Register a version for all the combinations of float/double
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_KERNEL_BUILDER(Name("DifferenceVisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T"),
                         DifferenceVisualMeshOp<float>)
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_KERNEL_BUILDER(Name("DifferenceVisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T"),
                         DifferenceVisualMeshOp<double>)

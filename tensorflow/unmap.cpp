@@ -37,6 +37,7 @@ enum Outputs {
     COORDINATES = 0,
 };
 
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_OP("UnmapVisualMesh")
   .Attr("T: {float, double}")
   .Input("vectors: T")
@@ -101,7 +102,9 @@ public:
 };
 
 // Register a version for all the combinations of float/double
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_KERNEL_BUILDER(Name("UnmapVisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T"),
                         UnmapVisualMeshOp<float>)
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_KERNEL_BUILDER(Name("UnmapVisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T"),
                         UnmapVisualMeshOp<double>)

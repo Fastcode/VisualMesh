@@ -39,6 +39,7 @@ template <typename Scalar>
 using Model  = visualmesh::model::Ring6<Scalar>;
 using Scalar = float;
 
+// NOLINTNEXTLINE(bugprone-exception-escape) This is debugging code, I would prefer exceptions crash the program
 int main() {
 
     // Input image path
@@ -104,7 +105,7 @@ int main() {
               cl_engine(mesh, element.Hoc, element.lens, element.image.data, visualmesh::fourcc("BGRA"));
             t.measure("\tOpenCL Classified Mesh");
             draw("Image", element.image, classified, colours);
-            if (char(cv::waitKey(0)) == 27) break;
+            if (char(cv::waitKey(0)) == 27) { break; }
         }
 #endif  // !defined(VISUALMESH_DISABLE_OPENCL)
 
@@ -125,7 +126,7 @@ int main() {
               cpu_engine(mesh, element.Hoc, element.lens, element.image.data, visualmesh::fourcc("BGRA"));
             t.measure("\tCPU Classified Mesh");
             draw("Image", element.image, classified, colours);
-            if (char(cv::waitKey(0)) == 27) break;
+            if (char(cv::waitKey(0)) == 27) { break; }
         }
     }
 }

@@ -30,7 +30,7 @@ namespace engine {
              *
              * @return a string containing the defines that are needed if the Scalar type is float
              */
-            inline constexpr auto get_scalar_defines(float) {
+            inline constexpr auto get_scalar_defines(float /*scalar_type*/) {
                 return "#define Scalar float\n"
                        "#define Scalar2 float2\n"
                        "#define Scalar3 float3\n"
@@ -44,7 +44,7 @@ namespace engine {
              *
              * @return a string containing the defines that are needed if the Scalar type is double
              */
-            inline constexpr auto get_scalar_defines(double) {
+            inline constexpr auto get_scalar_defines(double /*scalar_type*/) {
                 return "#define Scalar double\n"
                        "#define Scalar2 double2\n"
                        "#define Scalar3 double3\n"

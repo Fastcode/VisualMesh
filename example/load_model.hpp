@@ -22,14 +22,13 @@
 
 #include "visualmesh/network_structure.hpp"
 
-visualmesh::ActivationFunction activation_function(const std::string& name) {
-    // clang-format off
+inline visualmesh::ActivationFunction activation_function(const std::string& name) {
+
     if (name == "selu") { return visualmesh::ActivationFunction::SELU; }
-    else if (name == "softmax") { return visualmesh::ActivationFunction::SOFTMAX; }
-    else if (name == "relu") { return visualmesh::ActivationFunction::RELU; }
-    else if (name == "tanh") { return visualmesh::ActivationFunction::TANH; }
-    else { throw std::runtime_error("Unknown activation function " + name); }
-    // clang-format on
+    if (name == "softmax") { return visualmesh::ActivationFunction::SOFTMAX; }
+    if (name == "relu") { return visualmesh::ActivationFunction::RELU; }
+    if (name == "tanh") { return visualmesh::ActivationFunction::TANH; }
+    throw std::runtime_error("Unknown activation function " + name);
 }
 
 template <typename Scalar>

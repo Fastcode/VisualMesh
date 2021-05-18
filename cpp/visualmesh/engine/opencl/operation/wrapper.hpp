@@ -41,7 +41,7 @@ namespace engine {
          * @param code  the error code to check and throw
          * @param msg   the message to attach to the exception if it is thrown
          */
-        void throw_cl_error(const cl_int& code, const std::string& msg) {
+        inline void throw_cl_error(const cl_int& code, const std::string& msg) {
             if (code != CL_SUCCESS) { throw std::system_error(code, operation::opencl_error_category(), msg); }
         }
 

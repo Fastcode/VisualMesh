@@ -68,7 +68,7 @@ private:
         // The bounds of the range that this BSP element represents (start to one past the end)
         std::pair<int, int> range;
         // The indicies of the two children in this BSP
-        std::array<int, 2> children;
+        std::array<int, 2> children{};
         // The paramters of the cone that describe this part of the BSP
         // These include the unit axis in world space, and the cos and sin of the cone angle (θ)
         //
@@ -153,8 +153,9 @@ private:
 
             return elem;
         }
+
         // We treat the first element specially
-        else if (bsp.empty()) {
+        if (bsp.empty()) {
             // The first tree is always a split in the theta angle, and it split between +y from -y so that future loops
             // can sort purely based on x value making for a faster algorithm
 
@@ -186,65 +187,64 @@ private:
             }};
             return 0;
         }
-        else {
-            // Calculate our bounding cone for this cluster. We have to do a random sort of our segment here so that the
-            // performance of the bounding cone algorithm is expected to be linear
-            auto cone = bounding_cone(start, end);
 
-            // Find the extents of our data
-            Scalar min_phi   = std::numeric_limits<Scalar>::max();
-            Scalar max_phi   = std::numeric_limits<Scalar>::lowest();
-            Scalar min_theta = std::numeric_limits<Scalar>::max();
-            Scalar max_theta = std::numeric_limits<Scalar>::lowest();
-            Scalar sum_theta = 0;
-            Scalar sum_phi   = 0;
-            int count_theta  = 0;
-            int count_phi    = 0;
+        // Calculate our bounding cone for this cluster. We have to do a random sort of our segment here so that the
+        // performance of the bounding cone algorithm is expected to be linear
+        auto cone = bounding_cone(start, end);
 
-            for (auto it = start; it != end; ++it) {
-                const auto& ray    = nodes[*it].ray;
-                const auto& phi    = ray[2];
-                const Scalar theta = ray[0] / std::sqrt(1 - ray[2] * ray[2]);
+        // Find the extents of our data
+        Scalar min_phi   = std::numeric_limits<Scalar>::max();
+        Scalar max_phi   = std::numeric_limits<Scalar>::lowest();
+        Scalar min_theta = std::numeric_limits<Scalar>::max();
+        Scalar max_theta = std::numeric_limits<Scalar>::lowest();
+        Scalar sum_theta = 0;
+        Scalar sum_phi   = 0;
+        int count_theta  = 0;
+        int count_phi    = 0;
 
-                min_phi = std::min(min_phi, phi);
-                max_phi = std::max(max_phi, phi);
-                sum_phi += phi;
-                count_phi += 1;
+        for (auto it = start; it != end; ++it) {
+            const auto& ray    = nodes[*it].ray;
+            const auto& phi    = ray[2];
+            const Scalar theta = ray[0] / std::sqrt(1 - ray[2] * ray[2]);
 
-                if (std::isfinite(theta)) {
-                    min_theta = std::min(min_theta, theta);
-                    max_theta = std::max(max_theta, theta);
-                    sum_theta += theta;
-                    count_theta += 1;
-                }
+            min_phi = std::min(min_phi, phi);
+            max_phi = std::max(max_phi, phi);
+            sum_phi += phi;
+            count_phi += 1;
+
+            if (std::isfinite(theta)) {
+                min_theta = std::min(min_theta, theta);
+                max_theta = std::max(max_theta, theta);
+                sum_theta += theta;
+                count_theta += 1;
             }
-
-            // Work out the z and x values we need to split on as the average theta and phi
-            Scalar split_phi   = sum_phi / count_phi;
-            Scalar split_theta = sum_theta / count_theta;
-
-            // Partition based on either phi or theta
-            Iterator mid =
-              max_phi - min_phi > max_theta - min_theta
-                ? std::partition(start, end, [this, &split_phi](const int& a) { return nodes[a].ray[2] > split_phi; })
-                : std::partition(start, end, [this, &split_theta](const int& a) {
-                      // If an origin point is in here, this will be nan, which means the origin point will always
-                      // evaluate false here therefore going to one of the partitions
-                      return nodes[a].ray[0] / std::sqrt(1 - nodes[a].ray[2] * nodes[a].ray[2]) < split_theta;
-                  });
-
-            int elem = bsp.size();
-            bsp.push_back(BSP{
-              std::make_pair(offset, static_cast<int>(offset + std::distance(start, end))),
-              {{-1, -1}},
-              cone,
-            });
-            bsp[elem].children = {{
-              build_bsp(start, mid, min_points, offset),
-              build_bsp(mid, end, min_points, offset + std::distance(start, mid)),
-            }};
-            return elem;
         }
+
+        // Work out the z and x values we need to split on as the average theta and phi
+        Scalar split_phi   = sum_phi / count_phi;
+        Scalar split_theta = sum_theta / count_theta;
+
+        // Partition based on either phi or theta
+        Iterator mid =
+          max_phi - min_phi > max_theta - min_theta
+            ? std::partition(start, end, [this, &split_phi](const int& a) { return nodes[a].ray[2] > split_phi; })
+            : std::partition(start, end, [this, &split_theta](const int& a) {
+                  // If an origin point is in here, this will be nan, which means the origin point will always
+                  // evaluate false here therefore going to one of the partitions
+                  return nodes[a].ray[0] / std::sqrt(1 - nodes[a].ray[2] * nodes[a].ray[2]) < split_theta;
+              });
+
+        int elem = bsp.size();
+        bsp.push_back(BSP{
+          std::make_pair(offset, static_cast<int>(offset + std::distance(start, end))),
+          {{-1, -1}},
+          cone,
+        });
+        bsp[elem].children = {{
+          build_bsp(start, mid, min_points, offset),
+          build_bsp(mid, end, min_points, offset + std::distance(start, mid)),
+        }};
+        return elem;
     }
 
     /**
@@ -432,9 +432,13 @@ public:
         // We need to shuffle our list to ensure that the bounding cone algorithm has roughly linear performance.
         // We could use std::random_shuffle here but since we only need the list to be "kinda shuffled" so that it's
         // unlikely that we hit the worst case of the bounding cone algorithm. We can actually just shuffle every nth
-        // element and use a fairly bad random number model algorithm
-        for (int i = sorting.size() - 1; i > 0; i -= 5) {
-            std::swap(sorting[i], sorting[rand() % i]);
+        // element and use a fairly bad random number model algorithm (in this case an inline xor_shift algorithm)
+        uint32_t x = 0x4d657368;
+        for (int i = int(sorting.size()) - 1; i > 0; i -= 5) {
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            std::swap(sorting[i], sorting[x % i]);
         }
 
         // Build our bsp tree
@@ -590,7 +594,6 @@ public:
         return ranges;
     }
 
-public:
     /// The height that this mesh is designed to run at
     Scalar h;
     /// The maximum distance this mesh is setup for

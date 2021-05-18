@@ -66,6 +66,7 @@ using Engine = visualmesh::engine::cpu::Engine<Scalar>;
 
 #endif
 
+// NOLINTNEXTLINE(bugprone-exception-escape) This is debugging code, I would prefer exceptions crash the program
 int main() {
     std::string image_path = "../example/images";
 
@@ -143,7 +144,7 @@ int main() {
         draw("NM Grid 4", element.image, engine(nmgrid4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         draw("NM Grid 6", element.image, engine(nmgrid6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         draw("NM Grid 8", element.image, engine(nmgrid8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        if (char(cv::waitKey(0)) == 27) break;
+        if (char(cv::waitKey(0)) == 27) { break; }
     }
 
     // Run through the images doing projections

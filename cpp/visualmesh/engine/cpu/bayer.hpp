@@ -104,7 +104,7 @@ namespace engine {
                 int y_s = px[1] - 2;
 
                 // Read the image patch into a flat array
-                std::array<int32_t, 5 * 5> patch;
+                std::array<int32_t, 5 * 5> patch{};
                 for (int y = 0; y < 5; ++y) {
                     int y_c = std::min(std::max(y_s + y, 0), dimensions[1] - 1);
                     for (int x = 0; x < 5; ++x) {

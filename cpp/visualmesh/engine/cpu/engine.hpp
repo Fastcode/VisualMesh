@@ -196,7 +196,7 @@ namespace engine {
                 input.reserve(n_points * 4);
 
                 for (const auto& px : projected.pixel_coordinates) {
-                    const uint8_t* const im = reinterpret_cast<const uint8_t*>(image);
+                    const auto* const im = reinterpret_cast<const uint8_t*>(image);
 
                     const vec4<Scalar> p = interpolate(px, im, lens.dimensions, format);
                     input.insert(input.end(), p.begin(), p.end());
@@ -264,10 +264,12 @@ namespace engine {
                     }
                 }
 
+                // Move all the things we made into the classified mesh except the input
+                // We copy the input instead of moving it as we reuse the input buffer
                 return ClassifiedMesh<Scalar, N_NEIGHBOURS>{std::move(projected.pixel_coordinates),
                                                             std::move(projected.neighbourhood),
                                                             std::move(projected.global_indices),
-                                                            std::move(input)};
+                                                            input};
             }
 
             /**

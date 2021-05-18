@@ -72,7 +72,7 @@ std::vector<NodeQuality<Scalar, Model<Scalar>::N_NEIGHBOURS>> check_quality(
     // Loop through all the nodes in the mesh
     std::vector<NodeQuality<Scalar, N_NEIGHBOURS>> nodes;
     for (const auto& node : mesh.nodes) {
-        NodeQuality<Scalar, N_NEIGHBOURS> quality;
+        NodeQuality<Scalar, N_NEIGHBOURS> quality{};
 
         // Our ray pointing in the centre of the cluster
         const auto& r0 = node.ray;
@@ -99,7 +99,7 @@ std::vector<NodeQuality<Scalar, Model<Scalar>::N_NEIGHBOURS>> check_quality(
                 const auto& r1 = mesh.nodes[n1].ray;
 
                 // Radial difference to our neighbour
-                using namespace visualmesh;
+                using namespace visualmesh;  // NOLINT(google-build-using-namespace) Fine in function scope
                 auto r_d          = util::phi_difference(mesh.h, shape.c(), r0, r1);
                 quality.radial[i] = std::abs(shape.n(r_d.phi_0, r_d.h_prime) - shape.n(r_d.phi_1, r_d.h_prime));
 
@@ -188,6 +188,7 @@ void print_quality(const std::vector<NodeQuality<Scalar, N_NEIGHBOURS>>& nodes, 
     }
 }
 
+// NOLINTNEXTLINE(bugprone-exception-escape) This is debugging code, I would prefer exceptions crash the program
 int main(int argc, const char* argv[]) {
 
     const double h            = argc > 1 ? std::stof(argv[1]) : 1;

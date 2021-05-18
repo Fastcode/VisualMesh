@@ -108,7 +108,7 @@ inline Scalar distort(const Scalar& r, const vec2<Scalar>& k) {
     // https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4934233/pdf/sensors-16-00807.pdf
     // These terms have been stripped back to only include k1 and k2 and only uses the first 4 terms
     // if more are needed in the future go and get them from the original paper
-    // TODO if performance ever becomes an issue, this can be precomputed for the same k values
+    // TODO(thouliston): if performance ever becomes an issue, this can be precomputed for the same k values
     const vec4<Scalar> ik = inverse_coefficients(k);
     return r
            * (1.0                                                  //
@@ -210,7 +210,7 @@ vec3<Scalar> unproject(const vec2<Scalar>& px, const Lens<Scalar>& lens) {
     // Perform the unprojection math
     const Scalar& f  = lens.focal_length;
     const Scalar r_d = norm(screen);
-    if (r_d == 0) return {{1.0, 0.0, 0.0}};
+    if (r_d == 0) { return {{1.0, 0.0, 0.0}}; };
     const Scalar r_u = undistort(r_d, lens.k);
     Scalar theta;
     switch (lens.projection) {
