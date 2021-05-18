@@ -30,9 +30,7 @@ def export(config, output_path):
 
     # Get the training dataset so we know the output size
     training_dataset = (
-        Dataset(config, "training")
-        .map(keras_dataset, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        .prefetch(tf.data.experimental.AUTOTUNE)
+        Dataset(config, "training").map(keras_dataset, num_parallel_calls=tf.data.AUTOTUNE).prefetch(tf.data.AUTOTUNE)
     )
 
     # Get the dimensionality of the Y part of the dataset
