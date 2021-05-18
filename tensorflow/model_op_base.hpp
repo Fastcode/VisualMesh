@@ -22,9 +22,6 @@
 #include "visualmesh/model/nmgrid4.hpp"
 #include "visualmesh/model/nmgrid6.hpp"
 #include "visualmesh/model/nmgrid8.hpp"
-#include "visualmesh/model/radial4.hpp"
-#include "visualmesh/model/radial6.hpp"
-#include "visualmesh/model/radial8.hpp"
 #include "visualmesh/model/ring4.hpp"
 #include "visualmesh/model/ring6.hpp"
 #include "visualmesh/model/ring8.hpp"
@@ -54,10 +51,7 @@ public:
 
         // clang-format off
         using namespace visualmesh::model; // NOLINT(google-build-using-namespace) function scope is fine
-        if (m == "RADIAL4") { static_cast<Subclass*>(this)->template DoCompute<Radial4>(context, shape); }
-        else if (m == "RADIAL6") { static_cast<Subclass*>(this)->template DoCompute<Radial6>(context, shape); }
-        else if (m == "RADIAL8") { static_cast<Subclass*>(this)->template DoCompute<Radial8>(context, shape); }
-        else if (m == "RING4") { static_cast<Subclass*>(this)->template DoCompute<Ring4>(context, shape); }
+        if (m == "RING4") { static_cast<Subclass*>(this)->template DoCompute<Ring4>(context, shape); }
         else if (m == "RING6") { static_cast<Subclass*>(this)->template DoCompute<Ring6>(context, shape); }
         else if (m == "RING8") { static_cast<Subclass*>(this)->template DoCompute<Ring8>(context, shape); }
         else if (m == "NMGRID4") { static_cast<Subclass*>(this)->template DoCompute<NMGrid4>(context, shape); }

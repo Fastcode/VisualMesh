@@ -29,9 +29,6 @@
 #include "visualmesh/model/nmgrid4.hpp"
 #include "visualmesh/model/nmgrid6.hpp"
 #include "visualmesh/model/nmgrid8.hpp"
-#include "visualmesh/model/radial4.hpp"
-#include "visualmesh/model/radial6.hpp"
-#include "visualmesh/model/radial8.hpp"
 #include "visualmesh/model/ring4.hpp"
 #include "visualmesh/model/ring6.hpp"
 #include "visualmesh/model/ring8.hpp"
@@ -71,9 +68,6 @@ int main() {
     std::string image_path = "../example/images";
 
     // Create windows
-    cv::namedWindow("Radial 4", cv::WINDOW_AUTOSIZE);
-    cv::namedWindow("Radial 6", cv::WINDOW_AUTOSIZE);
-    cv::namedWindow("Radial 8", cv::WINDOW_AUTOSIZE);
     cv::namedWindow("Ring 4", cv::WINDOW_AUTOSIZE);
     cv::namedWindow("Ring 6", cv::WINDOW_AUTOSIZE);
     cv::namedWindow("Ring 8", cv::WINDOW_AUTOSIZE);
@@ -91,12 +85,6 @@ int main() {
 
     // Build meshes
     Timer t;
-    visualmesh::VisualMesh<Scalar, visualmesh::model::Radial4> radial4(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built Radial 4");
-    visualmesh::VisualMesh<Scalar, visualmesh::model::Radial6> radial6(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built Radial 6");
-    visualmesh::VisualMesh<Scalar, visualmesh::model::Radial8> radial8(sphere, 0.5, 1.5, 4, 0.5, 20);
-    t.measure("Built Radial 8");
     visualmesh::VisualMesh<Scalar, visualmesh::model::Ring4> ring4(sphere, 0.5, 1.5, 4, 0.5, 20);
     t.measure("Built Ring 4");
     visualmesh::VisualMesh<Scalar, visualmesh::model::Ring6> ring6(sphere, 0.5, 1.5, 4, 0.5, 20);
@@ -129,9 +117,6 @@ int main() {
     auto dataset = load_dataset<Scalar>(image_path);
 
     for (const auto& element : dataset) {
-        draw("Radial 4", element.image, engine(radial4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("Radial 6", element.image, engine(radial6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
-        draw("Radial 8", element.image, engine(radial8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         draw("Ring 4", element.image, engine(ring4, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         draw("Ring 6", element.image, engine(ring6, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
         draw("Ring 8", element.image, engine(ring8, element.Hoc, element.lens), cv::Scalar(255, 255, 255));
