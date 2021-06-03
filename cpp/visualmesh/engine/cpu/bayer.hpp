@@ -42,42 +42,45 @@ namespace engine {
             // These coefficent values are scaled by 64 (divide by 64 after multiplying out)
             // clang-format off
             // G at red locations
-            constexpr std::array<int16_t, 25> G_R =  {{  0,  0, -8,  0,  0,
-                                                         0,  0, 16,  0,  0,
-                                                        -8, 16, 32, 16, -8,
-                                                         0,  0, 16,  0,  0,
-                                                         0,  0, -8,  0,  0 }};
+            constexpr std::array<int, 25> G_R =  {{  0,  0, -8,  0,  0,
+                                                     0,  0, 16,  0,  0,
+                                                    -8, 16, 32, 16, -8,
+                                                     0,  0, 16,  0,  0,
+                                                     0,  0, -8,  0,  0 }};
             // G at blue locations
-            constexpr std::array<int16_t, 25> G_B = G_R;
+            constexpr std::array<int, 25> G_B = G_R;
 
 
             // R at blue locations
-            constexpr std::array<int16_t, 25> R_B =  {{  0,  0, -12,  0,   0,
-                                                         0, 16,   0, 16,   0,
-                                                       -12,  0,  48,  0, -12,
-                                                         0, 16,   0, 16,   0,
-                                                         0,  0, -12,  0,   0 }};
+            constexpr std::array<int, 25> R_B =  {{  0,  0, -12,  0,   0,
+                                                     0, 16,   0, 16,   0,
+                                                   -12,  0,  48,  0, -12,
+                                                     0, 16,   0, 16,   0,
+                                                     0,  0, -12,  0,   0 }};
             // B at red locations
-            constexpr std::array<int16_t, 25> B_R = R_B;
+            constexpr std::array<int, 25> B_R = R_B;
 
             // R at green locations on red rows
-            constexpr std::array<int16_t, 25> R_GR = {{  0,  0,  4,  0,  0,
-                                                         0, -8,  0, -8,  0,
-                                                        -8, 32, 40, 32, -8,
-                                                         0, -8,  0, -8,  0,
-                                                         0,  0,  4,  0,  0 }};
+            constexpr std::array<int, 25> R_GR = {{  0,  0,  4,  0,  0,
+                                                     0, -8,  0, -8,  0,
+                                                    -8, 32, 40, 32, -8,
+                                                     0, -8,  0, -8,  0,
+                                                     0,  0,  4,  0,  0 }};
             // Blue at green locations on red rows
-            constexpr std::array<int16_t, 25> B_GB = R_GR;
+            constexpr std::array<int, 25> B_GB = R_GR;
 
             // Red at green locations on blue rows
-            constexpr std::array<int16_t, 25> R_GB = {{  0,  0, -8,  0,  0,
-                                                         0, -8, 32, -8,  0,
-                                                         4,  0, 40,  0,  4,
-                                                         0, -8, 32, -8,  0,
-                                                         0,  0, -8,  0,  0 }};
+            constexpr std::array<int, 25> R_GB = {{  0,  0, -8,  0,  0,
+                                                     0, -8, 32, -8,  0,
+                                                     4,  0, 40,  0,  4,
+                                                     0, -8, 32, -8,  0,
+                                                     0,  0, -8,  0,  0 }};
             // Blue at green locations on red rows
-            constexpr std::array<int16_t, 25> B_GR = R_GB;
+            constexpr std::array<int, 25> B_GR = R_GB;
             // clang-format on
+
+            // Scale factor
+            constexpr int scale = 64;
 
             /**
              * @brief Demosaics the patch into an rgb pixel value
@@ -90,13 +93,13 @@ namespace engine {
              * @return an rgb value for the image patch
              */
             template <typename Scalar>
-            inline vec4<Scalar> demosaic(const std::array<int16_t, 5 * 5>& p, const BayerPixelType type) {
-                vec4<int16_t> output;
+            inline vec4<Scalar> demosaic(const std::array<int, 5 * 5>& p, const BayerPixelType type) {
+                vec4<int> output;
                 switch (type) {
-                    case R: output = vec4<int16_t>{{p[12], dot(p, G_R) / 64, dot(p, B_R) / 64, 255}}; break;
-                    case GR: output = vec4<int16_t>{{dot(p, R_GR) / 64, p[12], dot(p, B_GR) / 64, 255}}; break;
-                    case GB: output = vec4<int16_t>{{dot(p, R_GB) / 64, p[12], dot(p, B_GB) / 64, 255}}; break;
-                    case B: output = vec4<int16_t>{{dot(p, R_B) / 64, dot(p, G_B) / 64, p[12], 255}}; break;
+                    case R: output = vec4<int>{{p[12], dot(p, G_R) / scale, dot(p, B_R) / scale, 255}}; break;
+                    case GR: output = vec4<int>{{dot(p, R_GR) / scale, p[12], dot(p, B_GR) / scale, 255}}; break;
+                    case GB: output = vec4<int>{{dot(p, R_GB) / scale, p[12], dot(p, B_GB) / scale, 255}}; break;
+                    case B: output = vec4<int>{{dot(p, R_B) / scale, dot(p, G_B) / scale, p[12], 255}}; break;
                     default: throw std::runtime_error("Unknown bayer pixel type"); break;
                 }
 
@@ -127,7 +130,7 @@ namespace engine {
                 int y_s = px[1] - 2;
 
                 // Read the image patch into a flat array
-                std::array<int16_t, 5 * 5> patch{};
+                std::array<int, 5 * 5> patch{};
                 for (int y = 0; y < 5; ++y) {
                     int y_c = std::min(std::max(y_s + y, 0), dimensions[1] - 1);
                     for (int x = 0; x < 5; ++x) {
