@@ -57,7 +57,8 @@ std::vector<dataset_element<Scalar>> load_dataset(const std::string& path) {
                 element.number = file.substr(4, 7);
 
                 // NOLINTNEXTLINE(performance-inefficient-string-concatenation) Performance doesn't matter here
-                element.image          = cv::imread(path + "/image" + element.number + ".jpg");
+                element.image = cv::imread(path + "/image" + element.number + ".jpg");
+                // NOLINTNEXTLINE(performance-inefficient-string-concatenation) Performance doesn't matter here
                 YAML::Node lens        = YAML::LoadFile(path + "/" + file);
                 std::string projection = lens["projection"].as<std::string>();
 
