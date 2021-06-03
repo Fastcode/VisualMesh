@@ -79,6 +79,16 @@ namespace engine {
             constexpr std::array<int16_t, 25> B_GR = R_GB;
             // clang-format on
 
+            /**
+             * @brief Demosaics the patch into an rgb pixel value
+             *
+             * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+             *
+             * @param p     the image patch that we will apply the demosacing too
+             * @param type  the bayer pixel type (which pixel in the pattern we are)
+             *
+             * @return an rgb value for the image patch
+             */
             template <typename Scalar>
             inline vec4<Scalar> demosaic(const std::array<int16_t, 5 * 5>& p, const BayerPixelType type) {
                 vec4<int16_t> output;
@@ -94,6 +104,18 @@ namespace engine {
                 return multiply(cast<Scalar>(output), Scalar(1.0 / 255.0));
             }
 
+            /**
+             * @brief Get the pixel object
+             *
+             * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+             *
+             * @param px            the pixel coordinates to get the rgb value for
+             * @param image         the image bytes
+             * @param dimensions    the dimensions of the input image
+             * @param format        the pixel format of the input image
+             *
+             * @return an rgb value as three floats between 0.0 and 1.0
+             */
             template <typename Scalar>
             vec4<Scalar> get_pixel(const vec2<int>& px,
                                    const uint8_t* const image,

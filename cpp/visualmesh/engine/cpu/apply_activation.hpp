@@ -64,6 +64,15 @@ namespace engine {
             }
         }  // namespace activation
 
+        /**
+         * @brief Applys an activation function based on the selected activation function
+         *
+         * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+         *
+         * @param fn            the enum representing which activation function to use
+         * @param data          the data that we will be applying the activation function to
+         * @param dimensions    the dimensions of the layer for activation functions like softmax
+         */
         template <typename Scalar>
         void apply_activation(const ActivationFunction& fn, std::vector<Scalar>& data, const int& dimensions) {
             switch (fn) {
