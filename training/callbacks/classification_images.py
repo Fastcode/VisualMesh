@@ -121,4 +121,4 @@ class ClassificationImages(tf.keras.callbacks.Callback):
         # Sort by hash so the images show up in the same order every time
         with self.writer.as_default():
             for i, img in enumerate(sorted(images, key=lambda image: image[0])):
-                tf.summary.image("images/{}".format(i), tf.expand_dims(img[1], axis=-1), step=epoch, max_outputs=1)
+                tf.summary.image("images/{}".format(i), tf.expand_dims(img[1], axis=0), step=epoch, max_outputs=1)
