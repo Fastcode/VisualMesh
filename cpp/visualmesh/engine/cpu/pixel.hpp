@@ -130,8 +130,8 @@ namespace engine {
             const Scalar y        = P[1];
             const int x1          = std::max(int(std::floor(P[0])), 0);
             const int y1          = std::max(int(std::floor(P[1])), 0);
-            const int x2          = std::max(x1 + 1, dimensions[0]);
-            const int y2          = std::max(y1 + 1, dimensions[1]);
+            const int x2          = std::min(x1 + 1, dimensions[0] - 1);
+            const int y2          = std::min(y1 + 1, dimensions[1] - 1);
             const vec4<Scalar> Q1 = get_pixel<Scalar>(vec2<int>{x1, y1}, image, dimensions, format);
             const vec4<Scalar> Q2 = get_pixel<Scalar>(vec2<int>{x2, y1}, image, dimensions, format);
             const vec4<Scalar> Q3 = get_pixel<Scalar>(vec2<int>{x1, y2}, image, dimensions, format);
