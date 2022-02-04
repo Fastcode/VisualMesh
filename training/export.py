@@ -20,7 +20,6 @@ import yaml
 
 import tensorflow as tf
 
-from .dataset import keras_dataset
 from .flavour import Dataset
 from .layer.graph_convolution import GraphConvolution
 from .model import VisualMeshModel
@@ -29,12 +28,10 @@ from .model import VisualMeshModel
 def export(config, output_path):
 
     # Get the training dataset so we know the output size
-    training_dataset = (
-        Dataset(config, "training").map(keras_dataset, num_parallel_calls=tf.data.AUTOTUNE).prefetch(tf.data.AUTOTUNE)
-    )
+    training_dataset = Dataset(config, "training")
 
     # Get the dimensionality of the Y part of the dataset
-    output_dims = training_dataset.element_spec[1].shape[-1]
+    output_dims = training_dataset.element_spec["Y"].shape[-1]
 
     # Define the model
     model = VisualMeshModel(structure=config["network"]["structure"], output_dims=output_dims)
@@ -47,7 +44,8 @@ def export(config, output_path):
         raise RuntimeError("Could not find weights to load into the network")
 
     # We have to run a predict step so that everything is loaded properly
-    model.predict(training_dataset.take(1))
+    for v in training_dataset.take(1):
+        model(v["X"], v["G"], training=False)
 
     # Print out the model summary
     model.summary()

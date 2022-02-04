@@ -13,26 +13,20 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import os
-
-import numpy as np
+from tqdm import tqdm
 
 import tensorflow as tf
 
-from .dataset import keras_dataset
-from .flavour import Dataset, Loss, Metrics, TestMetrics
+from .flavour import Dataset, Loss, TestMetrics
 from .model import VisualMeshModel
 
 
 def test(config, output_path):
 
     # Get the testing dataset
-    testing_dataset = (
-        Dataset(config, "testing").map(keras_dataset, num_parallel_calls=tf.data.AUTOTUNE).prefetch(tf.data.AUTOTUNE)
-    )
-
+    testing_dataset = Dataset(config, "testing")
     # Get the dimensionality of the Y part of the dataset
-    output_dims = testing_dataset.element_spec[1].shape[-1]
+    output_dims = testing_dataset.element_spec["Y"].shape[-1]
 
     # Define the model
     model = VisualMeshModel(structure=config["network"]["structure"], output_dims=output_dims)
@@ -46,10 +40,17 @@ def test(config, output_path):
 
     # Get the metrics and curves we will be building
     metrics = TestMetrics(config)
-    model.compile(loss=Loss(config), metrics=metrics)
+    loss_fn = Loss(config)
 
-    # Run the evaluation step for each of the batches to build up our metrics
-    model.evaluate(testing_dataset)
+    loss_sum = 0
+    loss_count = 0
+    for data in tqdm(testing_dataset, desc="Testing", unit="batch", dynamic_ncols=True, leave=False):
+        logits = model(data["X"], data["G"], training=False)
+        loss_sum += loss_fn(data["Y"], logits)
+        loss_count += 1
+
+        for m in metrics:
+            m.update_state(data["Y"], logits)
 
     # Save all the metric data
     for m in metrics:

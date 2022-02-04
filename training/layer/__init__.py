@@ -13,5 +13,5 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from .graph_convolution import GraphConvolution
 from .depthwise_seperable_graph_convolution import DepthwiseSeparableGraphConvolution
+from .graph_convolution import GraphConvolution

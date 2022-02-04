@@ -13,10 +13,23 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from .dataset import Dataset
-from .learning_rate import LearningRate
-from .loss import Loss
-from .metrics import Metrics
-from .optimiser import Optimiser
-from .progress_images import ProgressImages
-from .test_metrics import TestMetrics
+import tensorflow as tf
+
+
+def Optimiser(config, initial_lr):
+
+    # Setup the optimiser
+    if config["training"]["optimiser"]["type"] == "Adam":
+        return tf.optimizers.Adam(learning_rate=initial_lr)
+    elif config["training"]["optimiser"]["type"] == "SGD":
+        return tf.optimizers.SGD(learning_rate=initial_lr)
+    elif config["training"]["optimiser"]["type"] == "Ranger":
+        import tensorflow_addons as tfa
+
+        return tfa.optimizers.Lookahead(
+            tfa.optimizers.RectifiedAdam(learning_rate=initial_lr),
+            sync_period=int(config["training"]["optimiser"]["sync_period"]),
+            slow_step_size=float(config["training"]["optimiser"]["slow_step_size"]),
+        )
+    else:
+        raise RuntimeError("Unknown optimiser type" + config["training"]["optimiser"]["type"])

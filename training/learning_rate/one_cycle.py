@@ -1,4 +1,4 @@
-# Copyright (C) 2017-2020 Alex Biddulph <Alexander.Biddulph@uon.edu.au>
+# Copyright (C) 2017-2020 Trent Houliston <trent@houliston.me>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -13,16 +13,9 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import os
 
-import numpy as np
-
-import tensorflow as tf
-
-
-class OneCycle(tf.keras.callbacks.LearningRateScheduler):
-    def __init__(self, config, **kwargs):
-        super(OneCycle, self).__init__(self.calc_lr, **kwargs)
+class OneCycle:
+    def __init__(self, config):
 
         # lr ranges
         self.min_lr = float(config["training"]["learning_rate"]["min_learning_rate"])
@@ -34,7 +27,7 @@ class OneCycle(tf.keras.callbacks.LearningRateScheduler):
         self.decay_epochs = int(config["training"]["epochs"]) - self.cycle_epochs
         self.start_step = None if config["training"]["learning_rate"].get("hot_start", False) else 0
 
-    def calc_lr(self, epoch, lr):
+    def __call__(self, epoch):
 
         # Update our start step if we haven't run yet
         self.start_step = epoch if self.start_step is None else self.start_step

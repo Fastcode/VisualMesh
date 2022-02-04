@@ -54,7 +54,7 @@ class Seeker:
         # Transform our remaining targets into observation plane space
         uOCo, l = tf.linalg.normalize(tf.einsum("ij,kj->ki", Hoc[:3, :3], targets), axis=-1)
 
-        # Check if this signal is close enough in distance to our observation plane to be considered
+        # Check if this point is close enough in distance to our observation plane to be considered
         height = Hoc[2, 3]
         ratio = tf.squeeze(l, axis=-1) / height
         uOCo = tf.gather(

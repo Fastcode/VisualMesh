@@ -28,9 +28,8 @@ mpl.use("Agg")
 import matplotlib.pyplot as plt  # isort:skip
 
 
-class ClassificationImages(tf.keras.callbacks.Callback):
+class ClassificationImages:
     def __init__(self, output_path, dataset, colours):
-        super(ClassificationImages, self).__init__()
 
         self.colours = colours
         self.writer = tf.summary.create_file_writer(os.path.join(output_path, "images"))
@@ -103,12 +102,12 @@ class ClassificationImages(tf.keras.callbacks.Callback):
 
         return (img_hash, data)
 
-    def on_epoch_end(self, epoch, logs=None):
+    def __call__(self, model, epoch):
 
         # Make a dataset that we can infer from, we need to make the input a tuple in a tuple.
         # If it is not it considers G to be Y and it fails to execute
         # Then using this dataset of images, do a prediction using the model
-        predictions = self.model((self.X, self.G))
+        predictions = model(self.X, self.G)
 
         # Work out the valid data ranges for each of the objects
         images = []

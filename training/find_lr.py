@@ -23,115 +23,59 @@ from tqdm import tqdm
 
 import tensorflow as tf
 
-from .dataset import keras_dataset
-from .flavour import Dataset, Loss
+from .flavour import Dataset, Loss, Optimiser
 from .model import VisualMeshModel
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt  # isort:skip
 
 
-class LRProgress(tf.keras.callbacks.Callback):
-    def __init__(self, n_steps, lr_schedule, **kwargs):
-        super(LRProgress, self).__init__(**kwargs)
-
-        self.lr_schedule = lr_schedule
-        self.n_steps = n_steps
-
-        # Tracking loss values
-        self.smooth_loss = None
-        self.losses = []
-
-        # Progress bar settings
-        self.n_history = 20
-        self.lr_progress = None
-        self.loss_title = None
-        self.loss_progress = None
-
-    def on_epoch_end(self, epoch, logs=None):
-        # Skip when we explode at the end
-        if not math.isfinite(logs["loss"]):
-            return
-
-        # Calculate smoothed loss values
-        self.smooth_loss = logs["loss"] if self.smooth_loss is None else self.smooth_loss * 0.98 + logs["loss"] * 0.02
-        self.losses.append(math.log1p(self.smooth_loss))
-
-        # Create the lr_progress bar so we can see how far it is
-        if self.lr_progress is None:
-            self.lr_progress = tqdm(total=self.n_steps, dynamic_ncols=True)
-        self.lr_progress.update()
-        self.lr_progress.set_description("LR:   {:.3e}".format(self.model.optimizer.lr.numpy()))
-
-        # Create our series of moving loss graphs
-        if self.loss_progress is None:
-            self.loss_title = tqdm(bar_format="{desc}", desc="Loss Graph")
-            self.loss_progress = [
-                tqdm(bar_format="{desc}|{bar}|", total=self.losses[-1], dynamic_ncols=True)
-                for i in range(self.n_history)
-            ]
-
-        valid_i = -min(len(self.losses), self.n_history)
-
-        # Get the maximum of the losses
-        loss_max = max(self.losses)
-
-        for bar, loss in zip(self.loss_progress[valid_i:], self.losses[valid_i:]):
-            bar.total = loss_max
-            bar.n = loss
-            bar.set_description("{:.3e}".format(math.expm1(loss)))
-
-
 # Find valid learning rates for
 def find_lr(config, output_path, min_lr, max_lr, n_steps, window_size):
 
     # Open the training dataset and put it on repeat
-    training_dataset = Dataset(config, "training").map(keras_dataset).repeat()
+    training_dataset = Dataset(config, "training").repeat()
 
     # Get the dimensionality of the Y part of the dataset
-    output_dims = training_dataset.element_spec[1].shape[-1]
+    output_dims = training_dataset.element_spec["Y"].shape[-1]
 
     # Define the model
     model = VisualMeshModel(structure=config["network"]["structure"], output_dims=output_dims)
 
-    def lr_schedule(epoch, lr):
+    def lr_schedule(epoch):
         return min_lr * (max_lr / min_lr) ** (epoch / n_steps)
 
-    # Setup the optimiser
-    if config["training"]["optimiser"]["type"] == "Adam":
-        optimiser = tf.optimizers.Adam(learning_rate=min_lr)
-    elif config["training"]["optimiser"]["type"] == "SGD":
-        optimiser = tf.optimizers.SGD(learning_rate=min_lr)
-    elif config["training"]["optimiser"]["type"] == "Ranger":
-        import tensorflow_addons as tfa
+    optimiser = Optimiser(config, lr_schedule(0))
+    loss_fn = Loss(config)
 
-        optimiser = tfa.optimizers.Lookahead(
-            tfa.optimizers.RectifiedAdam(learning_rate=min_lr),
-            sync_period=int(config["training"]["optimiser"]["sync_period"]),
-            slow_step_size=float(config["training"]["optimiser"]["slow_step_size"]),
-        )
-    else:
-        raise RuntimeError("Unknown optimiser type" + config["training"]["optimiser"]["type"])
+    losses = []
+    lrs = []
+    with tqdm(desc=f"LR: {optimiser.lr.numpy():.3e} Loss: ---", total=n_steps) as progress:
+        for step, data in enumerate(training_dataset):
+            if step > n_steps:
+                break
 
-    # Compile the model grabbing the flavours for the loss and metrics
-    model.compile(optimizer=optimiser, loss=Loss(config))
+            optimiser.lr = lr_schedule(step)
 
-    # Run the fit function on the model to calculate the learning rates
-    history = model.fit(
-        training_dataset,
-        epochs=n_steps,
-        steps_per_epoch=1,
-        callbacks=[
-            tf.keras.callbacks.TerminateOnNaN(),
-            tf.keras.callbacks.LearningRateScheduler(lr_schedule),
-            LRProgress(n_steps, lr_schedule),
-        ],
-        verbose=False,
-    )
+            with tf.GradientTape() as tape:
+                logits = model(data["X"], data["G"], training=True)
+                loss = loss_fn(data["Y"], logits)
+
+            if not tf.math.is_finite(loss):
+                break
+
+            grads = tape.gradient(loss, model.trainable_weights)
+            optimiser.apply_gradients(zip(grads, model.trainable_weights))
+
+            losses.append(loss.numpy())
+            lrs.append(optimiser.lr.numpy())
+
+            progress.set_description(f"LR: {optimiser.lr.numpy():.3e} Loss: {loss.numpy():.3e}")
+            progress.update()
 
     # Extract the loss and LR from before it became nan
-    loss = np.array(history.history["loss"][:-1])
-    lr = np.array(history.history["lr"][:-1])
+    loss = np.array(losses[:-1])
+    lr = np.array(lrs[:-1])
 
     # Make a smoothed version of the loss
     smooth_loss = np.convolve(loss, np.ones(window_size), "same") / np.convolve(

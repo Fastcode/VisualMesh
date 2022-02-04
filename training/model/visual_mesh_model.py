@@ -14,7 +14,7 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import tensorflow as tf
-from training.layer import GraphConvolution, DepthwiseSeparableGraphConvolution
+from training.layer import DepthwiseSeparableGraphConvolution, GraphConvolution
 
 
 class VisualMeshModel(tf.keras.Model):
@@ -74,13 +74,10 @@ class VisualMeshModel(tf.keras.Model):
             {**{k: v["inputs"] for k, v in structure.items()}, "X": [], "G": []},
         )
 
-    def call(self, X, training=False):
-
-        # Split out the graph and logits
-        logits, G = X
+    def call(self, X, G, training=False):
 
         # Run through each of the layers which are sorted in topological order
-        results = {"X": logits, "G": G}
+        results = {"X": X, "G": G}
         for s in self.stages:
             # Get the operation and inputs from the list of ops
             op, inputs = self.ops[s]

@@ -17,7 +17,6 @@ import hashlib
 import math
 import os
 
-import cv2
 import numpy as np
 
 import tensorflow as tf
@@ -25,9 +24,8 @@ from training.op import difference_visual_mesh, map_visual_mesh, unmap_visual_me
 from training.projection import project
 
 
-class SeekerImages(tf.keras.callbacks.Callback):
+class SeekerImages:
     def __init__(self, output_path, dataset, model, max_distance, geometry, radius, scale):
-        super(SeekerImages, self).__init__()
 
         self.max_distance = max_distance
         self.radius = radius
@@ -190,12 +188,12 @@ class SeekerImages(tf.keras.callbacks.Callback):
 
         return (img_hash, output)
 
-    def on_epoch_end(self, epoch, logs=None):
+    def __call__(self, model, epoch):
 
         # Make a dataset that we can infer from, we need to make the input a tuple in a tuple.
         # If it is not it considers G to be Y and it fails to execute
         # Then using this dataset of images, do a prediction using the model
-        predictions = self.model((self.X, self.G))
+        predictions = model(self.X, self.G)
 
         # Work out the valid data ranges for each of the objects
         images = []

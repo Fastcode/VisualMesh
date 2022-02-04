@@ -15,95 +15,178 @@
 
 import os
 
-import yaml
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 import tensorflow as tf
+from training import dataset
 
-from .callbacks import ImageTensorBoard, OneCycle
-from .dataset import keras_dataset
-from .flavour import Dataset, ImageCallback, Loss, Metrics
+from .flavour import Dataset, LearningRate, Loss, Metrics, Optimiser, ProgressImages
 from .model import VisualMeshModel
+
+
+# Writes out the metrics, handling the different kinds of metrics that we could have
+def _write_metrics(writer, step, loss, metrics, prefix="", images=True, reset=False):
+    m_status = [f"Loss: {loss:.02g}"]
+
+    with writer.as_default():
+        tf.summary.scalar(f"{prefix}loss", loss, step)
+        for m in metrics:
+            if hasattr(m, "images"):
+                if images:
+                    tf.summary.image(f"{prefix}{m.name}", m.images(m.result()), step)
+            else:
+                r = m.result()
+                m_status.append(f"{m.name}: {r:.02g}")
+                tf.summary.scalar(f"{prefix}{m.name}", r, step)
+
+    return m_status
+
+
+class DatasetGrouper:
+    def __init__(self, dataset, group_size):
+        self.dataset = dataset
+        self.it = iter(dataset)
+        self.group_size = group_size
+
+    def reset(self):
+        self.it = iter(dataset)
+
+    def __len__(self):
+        if self.group_size is None:
+            return len(self.dataset)
+        else:
+            return self.group_size
+
+    def __iter__(self):
+        # Entire dataset as group
+        if self.group_size is None:
+            for v in self.dataset:
+                yield v
+        else:
+            for i in range(self.group_size):
+                yield next(self.it)
 
 
 # Train the network
 def train(config, output_path):
 
-    # Open the two datasets for training and validation
-    training_dataset = Dataset(config, "training").map(keras_dataset)
-    validation_dataset = Dataset(config, "validation").map(keras_dataset)
+    # Get the flavour of network that we are training and prepare them
+    training_dataset = Dataset(config, "training")
+    validation_dataset = Dataset(config, "validation")
+    loss_fn = Loss(config)
+    metrics = Metrics(config)
+    learning_rate = LearningRate(config)
+    optimiser = Optimiser(config, learning_rate(0))
+    progress_images = ProgressImages(config, output_path)
 
-    # If we are using batches_per_epoch as a number rather than the whole dataset
-    if "batches_per_epoch" in config["training"]:
-        training_dataset = training_dataset.repeat()
-
-    # Get the dimensionality of the Y part of the dataset
-    output_dims = training_dataset.element_spec[1].shape[-1]
+    # Get the dimensionality of the Y part of the dataset so we know the size of the last layer of the network
+    output_dims = training_dataset.element_spec["Y"].shape[-1]
 
     # Define the model
     model = VisualMeshModel(structure=config["network"]["structure"], output_dims=output_dims)
 
-    # Determine the learning rate policy to use
-    if config["training"]["learning_rate"]["type"] == "static":
-        learning_rate = float(config["training"]["learning_rate"]["value"])
-        lr_callback = []
-    elif config["training"]["learning_rate"]["type"] == "one_cycle":
-        learning_rate = float(config["training"]["learning_rate"]["min_learning_rate"])
-        lr_callback = [OneCycle(config=config, verbose=True)]
+    # Create the tensorboard writers
+    train_writer = tf.summary.create_file_writer(os.path.join(output_path, "train"))
+    val_writer = tf.summary.create_file_writer(os.path.join(output_path, "validation"))
 
-    # Setup the optimiser
-    if config["training"]["optimiser"]["type"] == "Adam":
-        optimiser = tf.optimizers.Adam(learning_rate=learning_rate)
-    elif config["training"]["optimiser"]["type"] == "SGD":
-        optimiser = tf.optimizers.SGD(learning_rate=learning_rate)
-    elif config["training"]["optimiser"]["type"] == "Ranger":
-        import tensorflow_addons as tfa
-
-        optimiser = tfa.optimizers.Lookahead(
-            tfa.optimizers.RectifiedAdam(learning_rate=learning_rate),
-            sync_period=int(config["training"]["optimiser"]["sync_period"]),
-            slow_step_size=float(config["training"]["optimiser"]["slow_step_size"]),
-        )
-    else:
-        raise RuntimeError("Unknown optimiser type" + config["training"]["optimiser"]["type"])
-
-    # Compile the model grabbing the flavours for the loss and metrics
-    model.compile(optimizer=optimiser, loss=Loss(config), metrics=Metrics(config))
-
-    # Find the latest checkpoint file and load it
+    # Find the latest checkpoint file and load it so we can resume training
     checkpoint_file = tf.train.latest_checkpoint(output_path)
     if checkpoint_file is not None:
         model.load_weights(checkpoint_file)
 
-    # Fit the model
-    history = model.fit(
-        training_dataset,
-        epochs=config["training"]["epochs"],
-        steps_per_epoch=(
-            None if "batches_per_epoch" not in config["training"] else config["training"]["batches_per_epoch"]
-        ),
-        validation_data=validation_dataset,
-        validation_steps=config["training"]["validation"]["samples"],
-        callbacks=[
-            ImageTensorBoard(
-                log_dir=output_path,
-                update_freq=config["training"]["validation"]["log_frequency"],
-                profile_batch=0,
-                write_graph=True,
-                histogram_freq=1,
-            ),
-            tf.keras.callbacks.ModelCheckpoint(
-                filepath=os.path.join(output_path, "model"),
-                monitor="loss",
-                save_weights_only=True,
-                save_best_only=True,
-            ),
-            tf.keras.callbacks.TerminateOnNaN(),
-            ImageCallback(config, output_path),
-            *lr_callback,
-        ],
-    )
+    # Create the iterator objects to loop through the dataset
+    if config["training"]["batches"] is not None:
+        training_dataset = training_dataset.repeat()
+    validation_dataset = validation_dataset.repeat()
+    training = DatasetGrouper(training_dataset, config["training"]["batches_per_epoch"])
+    validation = DatasetGrouper(validation_dataset, config["training"]["validation"]["samples"])
 
-    # Pickle the history object
-    with open(os.path.join(output_path, "history.yaml"), "w") as out:
-        yaml.dump(history.history, out, default_flow_style=None, width=float("inf"))
+    batch_no = 0
+    best_loss = None
+    for epoch in trange(config["training"]["epochs"], desc="Epoch", unit="epoch", dynamic_ncols=True):
+
+        # Update the learning rate
+        optimiser.lr = learning_rate(epoch)
+
+        # Perform the training loop
+        loss_sum = 0
+        loss_count = 0
+        for data in tqdm(training, desc="Train Batch", unit="batch", dynamic_ncols=True, leave=False):
+
+            # Run the network
+            with tf.GradientTape() as tape:
+                logits = model(data["X"], data["G"], training=True)
+                loss = loss_fn(data["Y"], logits)
+
+            # If our loss ever becomes non finite end training
+            if not tf.math.is_finite(loss):
+                tqdm.write("Loss is not finite, terminating training")
+                exit(1)
+
+            # Apply the gradient update
+            grads = tape.gradient(loss, model.trainable_weights)
+            optimiser.apply_gradients(zip(grads, model.trainable_weights))
+
+            # Update all the metric states
+            for m in metrics:
+                m.update_state(data["Y"], logits)
+            loss_sum += loss
+            loss_count += 1
+
+            # If we are doing batch level logs
+            if config["training"]["validation"]["log_frequency"] == "batch":
+                _write_metrics(
+                    writer=train_writer,
+                    loss=loss,
+                    step=batch_no,
+                    prefix="batch/",
+                    metrics=metrics,
+                    images=False,
+                    reset=False,
+                )
+
+            batch_no += 1
+
+        # Output progress images
+        progress_images(model, epoch)
+
+        # Log epoch level stats
+        train_metric = _write_metrics(
+            writer=train_writer,
+            loss=(loss_sum / loss_count),
+            step=epoch,
+            prefix="epoch/",
+            metrics=metrics,
+            images=True,
+            reset=True,
+        )
+
+        tqdm.write("Training Epoch {}\n{}".format(epoch, ", ".join(train_metric)))
+
+        # Run validation at the end of each step
+        loss_sum = 0
+        loss_count = 0
+        for data in tqdm(validation, desc="Validation Batch", unit="batch", dynamic_ncols=True, leave=False):
+            logits = model(data["X"], data["G"], training=False)
+            loss_sum += loss_fn(data["Y"], logits)
+            loss_count += 1
+
+            for m in metrics:
+                m.update_state(data["Y"], logits)
+
+        # Validation stats
+        validation_metric = _write_metrics(
+            writer=val_writer,
+            loss=loss_sum / loss_count,
+            step=epoch,
+            prefix="epoch/",
+            metrics=metrics,
+            images=True,
+            reset=True,
+        )
+
+        tqdm.write("Validation Epoch {}\n{}".format(epoch, ", ".join(validation_metric)))
+
+        # If this is the best model we have seen, save it
+        if best_loss is None or best_loss > loss_sum / loss_count:
+            model.save_weights(os.path.join(output_path, "checkpoint"))

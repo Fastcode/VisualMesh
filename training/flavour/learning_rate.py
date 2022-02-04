@@ -13,7 +13,15 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from .classification_images import ClassificationImages
-from .one_cycle import OneCycle
-from .seeker_images import SeekerImages
-from .image_tensorboard import ImageTensorBoard
+import tensorflow as tf
+
+from ..learning_rate import OneCycle, Static
+
+
+def LearningRate(config):
+
+    # Determine the learning rate policy to use
+    if config["training"]["learning_rate"]["type"] == "static":
+        return Static(config=config)
+    elif config["training"]["learning_rate"]["type"] == "one_cycle":
+        return OneCycle(config=config)

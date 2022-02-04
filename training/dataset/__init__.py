@@ -68,9 +68,3 @@ def Dataset(paths, batch_size, view, example, orientation, label, projection, ke
         label=label,
         keys=keys,
     ).build()
-
-
-# Convert a dataset into a format that will be accepted by keras fit
-def keras_dataset(args):
-    # Return in the format (x, y, weights)
-    return ((args["X"], args["G"]), args["Y"])

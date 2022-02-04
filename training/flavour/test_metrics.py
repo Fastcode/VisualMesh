@@ -13,9 +13,9 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from training.metrics.test.seeker_hourglass import SeekerHourglass
 import training.metrics.test.confusion_curve as confusion
 from training.metrics.test import Confusion, ConfusionCurve
+from training.metrics.test.seeker_hourglass import SeekerHourglass
 
 
 def TestMetrics(config):
