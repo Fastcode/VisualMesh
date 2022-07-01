@@ -22,6 +22,7 @@
 #if !defined(VISUALMESH_DISABLE_OPENCL)
 
 #include <iomanip>
+#include <iostream>
 #include <numeric>
 #include <sstream>
 #include <tuple>
@@ -70,7 +71,7 @@ namespace engine {
              * @param structure the network structure to use classification
              */
             Engine(const NetworkStructure<Scalar>& structure = {}) {
-
+                std::cout << "engine start" << std::endl;
                 // Create the OpenCL context and command queue
                 cl_int error              = CL_SUCCESS;
                 cl_device_id device       = nullptr;
@@ -85,6 +86,8 @@ namespace engine {
                 sources << PROJECT_RECTILINEAR_CL;
                 sources << LOAD_IMAGE_CL;
                 sources << operation::make_network(structure);
+
+                std::cout << "engine 1" << std::endl;
 
                 std::string source = sources.str();
                 const char* cstr   = source.c_str();
@@ -112,6 +115,7 @@ namespace engine {
                     throw_cl_error(error,
                                    "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                 }
+                std::cout << "engine 2" << std::endl;
 
                 project_rectilinear =
                   cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
@@ -158,6 +162,7 @@ namespace engine {
                 for (const auto& k : conv_layers) {
                     workgroup_size = std::max(workgroup_size, workgroup_size_for_kernel(k.first));
                 }
+                std::cout << "engine end" << std::endl;
             }
 
             /**
@@ -175,6 +180,7 @@ namespace engine {
             inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> operator()(const Mesh<Scalar, Model>& mesh,
                                                                                  const mat4<Scalar>& Hoc,
                                                                                  const Lens<Scalar>& lens) const {
+                std::cout << "engine start 1" << std::endl;
                 static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 // Perform the projection
@@ -200,7 +206,7 @@ namespace engine {
                                                      events.data(),
                                                      nullptr);
                 throw_cl_error(error, "Failed reading projected pixels from the device");
-
+                std::cout << "engine end 2" << std::endl;
                 return ProjectedMesh<Scalar, N_NEIGHBOURS>{
                   std::move(pixels), std::move(neighbourhood), std::move(indices)};
             }
@@ -242,6 +248,7 @@ namespace engine {
                                                                            const Lens<Scalar>& lens,
                                                                            const void* image,
                                                                            const uint32_t& format) const {
+                std::cout << "engine start 2" << std::endl;
                 static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
                 cl_int error                      = CL_SUCCESS;
 
@@ -419,6 +426,7 @@ namespace engine {
                 // Wait for the chain to finish up to where we care about it
                 std::array<cl_event, 2> end_events = {pixels_read, classes_read};
                 ::clWaitForEvents(2, end_events.data());
+                std::cout << "engine end 2" << std::endl;
 
                 return ClassifiedMesh<Scalar, N_NEIGHBOURS>{
                   std::move(pixels), std::move(neighbourhood), std::move(indices), std::move(classifications)};
@@ -466,6 +474,7 @@ namespace engine {
             template <template <typename> class Model>
             std::tuple<std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>>, std::vector<int>, cl::mem, cl::event>
               do_project(const Mesh<Scalar, Model>& mesh, const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
+                std::cout << "engine start 3" << std::endl;
                 static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 // Lookup the on screen ranges
@@ -513,9 +522,7 @@ namespace engine {
                     // Cache for future runs
                     device_points_cache[&mesh] = cl_points;
                 }
-                else {
-                    cl_points = device_mesh->second;
-                }
+                else { cl_points = device_mesh->second; }
 
                 // First count the size of the buffer we will need to allocate
                 int n_points = 0;
@@ -622,7 +629,7 @@ namespace engine {
                 // finished If we don't do this here, some of our buffers can go out of scope before the queue picks
                 // them up causing errors
                 ::clFlush(queue);
-
+                std::cout << "engine end 3" << std::endl;
                 // Return what we calculated
                 return std::make_tuple(std::move(local_neighbourhood),  // CPU buffer
                                        std::move(indices),              // CPU buffer
