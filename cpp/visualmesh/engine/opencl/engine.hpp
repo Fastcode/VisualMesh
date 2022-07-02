@@ -98,12 +98,14 @@ namespace engine {
                 throw_cl_error(error, "Error adding sources to OpenCL program");
 
                 // Compile the program
+                std::cout << "engine 1 before compile" << std::endl;
                 error = ::clBuildProgram(program,
                                          0,
                                          nullptr,
                                          "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
                                          nullptr,
                                          nullptr);
+                std::cout << "engine 1 after compile" << std::endl;
                 if (error != CL_SUCCESS) {
                     // Get program build log
                     size_t used = 0;
