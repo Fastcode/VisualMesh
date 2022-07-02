@@ -99,12 +99,13 @@ namespace engine {
 
                 // Compile the program
                 std::cout << "engine 1 before compile" << std::endl;
-                error = ::clBuildProgram(program,
-                                         0,
-                                         nullptr,
-                                         "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
-                                         nullptr,
-                                         nullptr);
+                error =
+                  ::clBuildProgram(program,
+                                   0,
+                                   nullptr,
+                                   "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable -cl-opt-disable",
+                                   nullptr,
+                                   nullptr);
                 std::cout << "engine 1 after compile" << std::endl;
                 if (error != CL_SUCCESS) {
                     // Get program build log
