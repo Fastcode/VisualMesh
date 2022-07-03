@@ -123,7 +123,7 @@ namespace engine {
                     read_binary.read(binary, length);
                     if (!read_binary) { throw("Read failed"); }
                     read_binary.close();
-                    std::cout << "engine close file" << std::endl;
+                    std::cout << "engine close file" << &binary << std::endl;
                 }
                 // The compiled binary doesn't exist, create it
                 else {
