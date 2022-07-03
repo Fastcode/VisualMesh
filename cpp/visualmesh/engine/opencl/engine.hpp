@@ -21,6 +21,7 @@
 // If OpenCL is disabled then don't provide this file
 #if !defined(VISUALMESH_DISABLE_OPENCL)
 
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -48,20 +49,20 @@ namespace visualmesh {
 namespace engine {
     namespace opencl {
 
-        using fs = std::filesystem
+        using fs = std::filesystem;
 
-          /**
-           * @brief An OpenCL implementation of the visual mesh inference engine
-           *
-           * @details
-           *  The OpenCL implementation is designed to be used for high performance inference. It is able to take
-           *  advantage of either GPUs from Intel, AMD, ARM, NVIDIA etc as well as multithreaded CPU implementations.
-           *  This allows it to be very flexible with its deployment on devices.
-           *
-           * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
-           */
-          template <typename Scalar>
-          class Engine {
+        /**
+         * @brief An OpenCL implementation of the visual mesh inference engine
+         *
+         * @details
+         *  The OpenCL implementation is designed to be used for high performance inference. It is able to take
+         *  advantage of either GPUs from Intel, AMD, ARM, NVIDIA etc as well as multithreaded CPU implementations.
+         *  This allows it to be very flexible with its deployment on devices.
+         *
+         * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+         */
+        template <typename Scalar>
+        class Engine {
         private:
             // OpenCL ::clSetKernelArg functions take the sizeof a pointer as their argument, this is correct
             static constexpr size_t MEM_SIZE = sizeof(cl_mem);
