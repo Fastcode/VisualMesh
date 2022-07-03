@@ -165,9 +165,9 @@ namespace engine {
                 }
                 std::cout << "engine loading the binary" << std::endl;
                 // Load the binary and build
-                cl_int binary_status = CL_SUCCESS;
-                cl_program binary_program =
-                  ::clCreateProgramWithBinary(context, 1, &device, &binary_size, &binary, &binary_status, &error);
+                cl_int binary_status      = CL_SUCCESS;
+                cl_program binary_program = ::clCreateProgramWithBinary(
+                  context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &error);
                 std::cout << "engine create with binary " << binary_status << " " << error << std::endl;
                 delete[] binary;  // done with the binary so delete it
                 std::cout << "engine deleted the binary" << std::endl;
