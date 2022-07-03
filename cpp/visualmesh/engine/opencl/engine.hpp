@@ -123,7 +123,7 @@ namespace engine {
                     read_binary.read(binary, length);
                     if (!read_binary) { throw("Read failed"); }
                     read_binary.close();
-                    std::cout << "engine close file" << &binary << std::endl;
+                    std::cout << "engine close file " << binary << std::endl;
                 }
                 // The compiled binary doesn't exist, create it
                 else {
@@ -159,7 +159,7 @@ namespace engine {
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
                     std::cout << "engine about to write" << std::endl;
                     write_binary.write(binary, binary_size);
-                    std::cout << "engine written" << std::endl;
+                    std::cout << "engine written " << binary << std::endl;
                     write_binary.close();
                     std::cout << "engine saved" << std::endl;
                 }
