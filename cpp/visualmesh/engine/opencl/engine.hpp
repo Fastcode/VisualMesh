@@ -91,7 +91,7 @@ namespace engine {
                 sources << operation::make_network(structure);
 
 
-                std::cout << "engine 1" << std::endl;
+                std::cout << "engine before sources" << std::endl;
 
                 std::string source = sources.str();
                 const char* cstr   = source.c_str();
@@ -100,29 +100,34 @@ namespace engine {
                 // The hash of the sources represents the name of the OpenCL compiled program binary file, so that a new
                 // binary will be created for different sources
                 std::size_t source_hash = std::hash<std::string>{}(source);
-
+                std::cout << "engine after hash " << std::to_string(source_hash) << std::endl;
                 // Variables for reading the binary
                 size_t binary_size;
                 char* binary;
 
                 // The compiled binary exists, read it
-                std::string binary_path = cache_directory + "/" + std::to_string(int(source_hash)) + ".bin";
+                std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
                 std::ifstream read_binary(binary_path, std::ios::in);
+                std::cout << "engine try read" << std::endl;
                 if (read_binary) {
+                    std::cout << "engine reading" << std::endl;
                     char* binary;
 
                     // Get the length
                     read_binary.seekg(0, read_binary.end);
                     long length = read_binary.tellg();
                     read_binary.seekg(0, read_binary.beg);
+                    std::cout << "engine length " << length << std::endl;
                     binary = new char[length];
                     // Read the file
                     read_binary.read(binary, length);
-                    if (!read_binary) { binary = NULL; }
+                    if (!read_binary) { throw("Read failed"); }
                     read_binary.close();
+                    std::cout << "engine close file" << std::endl;
                 }
                 // The compiled binary doesn't exist, create it
                 else {
+                    std::cout << "engine no file so create one" << std::endl;
                     // Create the program and build
                     program =
                       cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
@@ -133,7 +138,7 @@ namespace engine {
                                              "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
                                              nullptr,
                                              nullptr);
-
+                    std::cout << "engine compiled" << std::endl;
                     // If it didn't work, log and throw an error
                     if (error != CL_SUCCESS) {
                         // Get program build log
@@ -145,24 +150,32 @@ namespace engine {
                         throw_cl_error(
                           error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                     }
-
+                    std::cout << "engine about to save" << std::endl;
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, NULL);
                     binary = new char[binary_size];
+                    std::cout << "engine binary size is " << binary_size << std::endl;
                     clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &binary, NULL);
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
+                    std::cout << "engine about to write" << std::endl;
                     write_binary.write(binary, binary_size);
+                    std::cout << "engine written" << std::endl;
                     write_binary.close();
+                    std::cout << "engine saved" << std::endl;
                 }
-
+                std::cout << "engine loading the binary" << std::endl;
                 // Load the binary and build
                 cl_int binary_status      = CL_SUCCESS;
                 cl_program binary_program = ::clCreateProgramWithBinary(
                   context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &error);
+                std::cout << "engine create with binary" << std::endl;
                 delete[] binary;  // done with the binary so delete it
+                std::cout << "engine deleted the binary" << std::endl;
                 clBuildProgram(binary_program, 1, &device, NULL, NULL, NULL);
+                std::cout << "engine build the program" << std::endl;
 
                 // Get the kernels
+                std::cout << "engine get kernels" << std::endl;
                 project_rectilinear =
                   cl::kernel(::clCreateKernel(binary_program, "project_rectilinear", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Error getting project_rectilinear kernel");
@@ -174,7 +187,7 @@ namespace engine {
                 throw_cl_error(error, "Error getting project_equisolid kernel");
                 load_image = cl::kernel(::clCreateKernel(binary_program, "load_image", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Failed to create kernel load_image");
-
+                std::cout << "engine do more things" << std::endl;
                 // Grab all the kernels that were generated
                 for (unsigned int i = 0; i < structure.size(); ++i) {
                     std::string kernel       = "conv" + std::to_string(i);
@@ -568,7 +581,9 @@ namespace engine {
                     // Cache for future runs
                     device_points_cache[&mesh] = cl_points;
                 }
-                else { cl_points = device_mesh->second; }
+                else {
+                    cl_points = device_mesh->second;
+                }
 
                 // First count the size of the buffer we will need to allocate
                 int n_points = 0;
