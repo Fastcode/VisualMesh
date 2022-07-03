@@ -48,18 +48,20 @@ namespace visualmesh {
 namespace engine {
     namespace opencl {
 
-        /**
-         * @brief An OpenCL implementation of the visual mesh inference engine
-         *
-         * @details
-         *  The OpenCL implementation is designed to be used for high performance inference. It is able to take
-         *  advantage of either GPUs from Intel, AMD, ARM, NVIDIA etc as well as multithreaded CPU implementations.
-         *  This allows it to be very flexible with its deployment on devices.
-         *
-         * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
-         */
-        template <typename Scalar>
-        class Engine {
+        using fs = std::filesystem
+
+          /**
+           * @brief An OpenCL implementation of the visual mesh inference engine
+           *
+           * @details
+           *  The OpenCL implementation is designed to be used for high performance inference. It is able to take
+           *  advantage of either GPUs from Intel, AMD, ARM, NVIDIA etc as well as multithreaded CPU implementations.
+           *  This allows it to be very flexible with its deployment on devices.
+           *
+           * @tparam Scalar the scalar type used for calculations and storage (normally one of float or double)
+           */
+          template <typename Scalar>
+          class Engine {
         private:
             // OpenCL ::clSetKernelArg functions take the sizeof a pointer as their argument, this is correct
             static constexpr size_t MEM_SIZE = sizeof(cl_mem);
@@ -70,7 +72,8 @@ namespace engine {
              *
              * @param structure the network structure to use classification
              */
-            Engine(const NetworkStructure<Scalar>& structure = {}) {
+
+            Engine(const NetworkStructure<Scalar>& structure = {}, std::filesystem::path cache_directory = "") {
                 std::cout << "engine start" << std::endl;
                 // Create the OpenCL context and command queue
                 cl_int error              = CL_SUCCESS;
@@ -87,49 +90,90 @@ namespace engine {
                 sources << LOAD_IMAGE_CL;
                 sources << operation::make_network(structure);
 
+
                 std::cout << "engine 1" << std::endl;
 
                 std::string source = sources.str();
                 const char* cstr   = source.c_str();
                 size_t csize       = source.size();
 
-                program =
-                  cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
-                throw_cl_error(error, "Error adding sources to OpenCL program");
+                // The hash of the sources represents the name of the OpenCL compiled program binary file, so that a new
+                // binary will be created for different sources
+                std::size_t source_hash = std::hash<std::string>(source);
 
-                // Compile the program
-                std::cout << "engine 1 before compile" << std::endl;
-                error =
-                  ::clBuildProgram(program,
-                                   0,
-                                   nullptr,
-                                   "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable -cl-opt-disable",
-                                   nullptr,
-                                   nullptr);
-                std::cout << "engine 1 after compile" << std::endl;
-                if (error != CL_SUCCESS) {
-                    // Get program build log
-                    size_t used = 0;
-                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
-                    std::vector<char> log(used);
-                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
+                // Variables for reading the binary
+                size_t binary_size;
+                char* binary;  // our binary
 
-                    // Throw an error with the build log
-                    throw_cl_error(error,
-                                   "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
+                // The compiled binary exists, read it
+                fs::path binary_path = std::format("{}/{}.bin", cache_directory, source_hash);
+                if (fs::exists(binary_path)) {
+                    char* binary;
+                    FILE* f;
+                    long length;
+
+                    f = fopen(binary_path, "r");
+                    assert(NULL != f);
+                    fseek(f, 0, SEEK_END);
+                    length = ftell(f);
+                    fseek(f, 0, SEEK_SET);
+                    binary = malloc(length);
+                    if (fread(binary, 1, length, f) < (size_t) length) { return NULL; }
+                    fclose(f);
+                    if (NULL != length_out) { *length_out = length; }
                 }
-                std::cout << "engine 2" << std::endl;
+                // The compiled binary doesn't exist, create it
+                else {
+                    // Create the program and build
+                    program =
+                      cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
+                    throw_cl_error(error, "Error adding sources to OpenCL program");
+                    error = ::clBuildProgram(program,
+                                             0,
+                                             nullptr,
+                                             "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
+                                             nullptr,
+                                             nullptr);
 
+                    // If it didn't work, log and throw an error
+                    if (error != CL_SUCCESS) {
+                        // Get program build log
+                        size_t used = 0;
+                        ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
+                        std::vector<char> log(used);
+                        ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
+                        // Throw an error with the build log
+                        throw_cl_error(
+                          error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
+                    }
+
+                    // Save the the built program to a file
+                    clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, NULL);
+                    binary = malloc(binary_size);
+                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &binary, NULL);
+                    f = fopen(binary_path, "w");
+                    fwrite(binary, binary_size, 1, f);
+                    fclose(f);
+                }
+
+                // Load the binary and build
+                cl_int input[]            = {1, 2}, errcode_ret, binary_status;
+                cl_program binary_program = ::clCreateProgramWithBinary(
+                  context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &errcode_ret);
+                free(binary);
+                clBuildProgram(binary_program, 1, &device, NULL, NULL, NULL);
+
+                // Get the kernels
                 project_rectilinear =
-                  cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
+                  cl::kernel(::clCreateKernel(binary_program, "project_rectilinear", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Error getting project_rectilinear kernel");
                 project_equidistant =
-                  cl::kernel(::clCreateKernel(program, "project_equidistant", &error), ::clReleaseKernel);
+                  cl::kernel(::clCreateKernel(binary_program, "project_equidistant", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Error getting project_equidistant kernel");
                 project_equisolid =
-                  cl::kernel(::clCreateKernel(program, "project_equisolid", &error), ::clReleaseKernel);
+                  cl::kernel(::clCreateKernel(binary_program, "project_equisolid", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Error getting project_equisolid kernel");
-                load_image = cl::kernel(::clCreateKernel(program, "load_image", &error), ::clReleaseKernel);
+                load_image = cl::kernel(::clCreateKernel(binary_program, "load_image", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Failed to create kernel load_image");
 
                 // Grab all the kernels that were generated
@@ -137,7 +181,7 @@ namespace engine {
                     std::string kernel       = "conv" + std::to_string(i);
                     unsigned int output_size = structure[i].back().biases.size();
 
-                    cl::kernel k(::clCreateKernel(program, kernel.c_str(), &error), ::clReleaseKernel);
+                    cl::kernel k(::clCreateKernel(binary_program, kernel.c_str(), &error), ::clReleaseKernel);
                     throw_cl_error(error, "Failed to create kernel " + kernel);
                     conv_layers.emplace_back(k, output_size);
                 }
