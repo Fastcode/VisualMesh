@@ -169,7 +169,7 @@ namespace engine {
                 cl_program binary_program = ::clCreateProgramWithBinary(
                   context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &error);
                 std::cout << "engine create with binary" << std::endl;
-                delete[] binary;  // done with the binary so delete it
+                delete binary;  // done with the binary so delete it
                 std::cout << "engine deleted the binary" << std::endl;
                 clBuildProgram(binary_program, 1, &device, NULL, NULL, NULL);
                 std::cout << "engine build the program" << std::endl;
@@ -581,9 +581,7 @@ namespace engine {
                     // Cache for future runs
                     device_points_cache[&mesh] = cl_points;
                 }
-                else {
-                    cl_points = device_mesh->second;
-                }
+                else { cl_points = device_mesh->second; }
 
                 // First count the size of the buffer we will need to allocate
                 int n_points = 0;
