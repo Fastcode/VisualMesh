@@ -21,7 +21,8 @@
 // If OpenCL is disabled then don't provide this file
 #if !defined(VISUALMESH_DISABLE_OPENCL)
 
-#include <filesystem>
+#include <fstream>
+#include <hash_map>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -49,8 +50,6 @@ namespace visualmesh {
 namespace engine {
     namespace opencl {
 
-        using fs = std::filesystem;
-
         /**
          * @brief An OpenCL implementation of the visual mesh inference engine
          *
@@ -74,7 +73,7 @@ namespace engine {
              * @param structure the network structure to use classification
              */
 
-            Engine(const NetworkStructure<Scalar>& structure = {}, std::filesystem::path cache_directory = "") {
+            Engine(const NetworkStructure<Scalar>& structure = {}, std::string cache_directory = "") {
                 std::cout << "engine start" << std::endl;
                 // Create the OpenCL context and command queue
                 cl_int error              = CL_SUCCESS;
@@ -100,28 +99,27 @@ namespace engine {
 
                 // The hash of the sources represents the name of the OpenCL compiled program binary file, so that a new
                 // binary will be created for different sources
-                std::size_t source_hash = std::hash<std::string>(source);
+                std::size_t source_hash = std::hash<std::string>{}(source);
 
                 // Variables for reading the binary
                 size_t binary_size;
-                char* binary;  // our binary
+                char* binary;
 
                 // The compiled binary exists, read it
-                fs::path binary_path = std::format("{}/{}.bin", cache_directory, source_hash);
-                if (fs::exists(binary_path)) {
+                std::string binary_path = cache_directory + "/" + std::to_string(int(source_hash)) + ".bin";
+                std::ifstream read_binary(binary_path, std::ios::in);
+                if (read_binary) {
                     char* binary;
-                    FILE* f;
-                    long length;
 
-                    f = fopen(binary_path, "r");
-                    assert(NULL != f);
-                    fseek(f, 0, SEEK_END);
-                    length = ftell(f);
-                    fseek(f, 0, SEEK_SET);
-                    binary = malloc(length);
-                    if (fread(binary, 1, length, f) < (size_t) length) { return NULL; }
-                    fclose(f);
-                    if (NULL != length_out) { *length_out = length; }
+                    // Get the length
+                    read_binary.seekg(0, read_binary.end);
+                    long length = read_binary.tellg();
+                    read_binary.seekg(0, read_binary.beg);
+                    binary = new char[length];
+                    // Read the file
+                    read_binary.read(binary, length);
+                    if (!read_binary) { binary = NULL; }
+                    read_binary.close();
                 }
                 // The compiled binary doesn't exist, create it
                 else {
@@ -150,18 +148,18 @@ namespace engine {
 
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, NULL);
-                    binary = malloc(binary_size);
+                    binary = new char[binary_size];
                     clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &binary, NULL);
-                    f = fopen(binary_path, "w");
-                    fwrite(binary, binary_size, 1, f);
-                    fclose(f);
+                    std::ofstream write_binary(binary_path, std::ofstream::binary);
+                    write_binary.write(binary, binary_size);
+                    write_binary.close();
                 }
 
                 // Load the binary and build
-                cl_int input[]            = {1, 2}, errcode_ret, binary_status;
+                cl_int binary_status      = CL_SUCCESS;
                 cl_program binary_program = ::clCreateProgramWithBinary(
-                  context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &errcode_ret);
-                free(binary);
+                  context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &error);
+                delete[] binary;  // done with the binary so delete it
                 clBuildProgram(binary_program, 1, &device, NULL, NULL, NULL);
 
                 // Get the kernels
