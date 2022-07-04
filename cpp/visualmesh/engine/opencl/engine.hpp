@@ -185,10 +185,10 @@ namespace engine {
                 throw_cl_error(error, "Failed to create program from binary");
                 std::cout << "engine create with binary " << binary_status << " " << error << std::endl;
 
-                for (int i = 0; i < length; i++) {
-                    std::cout << binary[i];
-                }
-                std::cout << std::endl;
+                // for (int i = 0; i < binary_size; i++) {
+                //     std::cout << binary[i];
+                // }
+                // std::cout << std::endl;
 
                 delete[] binary;  // done with the binary so delete it
                 std::cout << "engine deleted the binary" << std::endl;
