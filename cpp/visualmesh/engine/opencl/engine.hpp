@@ -109,17 +109,17 @@ namespace engine {
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
                 std::ifstream read_binary(binary_path, std::ios::in);
                 std::cout << "engine try read" << std::endl;
-                long length = 0;
+
                 if (read_binary) {
                     std::cout << "engine reading" << std::endl;
                     // Get the length
                     read_binary.seekg(0, read_binary.end);
-                    length = read_binary.tellg();
+                    binary_size = read_binary.tellg();
                     read_binary.seekg(0, read_binary.beg);
-                    std::cout << "engine length " << length << std::endl;
-                    binary = new char[length];
+                    std::cout << "engine binary_size " << binary_size << std::endl;
+                    binary = new char[binary_size];
                     // Read the file
-                    read_binary.read(binary, length);
+                    read_binary.read(binary, binary_size);
                     if (!read_binary) { throw("Read failed"); }
                     read_binary.close();
                     std::cout << "engine close file " << std::endl;
