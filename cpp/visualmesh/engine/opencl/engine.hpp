@@ -138,18 +138,6 @@ namespace engine {
                           error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                     }
 
-                    // project_rectilinear =
-                    //   cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
-                    // throw_cl_error(error, "Error getting project_rectilinear kernel");
-                    // project_equidistant =
-                    //   cl::kernel(::clCreateKernel(program, "project_equidistant", &error), ::clReleaseKernel);
-                    // throw_cl_error(error, "Error getting project_equidistant kernel");
-                    // project_equisolid =
-                    //   cl::kernel(::clCreateKernel(program, "project_equisolid", &error), ::clReleaseKernel);
-                    // throw_cl_error(error, "Error getting project_equisolid kernel");
-                    // load_image = cl::kernel(::clCreateKernel(program, "load_image", &error), ::clReleaseKernel);
-                    // throw_cl_error(error, "Failed to create kernel load_image");
-
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, NULL);
                     binary = new char[binary_size];
@@ -587,7 +575,9 @@ namespace engine {
                     // Cache for future runs
                     device_points_cache[&mesh] = cl_points;
                 }
-                else { cl_points = device_mesh->second; }
+                else { 
+                    cl_points = device_mesh->second; 
+                }
 
                 // First count the size of the buffer we will need to allocate
                 int n_points = 0;
@@ -694,6 +684,7 @@ namespace engine {
                 // finished If we don't do this here, some of our buffers can go out of scope before the queue picks
                 // them up causing errors
                 ::clFlush(queue);
+
                 // Return what we calculated
                 return std::make_tuple(std::move(local_neighbourhood),  // CPU buffer
                                        std::move(indices),              // CPU buffer
