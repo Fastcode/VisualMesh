@@ -112,8 +112,6 @@ namespace engine {
                 long length = 0;
                 if (read_binary) {
                     std::cout << "engine reading" << std::endl;
-                    char* binary;
-
                     // Get the length
                     read_binary.seekg(0, read_binary.end);
                     length = read_binary.tellg();
