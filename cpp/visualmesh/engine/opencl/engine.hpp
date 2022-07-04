@@ -22,7 +22,6 @@
 #if !defined(VISUALMESH_DISABLE_OPENCL)
 
 #include <fstream>
-#include <hash_map>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -100,10 +99,9 @@ namespace engine {
                 size_t binary_size;
                 char* binary;
 
-                // The compiled binary exists, read it
+                // If the compiled binary exists, read it
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
                 std::ifstream read_binary(binary_path, std::ios::in);
-
                 if (read_binary) {
                     // Get the length
                     read_binary.seekg(0, read_binary.end);
@@ -121,6 +119,7 @@ namespace engine {
                     program =
                       cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
                     throw_cl_error(error, "Error adding sources to OpenCL program");
+
                     error = ::clBuildProgram(program,
                                              0,
                                              nullptr,
@@ -169,7 +168,12 @@ namespace engine {
 
                 delete[] binary;  // done with the binary so delete it
 
-                error = clBuildProgram(program, 1, &device, NULL, NULL, NULL);
+                error = ::clBuildProgram(program,
+                                         1,
+                                         &device,
+                                         "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
+                                         NULL,
+                                         NULL);
                 // If it didn't work, log and throw an error
                 if (error != CL_SUCCESS) {
                     // Get program build log
