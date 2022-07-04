@@ -123,7 +123,10 @@ namespace engine {
                     read_binary.read(binary, length);
                     if (!read_binary) { throw("Read failed"); }
                     read_binary.close();
-                    std::cout << "engine close file " << binary << std::endl;
+                    std::cout << "engine close file " << std::endl;
+                    for (auto& b : binary) {
+                        std::cout << b << std::endl;
+                    }
                 }
                 // The compiled binary doesn't exist, create it
                 else {
@@ -150,6 +153,19 @@ namespace engine {
                         throw_cl_error(
                           error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                     }
+
+                    project_rectilinear =
+                      cl::kernel(::clCreateKernel(binary_program, "project_rectilinear", &error), ::clReleaseKernel);
+                    throw_cl_error(error, "Error getting project_rectilinear kernel");
+                    project_equidistant =
+                      cl::kernel(::clCreateKernel(binary_program, "project_equidistant", &error), ::clReleaseKernel);
+                    throw_cl_error(error, "Error getting project_equidistant kernel");
+                    project_equisolid =
+                      cl::kernel(::clCreateKernel(binary_program, "project_equisolid", &error), ::clReleaseKernel);
+                    throw_cl_error(error, "Error getting project_equisolid kernel");
+                    load_image = cl::kernel(::clCreateKernel(binary_program, "load_image", &error), ::clReleaseKernel);
+                    throw_cl_error(error, "Failed to create kernel load_image");
+
                     std::cout << "engine about to save" << std::endl;
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, NULL);
