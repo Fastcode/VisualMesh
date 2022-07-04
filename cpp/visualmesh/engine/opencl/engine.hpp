@@ -124,10 +124,6 @@ namespace engine {
                     if (!read_binary) { throw("Read failed"); }
                     read_binary.close();
                     std::cout << "engine close file " << std::endl;
-                    for (int i = 0; i < length; i++) {
-                        std::cout << binary[i];
-                    }
-                    std::cout << std::endl;
                 }
                 // The compiled binary doesn't exist, create it
                 else {
@@ -187,6 +183,7 @@ namespace engine {
                   ::clCreateProgramWithBinary(
                     context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &error),
                   ::clReleaseProgram);
+                throw_cl_error(error, "Failed to create program from binary");
                 std::cout << "engine create with binary " << binary_status << " " << error << std::endl;
                 delete[] binary;  // done with the binary so delete it
                 std::cout << "engine deleted the binary" << std::endl;
