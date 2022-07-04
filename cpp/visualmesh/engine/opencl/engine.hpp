@@ -126,6 +126,7 @@ namespace engine {
                                              "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
                                              nullptr,
                                              nullptr);
+
                     // If it didn't work, log and throw an error
                     if (error != CL_SUCCESS) {
                         // Get program build log
@@ -146,6 +147,7 @@ namespace engine {
                     write_binary.write(binary, binary_size);
                     write_binary.close();
                 }
+
                 // Load the binary and build
                 cl_int binary_status = CL_SUCCESS;
                 program              = cl::program(
@@ -162,6 +164,7 @@ namespace engine {
                                          "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
                                          NULL,
                                          NULL);
+                
                 // If it didn't work, log and throw an error
                 if (error != CL_SUCCESS) {
                     // Get program build log
@@ -575,8 +578,8 @@ namespace engine {
                     // Cache for future runs
                     device_points_cache[&mesh] = cl_points;
                 }
-                else { 
-                    cl_points = device_mesh->second; 
+                else {
+                    cl_points = device_mesh->second;
                 }
 
                 // First count the size of the buffer we will need to allocate
