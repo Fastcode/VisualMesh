@@ -124,9 +124,10 @@ namespace engine {
                     if (!read_binary) { throw("Read failed"); }
                     read_binary.close();
                     std::cout << "engine close file " << std::endl;
-                    for (auto& b : binary) {
-                        std::cout << b << std::endl;
+                    for (int i = 0; i < length; i++) {
+                        std::cout << binary[i];
                     }
+                    std::cout << std::endl;
                 }
                 // The compiled binary doesn't exist, create it
                 else {
@@ -155,15 +156,15 @@ namespace engine {
                     }
 
                     project_rectilinear =
-                      cl::kernel(::clCreateKernel(binary_program, "project_rectilinear", &error), ::clReleaseKernel);
+                      cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
                     throw_cl_error(error, "Error getting project_rectilinear kernel");
                     project_equidistant =
-                      cl::kernel(::clCreateKernel(binary_program, "project_equidistant", &error), ::clReleaseKernel);
+                      cl::kernel(::clCreateKernel(program, "project_equidistant", &error), ::clReleaseKernel);
                     throw_cl_error(error, "Error getting project_equidistant kernel");
                     project_equisolid =
-                      cl::kernel(::clCreateKernel(binary_program, "project_equisolid", &error), ::clReleaseKernel);
+                      cl::kernel(::clCreateKernel(program, "project_equisolid", &error), ::clReleaseKernel);
                     throw_cl_error(error, "Error getting project_equisolid kernel");
-                    load_image = cl::kernel(::clCreateKernel(binary_program, "load_image", &error), ::clReleaseKernel);
+                    load_image = cl::kernel(::clCreateKernel(program, "load_image", &error), ::clReleaseKernel);
                     throw_cl_error(error, "Failed to create kernel load_image");
 
                     std::cout << "engine about to save" << std::endl;
@@ -181,27 +182,30 @@ namespace engine {
                 }
                 std::cout << "engine loading the binary" << std::endl;
                 // Load the binary and build
-                cl_int binary_status      = CL_SUCCESS;
-                cl_program binary_program = ::clCreateProgramWithBinary(
-                  context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &error);
+                cl_int binary_status = CL_SUCCESS;
+                program              = cl::program(
+                  ::clCreateProgramWithBinary(
+                    context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &error),
+                  ::clReleaseProgram);
                 std::cout << "engine create with binary " << binary_status << " " << error << std::endl;
                 delete[] binary;  // done with the binary so delete it
                 std::cout << "engine deleted the binary" << std::endl;
-                clBuildProgram(binary_program, 1, &device, NULL, NULL, NULL);
+                error = clBuildProgram(program, 1, &device, NULL, NULL, NULL);
+
                 std::cout << "engine build the program" << std::endl;
 
                 // Get the kernels
                 std::cout << "engine get kernels" << std::endl;
                 project_rectilinear =
-                  cl::kernel(::clCreateKernel(binary_program, "project_rectilinear", &error), ::clReleaseKernel);
+                  cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Error getting project_rectilinear kernel");
                 project_equidistant =
-                  cl::kernel(::clCreateKernel(binary_program, "project_equidistant", &error), ::clReleaseKernel);
+                  cl::kernel(::clCreateKernel(program, "project_equidistant", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Error getting project_equidistant kernel");
                 project_equisolid =
-                  cl::kernel(::clCreateKernel(binary_program, "project_equisolid", &error), ::clReleaseKernel);
+                  cl::kernel(::clCreateKernel(program, "project_equisolid", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Error getting project_equisolid kernel");
-                load_image = cl::kernel(::clCreateKernel(binary_program, "load_image", &error), ::clReleaseKernel);
+                load_image = cl::kernel(::clCreateKernel(program, "load_image", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Failed to create kernel load_image");
                 std::cout << "engine do more things" << std::endl;
                 // Grab all the kernels that were generated
@@ -209,7 +213,7 @@ namespace engine {
                     std::string kernel       = "conv" + std::to_string(i);
                     unsigned int output_size = structure[i].back().biases.size();
 
-                    cl::kernel k(::clCreateKernel(binary_program, kernel.c_str(), &error), ::clReleaseKernel);
+                    cl::kernel k(::clCreateKernel(program, kernel.c_str(), &error), ::clReleaseKernel);
                     throw_cl_error(error, "Failed to create kernel " + kernel);
                     conv_layers.emplace_back(k, output_size);
                 }
