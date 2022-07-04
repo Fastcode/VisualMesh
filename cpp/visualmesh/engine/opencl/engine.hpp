@@ -97,7 +97,7 @@ namespace engine {
 
                 // Variables for reading the binary
                 size_t binary_size;
-                char* binary;
+                std::vector<char> binary;
 
                 // If the compiled binary exists, read it
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
@@ -107,9 +107,9 @@ namespace engine {
                     read_binary.seekg(0, read_binary.end);
                     binary_size = read_binary.tellg();
                     read_binary.seekg(0, read_binary.beg);
-                    binary = new char[binary_size];
+                    binary.reserve(binary_size);
                     // Read the file
-                    read_binary.read(binary, binary_size);
+                    read_binary.read(&binary[0], binary_size);
                     if (!read_binary) { throw("Read failed"); }
                     read_binary.close();
                 }
@@ -140,9 +140,9 @@ namespace engine {
                     }
 
                     // Save the the built program to a file
-                    clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, NULL);
-                    binary = new char[binary_size];
-                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &binary, NULL);
+                    clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
+                    binary.reserve(binary_size);
+                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &binary[0], nullp);
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
                     write_binary.write(binary, binary_size);
                     write_binary.close();
@@ -152,19 +152,18 @@ namespace engine {
                 cl_int binary_status = CL_SUCCESS;
                 program              = cl::program(
                   ::clCreateProgramWithBinary(
-                    context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &error),
+                    context, 1, &device, &binary_size, const unsigned char**(&binary[0]), &binary_status, &error),
                   ::clReleaseProgram);
                 throw_cl_error(error, "Failed to create program from binary");
-
-                delete[] binary;  // done with the binary so delete it
+                throw_cl_error(binary_status, "Invalid binary");
 
                 error = ::clBuildProgram(program,
                                          1,
                                          &device,
                                          "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
-                                         NULL,
-                                         NULL);
-                
+                                         nullptr,
+                                         nullptr);
+
                 // If it didn't work, log and throw an error
                 if (error != CL_SUCCESS) {
                     // Get program build log
