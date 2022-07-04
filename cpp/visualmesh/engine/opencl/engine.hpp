@@ -142,18 +142,22 @@ namespace engine {
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
                     binary.reserve(binary_size);
-                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &binary[0], nullp);
+                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &binary[0], nullptr);
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
-                    write_binary.write(binary, binary_size);
+                    write_binary.write(&binary[0], binary_size);
                     write_binary.close();
                 }
 
                 // Load the binary and build
                 cl_int binary_status = CL_SUCCESS;
-                program              = cl::program(
-                  ::clCreateProgramWithBinary(
-                    context, 1, &device, &binary_size, const unsigned char**(&binary[0]), &binary_status, &error),
-                  ::clReleaseProgram);
+                program              = cl::program(::clCreateProgramWithBinary(context,
+                                                                  1,
+                                                                  &device,
+                                                                  &binary_size,
+                                                                  reinterpret_cast<const unsigned char**>(&binary[0]),
+                                                                  &binary_status,
+                                                                  &error),
+                                      ::clReleaseProgram);
                 throw_cl_error(error, "Failed to create program from binary");
                 throw_cl_error(binary_status, "Invalid binary");
 
@@ -577,9 +581,7 @@ namespace engine {
                     // Cache for future runs
                     device_points_cache[&mesh] = cl_points;
                 }
-                else {
-                    cl_points = device_mesh->second;
-                }
+                else { cl_points = device_mesh->second; }
 
                 // First count the size of the buffer we will need to allocate
                 int n_points = 0;
