@@ -109,13 +109,14 @@ namespace engine {
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
                 std::ifstream read_binary(binary_path, std::ios::in);
                 std::cout << "engine try read" << std::endl;
+                long length = 0;
                 if (read_binary) {
                     std::cout << "engine reading" << std::endl;
                     char* binary;
 
                     // Get the length
                     read_binary.seekg(0, read_binary.end);
-                    long length = read_binary.tellg();
+                    length = read_binary.tellg();
                     read_binary.seekg(0, read_binary.beg);
                     std::cout << "engine length " << length << std::endl;
                     binary = new char[length];
@@ -185,6 +186,12 @@ namespace engine {
                   ::clReleaseProgram);
                 throw_cl_error(error, "Failed to create program from binary");
                 std::cout << "engine create with binary " << binary_status << " " << error << std::endl;
+
+                for (int i = 0; i < length; i++) {
+                    std::cout << binary[i];
+                }
+                std::cout << std::endl;
+
                 delete[] binary;  // done with the binary so delete it
                 std::cout << "engine deleted the binary" << std::endl;
                 error = clBuildProgram(program, 1, &device, NULL, NULL, NULL);
