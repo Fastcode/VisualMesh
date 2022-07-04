@@ -74,7 +74,6 @@ namespace engine {
              */
 
             Engine(const NetworkStructure<Scalar>& structure = {}, std::string cache_directory = "") {
-                std::cout << "engine start" << std::endl;
                 // Create the OpenCL context and command queue
                 cl_int error              = CL_SUCCESS;
                 cl_device_id device       = nullptr;
@@ -90,17 +89,13 @@ namespace engine {
                 sources << LOAD_IMAGE_CL;
                 sources << operation::make_network(structure);
 
-
-                std::cout << "engine before sources" << std::endl;
-
                 std::string source = sources.str();
                 const char* cstr   = source.c_str();
                 size_t csize       = source.size();
-
                 // The hash of the sources represents the name of the OpenCL compiled program binary file, so that a new
                 // binary will be created for different sources
                 std::size_t source_hash = std::hash<std::string>{}(source);
-                std::cout << "engine after hash " << std::to_string(source_hash) << std::endl;
+
                 // Variables for reading the binary
                 size_t binary_size;
                 char* binary;
@@ -108,25 +103,20 @@ namespace engine {
                 // The compiled binary exists, read it
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
                 std::ifstream read_binary(binary_path, std::ios::in);
-                std::cout << "engine try read" << std::endl;
 
                 if (read_binary) {
-                    std::cout << "engine reading" << std::endl;
                     // Get the length
                     read_binary.seekg(0, read_binary.end);
                     binary_size = read_binary.tellg();
                     read_binary.seekg(0, read_binary.beg);
-                    std::cout << "engine binary_size " << binary_size << std::endl;
                     binary = new char[binary_size];
                     // Read the file
                     read_binary.read(binary, binary_size);
                     if (!read_binary) { throw("Read failed"); }
                     read_binary.close();
-                    std::cout << "engine close file " << std::endl;
                 }
                 // The compiled binary doesn't exist, create it
                 else {
-                    std::cout << "engine no file so create one" << std::endl;
                     // Create the program and build
                     program =
                       cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
@@ -137,7 +127,6 @@ namespace engine {
                                              "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
                                              nullptr,
                                              nullptr);
-                    std::cout << "engine compiled" << std::endl;
                     // If it didn't work, log and throw an error
                     if (error != CL_SUCCESS) {
                         // Get program build log
@@ -162,20 +151,14 @@ namespace engine {
                     load_image = cl::kernel(::clCreateKernel(program, "load_image", &error), ::clReleaseKernel);
                     throw_cl_error(error, "Failed to create kernel load_image");
 
-                    std::cout << "engine about to save" << std::endl;
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, NULL);
                     binary = new char[binary_size];
-                    std::cout << "engine binary size is " << binary_size << std::endl;
                     clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &binary, NULL);
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
-                    std::cout << "engine about to write" << std::endl;
                     write_binary.write(binary, binary_size);
-                    std::cout << "engine written " << binary << std::endl;
                     write_binary.close();
-                    std::cout << "engine saved" << std::endl;
                 }
-                std::cout << "engine loading the binary" << std::endl;
                 // Load the binary and build
                 cl_int binary_status = CL_SUCCESS;
                 program              = cl::program(
@@ -183,21 +166,23 @@ namespace engine {
                     context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &error),
                   ::clReleaseProgram);
                 throw_cl_error(error, "Failed to create program from binary");
-                std::cout << "engine create with binary " << binary_status << " " << error << std::endl;
-
-                // for (int i = 0; i < binary_size; i++) {
-                //     std::cout << binary[i];
-                // }
-                // std::cout << std::endl;
 
                 delete[] binary;  // done with the binary so delete it
-                std::cout << "engine deleted the binary" << std::endl;
-                error = clBuildProgram(program, 1, &device, NULL, NULL, NULL);
 
-                std::cout << "engine build the program" << std::endl;
+                error = clBuildProgram(program, 1, &device, NULL, NULL, NULL);
+                // If it didn't work, log and throw an error
+                if (error != CL_SUCCESS) {
+                    // Get program build log
+                    size_t used = 0;
+                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
+                    std::vector<char> log(used);
+                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
+                    // Throw an error with the build log
+                    throw_cl_error(error,
+                                   "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
+                }
 
                 // Get the kernels
-                std::cout << "engine get kernels" << std::endl;
                 project_rectilinear =
                   cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Error getting project_rectilinear kernel");
@@ -209,7 +194,7 @@ namespace engine {
                 throw_cl_error(error, "Error getting project_equisolid kernel");
                 load_image = cl::kernel(::clCreateKernel(program, "load_image", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Failed to create kernel load_image");
-                std::cout << "engine do more things" << std::endl;
+
                 // Grab all the kernels that were generated
                 for (unsigned int i = 0; i < structure.size(); ++i) {
                     std::string kernel       = "conv" + std::to_string(i);
@@ -243,7 +228,6 @@ namespace engine {
                 for (const auto& k : conv_layers) {
                     workgroup_size = std::max(workgroup_size, workgroup_size_for_kernel(k.first));
                 }
-                std::cout << "engine end" << std::endl;
             }
 
             /**
@@ -261,7 +245,6 @@ namespace engine {
             inline ProjectedMesh<Scalar, Model<Scalar>::N_NEIGHBOURS> operator()(const Mesh<Scalar, Model>& mesh,
                                                                                  const mat4<Scalar>& Hoc,
                                                                                  const Lens<Scalar>& lens) const {
-                std::cout << "engine start 1" << std::endl;
                 static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 // Perform the projection
@@ -287,7 +270,7 @@ namespace engine {
                                                      events.data(),
                                                      nullptr);
                 throw_cl_error(error, "Failed reading projected pixels from the device");
-                std::cout << "engine end 2" << std::endl;
+
                 return ProjectedMesh<Scalar, N_NEIGHBOURS>{
                   std::move(pixels), std::move(neighbourhood), std::move(indices)};
             }
@@ -329,7 +312,6 @@ namespace engine {
                                                                            const Lens<Scalar>& lens,
                                                                            const void* image,
                                                                            const uint32_t& format) const {
-                std::cout << "engine start 2" << std::endl;
                 static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
                 cl_int error                      = CL_SUCCESS;
 
@@ -507,7 +489,6 @@ namespace engine {
                 // Wait for the chain to finish up to where we care about it
                 std::array<cl_event, 2> end_events = {pixels_read, classes_read};
                 ::clWaitForEvents(2, end_events.data());
-                std::cout << "engine end 2" << std::endl;
 
                 return ClassifiedMesh<Scalar, N_NEIGHBOURS>{
                   std::move(pixels), std::move(neighbourhood), std::move(indices), std::move(classifications)};
@@ -555,7 +536,6 @@ namespace engine {
             template <template <typename> class Model>
             std::tuple<std::vector<std::array<int, Model<Scalar>::N_NEIGHBOURS>>, std::vector<int>, cl::mem, cl::event>
               do_project(const Mesh<Scalar, Model>& mesh, const mat4<Scalar>& Hoc, const Lens<Scalar>& lens) const {
-                std::cout << "engine start 3" << std::endl;
                 static constexpr int N_NEIGHBOURS = Model<Scalar>::N_NEIGHBOURS;
 
                 // Lookup the on screen ranges
@@ -710,7 +690,6 @@ namespace engine {
                 // finished If we don't do this here, some of our buffers can go out of scope before the queue picks
                 // them up causing errors
                 ::clFlush(queue);
-                std::cout << "engine end 3" << std::endl;
                 // Return what we calculated
                 return std::make_tuple(std::move(local_neighbourhood),  // CPU buffer
                                        std::move(indices),              // CPU buffer
