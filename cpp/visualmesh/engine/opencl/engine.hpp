@@ -138,17 +138,17 @@ namespace engine {
                           error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                     }
 
-                    project_rectilinear =
-                      cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
-                    throw_cl_error(error, "Error getting project_rectilinear kernel");
-                    project_equidistant =
-                      cl::kernel(::clCreateKernel(program, "project_equidistant", &error), ::clReleaseKernel);
-                    throw_cl_error(error, "Error getting project_equidistant kernel");
-                    project_equisolid =
-                      cl::kernel(::clCreateKernel(program, "project_equisolid", &error), ::clReleaseKernel);
-                    throw_cl_error(error, "Error getting project_equisolid kernel");
-                    load_image = cl::kernel(::clCreateKernel(program, "load_image", &error), ::clReleaseKernel);
-                    throw_cl_error(error, "Failed to create kernel load_image");
+                    // project_rectilinear =
+                    //   cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
+                    // throw_cl_error(error, "Error getting project_rectilinear kernel");
+                    // project_equidistant =
+                    //   cl::kernel(::clCreateKernel(program, "project_equidistant", &error), ::clReleaseKernel);
+                    // throw_cl_error(error, "Error getting project_equidistant kernel");
+                    // project_equisolid =
+                    //   cl::kernel(::clCreateKernel(program, "project_equisolid", &error), ::clReleaseKernel);
+                    // throw_cl_error(error, "Error getting project_equisolid kernel");
+                    // load_image = cl::kernel(::clCreateKernel(program, "load_image", &error), ::clReleaseKernel);
+                    // throw_cl_error(error, "Failed to create kernel load_image");
 
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, NULL);
