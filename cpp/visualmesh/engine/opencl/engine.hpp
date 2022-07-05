@@ -144,7 +144,7 @@ namespace engine {
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
                     std::cout << "reserving" << std::endl;
-                    binary->reserve(binary_size);
+                    binary_prog->reserve(binary_size);
                     std::cout << "prog info" << std::endl;
                     clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &(binary_prog->front()), nullptr);
                     std::cout << "make var " << binary_size << std::endl;
