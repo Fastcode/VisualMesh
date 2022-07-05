@@ -140,14 +140,20 @@ namespace engine {
                         throw_cl_error(
                           error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                     }
-
+                    std::cout << "built" << std::endl;
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
+                    std::cout << "reserving" << std::endl;
                     binary.reserve(binary_size);
+                    std::cout << "prog info" << std::endl;
                     clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &binary[0], nullptr);
+                    std::cout << "make var" << std::endl;
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
+                    std::cout << "write" << std::endl;
                     write_binary.write(&binary[0], binary_size);
+                    std::cout << "close" << std::endl;
                     write_binary.close();
+                    std::cout << "done" << std::endl;
                 }
                 std::cout << "Compiling with binary" << std::endl;
                 // Load the binary and build
