@@ -97,7 +97,7 @@ namespace engine {
 
                 // Variables for reading the binary
                 size_t binary_size;
-                std::shared_ptr<std::vector<char>> binary = std::make_shared<std::vector<char>>();
+                std::shared_ptr<std::vector<char>> binary_prog = std::make_shared<std::vector<char>>();
 
                 // If the compiled binary exists, read it
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
@@ -108,9 +108,9 @@ namespace engine {
                     read_binary.seekg(0, read_binary.end);
                     binary_size = read_binary.tellg();
                     read_binary.seekg(0, read_binary.beg);
-                    binary->reserve(binary_size);
+                    binary_prog->reserve(binary_size);
                     // Read the file
-                    read_binary.read(&(binary->front()), binary_size);
+                    read_binary.read(&(binary_prog->front()), binary_size);
                     if (!read_binary) { throw("Read failed"); }
                     read_binary.close();
                 }
@@ -146,11 +146,11 @@ namespace engine {
                     std::cout << "reserving" << std::endl;
                     binary->reserve(binary_size);
                     std::cout << "prog info" << std::endl;
-                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &(binary->front()), nullptr);
-                    std::cout << "make var" << std::endl;
+                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &(binary_prog->front()), nullptr);
+                    std::cout << "make var " << binary_size << std::endl;
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
                     std::cout << "write" << std::endl;
-                    write_binary.write(&(binary->front()), binary_size);
+                    write_binary.write(&(binary_prog->front()), binary_size);
                     std::cout << "close" << std::endl;
                     write_binary.close();
                     std::cout << "done" << std::endl;
@@ -158,15 +158,15 @@ namespace engine {
                 std::cout << "Compiling with binary" << std::endl;
                 // Load the binary and build
                 cl_int binary_status = CL_SUCCESS;
-                program =
-                  cl::program(::clCreateProgramWithBinary(context,
-                                                          1,
-                                                          &device,
-                                                          &binary_size,
-                                                          reinterpret_cast<const unsigned char**>(&(binary->front())),
-                                                          &binary_status,
-                                                          &error),
-                              ::clReleaseProgram);
+                program              = cl::program(
+                  ::clCreateProgramWithBinary(context,
+                                              1,
+                                              &device,
+                                              &binary_size,
+                                              reinterpret_cast<const unsigned char**>(&(binary_prog->front())),
+                                              &binary_status,
+                                              &error),
+                  ::clReleaseProgram);
                 throw_cl_error(error, "Failed to create program from binary");
                 throw_cl_error(binary_status, "Invalid binary");
 
