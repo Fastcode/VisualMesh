@@ -103,6 +103,7 @@ namespace engine {
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
                 std::ifstream read_binary(binary_path, std::ios::in);
                 if (read_binary) {
+                    std::cout << "reading binary" << std::endl;
                     // Get the length
                     read_binary.seekg(0, read_binary.end);
                     binary_size = read_binary.tellg();
@@ -115,6 +116,7 @@ namespace engine {
                 }
                 // The compiled binary doesn't exist, create it
                 else {
+                    std::cout << "building program" << std::endl;
                     // Create the program and build
                     program =
                       cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
@@ -147,7 +149,7 @@ namespace engine {
                     write_binary.write(&binary[0], binary_size);
                     write_binary.close();
                 }
-
+                std::cout << "Compiling with binary" << std::endl;
                 // Load the binary and build
                 cl_int binary_status = CL_SUCCESS;
                 program              = cl::program(::clCreateProgramWithBinary(context,
@@ -179,7 +181,7 @@ namespace engine {
                     throw_cl_error(error,
                                    "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                 }
-
+                std::cout << "done" << std::endl;
                 // Get the kernels
                 project_rectilinear =
                   cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
