@@ -174,10 +174,11 @@ namespace engine {
                     std::cout << "created binary" << std::endl;
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
-                    std::array<char, binary_size> binary_save{};
-                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, binary_save.data(), nullptr);
+                    std::vector<char> binary_save{};
+                    binary_save.resize(binary_size);
+                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_save.size(), binary_save.data(), nullptr);
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
-                    write_binary.write(binary_save.data(), binary_size);
+                    write_binary.write(binary_save.data(), binary_save.size());
                     write_binary.close();
                     std::cout << "saved binary" << std::endl;
                 }
