@@ -188,6 +188,7 @@ namespace engine {
                     std::cout << "reserve" << std::endl;
                     clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, binary_prog, nullptr);
                     std::cout << "make var " << std::endl;
+                    delete[] binary_prog;
                     // try {
                     //     std::ofstream write_binary(binary_path, std::ofstream::binary);
                     //     std::cout << "write" << std::endl;
