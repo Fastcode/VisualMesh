@@ -182,11 +182,12 @@ namespace engine {
                     size_t binary_size{};
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
                     std::cout << "get the binary size" << std::endl;
-                    std::vector<char> binary_prog{};
-                    binary_prog.reserve(binary_size);
+                    // std::vector<char> binary_prog{};
+                    // binary_prog.reserve(binary_size);
+                    char* binary_prog = new char[binary_size];
                     std::cout << "reserve" << std::endl;
-                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, binary_prog.data(), &error);
-                    std::cout << "make var " << binary_prog.data() << " " << error << std::endl;
+                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, binary_prog, nullptr);
+                    std::cout << "make var " << std::endl;
                     // try {
                     //     std::ofstream write_binary(binary_path, std::ofstream::binary);
                     //     std::cout << "write" << std::endl;
