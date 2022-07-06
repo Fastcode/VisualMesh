@@ -121,7 +121,7 @@ namespace engine {
                     // Load the binary and build
                     cl_int binary_status = CL_SUCCESS;
                     // const unsigned char* thing = reinterpret_cast<unsigned char*>(binary_prog.data());
-                    std::array<const unsigned char*, 1> binary_progs = {
+                    std::vector<const unsigned char*> binary_progs = {
                       reinterpret_cast<unsigned char*>(binary_prog.data())};
                     program =
                       cl::program(::clCreateProgramWithBinary(
@@ -139,9 +139,10 @@ namespace engine {
                     // If it didn't work, try rebuilding
                     if (error != CL_SUCCESS) { read_failed = true; }
                 }
+
                 // If the read failed, remove the file
                 if (read_failed) {
-                    std::cout << "read failed, remove the file " << binary_size << std::endl;
+                    std::cout << "read failed, remove the file " << std::endl;
                     std::remove(binary_path.c_str());
                 }
 
