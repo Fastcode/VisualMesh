@@ -99,7 +99,6 @@ namespace engine {
                 // Variables for reading the binary
                 size_t binary_size;
                 char* binary;
-                std::vector<char> binary_save{};
 
                 // If the compiled binary exists, read it
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
@@ -175,8 +174,7 @@ namespace engine {
                     std::cout << "created binary" << std::endl;
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
-                    binary_save.clear();
-                    binary_save.reserve(binary_size);
+                    std::array<char, binary_size> binary_save{};
                     clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, binary_save.data(), nullptr);
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
                     write_binary.write(binary_save.data(), binary_size);
