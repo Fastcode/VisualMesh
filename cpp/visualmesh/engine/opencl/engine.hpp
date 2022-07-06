@@ -96,10 +96,7 @@ namespace engine {
                 size_t csize       = source.size();
                 // The hash of the sources represents the name of the OpenCL compiled program binary file, so that a new
                 // binary will be created for different sources
-                std::size_t source_hash = std::hash<std::string>{}(source);
-
-                // Variables for reading the binary
-                size_t binary_size;
+                const std::size_t source_hash = std::hash<std::string>{}(source);
 
                 // If the compiled binary exists, read it
                 const std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
@@ -109,7 +106,7 @@ namespace engine {
                     std::cout << "reading binary" << std::endl;
                     // Get the length
                     read_binary.seekg(0, read_binary.end);
-                    binary_size = read_binary.tellg();
+                    size_t binary_size = read_binary.tellg();
                     read_binary.seekg(0, read_binary.beg);
                     std::vector<char> binary_prog{};
                     binary_prog.reserve(binary_size);
@@ -175,6 +172,7 @@ namespace engine {
                     }
                     std::cout << "built" << std::endl;
                     // Save the the built program to a file
+                    size_t binary_size{};
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
                     std::cout << "reserving" << std::endl;
                     std::vector<char> binary_prog{};
