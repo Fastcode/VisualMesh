@@ -184,15 +184,15 @@ namespace engine {
                     std::cout << "make var" << std::endl;
                     try {
                         std::ofstream write_binary(binary_path, std::ofstream::binary);
+                        std::cout << "write" << std::endl;
+                        write_binary.write(binary_prog.data(), binary_size);
+                        std::cout << "close" << std::endl;
+                        write_binary.close();
+                        std::cout << "done" << std::endl;
                     }
                     catch (const std::exception& e) {
                         std::cout << e.what();
                     }
-                    std::cout << "write" << std::endl;
-                    write_binary.write(binary_prog.data(), binary_size);
-                    std::cout << "close" << std::endl;
-                    write_binary.close();
-                    std::cout << "done" << std::endl;
                 }
                 std::cout << "done" << std::endl;
                 // Get the kernels
