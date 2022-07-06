@@ -75,6 +75,7 @@ namespace engine {
              */
 
             Engine(const NetworkStructure<Scalar>& structure = {}, std::string cache_directory = "") {
+                std::cout << "start" << std::endl;
                 // Create the OpenCL context and command queue
                 cl_int error              = CL_SUCCESS;
                 cl_device_id device       = nullptr;
@@ -201,7 +202,7 @@ namespace engine {
                 throw_cl_error(error, "Error getting project_equisolid kernel");
                 load_image = cl::kernel(::clCreateKernel(program, "load_image", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Failed to create kernel load_image");
-
+                std::cout << "kernels" << std::endl;
                 // Grab all the kernels that were generated
                 for (unsigned int i = 0; i < structure.size(); ++i) {
                     std::string kernel       = "conv" + std::to_string(i);
@@ -211,7 +212,7 @@ namespace engine {
                     throw_cl_error(error, "Failed to create kernel " + kernel);
                     conv_layers.emplace_back(k, output_size);
                 }
-
+                std::cout << "network stuff" << std::endl;
                 // Work out what the widest network layer is
                 max_width = 4;
                 for (const auto& k : conv_layers) {
@@ -235,6 +236,7 @@ namespace engine {
                 for (const auto& k : conv_layers) {
                     workgroup_size = std::max(workgroup_size, workgroup_size_for_kernel(k.first));
                 }
+                std::cout << "end" << std::endl;
             }
 
             /**
