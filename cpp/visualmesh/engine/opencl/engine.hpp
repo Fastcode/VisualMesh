@@ -116,7 +116,6 @@ namespace engine {
                     // Read the file
                     read_binary.read(binary_prog.data(), binary_size);
                     if (!read_binary) { read_failed = true; }
-                    read_binary.close();
 
                     std::cout << "Compiling with binary" << std::endl;
                     // Load the binary and build
@@ -140,6 +139,7 @@ namespace engine {
                     // If it didn't work, try rebuilding
                     if (error != CL_SUCCESS) { read_failed = true; }
                 }
+                read_binary.close();
 
                 // If the read failed, remove the file
                 if (read_failed) {
