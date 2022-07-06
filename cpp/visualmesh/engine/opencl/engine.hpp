@@ -73,6 +73,7 @@ namespace engine {
              */
 
             Engine(const NetworkStructure<Scalar>& structure = {}, std::string cache_directory = "") {
+                std::cout << "start" << std::endl;
                 // Create the OpenCL context and command queue
                 cl_int error              = CL_SUCCESS;
                 cl_device_id device       = nullptr;
@@ -103,6 +104,7 @@ namespace engine {
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
                 std::ifstream read_binary(binary_path, std::ios::in);
                 if (read_binary) {
+                    std::cout << "reading binary" << std::endl;
                     // Get the length
                     read_binary.seekg(0, read_binary.end);
                     binary_size = read_binary.tellg();
@@ -141,9 +143,11 @@ namespace engine {
                         throw_cl_error(
                           error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                     }
+                    std::cout << "built from binary" << std::endl;
                 }
                 // The compiled binary doesn't exist, create it
                 else {
+                    std::cout << "creating binary" << std::endl;
                     // Create the program and build
                     program =
                       cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
@@ -167,7 +171,7 @@ namespace engine {
                         throw_cl_error(
                           error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                     }
-
+                    std::cout << "created binary" << std::endl;
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
                     binary = new char[binary_size];
@@ -175,8 +179,10 @@ namespace engine {
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
                     write_binary.write(binary, binary_size);
                     write_binary.close();
+                    delete[] binary;
+                    std::cout << "saved binary" << std::endl;
                 }
-
+                std::cout << "kernels" << std::endl;
                 // Get the kernels
                 project_rectilinear =
                   cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
@@ -223,6 +229,7 @@ namespace engine {
                 for (const auto& k : conv_layers) {
                     workgroup_size = std::max(workgroup_size, workgroup_size_for_kernel(k.first));
                 }
+                std::cout << "end" << std::endl;
             }
 
             /**
