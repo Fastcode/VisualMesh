@@ -178,10 +178,10 @@ namespace engine {
                           error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                     }
                     std::cout << "built" << std::endl;
-                    // // Save the the built program to a file
-                    // size_t binary_size{};
-                    // clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
-                    // std::cout << "reserving" << std::endl;
+                    // Save the the built program to a file
+                    size_t binary_size{};
+                    clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
+                    std::cout << "get the binary size" << std::endl;
                     // std::vector<char> binary_prog{};
                     // binary_prog.reserve(binary_size);
                     // std::cout << "prog info" << std::endl;
