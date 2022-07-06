@@ -102,56 +102,57 @@ namespace engine {
                 const std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
                 std::ifstream read_binary(binary_path, std::ios::binary);
                 bool read_failed = false;
-                if (read_binary) {
-                    std::cout << "reading binary" << std::endl;
-                    // Get the length
-                    read_binary.seekg(0, read_binary.end);
-                    size_t binary_size = read_binary.tellg();
-                    read_binary.seekg(0, read_binary.beg);
-                    std::vector<char> binary_prog{};
-                    binary_prog.reserve(binary_size);
-                    // Read the file
-                    read_binary.read(binary_prog.data(), binary_size);
-                    if (!read_binary) { read_failed = true; }
+                // if (read_binary) {
+                //     std::cout << "reading binary" << std::endl;
+                //     // Get the length
+                //     read_binary.seekg(0, read_binary.end);
+                //     size_t binary_size = read_binary.tellg();
+                //     read_binary.seekg(0, read_binary.beg);
+                //     std::vector<char> binary_prog{};
+                //     binary_prog.reserve(binary_size);
+                //     // Read the file
+                //     read_binary.read(binary_prog.data(), binary_size);
+                //     if (!read_binary) { read_failed = true; }
 
-                    std::cout << "Compiling with binary" << std::endl;
-                    // Load the binary and build
-                    cl_int binary_status = CL_SUCCESS;
-                    // const unsigned char* thing = reinterpret_cast<unsigned char*>(binary_prog.data());
-                    std::vector<const unsigned char*> binary_progs = {
-                      reinterpret_cast<unsigned char*>(binary_prog.data())};
-                    program =
-                      cl::program(::clCreateProgramWithBinary(
-                                    context, 1, &device, &binary_size, binary_progs.data(), &binary_status, &error),
-                                  ::clReleaseProgram);
-                    if ((error != CL_SUCCESS) || (binary_status != CL_SUCCESS)) { read_failed = true; }
+                //     std::cout << "Compiling with binary" << std::endl;
+                //     // Load the binary and build
+                //     cl_int binary_status = CL_SUCCESS;
+                //     // const unsigned char* thing = reinterpret_cast<unsigned char*>(binary_prog.data());
+                //     std::vector<const unsigned char*> binary_progs = {
+                //       reinterpret_cast<unsigned char*>(binary_prog.data())};
+                //     program =
+                //       cl::program(::clCreateProgramWithBinary(
+                //                     context, 1, &device, &binary_size, binary_progs.data(), &binary_status, &error),
+                //                   ::clReleaseProgram);
+                //     if ((error != CL_SUCCESS) || (binary_status != CL_SUCCESS)) { read_failed = true; }
 
-                    error = ::clBuildProgram(program,
-                                             1,
-                                             &device,
-                                             "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
-                                             nullptr,
-                                             nullptr);
+                //     error = ::clBuildProgram(program,
+                //                              1,
+                //                              &device,
+                //                              "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
+                //                              nullptr,
+                //                              nullptr);
 
-                    // If it didn't work, try rebuilding
-                    if (error != CL_SUCCESS) { read_failed = true; }
-                }
-                read_binary.close();
+                //     // If it didn't work, try rebuilding
+                //     if (error != CL_SUCCESS) { read_failed = true; }
+                // }
+                // read_binary.close();
 
-                // If the read failed, remove the file
-                if (read_failed) {
-                    std::cout << "read failed, remove the file " << std::endl;
-                    std::remove(binary_path.c_str());
+                // // If the read failed, remove the file
+                // if (read_failed) {
+                //     std::cout << "read failed, remove the file " << std::endl;
+                //     std::remove(binary_path.c_str());
 
-                    // reset vars
-                    error                     = CL_SUCCESS;
-                    device                    = nullptr;
-                    std::tie(context, device) = operation::make_context();
-                    queue                     = operation::make_queue(context, device);
-                }
+                //     // reset vars
+                //     error                     = CL_SUCCESS;
+                //     device                    = nullptr;
+                //     std::tie(context, device) = operation::make_context();
+                //     queue                     = operation::make_queue(context, device);
+                // }
 
                 // The compiled binary doesn't exist, create it
-                if (!read_binary || read_failed) {
+                // if (!read_binary || read_failed) {
+                if (true) {
                     std::cout << "building program" << std::endl;
                     // Create the program and build
                     program =
