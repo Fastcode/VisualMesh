@@ -101,7 +101,7 @@ namespace engine {
                 size_t binary_size;
 
                 // If the compiled binary exists, read it
-                std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
+                const std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
                 std::ifstream read_binary(binary_path, std::ios::in);
                 bool read_failed = false;
                 if (read_binary) {
@@ -142,7 +142,7 @@ namespace engine {
                 // If the read failed, remove the file
                 if (read_failed) {
                     std::cout << "read failed, remove the file " << binary_size << std::endl;
-                    std::remove(binary_path);
+                    std::remove(binary_path.c_str());
                 }
 
                 // The compiled binary doesn't exist, create it
