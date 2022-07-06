@@ -182,7 +182,12 @@ namespace engine {
                     std::cout << "prog info" << std::endl;
                     clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, binary_prog.data(), nullptr);
                     std::cout << "make var" << std::endl;
-                    std::ofstream write_binary(binary_path, std::ofstream::binary);
+                    try {
+                        std::ofstream write_binary(binary_path, std::ofstream::binary);
+                    }
+                    catch (const std::exception& e) {
+                        std::cout << e.what();
+                    }
                     std::cout << "write" << std::endl;
                     write_binary.write(binary_prog.data(), binary_size);
                     std::cout << "close" << std::endl;
