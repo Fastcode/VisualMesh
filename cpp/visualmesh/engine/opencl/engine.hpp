@@ -103,7 +103,7 @@ namespace engine {
 
                 // If the compiled binary exists, read it
                 const std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
-                std::ifstream read_binary(binary_path, std::ios::in);
+                std::ifstream read_binary(binary_path, std::ios::binary);
                 bool read_failed = false;
                 if (read_binary) {
                     std::cout << "reading binary" << std::endl;
