@@ -97,7 +97,7 @@ namespace engine {
 
                 // Variables for reading the binary
                 size_t binary_size;
-                std::shared_ptr<std::vector<char>> binary_prog = std::make_shared<std::vector<char>>();
+                std::vector<char> binary_prog{};
 
                 // If the compiled binary exists, read it
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
@@ -110,8 +110,8 @@ namespace engine {
                     read_binary.seekg(0, read_binary.beg);
                     binary_prog->reserve(binary_size);
                     // Read the file
-                    read_binary.read(&(binary_prog->front()), binary_size);
-                    if (!read_binary) { throw("Read failed"); }
+                    read_binary.read(binary_prog.data(), binary_size);
+                    if (!read_binary) { throw std::runtime_error("Read failed"); }
                     read_binary.close();
                 }
                 // The compiled binary doesn't exist, create it
@@ -146,24 +146,25 @@ namespace engine {
                     std::cout << "reserving" << std::endl;
                     binary_prog->reserve(binary_size);
                     std::cout << "prog info" << std::endl;
-                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &(binary_prog->front()), nullptr);
+                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, binary_prog.data(), nullptr);
                     std::cout << "make var " << binary_size << std::endl;
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
                     std::cout << "write" << std::endl;
-                    write_binary.write(&(binary_prog->front()), binary_size);
+                    write_binary.write(binary_prog.data(), binary_size);
                     std::cout << "close" << std::endl;
                     write_binary.close();
                     std::cout << "done" << std::endl;
                 }
                 std::cout << "Compiling with binary" << std::endl;
                 // Load the binary and build
-                cl_int binary_status = CL_SUCCESS;
+                cl_int binary_status              = CL_SUCCESS;
+                std::array<char*, 1> binary_progs = {binary_prog.data()};
                 program              = cl::program(
                   ::clCreateProgramWithBinary(context,
                                               1,
                                               &device,
                                               &binary_size,
-                                              reinterpret_cast<const unsigned char**>(&(binary_prog->front())),
+                                              binary_progs.data()),
                                               &binary_status,
                                               &error),
                   ::clReleaseProgram);
