@@ -112,6 +112,35 @@ namespace engine {
                     read_binary.read(binary, binary_size);
                     if (!read_binary) { throw("Read failed"); }
                     read_binary.close();
+
+                    // Load the binary and build
+                    cl_int binary_status = CL_SUCCESS;
+                    program              = cl::program(
+                      ::clCreateProgramWithBinary(
+                        context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &error),
+                      ::clReleaseProgram);
+                    throw_cl_error(error, "Failed to create program from binary");
+
+                    delete[] binary;  // done with the binary so delete it
+
+                    error = ::clBuildProgram(program,
+                                             1,
+                                             &device,
+                                             "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
+                                             nullptr,
+                                             nullptr);
+
+                    // If it didn't work, log and throw an error
+                    if (error != CL_SUCCESS) {
+                        // Get program build log
+                        size_t used = 0;
+                        ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
+                        std::vector<char> log(used);
+                        ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
+                        // Throw an error with the build log
+                        throw_cl_error(
+                          error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
+                    }
                 }
                 // The compiled binary doesn't exist, create it
                 else {
@@ -146,35 +175,6 @@ namespace engine {
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
                     write_binary.write(binary, binary_size);
                     write_binary.close();
-                }
-
-                // Load the binary and build
-                cl_int binary_status = CL_SUCCESS;
-                program              = cl::program(
-                  ::clCreateProgramWithBinary(
-                    context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &error),
-                  ::clReleaseProgram);
-                throw_cl_error(error, "Failed to create program from binary");
-
-                delete[] binary;  // done with the binary so delete it
-
-                error = ::clBuildProgram(program,
-                                         1,
-                                         &device,
-                                         "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
-                                         nullptr,
-                                         nullptr);
-
-                // If it didn't work, log and throw an error
-                if (error != CL_SUCCESS) {
-                    // Get program build log
-                    size_t used = 0;
-                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
-                    std::vector<char> log(used);
-                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
-                    // Throw an error with the build log
-                    throw_cl_error(error,
-                                   "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                 }
 
                 // Get the kernels
