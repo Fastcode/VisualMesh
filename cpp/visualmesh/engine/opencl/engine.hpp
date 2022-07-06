@@ -142,6 +142,12 @@ namespace engine {
                 if (read_failed) {
                     std::cout << "read failed, remove the file " << std::endl;
                     std::remove(binary_path.c_str());
+
+                    // reset vars
+                    error                     = CL_SUCCESS;
+                    device                    = nullptr;
+                    std::tie(context, device) = operation::make_context();
+                    queue                     = operation::make_queue(context, device);
                 }
 
                 // The compiled binary doesn't exist, create it
