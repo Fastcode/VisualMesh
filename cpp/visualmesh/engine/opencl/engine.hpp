@@ -21,6 +21,8 @@
 // If OpenCL is disabled then don't provide this file
 #if !defined(VISUALMESH_DISABLE_OPENCL)
 
+#include <stdio.h>
+
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -137,6 +139,12 @@ namespace engine {
                     // If it didn't work, try rebuilding
                     if (error != CL_SUCCESS) { read_failed = true; }
                 }
+                // If the read failed, remove the file
+                if (read_failed) {
+                    std::cout << "read failed, remove the file " << binary_size << std::endl;
+                    std::remove(binary_path);
+                }
+
                 // The compiled binary doesn't exist, create it
                 if (!read_binary || read_failed) {
                     std::cout << "building program" << std::endl;
@@ -171,7 +179,7 @@ namespace engine {
                     binary_prog.reserve(binary_size);
                     std::cout << "prog info" << std::endl;
                     clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, binary_prog.data(), nullptr);
-                    std::cout << "make var " << binary_size << std::endl;
+                    std::cout << "make var" << std::endl;
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
                     std::cout << "write" << std::endl;
                     write_binary.write(binary_prog.data(), binary_size);
