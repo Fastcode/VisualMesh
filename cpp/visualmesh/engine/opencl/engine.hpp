@@ -99,9 +99,9 @@ namespace engine {
                 const std::size_t source_hash = std::hash<std::string>{}(source);
 
                 // If the compiled binary exists, read it
-                const std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
-                std::ifstream read_binary(binary_path, std::ios::binary);
-                bool read_failed = false;
+                // const std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
+                // std::ifstream read_binary(binary_path, std::ios::binary);
+                // bool read_failed = false;
                 // if (read_binary) {
                 //     std::cout << "reading binary" << std::endl;
                 //     // Get the length
@@ -178,26 +178,26 @@ namespace engine {
                           error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                     }
                     std::cout << "built" << std::endl;
-                    // Save the the built program to a file
-                    size_t binary_size{};
-                    clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
-                    std::cout << "reserving" << std::endl;
-                    std::vector<char> binary_prog{};
-                    binary_prog.reserve(binary_size);
-                    std::cout << "prog info" << std::endl;
-                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, binary_prog.data(), nullptr);
-                    std::cout << "make var" << std::endl;
-                    try {
-                        std::ofstream write_binary(binary_path, std::ofstream::binary);
-                        std::cout << "write" << std::endl;
-                        write_binary.write(binary_prog.data(), binary_size);
-                        std::cout << "close" << std::endl;
-                        write_binary.close();
-                        std::cout << "done" << std::endl;
-                    }
-                    catch (const std::exception& e) {
-                        std::cout << e.what();
-                    }
+                    // // Save the the built program to a file
+                    // size_t binary_size{};
+                    // clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
+                    // std::cout << "reserving" << std::endl;
+                    // std::vector<char> binary_prog{};
+                    // binary_prog.reserve(binary_size);
+                    // std::cout << "prog info" << std::endl;
+                    // clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, binary_prog.data(), nullptr);
+                    // std::cout << "make var" << std::endl;
+                    // try {
+                    //     std::ofstream write_binary(binary_path, std::ofstream::binary);
+                    //     std::cout << "write" << std::endl;
+                    //     write_binary.write(binary_prog.data(), binary_size);
+                    //     std::cout << "close" << std::endl;
+                    //     write_binary.close();
+                    //     std::cout << "done" << std::endl;
+                    // }
+                    // catch (const std::exception& e) {
+                    //     std::cout << e.what();
+                    // }
                 }
                 std::cout << "done" << std::endl;
                 // Get the kernels
