@@ -140,9 +140,9 @@ namespace engine {
                     }
 
                     // Save the the built program to a file
-                    clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, NULL);
+                    clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
                     binary = new char[binary_size];
-                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &binary, NULL);
+                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, &binary, nullptr);
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
                     write_binary.write(binary, binary_size);
                     write_binary.close();
@@ -162,9 +162,9 @@ namespace engine {
                                          1,
                                          &device,
                                          "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
-                                         NULL,
-                                         NULL);
-                
+                                         nullptr,
+                                         nullptr);
+
                 // If it didn't work, log and throw an error
                 if (error != CL_SUCCESS) {
                     // Get program build log
@@ -578,9 +578,7 @@ namespace engine {
                     // Cache for future runs
                     device_points_cache[&mesh] = cl_points;
                 }
-                else {
-                    cl_points = device_mesh->second;
-                }
+                else { cl_points = device_mesh->second; }
 
                 // First count the size of the buffer we will need to allocate
                 int n_points = 0;
