@@ -113,6 +113,41 @@ namespace engine {
                     read_binary.read(binary_prog.data(), binary_size);
                     if (!read_binary) { throw std::runtime_error("Read failed"); }
                     read_binary.close();
+
+                    std::cout << "Compiling with binary" << std::endl;
+                    // Load the binary and build
+                    cl_int binary_status              = CL_SUCCESS;
+                    std::array<char*, 1> binary_progs = {binary_prog.data()};
+                    program              = cl::program(
+                    ::clCreateProgramWithBinary(context,
+                                                1,
+                                                &device,
+                                                &binary_size,
+                                                binary_progs.data()),
+                                                &binary_status,
+                                                &error),
+                    ::clReleaseProgram);
+                    throw_cl_error(error, "Failed to create program from binary");
+                    throw_cl_error(binary_status, "Invalid binary");
+
+                    error = ::clBuildProgram(program,
+                                             1,
+                                             &device,
+                                             "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
+                                             nullptr,
+                                             nullptr);
+
+                    // If it didn't work, log and throw an error
+                    if (error != CL_SUCCESS) {
+                        // Get program build log
+                        size_t used = 0;
+                        ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
+                        std::vector<char> log(used);
+                        ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
+                        // Throw an error with the build log
+                        throw_cl_error(
+                          error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
+                    }
                 }
                 // The compiled binary doesn't exist, create it
                 else {
@@ -154,40 +189,6 @@ namespace engine {
                     std::cout << "close" << std::endl;
                     write_binary.close();
                     std::cout << "done" << std::endl;
-                }
-                std::cout << "Compiling with binary" << std::endl;
-                // Load the binary and build
-                cl_int binary_status              = CL_SUCCESS;
-                std::array<char*, 1> binary_progs = {binary_prog.data()};
-                program              = cl::program(
-                  ::clCreateProgramWithBinary(context,
-                                              1,
-                                              &device,
-                                              &binary_size,
-                                              binary_progs.data()),
-                                              &binary_status,
-                                              &error),
-                  ::clReleaseProgram);
-                throw_cl_error(error, "Failed to create program from binary");
-                throw_cl_error(binary_status, "Invalid binary");
-
-                error = ::clBuildProgram(program,
-                                         1,
-                                         &device,
-                                         "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
-                                         nullptr,
-                                         nullptr);
-
-                // If it didn't work, log and throw an error
-                if (error != CL_SUCCESS) {
-                    // Get program build log
-                    size_t used = 0;
-                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
-                    std::vector<char> log(used);
-                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
-                    // Throw an error with the build log
-                    throw_cl_error(error,
-                                   "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                 }
                 std::cout << "done" << std::endl;
                 // Get the kernels
