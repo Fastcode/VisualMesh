@@ -66,78 +66,68 @@ namespace engine {
             static constexpr size_t MEM_SIZE = sizeof(cl_mem);
 
             /**
-             * @brief Build the OpenCL program and save the binary to a file
+             * @brief Load an OpenCL binary from a file and build it
              *
              * @param binary_path path to save the binary file to
              * @param device OpenCL device id
              *
-             * @return true if loading and building succeeded, false if it failed
              */
-            bool load_build_binary(std::string binary_path, cl_device_id& device) {
-                try {
-                    // If the file doesn't exist, this isn't an error so don't throw just return that it didn't work
-                    std::ifstream read_binary(binary_path, std::ios::in);
-                    if (!read_binary) { return true; }
+            void load_binary(std::string binary_path, cl_device_id& device) {
+                // If the file doesn't exist, this isn't an error so don't throw just return that it didn't work
+                std::ifstream read_binary(binary_path, std::ios::in);
+                if (!read_binary) { throw std::runtime_error("Failed to read from precompiled OpenCL binary."); }
 
-                    // Error flag to check if any OpenCL functions fail
-                    cl_int error = CL_SUCCESS;
+                // Error flag to check if any OpenCL functions fail
+                cl_int error = CL_SUCCESS;
 
-                    // Get the length
-                    read_binary.seekg(0, read_binary.end);
-                    size_t binary_size = read_binary.tellg();
-                    read_binary.seekg(0, read_binary.beg);
+                // Get the length
+                read_binary.seekg(0, read_binary.end);
+                size_t binary_size = read_binary.tellg();
+                read_binary.seekg(0, read_binary.beg);
 
-                    // Read the binary file
-                    std::vector<char> binary_load(binary_size, 0);
-                    read_binary.read(binary_load.data(), binary_size);
-                    read_binary.close();
-                    if (!read_binary) { throw std::runtime_error("Failed to read from precompiled OpenCL binary."); }
+                // Read the binary file
+                std::vector<char> binary_load(binary_size, 0);
+                read_binary.read(binary_load.data(), binary_size);
+                read_binary.close();
+                if (!read_binary) { throw std::runtime_error("Failed to read from precompiled OpenCL binary."); }
 
-                    // Create the program and build using the loaded binary
-                    cl_int binary_status            = CL_SUCCESS;
-                    const unsigned char* binary_ptr = reinterpret_cast<unsigned char*>(binary_load.data());
+                // Create the program and build using the loaded binary
+                cl_int binary_status            = CL_SUCCESS;
+                const unsigned char* binary_ptr = reinterpret_cast<unsigned char*>(binary_load.data());
 
-                    program = cl::program(::clCreateProgramWithBinary(
-                                            context, 1, &device, &binary_size, &binary_ptr, &binary_status, &error),
-                                          ::clReleaseProgram);
-                    throw_cl_error(error, "Failed to create program from binary");
+                program = cl::program(
+                  ::clCreateProgramWithBinary(context, 1, &device, &binary_size, &binary_ptr, &binary_status, &error),
+                  ::clReleaseProgram);
+                throw_cl_error(error, "Failed to create program from binary");
 
-                    error = ::clBuildProgram(program,
-                                             1,
-                                             &device,
-                                             "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
-                                             nullptr,
-                                             nullptr);
+                error = ::clBuildProgram(program,
+                                         1,
+                                         &device,
+                                         "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
+                                         nullptr,
+                                         nullptr);
 
-                    // If it didn't work, log and throw an error
-                    if (error != CL_SUCCESS) {
-                        // Get program build log
-                        size_t used = 0;
-                        ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
-                        std::vector<char> log(used);
-                        ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
-                        // Throw an error with the build log
-                        throw_cl_error(
-                          error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
-                    }
-
-                    return false;  // succeeded in loading and building
-                }
-                catch (std::exception e) {
-                    std::cout << e.what() << std::endl;
-                    return true;  // failed to load and build
+                // If it didn't work, log and throw an error
+                if (error != CL_SUCCESS) {
+                    // Get program build log
+                    size_t used = 0;
+                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
+                    std::vector<char> log(used);
+                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
+                    // Throw an error with the build log
+                    throw_cl_error(error,
+                                   "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                 }
             }
 
             /**
-             * @brief Build the OpenCL program and save the binary to a file
+             * @brief Build the OpenCL program
              *
-             * @param binary_path path to save the binary file to
              * @param device OpenCL device id
              * @param cstr OpenCL source information as a string
              * @param csize size of the OpenCL source information
              */
-            void save_build_binary(std::string binary_path, cl_device_id& device, const char* cstr, size_t csize) {
+            void build_binary(cl_device_id& device, const char* cstr, size_t csize) {
                 // Error flag to check if any OpenCL functions fail
                 cl_int error = CL_SUCCESS;
 
@@ -164,6 +154,14 @@ namespace engine {
                     throw_cl_error(error,
                                    "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                 }
+            }
+
+            /**
+             * @brief Save the current OpenCL program in a binary file
+             *
+             * @param binary_path path to save the binary file to
+             */
+            void save_binary(std::string binary_path) {
 
                 // Get the size of the binary to save
                 size_t binary_size{};
@@ -216,10 +214,14 @@ namespace engine {
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
 
                 // Try to read the binary
-                bool read_failed = load_build_binary(binary_path, device);
-
+                try {
+                    load_binary(binary_path, device);
+                }
                 // The compiled binary doesn't exist, create it
-                if (read_failed) { save_build_binary(binary_path, device, cstr, csize); }
+                catch (std::exception& /* e */) {
+                    build_binary(device, cstr, csize);
+                    save_binary(binary_path);
+                }
 
                 // Get the kernels
                 project_rectilinear =
