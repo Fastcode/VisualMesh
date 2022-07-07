@@ -124,16 +124,15 @@ namespace engine {
              * @brief Build the OpenCL program
              *
              * @param device OpenCL device id
-             * @param cstr OpenCL source information as a string
-             * @param csize size of the OpenCL source information
+             * @param source OpenCL source information
              */
             void build_from_source(cl_device_id& device, const std::string& source) {
                 // Error flag to check if any OpenCL functions fail
                 cl_int error = CL_SUCCESS;
 
                 // Create the program and build
-                const char* cstr   = source.c_str();
-                size_t csize       = source.size();
+                const char* cstr = source.c_str();
+                size_t csize     = source.size();
                 program =
                   cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
                 throw_cl_error(error, "Error adding sources to OpenCL program");
@@ -219,7 +218,7 @@ namespace engine {
                 }
                 // The compiled binary doesn't exist, create it
                 catch (std::exception& /* e */) {
-                    build_binary(device, source);
+                    build_from_source(device, source);
                     save_binary(binary_path);
                 }
 
