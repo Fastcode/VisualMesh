@@ -147,7 +147,7 @@ namespace engine {
 
                         std::cout << "built from binary" << std::endl;
                     }
-                    catch (Exception e) {
+                    catch (std::exception e) {
                         read_failed = true;
                         std::cout << e.what() << std::endl;
                     }
