@@ -72,7 +72,7 @@ namespace engine {
              * @param device OpenCL device id
              *
              */
-            void load_binary(std::string binary_path, cl_device_id& device) {
+            void load_binary(const std::string& binary_path, cl_device_id& device) {
                 // If the file doesn't exist, this isn't an error so don't throw just return that it didn't work
                 std::ifstream read_binary(binary_path, std::ios::in);
                 if (!read_binary) { throw std::runtime_error("Failed to read from precompiled OpenCL binary."); }
@@ -127,11 +127,13 @@ namespace engine {
              * @param cstr OpenCL source information as a string
              * @param csize size of the OpenCL source information
              */
-            void build_binary(cl_device_id& device, const char* cstr, size_t csize) {
+            void build_from_source(cl_device_id& device, const std::string& source) {
                 // Error flag to check if any OpenCL functions fail
                 cl_int error = CL_SUCCESS;
 
                 // Create the program and build
+                const char* cstr   = source.c_str();
+                size_t csize       = source.size();
                 program =
                   cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
                 throw_cl_error(error, "Error adding sources to OpenCL program");
@@ -186,7 +188,7 @@ namespace engine {
              * @param structure the network structure to use classification
              * @param cache_directory directory to save/load the compiled OpenCL binary
              */
-            Engine(const NetworkStructure<Scalar>& structure = {}, std::string cache_directory = "") {
+            Engine(const NetworkStructure<Scalar>& structure = {}, const std::string& cache_directory = "") {
                 // Create the OpenCL context and command queue
                 cl_int error              = CL_SUCCESS;
                 cl_device_id device       = nullptr;
@@ -203,8 +205,6 @@ namespace engine {
                 sources << operation::make_network(structure);
 
                 std::string source = sources.str();
-                const char* cstr   = source.c_str();
-                size_t csize       = source.size();
 
                 // The hash of the sources represents the name of the OpenCL compiled program binary file, so that a new
                 // binary will be created for different sources
@@ -219,7 +219,7 @@ namespace engine {
                 }
                 // The compiled binary doesn't exist, create it
                 catch (std::exception& /* e */) {
-                    build_binary(device, cstr, csize);
+                    build_binary(device, source);
                     save_binary(binary_path);
                 }
 
