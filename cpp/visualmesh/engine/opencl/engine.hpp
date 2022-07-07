@@ -100,6 +100,7 @@ namespace engine {
                 // If the compiled binary exists, read it
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
                 std::ifstream read_binary(binary_path, std::ios::in);
+                bool read_failed = false;
                 if (read_binary) {
                     // Variables for reading the binary
                     size_t binary_size;
@@ -111,7 +112,7 @@ namespace engine {
                     std::vector<char> binary_load(binary_size, 0);
                     // Read the file
                     read_binary.read(binary_load.data(), binary_size);
-                    if (!read_binary) { throw("Read failed"); }
+                    if (!read_binary) { read_failed = true; }
                     read_binary.close();
 
                     // Load the binary and build
@@ -121,8 +122,7 @@ namespace engine {
                     program                         = cl::program(::clCreateProgramWithBinary(
                                             context, 1, &device, &binary_size, &binary_ptr, &binary_status, &error),
                                           ::clReleaseProgram);
-                    throw_cl_error(error, "Failed to create program from binary");
-
+                    if (error != CL_SUCCESS) { read_failed = true; }
 
                     error = ::clBuildProgram(program,
                                              1,
@@ -132,20 +132,11 @@ namespace engine {
                                              nullptr);
 
                     // If it didn't work, log and throw an error
-                    if (error != CL_SUCCESS) {
-                        // Get program build log
-                        size_t used = 0;
-                        ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
-                        std::vector<char> log(used);
-                        ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
-                        // Throw an error with the build log
-                        throw_cl_error(
-                          error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
-                    }
+                    if (error != CL_SUCCESS) { read_failed = true; }
                     std::cout << "built from binary" << std::endl;
                 }
                 // The compiled binary doesn't exist, create it
-                else {
+                if (!read_binary || read_failed) {
                     std::cout << "creating binary" << std::endl;
                     // Create the program and build
                     program =
