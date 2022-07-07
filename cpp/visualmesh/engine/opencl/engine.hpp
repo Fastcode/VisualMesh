@@ -98,62 +98,65 @@ namespace engine {
                 // binary will be created for different sources
                 const std::size_t source_hash = std::hash<std::string>{}(source);
 
+
                 // If the compiled binary exists, read it
-                // const std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
-                // std::ifstream read_binary(binary_path, std::ios::binary);
-                // bool read_failed = false;
-                // if (read_binary) {
-                //     std::cout << "reading binary" << std::endl;
-                //     // Get the length
-                //     read_binary.seekg(0, read_binary.end);
-                //     size_t binary_size = read_binary.tellg();
-                //     read_binary.seekg(0, read_binary.beg);
-                //     std::vector<char> binary_prog{};
-                //     binary_prog.reserve(binary_size);
-                //     // Read the file
-                //     read_binary.read(binary_prog.data(), binary_size);
-                //     if (!read_binary) { read_failed = true; }
+                std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
+                std::ifstream read_binary(binary_path, std::ios::in);
+                bool read_failed = false;
+                if (read_binary) {
+                    try {
+                        // Variables for reading the binary
+                        size_t binary_size;
+                        std::cout << "reading binary" << std::endl;
+                        // Get the length
+                        read_binary.seekg(0, read_binary.end);
+                        binary_size = read_binary.tellg();
+                        read_binary.seekg(0, read_binary.beg);
+                        std::vector<char> binary_load(binary_size, 0);
+                        // Read the file
+                        read_binary.read(binary_load.data(), binary_size);
+                        if (!read_binary) { throw std::runtime_error("Failed to read from precompiled OpenCL binary.") }
+                        read_binary.close();
 
-                //     std::cout << "Compiling with binary" << std::endl;
-                //     // Load the binary and build
-                //     cl_int binary_status = CL_SUCCESS;
-                //     // const unsigned char* thing = reinterpret_cast<unsigned char*>(binary_prog.data());
-                //     std::vector<const unsigned char*> binary_progs = {
-                //       reinterpret_cast<unsigned char*>(binary_prog.data())};
-                //     program =
-                //       cl::program(::clCreateProgramWithBinary(
-                //                     context, 1, &device, &binary_size, binary_progs.data(), &binary_status, &error),
-                //                   ::clReleaseProgram);
-                //     if ((error != CL_SUCCESS) || (binary_status != CL_SUCCESS)) { read_failed = true; }
+                        // Load the binary and build
+                        cl_int binary_status = CL_SUCCESS;
 
-                //     error = ::clBuildProgram(program,
-                //                              1,
-                //                              &device,
-                //                              "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
-                //                              nullptr,
-                //                              nullptr);
+                        const unsigned char* binary_ptr = reinterpret_cast<unsigned char*>(binary_load.data());
+                        program                         = cl::program(::clCreateProgramWithBinary(
+                                                context, 1, &device, &binary_size, &binary_ptr, &binary_status, &error),
+                                              ::clReleaseProgram);
+                        throw_cl_error(error, "Failed to create program from binary");
 
-                //     // If it didn't work, try rebuilding
-                //     if (error != CL_SUCCESS) { read_failed = true; }
-                // }
-                // read_binary.close();
+                        error = ::clBuildProgram(program,
+                                                 1,
+                                                 &device,
+                                                 "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
+                                                 nullptr,
+                                                 nullptr);
 
-                // // If the read failed, remove the file
-                // if (read_failed) {
-                //     std::cout << "read failed, remove the file " << std::endl;
-                //     std::remove(binary_path.c_str());
+                        // If it didn't work, log and throw an error
+                        if (error != CL_SUCCESS) {
+                            // Get program build log
+                            size_t used = 0;
+                            ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
+                            std::vector<char> log(used);
+                            ::clGetProgramBuildInfo(
+                              program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
+                            // Throw an error with the build log
+                            throw_cl_error(
+                              error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
+                        }
 
-                //     // reset vars
-                //     error                     = CL_SUCCESS;
-                //     device                    = nullptr;
-                //     std::tie(context, device) = operation::make_context();
-                //     queue                     = operation::make_queue(context, device);
-                // }
-
+                        std::cout << "built from binary" << std::endl;
+                    }
+                    catch (std::exception e) {
+                        read_failed = true;
+                        std::cout << e.what() << std::endl;
+                    }
+                }
                 // The compiled binary doesn't exist, create it
-                // if (!read_binary || read_failed) {
-                if (true) {
-                    std::cout << "building program" << std::endl;
+                if (!read_binary || read_failed) {
+                    std::cout << "creating binary" << std::endl;
                     // Create the program and build
                     program =
                       cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
@@ -177,31 +180,20 @@ namespace engine {
                         throw_cl_error(
                           error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                     }
-                    std::cout << "built" << std::endl;
+                    std::cout << "created binary" << std::endl;
                     // Save the the built program to a file
                     size_t binary_size{};
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
-                    std::cout << "get the binary size" << std::endl;
-                    // std::vector<char> binary_prog{};
-                    // binary_prog.reserve(binary_size);
-                    char* binary_prog = new char[binary_size];
-                    std::cout << "reserve" << std::endl;
-                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_size, binary_prog, nullptr);
-                    std::cout << "make var " << std::endl;
-                    delete[] binary_prog;
-                    // try {
-                    //     std::ofstream write_binary(binary_path, std::ofstream::binary);
-                    //     std::cout << "write" << std::endl;
-                    //     write_binary.write(binary_prog.data(), binary_size);
-                    //     std::cout << "close" << std::endl;
-                    //     write_binary.close();
-                    //     std::cout << "done" << std::endl;
-                    // }
-                    // catch (const std::exception& e) {
-                    //     std::cout << e.what();
-                    // }
+                    std::vector<char> binary_save(binary_size, 0);
+                    // Get an lvalue ptr to pass to clGetProgramInfo
+                    char* binary_ptr = binary_save.data();
+                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_save.size(), &binary_ptr, nullptr);
+                    std::ofstream write_binary(binary_path, std::ofstream::binary);
+                    write_binary.write(binary_save.data(), binary_save.size());
+                    write_binary.close();
+                    std::cout << "saved binary" << std::endl;
                 }
-                std::cout << "done" << std::endl;
+                std::cout << "kernels" << std::endl;
                 // Get the kernels
                 project_rectilinear =
                   cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
