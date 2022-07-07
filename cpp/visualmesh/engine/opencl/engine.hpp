@@ -96,34 +96,33 @@ namespace engine {
                 // binary will be created for different sources
                 std::size_t source_hash = std::hash<std::string>{}(source);
 
-                // Variables for reading the binary
-                size_t binary_size;
-                char* binary;
 
                 // If the compiled binary exists, read it
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
                 std::ifstream read_binary(binary_path, std::ios::in);
                 if (read_binary) {
+                    // Variables for reading the binary
+                    size_t binary_size;
                     std::cout << "reading binary" << std::endl;
                     // Get the length
                     read_binary.seekg(0, read_binary.end);
                     binary_size = read_binary.tellg();
                     read_binary.seekg(0, read_binary.beg);
-                    binary = new char[binary_size];
+                    std::vector<char> binary_load(binary_size, 0);
                     // Read the file
-                    read_binary.read(binary, binary_size);
+                    read_binary.read(binary_load.data(), binary_size);
                     if (!read_binary) { throw("Read failed"); }
                     read_binary.close();
 
                     // Load the binary and build
                     cl_int binary_status = CL_SUCCESS;
-                    program              = cl::program(
-                      ::clCreateProgramWithBinary(
-                        context, 1, &device, &binary_size, (const unsigned char**) &binary, &binary_status, &error),
-                      ::clReleaseProgram);
+
+                    const unsigned char* binary_ptr = reinterpret_cast<unsigned char*>(binary_load.data());
+                    program                         = cl::program(::clCreateProgramWithBinary(
+                                            context, 1, &device, &binary_size, &binary_ptr, &binary_status, &error),
+                                          ::clReleaseProgram);
                     throw_cl_error(error, "Failed to create program from binary");
 
-                    delete[] binary;  // done with the binary so delete it
 
                     error = ::clBuildProgram(program,
                                              1,
@@ -173,12 +172,12 @@ namespace engine {
                     }
                     std::cout << "created binary" << std::endl;
                     // Save the the built program to a file
+                    size_t binary_size{};
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
-                    std::vector<char> binary_save = std::vector<char>(binary_size, 0);
+                    std::vector<char> binary_save(binary_size, 0);
                     // Get an lvalue ptr to pass to clGetProgramInfo
                     char* binary_ptr = binary_save.data();
                     clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_save.size(), &binary_ptr, nullptr);
-
                     std::ofstream write_binary(binary_path, std::ofstream::binary);
                     write_binary.write(binary_save.data(), binary_save.size());
                     write_binary.close();
