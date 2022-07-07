@@ -174,8 +174,8 @@ namespace engine {
                     std::cout << "created binary" << std::endl;
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
-                    std::unique_ptr<std::vector<char>> binary_save =
-                      std::make_unique<std::vector<char>>(binary_size, 0);
+                    std::shared_ptr<std::vector<char>> binary_save =
+                      std::make_shared<std::vector<char>>(binary_size, 0);
                     std::cout << "binary size: " << binary_size << " vector size: " << binary_save->size() << std::endl;
                     clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_save->size(), binary_save->data(), nullptr);
                     std::cout << "binary size: " << binary_size << " vector size: " << binary_save->size() << std::endl;
