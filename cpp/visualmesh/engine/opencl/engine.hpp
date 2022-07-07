@@ -21,8 +21,6 @@
 // If OpenCL is disabled then don't provide this file
 #if !defined(VISUALMESH_DISABLE_OPENCL)
 
-#include <stdio.h>
-
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -67,6 +65,14 @@ namespace engine {
             // OpenCL ::clSetKernelArg functions take the sizeof a pointer as their argument, this is correct
             static constexpr size_t MEM_SIZE = sizeof(cl_mem);
 
+            /**
+             * @brief Build the OpenCL program and save the binary to a file
+             *
+             * @param binary_path path to save the binary file to
+             * @param device OpenCL device id
+             *
+             * @return true if loading and building succeeded, false if it failed
+             */
             bool load_build_binary(std::string binary_path, cl_device_id& device) {
                 try {
                     // If the file doesn't exist, this isn't an error so don't throw just return that it didn't work
@@ -115,7 +121,6 @@ namespace engine {
                           error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                     }
 
-                    std::cout << "built from binary" << std::endl;
                     return false;  // succeeded in loading and building
                 }
                 catch (std::exception e) {
@@ -124,10 +129,18 @@ namespace engine {
                 }
             }
 
+            /**
+             * @brief Build the OpenCL program and save the binary to a file
+             *
+             * @param binary_path path to save the binary file to
+             * @param device OpenCL device id
+             * @param cstr OpenCL source information as a string
+             * @param csize size of the OpenCL source information
+             */
             void save_build_binary(std::string binary_path, cl_device_id& device, const char* cstr, size_t csize) {
+                // Error flag to check if any OpenCL functions fail
                 cl_int error = CL_SUCCESS;
 
-                std::cout << "creating binary" << std::endl;
                 // Create the program and build
                 program =
                   cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
@@ -151,18 +164,21 @@ namespace engine {
                     throw_cl_error(error,
                                    "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
                 }
-                std::cout << "created binary" << std::endl;
-                // Save the the built program to a file
+
+                // Get the size of the binary to save
                 size_t binary_size{};
                 clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
+
+                // Get the data to save
                 std::vector<char> binary_save(binary_size, 0);
                 // Get an lvalue ptr to pass to clGetProgramInfo
                 char* binary_ptr = binary_save.data();
                 clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_save.size(), &binary_ptr, nullptr);
+
+                // Write to the file and close the file
                 std::ofstream write_binary(binary_path, std::ofstream::binary);
                 write_binary.write(binary_save.data(), binary_save.size());
                 write_binary.close();
-                std::cout << "saved binary" << std::endl;
             }
 
         public:
@@ -170,10 +186,9 @@ namespace engine {
              * @brief Construct a new OpenCL Engine object
              *
              * @param structure the network structure to use classification
+             * @param cache_directory directory to save/load the compiled OpenCL binary
              */
-
             Engine(const NetworkStructure<Scalar>& structure = {}, std::string cache_directory = "") {
-                std::cout << "start" << std::endl;
                 // Create the OpenCL context and command queue
                 cl_int error              = CL_SUCCESS;
                 cl_device_id device       = nullptr;
@@ -206,7 +221,6 @@ namespace engine {
                 // The compiled binary doesn't exist, create it
                 if (read_failed) { save_build_binary(binary_path, device, cstr, csize); }
 
-                std::cout << "kernels" << std::endl;
                 // Get the kernels
                 project_rectilinear =
                   cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
@@ -219,7 +233,7 @@ namespace engine {
                 throw_cl_error(error, "Error getting project_equisolid kernel");
                 load_image = cl::kernel(::clCreateKernel(program, "load_image", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Failed to create kernel load_image");
-                std::cout << "kernels" << std::endl;
+
                 // Grab all the kernels that were generated
                 for (unsigned int i = 0; i < structure.size(); ++i) {
                     std::string kernel       = "conv" + std::to_string(i);
@@ -229,7 +243,7 @@ namespace engine {
                     throw_cl_error(error, "Failed to create kernel " + kernel);
                     conv_layers.emplace_back(k, output_size);
                 }
-                std::cout << "network stuff" << std::endl;
+
                 // Work out what the widest network layer is
                 max_width = 4;
                 for (const auto& k : conv_layers) {
@@ -253,7 +267,6 @@ namespace engine {
                 for (const auto& k : conv_layers) {
                     workgroup_size = std::max(workgroup_size, workgroup_size_for_kernel(k.first));
                 }
-                std::cout << "end" << std::endl;
             }
 
             /**
