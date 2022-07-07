@@ -124,7 +124,7 @@ namespace engine {
                 }
             }
 
-            void save_build_binary() {
+            void save_build_binary(std::string binary_path, cl_device_id& device, const char* cstr, size_t csize) {
                 cl_int error = CL_SUCCESS;
 
                 std::cout << "creating binary" << std::endl;
@@ -204,7 +204,7 @@ namespace engine {
                 bool read_failed = load_build_binary(binary_path, device);
 
                 // The compiled binary doesn't exist, create it
-                if (read_failed) { save_build_binary(); }
+                if (read_failed) { save_build_binary(binary_path, device, cstr, csize); }
 
                 std::cout << "kernels" << std::endl;
                 // Get the kernels
