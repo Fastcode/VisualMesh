@@ -115,7 +115,9 @@ namespace engine {
                         std::vector<char> binary_load(binary_size, 0);
                         // Read the file
                         read_binary.read(binary_load.data(), binary_size);
-                        if (!read_binary) { throw std::runtime_error("Failed to read from precompiled OpenCL binary.") }
+                        if (!read_binary) {
+                            throw std::runtime_error("Failed to read from precompiled OpenCL binary.");
+                        }
                         read_binary.close();
 
                         // Load the binary and build
