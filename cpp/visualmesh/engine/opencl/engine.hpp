@@ -124,6 +124,47 @@ namespace engine {
                 }
             }
 
+            void save_build_binary() {
+                cl_int error = CL_SUCCESS;
+
+                std::cout << "creating binary" << std::endl;
+                // Create the program and build
+                program =
+                  cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
+                throw_cl_error(error, "Error adding sources to OpenCL program");
+
+                error = ::clBuildProgram(program,
+                                         0,
+                                         nullptr,
+                                         "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
+                                         nullptr,
+                                         nullptr);
+
+                // If it didn't work, log and throw an error
+                if (error != CL_SUCCESS) {
+                    // Get program build log
+                    size_t used = 0;
+                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
+                    std::vector<char> log(used);
+                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
+                    // Throw an error with the build log
+                    throw_cl_error(error,
+                                   "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
+                }
+                std::cout << "created binary" << std::endl;
+                // Save the the built program to a file
+                size_t binary_size{};
+                clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
+                std::vector<char> binary_save(binary_size, 0);
+                // Get an lvalue ptr to pass to clGetProgramInfo
+                char* binary_ptr = binary_save.data();
+                clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_save.size(), &binary_ptr, nullptr);
+                std::ofstream write_binary(binary_path, std::ofstream::binary);
+                write_binary.write(binary_save.data(), binary_save.size());
+                write_binary.close();
+                std::cout << "saved binary" << std::endl;
+            }
+
         public:
             /**
              * @brief Construct a new OpenCL Engine object
@@ -151,54 +192,20 @@ namespace engine {
                 std::string source = sources.str();
                 const char* cstr   = source.c_str();
                 size_t csize       = source.size();
+
                 // The hash of the sources represents the name of the OpenCL compiled program binary file, so that a new
                 // binary will be created for different sources
                 const std::size_t source_hash = std::hash<std::string>{}(source);
 
-
                 // If the compiled binary exists, read it
                 std::string binary_path = cache_directory + "/" + std::to_string(source_hash) + ".bin";
 
+                // Try to read the binary
                 bool read_failed = load_build_binary(binary_path, device);
+
                 // The compiled binary doesn't exist, create it
-                if (read_failed) {
-                    std::cout << "creating binary" << std::endl;
-                    // Create the program and build
-                    program =
-                      cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
-                    throw_cl_error(error, "Error adding sources to OpenCL program");
+                if (read_failed) { save_build_binary(); }
 
-                    error = ::clBuildProgram(program,
-                                             0,
-                                             nullptr,
-                                             "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
-                                             nullptr,
-                                             nullptr);
-
-                    // If it didn't work, log and throw an error
-                    if (error != CL_SUCCESS) {
-                        // Get program build log
-                        size_t used = 0;
-                        ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
-                        std::vector<char> log(used);
-                        ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
-                        // Throw an error with the build log
-                        throw_cl_error(
-                          error, "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
-                    }
-                    std::cout << "created binary" << std::endl;
-                    // Save the the built program to a file
-                    size_t binary_size{};
-                    clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
-                    std::vector<char> binary_save(binary_size, 0);
-                    // Get an lvalue ptr to pass to clGetProgramInfo
-                    char* binary_ptr = binary_save.data();
-                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_save.size(), &binary_ptr, nullptr);
-                    std::ofstream write_binary(binary_path, std::ofstream::binary);
-                    write_binary.write(binary_save.data(), binary_save.size());
-                    write_binary.close();
-                    std::cout << "saved binary" << std::endl;
-                }
                 std::cout << "kernels" << std::endl;
                 // Get the kernels
                 project_rectilinear =
