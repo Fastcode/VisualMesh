@@ -175,8 +175,10 @@ namespace engine {
                     // Save the the built program to a file
                     clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
                     std::vector<char> binary_save = std::vector<char>(binary_size, 0);
+                    // Get an lvalue ptr to pass to clGetProgramInfo
+                    char* binary_ptr = binary_save.data();
                     std::cout << "binary size: " << binary_size << " vector size: " << binary_save.size() << std::endl;
-                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_save.size(), &(binary_save.data()), nullptr);
+                    clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_save.size(), &binary_ptr, nullptr);
                     std::cout << "binary size: " << binary_size << " vector size: " << binary_save.size() << std::endl;
                     for (auto& b : binary_save) {
                         std::cout << b;
