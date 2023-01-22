@@ -47,7 +47,7 @@ public:
     /**
      * @brief Makes an unallocated visual mesh with no LUTs
      */
-    VisualMesh() {}
+    VisualMesh() = default;
 
     /**
      * @brief Generate a new visual mesh for the given shape.
@@ -125,15 +125,13 @@ public:
 
         // First element that is >= is the first one (we are off the low end)
         if (it == luts.begin()) { return it->second; }
+
         // We don't have an element that >= height (we are off the high end)
-        else if (it == luts.end()) {
-            return luts.rbegin()->second;
-        }
+        if (it == luts.end()) { return luts.rbegin()->second; }
+
         // Otherwise see if this element has less error than the previous one
-        else {
-            return std::abs(it->first - height) < std::abs(std::prev(it)->first - height) ? it->second
-                                                                                          : std::prev(it)->second;
-        }
+        return std::abs(it->first - height) < std::abs(std::prev(it)->first - height) ? it->second
+                                                                                      : std::prev(it)->second;
     }
 
     /**

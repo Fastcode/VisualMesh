@@ -26,9 +26,27 @@ class SeekerStdDev(tf.keras.metrics.Metric):
         self.s = self.add_weight(name="s", shape=(), initializer="zeros", dtype=tf.float64)
 
     def update_state(self, y_true, y_pred, sample_weight=None):
+
+        # Y true contains a list of all the possible answers, we are ranked on how close we are to the closest one
+        # This code works out the closest point to our prediction for each case so we can use that for training
+        y_true = tf.gather_nd(
+            y_true,
+            tf.stack(
+                [
+                    tf.range(tf.shape(y_true)[0], dtype=tf.int32),
+                    tf.math.argmin(
+                        tf.reduce_sum(tf.math.squared_difference(tf.expand_dims(y_pred, axis=-2), y_true), axis=-1),
+                        axis=-1,
+                        output_type=tf.int32,
+                    ),
+                ],
+                axis=1,
+            ),
+        )
+
         y_true = tf.clip_by_value(y_true, -1.0, 1.0)
 
-        # For standard deviation we only want to look at how we went for the truth samples
+        # For standard deviation we only want to look at how we went when we were predicting that we were close
         idx = tf.squeeze(tf.where(tf.reduce_all(tf.abs(y_pred) <= self.threshold, axis=-1)), axis=-1)
         y_true = tf.cast(tf.gather(y_true, idx), dtype=tf.float64)
         y_pred = tf.cast(tf.gather(y_pred, idx), dtype=tf.float64)

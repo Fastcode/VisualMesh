@@ -39,7 +39,7 @@ using mat4 = std::array<vec4<Scalar>, 4>;
  * Vector casting
  */
 template <typename OutScalar, typename InScalar, std::size_t L, std::size_t... I>
-inline std::array<OutScalar, L> cast(const std::array<InScalar, L>& a, const std::index_sequence<I...>&) {
+inline std::array<OutScalar, L> cast(const std::array<InScalar, L>& a, const std::index_sequence<I...>& /*unused*/) {
     return {{static_cast<OutScalar>(a[I])...}};
 }
 
@@ -52,7 +52,7 @@ inline std::array<OutScalar, L> cast(const std::array<InScalar, L>& a) {
  * Get the head of a vector
  */
 template <std::size_t S, typename Scalar, std::size_t L, std::size_t... I>
-inline std::array<Scalar, S> head(const std::array<Scalar, L>& a, const std::index_sequence<I...>&) {
+inline std::array<Scalar, S> head(const std::array<Scalar, L>& a, const std::index_sequence<I...>& /*unused*/) {
     return {{a[I]...}};
 }
 
@@ -67,7 +67,7 @@ inline std::enable_if_t<(S < L), std::array<Scalar, S>> head(const std::array<Sc
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a,
                                       const Scalar& b,
-                                      const std::index_sequence<I...>&) {
+                                      const std::index_sequence<I...>& /*unused*/) {
     return {{(a[I] - b)...}};
 }
 
@@ -82,7 +82,7 @@ inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const Scal
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a,
                                       const std::array<Scalar, L>& b,
-                                      const std::index_sequence<I...>&) {
+                                      const std::index_sequence<I...>& /*unused*/) {
     return {{(a[I] - b[I])...}};
 }
 
@@ -95,7 +95,9 @@ inline std::array<Scalar, L> subtract(const std::array<Scalar, L>& a, const std:
  * Vector Scalar addition
  */
 template <typename Scalar, std::size_t L, std::size_t... I>
-inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const Scalar& b, const std::index_sequence<I...>&) {
+inline std::array<Scalar, L> add(const std::array<Scalar, L>& a,
+                                 const Scalar& b,
+                                 const std::index_sequence<I...>& /*unused*/) {
     return {{(a[I] + b)...}};
 }
 
@@ -110,7 +112,7 @@ inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const Scalar& b
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> add(const std::array<Scalar, L>& a,
                                  const std::array<Scalar, L>& b,
-                                 const std::index_sequence<I...>&) {
+                                 const std::index_sequence<I...>& /*unused*/) {
     return {{(a[I] + b[I])...}};
 }
 
@@ -125,7 +127,7 @@ inline std::array<Scalar, L> add(const std::array<Scalar, L>& a, const std::arra
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
                                       const Scalar& s,
-                                      const std::index_sequence<I...>&) {
+                                      const std::index_sequence<I...>& /*unused*/) {
     return {{(a[I] * s)...}};
 }
 
@@ -140,7 +142,7 @@ inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a, const Scal
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<Scalar, L> multiply(const std::array<Scalar, L>& a,
                                       const std::array<Scalar, L>& b,
-                                      const std::index_sequence<I...>&) {
+                                      const std::index_sequence<I...>& /*unused*/) {
     return {{(a[I] * b[I])...}};
 }
 
@@ -208,13 +210,13 @@ inline vec3<Scalar> cross(const vec3<Scalar>& a, const vec3<Scalar>& b) {
  */
 template <std::size_t S, std::size_t T, typename Scalar, std::size_t L, std::size_t M, std::size_t... I>
 inline std::array<std::array<Scalar, T>, S> block(const std::array<std::array<Scalar, M>, L>& a,
-                                                  const std::index_sequence<I...>&) {
+                                                  const std::index_sequence<I...>& /*unused*/) {
     return {{head<T>(a[I])...}};
 }
 
 template <std::size_t S, std::size_t T, typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<std::array<Scalar, T>, S> block(const std::array<std::array<Scalar, T>, L>& a,
-                                                  const std::index_sequence<I...>&) {
+                                                  const std::index_sequence<I...>& /*unused*/) {
     return {{a[I]...}};
 }
 
@@ -229,13 +231,13 @@ inline std::enable_if_t<(S <= L && T < M) || (S < L && T <= M), std::array<std::
  */
 template <std::size_t X, typename Scalar, std::size_t L, std::size_t M, std::size_t... Y>
 inline std::array<Scalar, M> transpose_vector(const std::array<std::array<Scalar, L>, M>& mat,
-                                              const std::index_sequence<Y...>&) {
+                                              const std::index_sequence<Y...>& /*unused*/) {
     return {{mat[Y][X]...}};
 }
 
 template <typename Scalar, std::size_t L, std::size_t M, std::size_t... X>
 inline std::array<std::array<Scalar, L>, L> transpose(const std::array<std::array<Scalar, L>, M>& mat,
-                                                      const std::index_sequence<X...>&) {
+                                                      const std::index_sequence<X...>& /*unused*/) {
     return {{transpose_vector<X>(mat, std::make_index_sequence<M>())...}};
 }
 
@@ -261,7 +263,7 @@ inline vec3<Scalar> multiply(const mat3<Scalar>& a, const vec3<Scalar>& b) {
 template <typename Scalar, std::size_t L, std::size_t... I>
 inline std::array<std::array<Scalar, L>, L> multiply(const std::array<std::array<Scalar, L>, L>& a,
                                                      const Scalar& s,
-                                                     const std::index_sequence<I...>&) {
+                                                     const std::index_sequence<I...>& /*unused*/) {
     return {{multiply(a[I], s)...}};
 }
 

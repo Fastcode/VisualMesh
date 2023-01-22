@@ -56,6 +56,7 @@ enum Outputs {
     NEIGHBOURS = 1,
 };
 
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_OP("LookupVisualMesh")
   .Attr("T: {float, double}")
   .Attr("U: {int32, int64}")
@@ -76,9 +77,10 @@ REGISTER_OP("LookupVisualMesh")
   .Output("vectors: T")
   .Output("neighbours: int32")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
+      constexpr auto kUnknownDim = ::tensorflow::shape_inference::InferenceContext::kUnknownDim;
       // nx2 vectors on image, n+1xG neighbours (including off screen point), and n global indices
-      c->set_output(Outputs::VECTORS, c->MakeShape({c->kUnknownDim, 3}));
-      c->set_output(Outputs::NEIGHBOURS, c->MakeShape({c->kUnknownDim, c->kUnknownDim}));
+      c->set_output(Outputs::VECTORS, c->MakeShape({kUnknownDim, 3}));
+      c->set_output(Outputs::NEIGHBOURS, c->MakeShape({kUnknownDim, kUnknownDim}));
       return tensorflow::Status::OK();
   });
 
@@ -168,7 +170,7 @@ public:
         }};
 
         // Create our lens
-        visualmesh::Lens<T> lens;
+        visualmesh::Lens<T> lens{};
         lens.dimensions   = dimensions;
         lens.focal_length = focal_length;
         lens.centre       = {{lens_centre(1), lens_centre(0)}};  // Swap from tf coordinates to our coordinates
@@ -176,9 +178,9 @@ public:
         lens.fov          = fov;
 
         // clang-format off
-        if (projection == "EQUISOLID") lens.projection = visualmesh::EQUISOLID;
-        else if (projection == "EQUIDISTANT") lens.projection = visualmesh::EQUIDISTANT;
-        else if (projection == "RECTILINEAR") lens.projection = visualmesh::RECTILINEAR;
+        if (projection == "EQUISOLID") { lens.projection = visualmesh::EQUISOLID; }
+        else if (projection == "EQUIDISTANT") { lens.projection = visualmesh::EQUIDISTANT; }
+        else if (projection == "RECTILINEAR") { lens.projection = visualmesh::RECTILINEAR; }
         // clang-format on
 
         // Get a mesh that matches from the mesh cache
@@ -249,21 +251,25 @@ public:
 };
 
 // Register a version for all the combinations of float/double and int32/int64
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_KERNEL_BUILDER(Name("LookupVisualMesh")
                           .Device(tensorflow::DEVICE_CPU)
                           .TypeConstraint<float>("T")
                           .TypeConstraint<tensorflow::int32>("U"),
                         LookupVisualMeshOp<float, tensorflow::int32>)
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_KERNEL_BUILDER(Name("LookupVisualMesh")
                           .Device(tensorflow::DEVICE_CPU)
                           .TypeConstraint<float>("T")
                           .TypeConstraint<tensorflow::int64>("U"),
                         LookupVisualMeshOp<float, tensorflow::int64>)
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_KERNEL_BUILDER(Name("LookupVisualMesh")
                           .Device(tensorflow::DEVICE_CPU)
                           .TypeConstraint<double>("T")
                           .TypeConstraint<tensorflow::int32>("U"),
                         LookupVisualMeshOp<double, tensorflow::int32>)
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_KERNEL_BUILDER(Name("LookupVisualMesh")
                           .Device(tensorflow::DEVICE_CPU)
                           .TypeConstraint<double>("T")

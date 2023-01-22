@@ -13,7 +13,7 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-cmake_minimum_required(VERSION 3.1.0)
+cmake_minimum_required(VERSION 3.7.0)
 project(VisualMesh VERSION 2.0.0)
 
 # Default to Release build
@@ -25,6 +25,27 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     # Set the possible values of build type for cmake-gui
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
+
+# If this option is set we are building using continous integration
+option(CI_BUILD "Enable build options for building in the CI server" OFF)
+
+# Default not to run the clang-tidy checks, default to whatever our CI_BUILD is
+option(ENABLE_CLANG_TIDY "Enable building with clang-tidy checks." OFF)
+if(ENABLE_CLANG_TIDY OR CI_BUILD)
+  find_package(PythonInterp 3 REQUIRED)
+  set(CMAKE_CXX_CLANG_TIDY "${PYTHON_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/cmake/Scripts/clang-tidy.py"
+                           "${PROJECT_BINARY_DIR}/clang-tidy-fixes" clang-tidy
+  )
+  set(CMAKE_C_CLANG_TIDY ${CMAKE_CXX_CLANG_TIDY})
+
+  # Create a target that will apply clang-tidy fixes to the codebase
+  add_custom_target(
+    apply-clang-tidy
+    COMMAND clang-apply-replacements --format --style=file --style-config="${PROJECT_SOURCE_DIR}"
+            --remove-change-desc-files "${PROJECT_BINARY_DIR}/clang-tidy-fixes"
+    COMMENT "Applying fixes from clang-tidy to the codebase."
+  )
+endif(ENABLE_CLANG_TIDY OR CI_BUILD)
 
 # Add the cmake module path for custom modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")

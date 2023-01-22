@@ -133,12 +133,8 @@ namespace geometry {
         Scalar theta(const Scalar& n, const Scalar& h) const {
 
             // If n is < 0.5 then theta doesn't make sense, we interpolate from 2π to π to get a sensible approximation
-            if (n <= 0.5) {  //
-                return Scalar(2.0 * M_PI) / (1.0 + n * Scalar(2.0));
-            }
-            else {
-                return Scalar(2.0) * std::asin(r / ((h - r) * std::tan(phi(n, h))));
-            }
+            return n <= 0.5 ? Scalar(2.0 * M_PI) / (1.0 + n * Scalar(2.0))
+                            : Scalar(2.0) * std::asin(r / ((h - r) * std::tan(phi(n, h))));
         }
 
         // The radius of the circle

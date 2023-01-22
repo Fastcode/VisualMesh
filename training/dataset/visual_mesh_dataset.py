@@ -14,6 +14,7 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import tensorflow as tf
+import math
 
 
 class VisualMeshDataset:
@@ -28,7 +29,7 @@ class VisualMeshDataset:
         self.batch_size = batch_size
 
         # Autotune how many elements we prefetch and map by
-        self.prefetch = tf.data.experimental.AUTOTUNE
+        self.prefetch = tf.data.AUTOTUNE
 
         # First we need to know what features we need for each stage so we can load them from the dataset
         self.features = {}
@@ -112,6 +113,10 @@ class VisualMeshDataset:
         C = batch["C"].values
         V = batch["V"].values
 
+        # If Y has multiple values per label we need to expand them out so the loss function doesn't cry
+        if isinstance(Y, tf.RaggedTensor):
+            Y = Y.to_tensor(default_value=math.nan)
+
         # Fixed size elements are in sensible shapes
         jpg = batch["jpg"]
         Hoc = batch["Hoc"]
@@ -127,11 +132,7 @@ class VisualMeshDataset:
         G = (batch["G"] + tf.expand_dims(tf.expand_dims(cn, -1), -1)).values
 
         # Replace the offscreen negative points with the offscreen point and append it to the end
-        G = tf.concat(
-            [tf.where(G < 0, n_elems, G, name="vmdataset/_reduce/where/G"), tf.fill([1, tf.shape(G)[-1]], n_elems),],
-            axis=0,
-            name="vmdataset/_reduce/concat/G",
-        )
+        G = tf.concat([tf.where(G < 0, n_elems, G), tf.fill([1, tf.shape(G)[-1]], n_elems)], axis=0)
 
         return {
             "X": X,
@@ -145,10 +146,19 @@ class VisualMeshDataset:
             "lens": lens,
         }
 
+    def _interleave(self, *values):
+        ds = tf.data.Dataset.from_tensors(values[0])
+        for d in values[1:]:
+            ds = ds.concatenate(tf.data.Dataset.from_tensors(d))
+        return ds
+
     def build(self):
 
-        # Load the files
-        dataset = tf.data.TFRecordDataset(self.paths)
+        # Load the files and zip them into a tuple set
+        dataset = tf.data.Dataset.zip(tuple([tf.data.TFRecordDataset(p) for p in self.paths]))
+
+        # Flat map the dataset so it gets interleaved
+        dataset = dataset.flat_map(self._interleave)
 
         # Extract the data from the examples
         dataset = dataset.map(self._map, num_parallel_calls=self.prefetch)

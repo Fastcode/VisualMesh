@@ -37,6 +37,7 @@ enum Outputs {
     VECTORS = 0,
 };
 
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_OP("MapVisualMesh")
   .Attr("T: {float, double}")
   .Input("coordinates: T")
@@ -102,7 +103,9 @@ public:
 };
 
 // Register a version for all the combinations of float/double
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_KERNEL_BUILDER(Name("MapVisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<float>("T"),
                         MapVisualMeshOp<float>)
+// NOLINTNEXTLINE(cert-err58-cpp) this macro makes a static variable
 REGISTER_KERNEL_BUILDER(Name("MapVisualMesh").Device(tensorflow::DEVICE_CPU).TypeConstraint<double>("T"),
                         MapVisualMeshOp<double>)

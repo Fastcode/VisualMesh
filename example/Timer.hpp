@@ -32,6 +32,8 @@ public:
     Timer() : t(std::chrono::steady_clock::now()) {}
 
     template <size_t N>
+    // We allow c arrays here as it lets us pass in string literals with no copying
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
     inline void measure(const char (&c)[N]) {
 
         // Work out how long it took

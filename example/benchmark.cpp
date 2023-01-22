@@ -77,14 +77,15 @@ template <typename Engine, typename Mesh>
 void benchmark(const visualmesh::NetworkStructure<Scalar>& network,
                const std::vector<dataset_element<Scalar>>& dataset,
                const Mesh& mesh,
-               const int loops,
-               const int parallelity = 1) {
+               const int& loops,
+               const unsigned int& parallelity = 1) {
 
-    using namespace std::chrono;
+    using namespace std::chrono;  // NOLINT(google-build-using-namespace) fine in function scope
     Timer t;
     // Build engines
     std::vector<Benchmarker<Engine, Mesh>> benchmarkers;
-    for (int t = 0; t < parallelity; ++t) {
+    benchmarkers.reserve(parallelity);
+    for (unsigned int t = 0; t < parallelity; ++t) {
         benchmarkers.emplace_back(network, mesh, dataset, loops);
     }
     t.measure("Built benchmarkers");
@@ -105,6 +106,7 @@ void benchmark(const visualmesh::NetworkStructure<Scalar>& network,
     std::cout << "FPS: " << fps << std::endl;
 }
 
+// NOLINTNEXTLINE(bugprone-exception-escape) This is debugging code, I would prefer exceptions crash the program
 int main() {
     std::string image_path = "../example/images";
     std::string model_path = "../example/model.yaml";

@@ -113,7 +113,7 @@ namespace model {
                 // We only work with this point if we didn't exceed our max distance
                 if (distance <= max_distance) {
                     // Add the element to the output and store where this coordinate ended up so we can find it later
-                    Node<Scalar, N_NEIGHBOURS> node;
+                    Node<Scalar, N_NEIGHBOURS> node{};
                     node.ray = normalise(vec);
                     locations.emplace(e, output.size());
                     output.push_back(node);

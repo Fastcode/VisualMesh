@@ -13,8 +13,9 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from training.metrics.test.seeker_hourglass import SeekerHourglass
 import training.metrics.test.confusion_curve as confusion
-from training.metrics.test import Confusion, ConfusionCurve, SeekerErrorCurve
+from training.metrics.test import Confusion, ConfusionCurve
 
 
 def TestMetrics(config):
@@ -150,16 +151,7 @@ def TestMetrics(config):
 
     elif config["label"]["type"] == "Seeker":
         return [
-            SeekerErrorCurve(
-                name="metrics/curves/distance_error",
-                scale=config["label"]["config"]["scale"],
-                chart={
-                    "title": "Distance Error",
-                    "x_label": "Predicted Distance",
-                    "y_label": "Standard Deviation",
-                    "sort_label": "Predicted Distance",
-                },
-            ),
+            SeekerHourglass(name="metrics/curves/hourglass"),
         ]
 
     else:

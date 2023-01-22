@@ -29,6 +29,8 @@ namespace visualmesh {
  *
  * @return the uint32_t representing this four character code
  */
+// We allow c arrays here as it lets us pass in string literals with no copying
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
 inline constexpr uint32_t fourcc(const char (&code)[5]) {
     return uint32_t(code[0] | (code[1] << 8) | (code[2] << 16) | (code[3] << 24));
 }

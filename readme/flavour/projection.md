@@ -8,7 +8,7 @@ Fortunately, the neural networks are able to continue to function with these dis
 To account for this, several different models have been developed to try to preserve different properties.
 
 Whether you use a polar or cartesian coordinate system to present the points to the mesh makes a significant difference in how the network is able to perform.
-Polar networks such as Ring and Radial work well for Ground networks where you are looking at objects at a distance.
+Polar networks such as Ring work well for Ground networks where you are looking at objects at a distance.
 In these systems, an increase in distance is represented as a consistent direction in the graph, hence the orientation of upright objects are preserved.
 Grid networks work better for spotlight systems where having a consistent coordinate system for the object is beneficial.
 
@@ -104,20 +104,6 @@ This is the traditional visual mesh model as first proposed.
 - Following the graph outward will result in arc shapes in some areas.
 
 ![Ring](mesh_models/ring.jpg)
-
-### Radial
-The radial model is designed to provide a better global radial property to the ring model.
-In this model following the graph outward will better approximate a linear increase in distance without curving.
-However as a result of trying to maintain this property the distance between nodes is much more variable.
-The result of this is that the graph has better preserved global properties at the expense of local distortions.
-This model can be better when you are using deeper networks and looking at larger objects.
-
-#### Errors
-- Significant distortion at the origin where the singularity causes the inputs to be highly distorted.
-- Increased size of the previous/next ring are not fixed multiples which result in occasional X shapes due to misalignment.
-- Significant local distortion in the graph due to the enforcement of the radial outward property.
-
-![Radial](mesh_models/radial.jpg)
 
 ### XY Grid
 The XY grid is built by taking plane slices along two orthogonal axes.

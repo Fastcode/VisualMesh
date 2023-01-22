@@ -81,6 +81,11 @@ projection:
       # The maximum distance the Visual Mesh will be projected for. This should be slightly further than the most distant
       # object that you wish to detect to account for noises in the projection.
       max_distance: 20
+      # Edge type, if when we travel beyond the mesh (off the screen or off a mesh edge) what should the graph behaviour be
+      # HARD: Have a graph node that connects to itself with a -1 input value
+      # SAME: When a graph node would travel off an edge, connect back to itself
+      edge_type: SAME
+
     # The geometry of the object we are detecting in the Visual Mesh.
     geometry:
       # The shape to project, either CIRCLE or SPHERE.

@@ -89,9 +89,8 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> find_mesh(
         // iter_swap moves the lowest error mesh into the first position of meshes
         return *meshes.begin();
     }
-    else {
-        return nullptr;
-    }
+
+    return nullptr;
 }
 
 /**
@@ -147,18 +146,15 @@ std::shared_ptr<visualmesh::Mesh<Scalar, Model>> get_mesh(const Shape<Scalar>& s
         // Check again for an acceptable mesh in case someone else made one too
         auto mesh = find_mesh(meshes, shape, height, n_intersections, intersection_tolerance, max_distance);
         if (mesh != nullptr) { return mesh; }
-        // Otherwise add the one we made to the list
-        else {
 
-            // Only cache a fixed number of meshes so remove the old ones
-            while (static_cast<int32_t>(meshes.size()) > cached_meshes) {
-                meshes.pop_back();
-            }
-
-            // Add our new mesh to the cache and return
-            meshes.push_back(std::make_shared<visualmesh::Mesh<Scalar, Model>>(generated_mesh));
-            return meshes.back();
+        // Only cache a fixed number of meshes so remove the old ones
+        while (static_cast<int32_t>(meshes.size()) > cached_meshes) {
+            meshes.pop_back();
         }
+
+        // Add our new mesh to the cache and return
+        meshes.push_back(std::make_shared<visualmesh::Mesh<Scalar, Model>>(generated_mesh));
+        return meshes.back();
     }
 }
 

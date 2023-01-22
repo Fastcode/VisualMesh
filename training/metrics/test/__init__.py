@@ -18,4 +18,4 @@ import tensorflow as tf
 from .confusion import Confusion
 from .confusion_curve import ConfusionCurve
 from .curve import Curve
-from .seeker_error_curve import SeekerErrorCurve
+from .seeker_hourglass import SeekerHourglass

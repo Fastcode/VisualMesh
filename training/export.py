@@ -30,13 +30,11 @@ def export(config, output_path):
 
     # Get the training dataset so we know the output size
     training_dataset = (
-        Dataset(config, "training")
-        .map(keras_dataset, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        .prefetch(tf.data.experimental.AUTOTUNE)
+        Dataset(config, "training").map(keras_dataset, num_parallel_calls=tf.data.AUTOTUNE).prefetch(tf.data.AUTOTUNE)
     )
 
     # Get the dimensionality of the Y part of the dataset
-    output_dims = training_dataset.element_spec[1].shape[1]
+    output_dims = training_dataset.element_spec[1].shape[-1]
 
     # Define the model
     model = VisualMeshModel(structure=config["network"]["structure"], output_dims=output_dims)
@@ -83,12 +81,26 @@ def export(config, output_path):
             exit(1)
 
     # While we have a 3 values on our input, all the c++ take 4 due to alignment issues
-    # Therefore for that weights we need to increase it to 4
+    # Therefore for those weights we need to increase it to 4
     first = tf.convert_to_tensor(stages[0][0]["weights"])
     first = tf.reshape(first, (-1, 3, first.shape[-1]))
     first = tf.pad(first, [[0, 0], [0, 1], [0, 0]])
     first = tf.reshape(first, (-1, first.shape[-1]))
     stages[0][0]["weights"] = first.numpy().tolist()
 
+    network = {
+        "geometry": {
+            "intersections": config["projection"]["config"]["geometry"]["intersections"],
+            "radius": config["projection"]["config"]["geometry"]["radius"],
+            "shape": config["projection"]["config"]["geometry"]["shape"],
+        },
+        "mesh": config["projection"]["config"]["mesh"]["model"],
+        "network": stages,
+    }
+
+    # Add classification meta data
+    if config["label"]["type"] == "Classification":
+        network["class_map"] = {c["name"]: i for i, c in enumerate(config["label"]["config"]["classes"])}
+
     with open(os.path.join(output_path, "model.yaml"), "w") as out:
-        yaml.dump(stages, out, default_flow_style=None, width=float("inf"))
+        yaml.dump(network, out, default_flow_style=None, width=float("inf"))

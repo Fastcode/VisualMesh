@@ -117,9 +117,8 @@ class ClassificationImages(tf.keras.callbacks.Callback):
                 self.image(self.img[i].numpy(), C=self.C[r[0] : r[1]], X=predictions[r[0] : r[1]], colours=self.colours)
             )
 
+        # Write out the images to tensorboard
         # Sort by hash so the images show up in the same order every time
-        images = tf.stack([i for h, i in sorted(images)], axis=0)
-
         with self.writer.as_default():
-            # Write the images
-            tf.summary.image("images", images, step=epoch, max_outputs=images.shape[0])
+            for i, img in enumerate(sorted(images, key=lambda image: image[0])):
+                tf.summary.image("images/{}".format(i), tf.expand_dims(img[1], axis=0), step=epoch, max_outputs=1)

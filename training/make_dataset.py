@@ -55,6 +55,7 @@ def make_tfrecord(output_file, input_files):
                             "lens/fov": float_feature(lens["fov"]),
                             "lens/focal_length": float_feature(lens["focal_length"]),
                             "lens/centre": float_list_feature(lens["centre"]),
+                            "lens/k": float_list_feature(lens["k"]),
                             "Hoc": float_list_feature(np.array(lens["Hoc"]).flatten().tolist()),
                         }
                     )

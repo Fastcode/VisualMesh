@@ -73,7 +73,7 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     # Make all GPUs grow memory as needed
-    gpus = tf.config.experimental.list_physical_devices("GPU")
+    gpus = tf.config.list_physical_devices("GPU")
     if gpus:
         try:
             for gpu in gpus:

@@ -13,6 +13,8 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import math
+
 import tensorflow as tf
 
 from .random_rotation import random_axis, random_rotation
@@ -23,14 +25,49 @@ class Spotlight:
         self.augmentations = {} if "augmentations" not in config else config["augmentations"]
 
     def features(self):
-        return {
+        f = {
             "Hoc": tf.io.FixedLenFeature([4, 4], tf.float32),
             "spotlight/targets": tf.io.FixedLenSequenceFeature([3], tf.float32, allow_missing=True),
         }
+        if "position" in self.augmentations and "generate" in self.augmentations["position"]:
+            f["lens/fov"] = tf.io.FixedLenFeature([], tf.float32)
+        return f
 
     def __call__(self, Hoc, **features):
 
         targets = features["spotlight/targets"]
+        fov = features["lens/fov"]
+
+        # If we are told to generate random positions then append a random position to the list of targets
+        if "position" in self.augmentations:
+            p = self.augmentations["position"]
+            if "generate" in p and "limits" in p:
+
+                # Random distance
+                r = tf.random.uniform((), p["limits"][0], p["limits"][1])
+
+                # The random theta value is generated based on the lens fov
+                theta = tf.random.uniform((), 0, fov)
+                psi = tf.random.uniform((), -math.pi, math.pi)
+
+                # Add on this value
+                targets = tf.concat(
+                    [
+                        targets,
+                        tf.expand_dims(
+                            tf.stack(
+                                [
+                                    r * tf.math.cos(theta),
+                                    r * tf.math.cos(psi) * tf.math.sin(theta),
+                                    r * tf.math.sin(psi) * tf.math.sin(theta),
+                                ],
+                                axis=0,
+                            ),
+                            axis=0,
+                        ),
+                    ],
+                    axis=0,
+                )
 
         # Extract the world z that we will use to orient our mesh
         world_z = Hoc[2, :3]
@@ -58,10 +95,10 @@ class Spotlight:
         # If a minimum and/or maximum distance is given, apply them to the position
         if "position" in self.augmentations:
             v = self.augmentations["position"]
-            if "min" in v:
-                h = tf.math.maximum(tf.constant(v["min"], dtype=h.dtype), h)
-            if "max" in v:
-                h = tf.math.minimum(tf.constant(v["max"], dtype=h.dtype), h)
+            if "limits" in v:
+                h = tf.clip_by_value(
+                    h, tf.constant(v["limits"][0], dtype=h.dtype), tf.constant(v["limits"][1], dtype=h.dtype)
+                )
 
         y, _ = tf.linalg.normalize(tf.linalg.cross(z, world_z))
         x, _ = tf.linalg.normalize(tf.linalg.cross(y, z))

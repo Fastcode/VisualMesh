@@ -90,7 +90,7 @@ namespace model {
                 // Loop through and generate all the theta slices
                 start = int(nodes.size());
                 for (int j = 0; j < int(std::ceil(s_c)); ++j) {
-                    Node<Scalar, N_NEIGHBOURS> n;
+                    Node<Scalar, N_NEIGHBOURS> n{};
                     n.ray = PolarMap<Scalar>::map(shape, h, vec2<Scalar>{{n_c, j * m_jump}});
 
                     // Get the neighbours using our specific class

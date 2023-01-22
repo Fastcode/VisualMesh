@@ -48,7 +48,7 @@ public:
                     tensorflow::errors::InvalidArgument("Geometry must be one of SPHERE or CIRCLE"));
 
         // clang-format off
-        using namespace visualmesh::geometry;
+        using namespace visualmesh::geometry; // NOLINT(google-build-using-namespace) function scope is fine
         if (geometry == "SPHERE") { static_cast<Subclass*>(this)->DoCompute(context, Sphere<T>(radius)); }
         else if (geometry == "CIRCLE") { static_cast<Subclass*>(this)->DoCompute(context, Circle<T>(radius)); }
         // clang-format on

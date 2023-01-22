@@ -1,0 +1,42 @@
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-union-access,
+  -cppcoreguidelines-pro-type-vararg,
+  google-*,
+  -google-explicit-constructor,
+  -google-runtime-references,
+  misc-*,
+  -misc-non-private-member-variables-in-classes,
+  -misc-no-recursion,
+  performance-*,
+  readability-*,
+  -readability-uppercase-literal-suffix,
+  -readability-magic-numbers,
+  modernize-*,
+  -modernize-use-trailing-return-type
+WarningsAsErrors: ""
+HeaderFilterRegex: ".*"
+AnalyzeTemporaryDtors: false
+FormatStyle: file
+CheckOptions:
+  - key: cppcoreguidelines-avoid-magic-numbers.IgnoredFloatingPointValues
+    value: "0.5;1.0;2.0;3.0;4.0;100.0;"
+  - key: readability-magic-numbers.IgnoredFloatingPointValues
+    value: "0.5;1.0;2.0;3.0;4.0;100.0;"
+  - key: cppcoreguidelines-avoid-magic-numbers.IgnoredIntegerValues
+    value: "1;2;3;4;"
+  - key: readability-magic-numbers.IgnoredIntegerValues
+    value: "1;2;3;4;"
+  - key: modernize-loop-convert.NamingStyle
+    value: lower_case

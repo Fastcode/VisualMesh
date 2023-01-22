@@ -21,6 +21,7 @@
 // If OpenCL is disabled then don't provide this file
 #if !defined(VISUALMESH_DISABLE_OPENCL)
 
+#include <fstream>
 #include <iomanip>
 #include <numeric>
 #include <sstream>
@@ -60,6 +61,125 @@ namespace engine {
          */
         template <typename Scalar>
         class Engine {
+        private:
+            // OpenCL ::clSetKernelArg functions take the sizeof a pointer as their argument, this is correct
+            static constexpr size_t MEM_SIZE = sizeof(cl_mem);
+
+            /**
+             * @brief Load an OpenCL binary from a file and build it
+             *
+             * @param binary_path path to save the binary file to
+             * @param device OpenCL device id
+             *
+             */
+            void load_binary(const std::string& binary_path, cl_device_id& device) {
+                // If the file doesn't exist, this isn't an error so don't throw just return that it didn't work
+                std::ifstream read_binary(binary_path, std::ios::in);
+                if (!read_binary) { throw std::runtime_error("Failed to read from precompiled OpenCL binary."); }
+
+                // Error flag to check if any OpenCL functions fail
+                cl_int error = CL_SUCCESS;
+
+                // Get the length
+                read_binary.seekg(0, read_binary.end);
+                size_t binary_size = read_binary.tellg();
+                read_binary.seekg(0, read_binary.beg);
+
+                // Read the binary file
+                std::vector<char> binary_load(binary_size, 0);
+                read_binary.read(binary_load.data(), binary_size);
+                read_binary.close();
+                if (!read_binary) { throw std::runtime_error("Failed to read from precompiled OpenCL binary."); }
+
+                // Create the program and build using the loaded binary
+                cl_int binary_status            = CL_SUCCESS;
+                const unsigned char* binary_ptr = reinterpret_cast<unsigned char*>(binary_load.data());
+
+                program = cl::program(
+                  ::clCreateProgramWithBinary(context, 1, &device, &binary_size, &binary_ptr, &binary_status, &error),
+                  ::clReleaseProgram);
+                throw_cl_error(error, "Failed to create program from binary");
+
+                error = ::clBuildProgram(program,
+                                         1,
+                                         &device,
+                                         "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
+                                         nullptr,
+                                         nullptr);
+
+                // If it didn't work, log and throw an error
+                if (error != CL_SUCCESS) {
+                    // Get program build log
+                    size_t used = 0;
+                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
+                    std::vector<char> log(used);
+                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
+                    // Throw an error with the build log
+                    throw_cl_error(error,
+                                   "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
+                }
+            }
+
+            /**
+             * @brief Build the OpenCL program
+             *
+             * @param device OpenCL device id
+             * @param source OpenCL source information
+             */
+            void build_from_source(cl_device_id& device, const std::string& source) {
+                // Error flag to check if any OpenCL functions fail
+                cl_int error = CL_SUCCESS;
+
+                // Create the program and build
+                const char* cstr = source.c_str();
+                size_t csize     = source.size();
+                program =
+                  cl::program(::clCreateProgramWithSource(context, 1, &cstr, &csize, &error), ::clReleaseProgram);
+                throw_cl_error(error, "Error adding sources to OpenCL program");
+
+                error = ::clBuildProgram(program,
+                                         0,
+                                         nullptr,
+                                         "-cl-single-precision-constant -cl-fast-relaxed-math -cl-mad-enable",
+                                         nullptr,
+                                         nullptr);
+
+                // If it didn't work, log and throw an error
+                if (error != CL_SUCCESS) {
+                    // Get program build log
+                    size_t used = 0;
+                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &used);
+                    std::vector<char> log(used);
+                    ::clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log.size(), log.data(), &used);
+                    // Throw an error with the build log
+                    throw_cl_error(error,
+                                   "Error building OpenCL program\n" + std::string(log.begin(), log.begin() + used));
+                }
+            }
+
+            /**
+             * @brief Save the current OpenCL program in a binary file
+             *
+             * @param binary_path path to save the binary file to
+             */
+            void save_binary(std::string binary_path) {
+
+                // Get the size of the binary to save
+                size_t binary_size{};
+                clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binary_size, nullptr);
+
+                // Get the data to save
+                std::vector<char> binary_save(binary_size, 0);
+                // Get an lvalue ptr to pass to clGetProgramInfo
+                char* binary_ptr = binary_save.data();
+                clGetProgramInfo(program, CL_PROGRAM_BINARIES, binary_save.size(), &binary_ptr, nullptr);
+
+                // Write to the file and close the file
+                std::ofstream write_binary(binary_path, std::ofstream::binary);
+                write_binary.write(binary_save.data(), binary_save.size());
+                write_binary.close();
+            }
+
         public:
 
             /**
@@ -218,6 +338,7 @@ namespace engine {
                     save_binary(binary_path);
                 }
 
+                // Get the kernels
                 project_rectilinear =
                   cl::kernel(::clCreateKernel(program, "project_rectilinear", &error), ::clReleaseKernel);
                 throw_cl_error(error, "Error getting project_rectilinear kernel");
@@ -361,7 +482,7 @@ namespace engine {
                 cl_event ev = nullptr;
                 error       = clEnqueueWriteImage(
                   queue, cl_image, false, origin.data(), region.data(), 0, 0, image, 0, nullptr, &ev);
-                if (ev) cl_image_loaded = cl::event(ev, ::clReleaseEvent);
+                if (ev) { cl_image_loaded = cl::event(ev, ::clReleaseEvent); }
                 throw_cl_error(error, "Error mapping image onto device");
 
                 // Project our visual mesh
@@ -392,7 +513,7 @@ namespace engine {
                                                0,
                                                nullptr,
                                                &ev);
-                if (ev) cl_neighbourhood_loaded = cl::event(ev, ::clReleaseEvent);
+                if (ev) { cl_neighbourhood_loaded = cl::event(ev, ::clReleaseEvent); }
                 throw_cl_error(error, "Error writing neighbourhood points to the device");
 
                 // Grab our ping pong buffers from the cache
@@ -404,27 +525,27 @@ namespace engine {
                 cl::event img_load_event;
                 cl::event network_complete;
 
-                cl_mem arg;
-                arg   = cl_image;
-                error = ::clSetKernelArg(load_image, 0, sizeof(arg), &arg);
-                throw_cl_error(error, "Error setting kernel argument 0 for image load kernel");
-                error = ::clSetKernelArg(load_image, 1, sizeof(format), &format);
-                throw_cl_error(error, "Error setting kernel argument 1 for image load kernel");
-                arg   = cl_pixels;
-                error = ::clSetKernelArg(load_image, 2, sizeof(arg), &arg);
-                throw_cl_error(error, "Error setting kernel argument 2 for image load kernel");
-                arg   = cl_conv_input;
-                error = ::clSetKernelArg(load_image, 3, sizeof(arg), &arg);
-                throw_cl_error(error, "Error setting kernel argument 3 for image load kernel");
+                cl_mem arg = nullptr;
+                arg        = cl_image;
+                throw_cl_error(::clSetKernelArg(load_image, 0, MEM_SIZE, &arg),
+                               "Error setting kernel argument 0 for image load kernel");
+                throw_cl_error(::clSetKernelArg(load_image, 1, sizeof(format), &format),
+                               "Error setting kernel argument 1 for image load kernel");
+                arg = cl_pixels;
+                throw_cl_error(::clSetKernelArg(load_image, 2, MEM_SIZE, &arg),
+                               "Error setting kernel argument 2 for image load kernel");
+                arg = cl_conv_input;
+                throw_cl_error(::clSetKernelArg(load_image, 3, MEM_SIZE, &arg),
+                               "Error setting kernel argument 3 for image load kernel");
 
                 // When calculating global_size we round to the nearest workgroup size
-                size_t offset[1]       = {0};
-                size_t global_size[1]  = {(((n_points - 1) / workgroup_size) + 1) * workgroup_size};
-                cl_event event_list[2] = {cl_pixels_loaded, cl_image_loaded};
-                ev                     = nullptr;
-                error                  = ::clEnqueueNDRangeKernel(
-                  queue, load_image, 1, offset, global_size, &workgroup_size, 2, event_list, &ev);
-                if (ev) img_load_event = cl::event(ev, ::clReleaseEvent);
+                size_t offset                      = 0;
+                size_t global_size                 = (((n_points - 1) / workgroup_size) + 1) * workgroup_size;
+                std::array<cl_event, 2> event_list = {cl_pixels_loaded, cl_image_loaded};
+                ev                                 = nullptr;
+                error                              = ::clEnqueueNDRangeKernel(
+                  queue, load_image, 1, &offset, &global_size, &workgroup_size, 2, event_list.data(), &ev);
+                if (ev) { img_load_event = cl::event(ev, ::clReleaseEvent); }
                 throw_cl_error(error, "Error queueing the image load kernel");
 
                 // The offscreen point gets a value of -1.0 to make it easy to distinguish
@@ -441,41 +562,41 @@ namespace engine {
                                               1,
                                               img_loaded_events.data(),
                                               &ev);
-                if (ev) offscreen_fill_event = cl::event(ev, ::clReleaseEvent);
+                if (ev) { offscreen_fill_event = cl::event(ev, ::clReleaseEvent); }
                 throw_cl_error(error, "Error setting the offscreen pixel values");
 
 
                 // These events are required for our first convolution
                 std::vector<cl::event> events({img_load_event, offscreen_fill_event, cl_neighbourhood_loaded});
 
-                for (auto& conv : conv_layers) {
-                    cl_mem arg;
-                    arg   = cl_neighbourhood;
-                    error = ::clSetKernelArg(conv.first, 0, sizeof(arg), &arg);
-                    throw_cl_error(error, "Error setting argument 0 for convolution kernel");
-                    arg   = cl_conv_input;
-                    error = ::clSetKernelArg(conv.first, 1, sizeof(arg), &arg);
-                    throw_cl_error(error, "Error setting argument 1 for convolution kernel");
-                    arg   = cl_conv_output;
-                    error = ::clSetKernelArg(conv.first, 2, sizeof(arg), &arg);
-                    throw_cl_error(error, "Error setting argument 2 for convolution kernel");
+                for (const auto& conv : conv_layers) {
+                    cl_mem arg = nullptr;
+                    arg        = cl_neighbourhood;
+                    throw_cl_error(::clSetKernelArg(conv.first, 0, MEM_SIZE, &arg),
+                                   "Error setting argument 0 for convolution kernel");
+                    arg = cl_conv_input;
+                    throw_cl_error(::clSetKernelArg(conv.first, 1, MEM_SIZE, &arg),
+                                   "Error setting argument 1 for convolution kernel");
+                    arg = cl_conv_output;
+                    throw_cl_error(::clSetKernelArg(conv.first, 2, MEM_SIZE, &arg),
+                                   "Error setting argument 2 for convolution kernel");
 
                     // When calculating global_size we round to the nearest workgroup size
-                    size_t offset[1]      = {0};
-                    size_t global_size[1] = {(((n_points - 1) / workgroup_size) + 1) * workgroup_size};
+                    size_t offset      = 0;
+                    size_t global_size = (((n_points - 1) / workgroup_size) + 1) * workgroup_size;
                     cl::event event;
                     ev = nullptr;
                     std::vector<cl_event> cl_events(events.begin(), events.end());
                     error = ::clEnqueueNDRangeKernel(queue,
                                                      conv.first,
                                                      1,
-                                                     offset,
-                                                     global_size,
+                                                     &offset,
+                                                     &global_size,
                                                      &workgroup_size,
                                                      cl_events.size(),
                                                      cl_events.data(),
                                                      &ev);
-                    if (ev) event = cl::event(ev, ::clReleaseEvent);
+                    if (ev) { event = cl::event(ev, ::clReleaseEvent); }
                     throw_cl_error(error, "Error queueing convolution kernel");
 
                     // Convert our events into a vector of events and ping pong our buffers
@@ -498,7 +619,7 @@ namespace engine {
                                               1,
                                               &iev,
                                               &ev);
-                if (ev) pixels_read = cl::event(ev, ::clReleaseEvent);
+                if (ev) { pixels_read = cl::event(ev, ::clReleaseEvent); }
                 throw_cl_error(error, "Error reading projected pixels");
 
                 // Read the classifications off the device (they'll be in input)
@@ -515,15 +636,15 @@ namespace engine {
                                               1,
                                               &iev,
                                               &ev);
-                if (ev) classes_read = cl::event(ev, ::clReleaseEvent);
+                if (ev) { classes_read = cl::event(ev, ::clReleaseEvent); }
                 throw_cl_error(error, "Error reading classified values");
 
                 // Flush the queue to ensure all the commands have been issued
                 ::clFlush(queue);
 
                 // Wait for the chain to finish up to where we care about it
-                cl_event end_events[2] = {pixels_read, classes_read};
-                ::clWaitForEvents(2, end_events);
+                std::array<cl_event, 2> end_events = {pixels_read, classes_read};
+                ::clWaitForEvents(2, end_events.data());
 
                 return ClassifiedMesh<Scalar, N_NEIGHBOURS>{
                   std::move(pixels), std::move(neighbourhood), std::move(indices), std::move(classifications)};
@@ -577,8 +698,8 @@ namespace engine {
                 auto ranges = mesh.lookup(Hoc, lens);
 
                 // Reused variables
-                cl_int error;
-                cl_event ev = nullptr;
+                cl_int error = 0;
+                cl_event ev  = nullptr;
 
                 // Pack Rco into a Scalar16
                 // clang-format off
@@ -618,9 +739,7 @@ namespace engine {
                     // Cache for future runs
                     device_points_cache[&mesh] = cl_points;
                 }
-                else {
-                    cl_points = device_mesh->second;
-                }
+                else { cl_points = device_mesh->second; }
 
                 // First count the size of the buffer we will need to allocate
                 int n_points = 0;
@@ -653,7 +772,7 @@ namespace engine {
                 ev    = nullptr;
                 error = ::clEnqueueWriteBuffer(
                   queue, indices_map, false, 0, indices.size() * sizeof(cl_int), indices.data(), 0, nullptr, &ev);
-                if (ev) indices_event = cl::event(ev, ::clReleaseEvent);
+                if (ev) { indices_event = cl::event(ev, ::clReleaseEvent); }
                 throw_cl_error(error, "Error uploading indices_map to device");
 
                 // When everything is uploaded, we can run our projection kernel to get the pixel coordinates
@@ -672,36 +791,36 @@ namespace engine {
                 vec4<Scalar> ik = inverse_coefficients(lens.k);
 
                 // Load the arguments
-                cl_mem arg;
-                arg   = cl_points;
-                error = ::clSetKernelArg(projection_kernel, 0, sizeof(arg), &arg);
-                throw_cl_error(error, "Error setting kernel argument 0 for projection kernel");
-                arg   = indices_map;
-                error = ::clSetKernelArg(projection_kernel, 1, sizeof(arg), &arg);
-                throw_cl_error(error, "Error setting kernel argument 1 for projection kernel");
-                error = ::clSetKernelArg(projection_kernel, 2, sizeof(Rco), Rco.data());
-                throw_cl_error(error, "Error setting kernel argument 2 for projection kernel");
-                error = ::clSetKernelArg(projection_kernel, 3, sizeof(lens.focal_length), &lens.focal_length);
-                throw_cl_error(error, "Error setting kernel argument 3 for projection kernel");
-                error = ::clSetKernelArg(projection_kernel, 4, sizeof(lens.centre), lens.centre.data());
-                throw_cl_error(error, "Error setting kernel argument 4 for projection kernel");
-                error = ::clSetKernelArg(projection_kernel, 5, sizeof(ik), ik.data());
-                throw_cl_error(error, "Error setting kernel argument 5 for projection kernel");
-                error = ::clSetKernelArg(projection_kernel, 6, sizeof(lens.dimensions), lens.dimensions.data());
-                throw_cl_error(error, "Error setting kernel argument 6 for projection kernel");
-                arg   = pixel_coordinates;
-                error = ::clSetKernelArg(projection_kernel, 7, sizeof(arg), &arg);
-                throw_cl_error(error, "Error setting kernel argument 7 for projection kernel");
+                cl_mem arg = nullptr;
+                arg        = cl_points;
+                throw_cl_error(::clSetKernelArg(projection_kernel, 0, MEM_SIZE, &arg),
+                               "Error setting kernel argument 0 for projection kernel");
+                arg = indices_map;
+                throw_cl_error(::clSetKernelArg(projection_kernel, 1, MEM_SIZE, &arg),
+                               "Error setting kernel argument 1 for projection kernel");
+                throw_cl_error(::clSetKernelArg(projection_kernel, 2, sizeof(Rco), Rco.data()),
+                               "Error setting kernel argument 2 for projection kernel");
+                throw_cl_error(::clSetKernelArg(projection_kernel, 3, sizeof(lens.focal_length), &lens.focal_length),
+                               "Error setting kernel argument 3 for projection kernel");
+                throw_cl_error(::clSetKernelArg(projection_kernel, 4, sizeof(lens.centre), lens.centre.data()),
+                               "Error setting kernel argument 4 for projection kernel");
+                throw_cl_error(::clSetKernelArg(projection_kernel, 5, sizeof(ik), ik.data()),
+                               "Error setting kernel argument 5 for projection kernel");
+                throw_cl_error(::clSetKernelArg(projection_kernel, 6, sizeof(lens.dimensions), lens.dimensions.data()),
+                               "Error setting kernel argument 6 for projection kernel");
+                arg = pixel_coordinates;
+                throw_cl_error(::clSetKernelArg(projection_kernel, 7, MEM_SIZE, &arg),
+                               "Error setting kernel argument 7 for projection kernel");
 
                 // Project!
                 // When calculating global_size we round to the nearest workgroup size
-                size_t offset[1]      = {0};
-                size_t global_size[1] = {(((n_points - 1) / workgroup_size) + 1) * workgroup_size};
-                ev                    = nullptr;
-                cl_event iev          = indices_event;
-                error                 = ::clEnqueueNDRangeKernel(
-                  queue, projection_kernel, 1, offset, global_size, &workgroup_size, 1, &iev, &ev);
-                if (ev) projected = cl::event(ev, ::clReleaseEvent);
+                size_t offset      = 0;
+                size_t global_size = (((n_points - 1) / workgroup_size) + 1) * workgroup_size;
+                ev                 = nullptr;
+                cl_event iev       = indices_event;
+                error              = ::clEnqueueNDRangeKernel(
+                  queue, projection_kernel, 1, &offset, &global_size, &workgroup_size, 1, &iev, &ev);
+                if (ev) { projected = cl::event(ev, ::clReleaseEvent); }
                 throw_cl_error(error, "Error queueing the projection kernel");
 
                 // This can happen on the CPU while the OpenCL device is busy
@@ -739,8 +858,8 @@ namespace engine {
 
                 if (indices_map_memory.n_points < n_points) {
                     // Align the size to the nearest workgroup size
-                    size_t size = ((n_points - 1) / workgroup_size + 1) * workgroup_size * sizeof(int);
-                    cl_int error;
+                    size_t size               = ((n_points - 1) / workgroup_size + 1) * workgroup_size * sizeof(int);
+                    cl_int error              = 0;
                     indices_map_memory.memory = cl::mem(
                       ::clCreateBuffer(context, CL_MEM_READ_WRITE, size, nullptr, &error), ::clReleaseMemObject);
                     throw_cl_error(error, "Error allocating indices map buffer on device");
@@ -753,8 +872,8 @@ namespace engine {
 
                 if (pixel_coordinates_memory.n_points < n_points) {
                     // Align the size to the nearest workgroup size
-                    size_t size = ((n_points - 1) / workgroup_size + 1) * workgroup_size * sizeof(Scalar) * 2;
-                    cl_int error;
+                    size_t size  = ((n_points - 1) / workgroup_size + 1) * workgroup_size * sizeof(Scalar) * 2;
+                    cl_int error = 0;
                     pixel_coordinates_memory.memory = cl::mem(
                       ::clCreateBuffer(context, CL_MEM_READ_WRITE, size, nullptr, &error), ::clReleaseMemObject);
                     throw_cl_error(error, "Error allocating pixel coordinates buffer on device");
@@ -766,8 +885,8 @@ namespace engine {
             std::array<cl::mem, 2> get_network_memory(const int& n_points) const {
                 if (network_memory.n_points < n_points) {
                     // Align the size to the nearest workgroup size
-                    size_t size = ((n_points - 1) / workgroup_size + 1) * workgroup_size * sizeof(Scalar) * max_width;
-                    cl_int error;
+                    size_t size  = ((n_points - 1) / workgroup_size + 1) * workgroup_size * sizeof(Scalar) * max_width;
+                    cl_int error = 0;
                     network_memory.memory[0] = cl::mem(
                       ::clCreateBuffer(context, CL_MEM_READ_WRITE, size, nullptr, &error), ::clReleaseMemObject);
                     throw_cl_error(error, "Error allocating ping pong buffer 1 on device");
@@ -783,8 +902,8 @@ namespace engine {
 
                 if (neighbourhood_memory.n_points < n_points) {
                     // Align the size to the nearest workgroup size
-                    size_t size = ((n_points - 1) / workgroup_size + 1) * workgroup_size * sizeof(int) * n_neighbours;
-                    cl_int error;
+                    size_t size  = ((n_points - 1) / workgroup_size + 1) * workgroup_size * sizeof(int) * n_neighbours;
+                    cl_int error = 0;
                     neighbourhood_memory.memory = cl::mem(
                       ::clCreateBuffer(context, CL_MEM_READ_WRITE, size, nullptr, &error), ::clReleaseMemObject);
                     throw_cl_error(error, "Error allocating neighbourhood buffer on device");
@@ -804,6 +923,9 @@ namespace engine {
                         case fourcc("RGGB"):
                         case fourcc("GBRG"):
                         case fourcc("BGGR"): fmt = cl_image_format{CL_R, CL_UNORM_INT8}; break;
+                        case fourcc("GRAY"):
+                        case fourcc("GREY"):
+                        case fourcc("Y8  "): fmt = cl_image_format{CL_LUMINANCE, CL_UNORM_INT8}; break;
                         case fourcc("BGRA"): fmt = cl_image_format{CL_BGRA, CL_UNORM_INT8}; break;
                         case fourcc("RGBA"): fmt = cl_image_format{CL_RGBA, CL_UNORM_INT8}; break;
                         // Oh no...
@@ -814,7 +936,7 @@ namespace engine {
                       CL_MEM_OBJECT_IMAGE2D, size_t(dimensions[0]), size_t(dimensions[1]), 1, 1, 0, 0, 0, 0, nullptr};
 
                     // Create a buffer for our image
-                    cl_int error;
+                    cl_int error = 0;
                     cl::mem memory(::clCreateImage(context, CL_MEM_READ_ONLY, &fmt, &desc, nullptr, &error),
                                    ::clReleaseMemObject);
                     throw_cl_error(error, "Error creating image on device");
@@ -880,8 +1002,8 @@ namespace engine {
                 cl::mem memory;
             } image_memory;
 
-            /// The width of the maximumally wide layer in the network
-            size_t max_width;
+            /// The width of the maximumally wide layer in the network (always at least 4 because of the input)
+            size_t max_width = 4;
 
             /// The largest preferred workgroup size so we can overallocate memory
             size_t workgroup_size;

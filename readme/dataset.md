@@ -45,7 +45,7 @@ dataset:
           rotation: { mean: 0, stddev: 0.0872665 }
 ```
 
-To make a simple dataset you can follow the instructions in [Quick Start Guide](readme/quickstart.md) or read the code in [training/dataset.py](training/dataset.py)
+To make a simple dataset you can follow the instructions in [Quick Start Guide](quickstart.md) or read the code in [training/dataset.py](../training/make_dataset.py)
 
 ## Batching
 For the visual mesh, the method used for batching is very different from how most batching systems work.
