@@ -21,6 +21,7 @@
 // If OpenCL is disabled then don't provide this file
 #if !defined(VISUALMESH_DISABLE_OPENCL)
 
+#include <fstream>
 #include <iomanip>
 #include <numeric>
 #include <sstream>
