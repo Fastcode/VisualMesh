@@ -269,7 +269,7 @@ namespace engine {
                 return ClassifiedMesh<Scalar, N_NEIGHBOURS>{std::move(projected.pixel_coordinates),
                                                             std::move(projected.neighbourhood),
                                                             std::move(projected.global_indices),
-                                                            input};
+                                                            std::move(input)};
             }
 
             /**
