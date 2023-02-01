@@ -133,7 +133,7 @@ public:
         return std::abs(it->first - height) < std::abs(std::prev(it)->first - height) ? it->second
                                                                                       : std::prev(it)->second;
     }
-
+    //
     /**
      * Performs a visual mesh lookup using the description of the lens provided to find visual mesh points on the image.
      *
