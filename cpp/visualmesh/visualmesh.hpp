@@ -133,7 +133,7 @@ public:
         return std::abs(it->first - height) < std::abs(std::prev(it)->first - height) ? it->second
                                                                                       : std::prev(it)->second;
     }
-
+    //
     /**
      * Performs a visual mesh lookup using the description of the lens provided to find visual mesh points on the image.
      *
@@ -148,7 +148,7 @@ public:
         // z height from the transformation matrix
         const Scalar& h = Hoc[2][3];
         auto mesh       = height(h);
-        return mesh->lookup(Hoc, lens);
+        return std::make_pair(mesh, mesh.lookup(Hoc, lens));
     }
 
 private:
