@@ -48,7 +48,7 @@ REGISTER_OP("UnmapVisualMesh")
   .Output("coordinates: T")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
       c->set_output(Outputs::COORDINATES, c->Matrix(c->Dim(c->input(Args::VECTORS), 0), 2));
-      return tensorflow::Status::OK();
+      return tensorflow::OkStatus();
   });
 
 /**
