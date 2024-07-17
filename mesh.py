@@ -25,6 +25,7 @@ import training.export as export
 import training.find_lr as find_lr
 import training.testing as testing
 import training.training as training
+import training.unexport as unexport
 
 if __name__ == "__main__":
 
@@ -38,6 +39,7 @@ if __name__ == "__main__":
     train_command = subcommands.add_parser("train")
     test_command = subcommands.add_parser("test")
     export_command = subcommands.add_parser("export")
+    export_command = subcommands.add_parser("unexport")
     find_lr_command = subcommands.add_parser("find_lr")
 
     # Add common arguments
@@ -90,6 +92,9 @@ if __name__ == "__main__":
 
     elif args.command == "export":
         export.export(config, network_path)
+
+    elif args.command == "unexport":
+        unexport.unexport(config, network_path)
 
     elif args.command == "find_lr":
         find_lr.find_lr(config, network_path, args.min_lr, args.max_lr, args.steps, args.window_size)
