@@ -14,7 +14,7 @@ foreach(cl IN LISTS cls)
     list(APPEND hdr "${CMAKE_CURRENT_BINARY_DIR}/${cl_path}.hpp")
 endforeach(cl ${cls})
 
-# Add to ALL target so that the wrapped header files are always generated, even if nothing else (e.g. examples) is being built
+# Add to ALL target so that the wrapped header files are always generated, even if nothing else is being built
 add_custom_target(visualmesh_sources ALL DEPENDS ${hdr})
 
 # Define the VisualMesh library as header only but setup its links
@@ -59,7 +59,8 @@ set(INSTALL_INCLUDE_DIR ${CMAKE_INSTALL_FULL_INCLUDEDIR})
 write_basic_package_version_file(${PROJECT_BINARY_DIR}/VisualMeshConfigVersion.cmake COMPATIBILITY SameMajorVersion)
 configure_package_config_file(
     "${PROJECT_SOURCE_DIR}/cmake/VisualMeshConfig.cmake.in" "${PROJECT_BINARY_DIR}/VisualMeshConfig.cmake"
-    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/VisualMesh" PATH_VARS INSTALL_INCLUDE_DIR)
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/VisualMesh"
+    PATH_VARS INSTALL_INCLUDE_DIR)
 
 # Install version, config and target files.
 install(FILES "${PROJECT_BINARY_DIR}/VisualMeshConfigVersion.cmake" "${PROJECT_BINARY_DIR}/VisualMeshConfig.cmake"
