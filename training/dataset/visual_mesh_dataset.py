@@ -170,7 +170,7 @@ class VisualMeshDataset:
         dataset = dataset.filter(lambda args: tf.reduce_all(args["valid"]))
 
         # Perform a ragged batch
-        dataset = dataset.apply(tf.data.experimental.dense_to_ragged_batch(batch_size=self.batch_size))
+        dataset = dataset.ragged_batch(batch_size=self.batch_size)
 
         # Perform actions needed to convert the ragged batches into training examples
         dataset = dataset.map(self._reduce, num_parallel_calls=self.prefetch)

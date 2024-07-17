@@ -4,6 +4,7 @@ find_package(TensorFlow REQUIRED)
 
 add_library(tf_op SHARED "map.cpp" "unmap.cpp" "lookup.cpp" "difference.cpp" ${hdr})
 target_compile_options(tf_op PRIVATE -march=native -mtune=native)
+target_compile_features(tf_op PRIVATE cxx_std_17)
 set_target_properties(
     tf_op
     PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/training/op"

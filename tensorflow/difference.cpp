@@ -50,7 +50,7 @@ REGISTER_OP("DifferenceVisualMesh")
   .Output("vectors: T")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
       c->set_output(Outputs::DIFFERENCES, c->input(Args::COORDINATES_A));
-      return tensorflow::Status::OK();
+      return tensorflow::OkStatus();
   });
 
 /**

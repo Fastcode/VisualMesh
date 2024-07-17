@@ -17,7 +17,7 @@ import tensorflow as tf
 
 
 def curve_bucket(x, y):
-    return tf.math.sqrt(tf.add(tf.math.squared_difference(x[:-1], x[1:]), tf.math.squared_difference(y[:-1], y[1:]),))
+    return tf.math.sqrt(tf.add(tf.math.squared_difference(x[:-1], x[1:]), tf.math.squared_difference(y[:-1], y[1:])))
 
 
 def x_bucket(x, y):

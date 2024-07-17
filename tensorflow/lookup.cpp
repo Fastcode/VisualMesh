@@ -81,7 +81,7 @@ REGISTER_OP("LookupVisualMesh")
       // nx2 vectors on image, n+1xG neighbours (including off screen point), and n global indices
       c->set_output(Outputs::VECTORS, c->MakeShape({kUnknownDim, 3}));
       c->set_output(Outputs::NEIGHBOURS, c->MakeShape({kUnknownDim, kUnknownDim}));
-      return tensorflow::Status::OK();
+      return tensorflow::OkStatus();
   });
 
 /**

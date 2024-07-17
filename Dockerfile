@@ -13,12 +13,13 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-FROM tensorflow/tensorflow:2.7.3-gpu
+FROM tensorflow/tensorflow:2.17.0-gpu
 
 # Need cmake to build the op
 RUN apt-get update && apt-get -y install \
     cmake \
-    libtcmalloc-minimal4
+    libtcmalloc-minimal4 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Need these libraries for training
 RUN pip3 install \
@@ -35,18 +36,18 @@ RUN install -d -m 0777 /.cache/matplotlib
 # Build the tensorflow op and put it in /visualmesh
 RUN mkdir visualmesh
 COPY . visualmesh/
-ENV CXXFLAGS -D_GLIBCXX_USE_CXX11_ABI=0
 RUN mkdir visualmesh/build && cd visualmesh/build \
     && cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_EXAMPLES=Off \
+    -DBUILD_OPENCL_ENGINE=Off \
     -DBUILD_TENSORFLOW_OP=On \
     && make
 
-ENV LD_PRELOAD /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
 
 # Make tensorflow only print out info and above logs
-ENV TF_CPP_MIN_LOG_LEVEL 1
+ENV TF_CPP_MIN_LOG_LEVEL=1
 
 RUN mkdir /workspace
 WORKDIR /workspace
