@@ -148,7 +148,7 @@ public:
         // z height from the transformation matrix
         const Scalar& h = Hoc[2][3];
         auto mesh       = height(h);
-        return mesh->lookup(Hoc, lens);
+        return std::make_pair(mesh, mesh.lookup(Hoc, lens));
     }
 
 private:

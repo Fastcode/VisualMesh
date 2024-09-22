@@ -1,0 +1,17 @@
+
+example:
+  type: Image
+  config:
+    augmentations:
+      # Adjust the brightness `x + delta`
+      brightness:  { mean: 0, stddev: 0.05 }
+      # Adjust the contrast `(x - mean) * delta + mean`
+      contrast: { mean: 1, stddev: 0.05 }
+      # Convert to hsv, adjust the hue by a value from [-1 -> 1] and back to rgb
+      hue: { mean: 0, stddev: 0.05 }
+      # Convert to hsv, multiply saturation by value and convert back to rgb
+      saturation: { mean: 1, stddev: 0.05 }
+      # Adjust the gamma `gain * x**gamma`
+      gamma:
+        gamma: { mean: 1, stddev: 0.05 }
+        gain: { mean: 1, stddev: 0.05 }
